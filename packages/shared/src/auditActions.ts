@@ -34,6 +34,40 @@ export const AUDIT = {
   JOURNAL_ENTRY_POST: 'journal_entry.post',
   JOURNAL_ENTRY_VOID: 'journal_entry.void',
   JOURNAL_ENTRY_REVERSE: 'journal_entry.reverse',
+
+  // Customers
+  CUSTOMER_CREATE: 'customer.create',
+  CUSTOMER_UPDATE: 'customer.update',
+  CUSTOMER_DELETE: 'customer.delete',
+
+  // Tax codes
+  TAX_CODE_CREATE: 'tax_code.create',
+  TAX_CODE_UPDATE: 'tax_code.update',
+  TAX_RATE_ADD: 'tax_rate.add',
+
+  // Invoices
+  INVOICE_CREATE: 'invoice.create',
+  INVOICE_UPDATE: 'invoice.update',
+  INVOICE_ADD_LINE: 'invoice.add_line',
+  INVOICE_REMOVE_LINE: 'invoice.remove_line',
+  INVOICE_POST: 'invoice.post',
+  INVOICE_VOID: 'invoice.void',
+
+  // Payments
+  PAYMENT_CREATE: 'payment.create',
+  PAYMENT_UPDATE: 'payment.update',
+  PAYMENT_POST: 'payment.post',
+  PAYMENT_VOID: 'payment.void',
+  PAYMENT_APPLY: 'payment.apply',
+  PAYMENT_UNAPPLY: 'payment.unapply',
+
+  // Credit memos
+  CREDIT_MEMO_CREATE: 'credit_memo.create',
+  CREDIT_MEMO_UPDATE: 'credit_memo.update',
+  CREDIT_MEMO_POST: 'credit_memo.post',
+  CREDIT_MEMO_VOID: 'credit_memo.void',
+  CREDIT_MEMO_APPLY: 'credit_memo.apply',
+  CREDIT_MEMO_UNAPPLY: 'credit_memo.unapply',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
