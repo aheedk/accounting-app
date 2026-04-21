@@ -514,7 +514,7 @@ git commit -m "chore(api): scaffold express + kysely package"
 ### Task 5: Web package skeleton with Vite + Tailwind + shadcn
 
 **Files:**
-- Create: `apps/web/package.json`, `apps/web/tsconfig.json`, `apps/web/tsconfig.node.json`, `apps/web/vite.config.ts`, `apps/web/tailwind.config.ts`, `apps/web/postcss.config.js`, `apps/web/components.json`, `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`, `apps/web/src/index.css`, `apps/web/src/lib/utils.ts`
+- Create: `apps/web/package.json`, `apps/web/.eslintrc.cjs`, `apps/web/tsconfig.json`, `apps/web/tsconfig.node.json`, `apps/web/vite.config.ts`, `apps/web/tailwind.config.ts`, `apps/web/postcss.config.js`, `apps/web/components.json`, `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`, `apps/web/src/index.css`, `apps/web/src/lib/utils.ts`
 
 - [ ] **Step 1: Write `apps/web/package.json`**
 
@@ -528,8 +528,8 @@ git commit -m "chore(api): scaffold express + kysely package"
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit",
-    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "typecheck": "tsc -b",
+    "lint": "eslint --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}'",
     "test": "vitest run"
   },
   "dependencies": {
@@ -685,6 +685,29 @@ export default {
     "utils": "@/lib/utils"
   }
 }
+```
+
+- [ ] **Step 7.5: Write `apps/web/.eslintrc.cjs`**
+
+> Note: ESLint v8 hard-errors when no config is found. We mirror the api workspace's `.eslintrc.cjs` and add the React-specific plugins (`react-hooks`, `react-refresh`) that web's package.json already declares as devDeps. The `--no-error-on-unmatched-pattern` flag in the lint script keeps things sane while `src/` is sparse.
+
+```js
+module.exports = {
+  parser: '@typescript-eslint/parser',
+  parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
+  plugins: ['@typescript-eslint', 'react-hooks', 'react-refresh'],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:react-hooks/recommended',
+  ],
+  rules: {
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-explicit-any': 'error',
+    'react-refresh/only-export-components': 'warn',
+  },
+  ignorePatterns: ['dist/', 'dist-node/', 'node_modules/'],
+};
 ```
 
 - [ ] **Step 8: Write `apps/web/index.html`**
