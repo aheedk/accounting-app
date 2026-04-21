@@ -3,8 +3,10 @@ import { cn } from '@/lib/utils';
 
 const items = [
   { to: '/', label: 'Dashboard' },
-  // Plan 1.1 adds: Journal, COA, Periods
-  // Plan 1.2 adds: Customers, Invoices, Payments, Credit Memos, Aging
+  { to: '/journal', label: 'Journal Entries' },
+  { to: '/reports/trial-balance', label: 'Trial Balance' },
+  { to: '/settings/coa', label: 'Chart of Accounts' },
+  { to: '/settings/periods', label: 'Fiscal Periods' },
 ];
 
 export function Sidebar() {
