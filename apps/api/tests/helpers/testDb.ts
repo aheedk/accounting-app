@@ -8,6 +8,9 @@ import pg from 'pg';
 import type { DB } from '../../src/db/types.js';
 
 pg.types.setTypeParser(1700, (val) => val);
+// Parse `date` (OID 1082) as STRING (YYYY-MM-DD) instead of JS Date so it
+// matches the kysely ColumnType<string, ...> contract used in db/types.ts.
+pg.types.setTypeParser(1082, (val) => val);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIG_DIR = path.resolve(__dirname, '../../../../db/migrations');
