@@ -2,6 +2,13 @@
 
 Production-grade accounting system for an accounting firm. See `docs/superpowers/specs/` for the design spec.
 
+## Deployed environments
+
+- **API:** `<paste Railway URL here>`
+- **Web:** `<paste Netlify URL here>`
+
+Admin credentials are stored in 1Password. If lost, open a Railway shell and re-run `ADMIN_EMAIL=... ADMIN_PASSWORD=... npx tsx bin/create-admin.ts`.
+
 ## Quickstart
 
 ```bash

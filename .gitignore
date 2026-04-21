@@ -13,3 +13,4 @@ apps/web/dist-node/
 apps/web/*.tsbuildinfo
 apps/api/dist/
 packages/shared/dist/
+*.tsbuildinfo
