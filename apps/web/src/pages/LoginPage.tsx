@@ -20,8 +20,10 @@ export default function LoginPage() {
     try {
       await login(email, password);
       nav('/', { replace: true });
-    } catch (e: any) {
-      setErr(e?.response?.data?.error?.message ?? 'Login failed');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
+        ?.response?.data?.error?.message;
+      setErr(msg ?? 'Login failed');
     } finally {
       setBusy(false);
     }
