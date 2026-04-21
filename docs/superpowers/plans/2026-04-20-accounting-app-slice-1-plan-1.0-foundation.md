@@ -2916,6 +2916,7 @@ git commit -m "test(api): integration tests for auth HTTP routes"
 - [ ] **Step 1: Write `apps/web/src/lib/apiClient.ts`**
 
 ```ts
+/// <reference types="vite/client" />
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
