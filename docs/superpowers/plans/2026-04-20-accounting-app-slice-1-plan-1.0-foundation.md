@@ -2227,30 +2227,36 @@ function ctxFromLogin(user: { id: string; firm_id: string; role: UserRole }, met
 }
 
 export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): Promise<LoginResult> {
-  return db.transaction().execute(async (trx) => {
-    const user = await trx
-      .selectFrom('users')
-      .selectAll()
-      .where('email', '=', input.email)
-      .where('deleted_at', 'is', null)
-      .executeTakeFirst();
+  // Pre-check: load user + verify password OUTSIDE the success transaction so a
+  // login_failed audit row is committed independently of the failure throw.
+  // (Doing the audit inside the throwing transaction would roll the audit row back.)
+  const preUser = await db
+    .selectFrom('users')
+    .selectAll()
+    .where('email', '=', input.email)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
 
-    if (!user || !(await verifyPassword(input.password, user.password_hash))) {
-      // Log attempt with whatever ctx we can reconstruct. If user unknown, firm_id is null —
-      // store under a sentinel firm? The spec says audit_logs.firm_id NOT NULL. For
-      // login_failed on unknown users, skip the audit write (can't attribute to a firm).
-      if (user) {
-        await auditRecord(trx, ctxFromLogin(user, meta), {
+  if (!preUser || !(await verifyPassword(input.password, preUser.password_hash))) {
+    // Log attempt with whatever ctx we can reconstruct. If user unknown, firm_id is null —
+    // audit_logs.firm_id is NOT NULL, so for login_failed on unknown users we skip the
+    // audit write (can't attribute to a firm).
+    if (preUser) {
+      await db.transaction().execute(async (trx) => {
+        await auditRecord(trx, ctxFromLogin(preUser, meta), {
           action: AUDIT.AUTH_LOGIN_FAILED,
           entity_type: 'user',
-          entity_id: user.id,
+          entity_id: preUser.id,
           before: null,
           after: { email: input.email },
         });
-      }
-      throw new AuthError(ERR.INVALID_CREDENTIALS, 'Invalid email or password');
+      });
     }
+    throw new AuthError(ERR.INVALID_CREDENTIALS, 'Invalid email or password');
+  }
 
+  return db.transaction().execute(async (trx) => {
+    const user = preUser;
     const raw = generateRefreshToken();
     const token_hash = await hashRefreshToken(raw);
     const expires_at = new Date(Date.now() + config.JWT_REFRESH_TTL_DAYS * 24 * 3600 * 1000);
