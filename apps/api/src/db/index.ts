@@ -6,6 +6,9 @@ import type { DB } from './types.js';
 // Parse numeric (OID 1700) as a STRING, not JS number — preserves precision.
 // Uses pg.types.setTypeParser; safe to run at module load.
 pg.types.setTypeParser(1700, (val) => val);
+// Parse date (OID 1082) as a STRING ('YYYY-MM-DD'), not JS Date — matches the
+// kysely DB type contract for fiscal_periods.starts_on/ends_on, journal_entries.entry_date, etc.
+pg.types.setTypeParser(1082, (val) => val);
 
 export function makeDb(connectionString = config.DATABASE_URL): Kysely<DB> {
   const pool = new pg.Pool({
