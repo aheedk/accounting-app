@@ -396,13 +396,20 @@ BEGIN
       END IF;
       RETURN NEW;
     END IF;
-    -- Allow transitioning posted -> paid (invoices) via sub-ledger update
-    IF v_entity = 'invoice' AND NEW.status = 'paid' THEN
-      RETURN NEW;
+    -- Allow transitioning posted -> paid (invoices) via sub-ledger update.
+    -- Nested IF (rather than AND) so the NEW.status literal is only evaluated
+    -- for the matching v_entity; comparing to 'paid' under a payments NEW row
+    -- would fail the payment_status enum cast.
+    IF v_entity = 'invoice' THEN
+      IF NEW.status = 'paid' THEN
+        RETURN NEW;
+      END IF;
     END IF;
-    -- Allow transitioning posted -> applied (credit_memos) via sub-ledger update
-    IF v_entity = 'credit_memo' AND NEW.status = 'applied' THEN
-      RETURN NEW;
+    -- Allow transitioning posted -> applied (credit_memos) via sub-ledger update.
+    IF v_entity = 'credit_memo' THEN
+      IF NEW.status = 'applied' THEN
+        RETURN NEW;
+      END IF;
     END IF;
     -- Disallow any other column change on a posted row (except the remaining_amount
     -- / unapplied_amount tracking fields which are sub-ledger, not GL)
@@ -2030,9 +2037,12 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     throw new PreconditionError('cash_account must be an asset account in this business');
   }
 
-  const initialAppliedTotal = (input.initial_applications ?? []).reduce((s, a) => addMoney(s, a.applied_amount), '0');
-  if (parseFloat(toMoneyString(initialAppliedTotal)) > parseFloat(input.amount)) {
-    throw new OverApplicationError('payment', '(draft)', toMoneyString(initialAppliedTotal), input.amount);
+  const initialAppliedTotal = (input.initial_applications ?? []).reduce<string>(
+    (s, a) => toMoneyString(addMoney(s, a.applied_amount)),
+    '0',
+  );
+  if (parseFloat(initialAppliedTotal) > parseFloat(input.amount)) {
+    throw new OverApplicationError('payment', '(draft)', initialAppliedTotal, input.amount);
   }
 
   const payment = await trx.insertInto('payments').values({
