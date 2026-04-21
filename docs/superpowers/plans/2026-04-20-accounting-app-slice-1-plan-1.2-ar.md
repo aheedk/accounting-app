@@ -83,9 +83,9 @@ apps/web/src/
     payments/PaymentListPage.tsx
     payments/PaymentDetailPage.tsx
     payments/PaymentNewPage.tsx
-    creditMemos/CreditMemoListPage.tsx
-    creditMemos/CreditMemoDetailPage.tsx
-    creditMemos/CreditMemoNewPage.tsx
+    credit-memos/CreditMemoListPage.tsx
+    credit-memos/CreditMemoDetailPage.tsx
+    credit-memos/CreditMemoNewPage.tsx
     reports/AgingReportPage.tsx
     settings/TaxCodesPage.tsx
   components/layout/Sidebar.tsx     # MODIFY: add AR nav items
@@ -3874,7 +3874,7 @@ git commit -m "feat(web): payment list/detail/new with applications UI"
 ### Task 27: Credit memo pages
 
 **Files:**
-- Create: `apps/web/src/pages/creditMemos/CreditMemoListPage.tsx`, `CreditMemoNewPage.tsx`, `CreditMemoDetailPage.tsx`
+- Create: `apps/web/src/pages/credit-memos/CreditMemoListPage.tsx`, `CreditMemoNewPage.tsx`, `CreditMemoDetailPage.tsx`
 
 - [ ] **Step 1: Write the three pages (compact — pattern matches invoices/payments)**
 
@@ -4058,7 +4058,7 @@ export default function CreditMemoDetailPage() {
 - [ ] **Step 2: Commit**
 
 ```bash
-git add apps/web/src/pages/creditMemos/
+git add apps/web/src/pages/credit-memos/
 git commit -m "feat(web): credit memo list/new/detail with apply"
 ```
 
@@ -4282,9 +4282,9 @@ import InvoiceDetailPage from '@/pages/invoices/InvoiceDetailPage';
 import PaymentListPage from '@/pages/payments/PaymentListPage';
 import PaymentNewPage from '@/pages/payments/PaymentNewPage';
 import PaymentDetailPage from '@/pages/payments/PaymentDetailPage';
-import CreditMemoListPage from '@/pages/creditMemos/CreditMemoListPage';
-import CreditMemoNewPage from '@/pages/creditMemos/CreditMemoNewPage';
-import CreditMemoDetailPage from '@/pages/creditMemos/CreditMemoDetailPage';
+import CreditMemoListPage from '@/pages/credit-memos/CreditMemoListPage';
+import CreditMemoNewPage from '@/pages/credit-memos/CreditMemoNewPage';
+import CreditMemoDetailPage from '@/pages/credit-memos/CreditMemoDetailPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 
 export default function App() {
