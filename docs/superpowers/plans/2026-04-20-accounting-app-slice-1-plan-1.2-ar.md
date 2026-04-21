@@ -2523,6 +2523,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
 import { makeFirm, makeBusiness, makeUser, makeCustomer, seedYearPeriods, seedCoa } from '../helpers/factories.js';
 import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
+import * as paymentSvc from '../../src/services/ar/paymentService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
 const meta = { request_id: '00000000-0000-0000-0000-0000000aaa17', ip_address: '127.0.0.1', user_agent: 'vitest' };
@@ -2557,24 +2558,26 @@ describe('AR DB triggers (adversarial)', () => {
   });
 
   it('cannot DELETE a posted payment', async () => {
-    // similar pattern; create + post a payment via raw SQL would be longer — covered by service behaviour above.
-    // Direct delete attempt with a fabricated row scenario:
+    // Create a real posted payment via the service so the CHECK constraint
+    // (status='posted' requires posted_journal_entry_id) is satisfied.
     const firm = await makeFirm(t.db);
     const biz = await makeBusiness(t.db, firm.id);
-    const cust = await makeCustomer(t.db, biz.id);
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
+    await seedYearPeriods(t.db, biz.id, 2026);
     await seedCoa(t.db, biz.id);
+    const customer = await makeCustomer(t.db, biz.id);
     const cash = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '1020').executeTakeFirstOrThrow();
-    const fakePosted = await t.db.insertInto('payments').values({
-      business_id: biz.id, customer_id: cust.id, payment_date: '2026-01-01',
-      payment_method: 'cash', amount: '10.0000', unapplied_amount: '10.0000',
-      cash_account_id: cash.id, status: 'posted', posted_at: new Date().toISOString() as unknown as string,
-      posted_journal_entry_id: null,
-    }).returningAll().executeTakeFirstOrThrow();
-    void fakePosted;
-    // Note: posted_journal_entry_id is null here (CHECK constraint allows insert because trigger fires on UPDATE/DELETE only)
-    // — for the delete attempt, the trigger should still fire and block:
+    const draft = await t.db.transaction().execute(trx =>
+      paymentSvc.createDraft(trx, ctx, {
+        business_id: biz.id, customer_id: customer.id, payment_date: '2026-04-15',
+        payment_method: 'cash', reference: null, amount: '10.0000',
+        cash_account_id: cash.id, memo: null,
+      }),
+    );
+    const posted = await t.db.transaction().execute(trx => paymentSvc.postPayment(trx, ctx, { payment_id: draft.payment.id }));
     await expect(
-      t.db.deleteFrom('payments').where('id', '=', fakePosted.id).execute(),
+      t.db.deleteFrom('payments').where('id', '=', posted.id).execute(),
     ).rejects.toThrow(/cannot delete posted payment/);
   });
 });
