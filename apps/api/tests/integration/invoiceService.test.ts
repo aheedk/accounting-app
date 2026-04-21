@@ -136,4 +136,30 @@ describe('invoiceService', () => {
     const reversal = jes.find(j => j.source_type === 'reversal');
     expect(reversal).toBeTruthy();
   });
+
+  it('addLine and removeLine work on drafts; refused on posted', async () => {
+    const { biz, ctx, customer, revenue, taxCode } = await setup(t);
+    const draft = await t.db.transaction().execute(trx =>
+      invoiceSvc.createDraft(trx, ctx, {
+        business_id: biz.id, customer_id: customer.id,
+        invoice_number: 'INV-006', issue_date: '2026-04-15', due_date: '2026-05-15',
+        memo: null, terms: null,
+        lines: [{ description: 'A', quantity: '1', unit_price: '10', revenue_account_id: revenue.id, tax_code_id: null }],
+      }),
+    );
+    const after = await t.db.transaction().execute(trx =>
+      invoiceSvc.addLine(trx, ctx, { invoice_id: draft.invoice.id,
+        line: { description: 'B', quantity: '2', unit_price: '5', revenue_account_id: revenue.id, tax_code_id: taxCode.id } }),
+    );
+    expect(after.lines).toHaveLength(2);
+    expect(after.invoice.subtotal).toBe('20.0000');
+
+    await t.db.transaction().execute(trx => invoiceSvc.postInvoice(trx, ctx, { invoice_id: draft.invoice.id }));
+    await expect(
+      t.db.transaction().execute(trx =>
+        invoiceSvc.addLine(trx, ctx, { invoice_id: draft.invoice.id,
+          line: { description: 'C', quantity: '1', unit_price: '1', revenue_account_id: revenue.id, tax_code_id: null } }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
+  });
 });

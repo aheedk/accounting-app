@@ -219,3 +219,51 @@ export async function listInvoices(db: Kysely<DB>, q: { business_id: string; sta
   if (q.customer_id) qb = qb.where('customer_id', '=', q.customer_id);
   return qb.orderBy('issue_date', 'desc').limit(q.limit ?? 50).offset(q.offset ?? 0).execute();
 }
+
+async function recomputeInvoiceTotals(trx: Transaction<DB>, invoice_id: string) {
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', invoice_id).executeTakeFirstOrThrow();
+  const lines = await trx.selectFrom('invoice_lines').selectAll().where('invoice_id', '=', invoice_id).execute();
+  let sub = '0.0000', tax = '0.0000';
+  for (const l of lines) { sub = toMoneyString(addMoney(sub, l.line_subtotal)); tax = toMoneyString(addMoney(tax, l.tax_amount)); }
+  const total = toMoneyString(addMoney(sub, tax));
+  await trx.updateTable('invoices').set({ subtotal: sub, tax_total: tax, total }).where('id', '=', invoice_id).execute();
+  void inv;
+}
+
+export async function addLine(
+  trx: Transaction<DB>, ctx: ServiceCtx,
+  input: { invoice_id: string; line: InvoiceLineInput },
+) {
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).executeTakeFirst();
+  if (!inv) throw new NotFoundError('invoice', input.invoice_id);
+  if (inv.status !== 'draft') throw new InvalidStateTransitionError('invoice', inv.id, inv.status, 'mutate');
+
+  const c = await computeLine(trx as unknown as Kysely<DB>, input.line, inv.issue_date);
+  const last = await trx.selectFrom('invoice_lines').select(({ fn }) => fn.max<number>('line_number').as('mx'))
+    .where('invoice_id', '=', input.invoice_id).executeTakeFirst();
+  const next = (last?.mx ?? 0) + 1;
+  await trx.insertInto('invoice_lines').values({
+    invoice_id: input.invoice_id, line_number: next,
+    description: input.line.description, quantity: input.line.quantity, unit_price: input.line.unit_price,
+    revenue_account_id: input.line.revenue_account_id, tax_code_id: input.line.tax_code_id,
+    line_subtotal: c.subtotal, tax_amount: c.taxAmount, line_total: c.total,
+  }).execute();
+  await recomputeInvoiceTotals(trx, input.invoice_id);
+
+  await auditRecord(trx, ctx, { action: AUDIT.INVOICE_ADD_LINE, entity_type: 'invoice', entity_id: input.invoice_id, before: null, after: input.line });
+  return getInvoiceWithLines(trx as unknown as Kysely<DB>, inv.business_id, input.invoice_id);
+}
+
+export async function removeLine(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { invoice_id: string; line_id: string },
+) {
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).executeTakeFirst();
+  if (!inv) throw new NotFoundError('invoice', input.invoice_id);
+  if (inv.status !== 'draft') throw new InvalidStateTransitionError('invoice', inv.id, inv.status, 'mutate');
+
+  await trx.deleteFrom('invoice_lines').where('id', '=', input.line_id).where('invoice_id', '=', input.invoice_id).execute();
+  await recomputeInvoiceTotals(trx, input.invoice_id);
+
+  await auditRecord(trx, ctx, { action: AUDIT.INVOICE_REMOVE_LINE, entity_type: 'invoice', entity_id: input.invoice_id, before: { line_id: input.line_id }, after: null });
+  return getInvoiceWithLines(trx as unknown as Kysely<DB>, inv.business_id, input.invoice_id);
+}
