@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm -w @accounting/api run dev\" \"npm -w @accounting/web run dev\"",
     "build": "npm -w @accounting/shared run build && npm -w @accounting/api run build && npm -w @accounting/web run build",
+    "start:api": "node apps/api/dist/index.js",
+    "migrate:prod": "tsx bin/migrate.ts",
     "lint": "npm -ws run lint --if-present",
     "typecheck": "npm -ws run typecheck --if-present",
     "test": "npm -ws run test --if-present",

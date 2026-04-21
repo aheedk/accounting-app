@@ -1,0 +1,9 @@
+[build]
+  base = "apps/web"
+  command = "npm --prefix=../.. ci && npm --prefix=../.. -w @accounting/shared run build && npm --prefix=../.. -w @accounting/web run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
