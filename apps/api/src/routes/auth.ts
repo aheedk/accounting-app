@@ -8,7 +8,7 @@ const router = Router();
 
 function reqMeta(req: Request) {
   return {
-    request_id: req.headers['x-request-id'] as string ?? crypto.randomUUID(),
+    request_id: req.request_id,
     ip_address: req.ip ?? '0.0.0.0',
     user_agent: req.headers['user-agent'] ?? '',
   };

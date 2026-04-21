@@ -30,6 +30,19 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     });
   }
 
+  // CORS rejection from cors() middleware — surface as 403 not 500
+  if (err instanceof Error && err.message?.startsWith('CORS:')) {
+    return res.status(403).json({
+      error: {
+        code: ERR.FORBIDDEN,
+        message: err.message,
+        details: null,
+        field_errors: null,
+      },
+      request_id,
+    });
+  }
+
   // Unknown — log, return INTERNAL
   console.error(`[${request_id}]`, err);
   res.status(500).json({

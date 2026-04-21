@@ -2399,7 +2399,7 @@ const router = Router();
 
 function reqMeta(req: Request) {
   return {
-    request_id: req.headers['x-request-id'] as string ?? crypto.randomUUID(),
+    request_id: req.request_id,
     ip_address: req.ip ?? '0.0.0.0',
     user_agent: req.headers['user-agent'] ?? '',
   };
@@ -2540,8 +2540,10 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     req.auth = { user_id: claims.user_id, firm_id: claims.firm_id, role: claims.role };
     next();
   } catch (err) {
-    if (err instanceof AuthError) next(err);
-    else next(new AuthError(ERR.TOKEN_EXPIRED, 'Invalid or expired token'));
+    if (err instanceof AuthError) return next(err);
+    const reason = err instanceof Error ? err.name : 'unknown';
+    if (reason !== 'unknown') console.warn(`[auth] token verify failed: ${reason}`);
+    next(new AuthError(ERR.UNAUTHORIZED, 'Invalid or expired token', { reason }));
   }
 }
 ```
@@ -2660,6 +2662,19 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
         code: err.code,
         message: err.message,
         details: err.details ?? null,
+        field_errors: null,
+      },
+      request_id,
+    });
+  }
+
+  // CORS rejection from cors() middleware — surface as 403 not 500
+  if (err instanceof Error && err.message?.startsWith('CORS:')) {
+    return res.status(403).json({
+      error: {
+        code: ERR.FORBIDDEN,
+        message: err.message,
+        details: null,
         field_errors: null,
       },
       request_id,

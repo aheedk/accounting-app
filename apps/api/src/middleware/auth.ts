@@ -11,7 +11,9 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     req.auth = { user_id: claims.user_id, firm_id: claims.firm_id, role: claims.role };
     next();
   } catch (err) {
-    if (err instanceof AuthError) next(err);
-    else next(new AuthError(ERR.TOKEN_EXPIRED, 'Invalid or expired token'));
+    if (err instanceof AuthError) return next(err);
+    const reason = err instanceof Error ? err.name : 'unknown';
+    if (reason !== 'unknown') console.warn(`[auth] token verify failed: ${reason}`);
+    next(new AuthError(ERR.UNAUTHORIZED, 'Invalid or expired token', { reason }));
   }
 }
