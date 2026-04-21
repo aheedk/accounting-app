@@ -1641,8 +1641,35 @@ export function makeDb(connectionString = config.DATABASE_URL): Kysely<DB> {
   return new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
 }
 
-// A long-lived instance used by routes. Tests create their own via makeDb().
-export const db: Kysely<DB> = makeDb();
+// A long-lived instance used by routes. Constructed lazily on first access so
+// tests can rebind `process.env.DATABASE_URL` (e.g. to a testcontainer URL)
+// before the singleton is materialized. Reads `process.env.DATABASE_URL` at
+// first access rather than the already-parsed `config.DATABASE_URL` so test
+// rebinding actually takes effect.
+let _db: Kysely<DB> | null = null;
+function getDb(): Kysely<DB> {
+  if (!_db) _db = makeDb(process.env.DATABASE_URL ?? config.DATABASE_URL);
+  return _db;
+}
+
+export const db: Kysely<DB> = new Proxy({} as Kysely<DB>, {
+  get(_t, prop, recv) {
+    const real = getDb() as unknown as Record<PropertyKey, unknown>;
+    const value = Reflect.get(real, prop, recv);
+    return typeof value === 'function' ? value.bind(real) : value;
+  },
+});
+
+// Test-only: dispose the lazy singleton so its pg pool is closed cleanly. Used
+// by HTTP-route integration tests that share a testcontainer DB with the
+// singleton via `process.env.DATABASE_URL`.
+export async function destroyDbSingleton(): Promise<void> {
+  if (_db) {
+    const inst = _db;
+    _db = null;
+    await inst.destroy();
+  }
+}
 
 export type { DB };
 ```
@@ -2862,7 +2889,7 @@ describe('auth routes', () => {
     const firm = await makeFirm(t.db);
     await makeUser(t.db, firm.id, { email: 'a@x.com', password: 'pw12345678' });
     const app = makeApp();
-    const res = await request(app).post('/auth/login').send({ email: 'a@x.com', password: 'wrong' });
+    const res = await request(app).post('/auth/login').send({ email: 'a@x.com', password: 'wrongpass' });
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
   });
