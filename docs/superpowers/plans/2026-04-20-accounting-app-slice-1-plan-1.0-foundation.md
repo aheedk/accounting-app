@@ -592,14 +592,17 @@ git commit -m "chore(api): scaffold express + kysely package"
 
 - [ ] **Step 3: Write `apps/web/tsconfig.node.json`**
 
+> Note: `tsc -b` (build mode, used by the web `build` script) requires every referenced project to have `composite: true` and to emit. We therefore set `composite: true`, drop `noEmit`, and direct emitted artefacts (.d.ts/.js plus `tsconfig.node.tsbuildinfo`) into `./dist-node`. The repo `.gitignore` excludes `apps/web/dist-node/` and `apps/web/*.tsbuildinfo`.
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
-    "noEmit": true
+    "outDir": "./dist-node"
   },
   "include": ["vite.config.ts", "tailwind.config.ts"]
 }
