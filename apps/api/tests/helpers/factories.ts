@@ -73,3 +73,29 @@ export async function makePeriod(
 export async function seedYearPeriods(db: Kysely<DB>, business_id: string, year: number) {
   await sql`SELECT seed_calendar_year_periods(${business_id}::uuid, ${year}::int)`.execute(db);
 }
+
+export async function makeCustomer(db: Kysely<DB>, business_id: string, opts: Partial<{ name: string; email: string | null }> = {}) {
+  return db.insertInto('customers').values({
+    business_id,
+    name: opts.name ?? `Customer ${Math.random().toString(36).slice(2, 8)}`,
+    email: opts.email ?? null,
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function makeTaxCode(
+  db: Kysely<DB>, business_id: string, tax_payable_account_id: string,
+  opts: Partial<{ code: string; name: string; rate: number }> = {},
+) {
+  const tc = await db.insertInto('tax_codes').values({
+    business_id,
+    code: opts.code ?? 'TAX',
+    name: opts.name ?? 'Sales Tax',
+    tax_payable_account_id,
+  }).returningAll().executeTakeFirstOrThrow();
+  await db.insertInto('tax_rates').values({
+    tax_code_id: tc.id,
+    rate: String(opts.rate ?? 0.0875),
+    effective_from: '2000-01-01',
+  }).execute();
+  return tc;
+}
