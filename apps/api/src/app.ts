@@ -14,6 +14,9 @@ import journalEntryRoutes from './routes/journalEntries.js';
 import trialBalanceRoutes from './routes/trialBalance.js';
 import customerRoutes from './routes/customers.js';
 import taxCodeRoutes from './routes/taxCodes.js';
+import invoiceRoutes from './routes/invoices.js';
+import paymentRoutes from './routes/payments.js';
+import creditMemoRoutes from './routes/creditMemos.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -37,6 +40,9 @@ export function makeApp(): Express {
   app.use(trialBalanceRoutes);
   app.use(customerRoutes);
   app.use(taxCodeRoutes);
+  app.use(invoiceRoutes);
+  app.use(paymentRoutes);
+  app.use(creditMemoRoutes);
   app.use(errorHandler);
   return app;
 }
