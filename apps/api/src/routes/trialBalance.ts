@@ -6,7 +6,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import * as ledger from '../services/core/ledgerService.js';
 
 const router = Router({ mergeParams: true });
-router.use(requireAuth, resolveBusiness);
+router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/reports/trial-balance', async (req, res, next) => {
   try {

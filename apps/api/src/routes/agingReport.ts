@@ -6,7 +6,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import * as aging from '../services/ar/reports/agingReportService.js';
 
 const router = Router({ mergeParams: true });
-router.use(requireAuth, resolveBusiness);
+router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/reports/aging', async (req, res, next) => {
   try {

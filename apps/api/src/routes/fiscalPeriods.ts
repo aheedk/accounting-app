@@ -18,7 +18,7 @@ function ctxFromReq(req: any): ServiceCtx {
   };
 }
 
-router.use(requireAuth, resolveBusiness);
+router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/periods', async (req, res, next) => {
   try {

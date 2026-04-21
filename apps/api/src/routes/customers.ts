@@ -19,7 +19,7 @@ function ctxFromReq(req: Request): ServiceCtx {
   };
 }
 
-router.use(requireAuth, resolveBusiness);
+router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/customers', async (req, res, next) => {
   try { res.json({ customers: await cust.listCustomers(db, req.tenancy!.business_id) }); }

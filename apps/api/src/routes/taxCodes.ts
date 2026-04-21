@@ -17,7 +17,7 @@ function ctxFromReq(req: Request): ServiceCtx {
     user_agent: req.header('user-agent') ?? '',
   };
 }
-router.use(requireAuth, resolveBusiness);
+router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/tax-codes', async (req, res, next) => {
   try { res.json({ tax_codes: await tax.listTaxCodes(db, req.tenancy!.business_id) }); }
