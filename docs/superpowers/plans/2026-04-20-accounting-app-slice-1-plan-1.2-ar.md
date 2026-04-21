@@ -2745,7 +2745,7 @@ describe('aging report', () => {
 - [ ] **Step 2: Implement `apps/api/src/services/ar/reports/agingReportService.ts`**
 
 ```ts
-import { Kysely, sql } from 'kysely';
+import { type Kysely } from 'kysely';
 import { addMoney, subMoney, toMoneyString } from '@accounting/shared';
 import type { DB } from '../../../db/types.js';
 
@@ -2769,14 +2769,16 @@ export async function customerAging(db: Kysely<DB>, q: { business_id: string; as
     .where('i.deleted_at', 'is', null)
     .execute();
 
+  if (invoices.length === 0) return [];
+
   // Build applied lookup
   const appliedMap = new Map<string, string>();
   const apps = await db.selectFrom('payment_applications as pa')
     .leftJoin('payments as p', 'p.id', 'pa.payment_id')
     .leftJoin('credit_memos as cm', 'cm.id', 'pa.credit_memo_id')
     .select(['pa.invoice_id', 'pa.applied_amount'])
-    .where('pa.invoice_id', 'in', invoices.map(i => i.id).length > 0 ? invoices.map(i => i.id) : ['00000000-0000-0000-0000-000000000000'])
-    .where(eb => eb.or([eb('p.status', '=', 'posted'), eb('cm.status', 'in', ['posted','applied'])]))
+    .where('pa.invoice_id', 'in', invoices.map(i => i.id))
+    .where(eb => eb.or([eb('p.status', '=', 'posted'), eb('cm.status', 'in', ['posted', 'applied'])]))
     .execute();
   for (const a of apps) {
     const cur = appliedMap.get(a.invoice_id) ?? '0';
