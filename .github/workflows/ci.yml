@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typecheck-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm -w @accounting/shared run build
+      - run: npm run typecheck
+      - run: npm -w @accounting/shared test
+      - run: npm -w @accounting/api test
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: typecheck-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm -w @accounting/shared run build
+      - run: npm -w @accounting/api run test:integration
