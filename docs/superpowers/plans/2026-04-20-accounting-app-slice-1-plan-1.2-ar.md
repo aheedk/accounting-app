@@ -558,9 +558,9 @@ export interface InvoicesTable {
   issue_date: ColumnType<string, string, string>;
   due_date: ColumnType<string, string, string>;
   status: Generated<InvoiceStatus>;
-  subtotal: Generated<ColumnType<string, string | number, string | number>>;
-  tax_total: Generated<ColumnType<string, string | number, string | number>>;
-  total: Generated<ColumnType<string, string | number, string | number>>;
+  subtotal: ColumnType<string, string | number | undefined, string | number>;
+  tax_total: ColumnType<string, string | number | undefined, string | number>;
+  total: ColumnType<string, string | number | undefined, string | number>;
   ar_account_id: string;
   posted_journal_entry_id: string | null;
   memo: string | null;
@@ -585,7 +585,7 @@ export interface InvoiceLinesTable {
   revenue_account_id: string;
   tax_code_id: string | null;
   line_subtotal: ColumnType<string, string | number, string | number>;
-  tax_amount: Generated<ColumnType<string, string | number, string | number>>;
+  tax_amount: ColumnType<string, string | number | undefined, string | number>;
   line_total: ColumnType<string, string | number, string | number>;
 }
 
