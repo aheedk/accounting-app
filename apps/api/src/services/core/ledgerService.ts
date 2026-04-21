@@ -201,6 +201,54 @@ export async function computeAccountBalance(
   return toMoneyString(subMoney(debit, credit));
 }
 
+export type TrialBalanceRow = {
+  account_id: string;
+  code: string;
+  name: string;
+  account_type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  total_debit: string;
+  total_credit: string;
+  net: string;
+};
+
+export async function computeTrialBalance(
+  db: Kysely<DB>, q: { business_id: string; as_of: string },
+): Promise<{ rows: TrialBalanceRow[]; totals: { total_debit: string; total_credit: string } }> {
+  const rows = await db.selectFrom('chart_of_accounts as a')
+    .leftJoin('journal_entry_lines as jel', 'jel.account_id', 'a.id')
+    .leftJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
+    .select(({ fn }) => [
+      'a.id as account_id', 'a.code', 'a.name', 'a.account_type',
+      fn.coalesce(fn.sum<string>('jel.debit'), sql.lit('0')).as('total_debit'),
+      fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('total_credit'),
+    ])
+    .where('a.business_id', '=', q.business_id)
+    .where(eb => eb.or([
+      eb('je.id', 'is', null),
+      eb.and([eb('je.status', '=', 'posted'), eb('je.entry_date', '<=', q.as_of)]),
+    ]))
+    .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type'])
+    .orderBy('a.code')
+    .execute();
+
+  let totalD = '0.0000', totalC = '0.0000';
+  const out: TrialBalanceRow[] = rows.map(r => {
+    const net = toMoneyString(subMoney(r.total_debit ?? '0', r.total_credit ?? '0'));
+    totalD = toMoneyString(addMoney(totalD, r.total_debit ?? '0'));
+    totalC = toMoneyString(addMoney(totalC, r.total_credit ?? '0'));
+    return {
+      account_id: r.account_id,
+      code: r.code,
+      name: r.name,
+      account_type: r.account_type as any,
+      total_debit: toMoneyString(r.total_debit ?? '0'),
+      total_credit: toMoneyString(r.total_credit ?? '0'),
+      net,
+    };
+  });
+  return { rows: out, totals: { total_debit: totalD, total_credit: totalC } };
+}
+
 async function currentSetting(trx: Transaction<DB>, key: string): Promise<string | null> {
   const r = await sql<{ v: string | null }>`SELECT current_setting(${key}, true) AS v`.execute(trx);
   return r.rows[0]?.v ?? null;
