@@ -133,6 +133,137 @@ export interface JournalEntryLinesTable {
   memo: string | null;
 }
 
+export type InvoiceStatus = 'draft' | 'posted' | 'voided' | 'paid';
+export type PaymentStatus = 'draft' | 'posted' | 'voided';
+export type PaymentMethod = 'cash' | 'check' | 'ach' | 'wire' | 'card' | 'other';
+export type CreditMemoStatus = 'draft' | 'posted' | 'voided' | 'applied';
+
+export interface CustomersTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  billing_address: unknown | null;
+  default_terms_days: Generated<number>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface TaxCodesTable {
+  id: Generated<string>;
+  business_id: string;
+  code: string;
+  name: string;
+  tax_payable_account_id: string;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface TaxRatesTable {
+  id: Generated<string>;
+  tax_code_id: string;
+  rate: ColumnType<string, string | number, string | number>;
+  effective_from: ColumnType<string, string, string>;
+  effective_to: ColumnType<string, string, string> | null;
+  created_at: Generated<Timestamp>;
+}
+
+export interface InvoicesTable {
+  id: Generated<string>;
+  business_id: string;
+  customer_id: string;
+  invoice_number: string;
+  issue_date: ColumnType<string, string, string>;
+  due_date: ColumnType<string, string, string>;
+  status: Generated<InvoiceStatus>;
+  subtotal: Generated<ColumnType<string, string | number, string | number>>;
+  tax_total: Generated<ColumnType<string, string | number, string | number>>;
+  total: Generated<ColumnType<string, string | number, string | number>>;
+  ar_account_id: string;
+  posted_journal_entry_id: string | null;
+  memo: string | null;
+  terms: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface InvoiceLinesTable {
+  id: Generated<string>;
+  invoice_id: string;
+  line_number: number;
+  description: string;
+  quantity: ColumnType<string, string | number, string | number>;
+  unit_price: ColumnType<string, string | number, string | number>;
+  revenue_account_id: string;
+  tax_code_id: string | null;
+  line_subtotal: ColumnType<string, string | number, string | number>;
+  tax_amount: Generated<ColumnType<string, string | number, string | number>>;
+  line_total: ColumnType<string, string | number, string | number>;
+}
+
+export interface PaymentsTable {
+  id: Generated<string>;
+  business_id: string;
+  customer_id: string;
+  payment_date: ColumnType<string, string, string>;
+  payment_method: PaymentMethod;
+  reference: string | null;
+  amount: ColumnType<string, string | number, string | number>;
+  unapplied_amount: ColumnType<string, string | number, string | number>;
+  cash_account_id: string;
+  status: Generated<PaymentStatus>;
+  posted_journal_entry_id: string | null;
+  memo: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PaymentApplicationsTable {
+  id: Generated<string>;
+  payment_id: string | null;
+  credit_memo_id: string | null;
+  invoice_id: string;
+  applied_amount: ColumnType<string, string | number, string | number>;
+  applied_at: Generated<Timestamp>;
+  applied_by_user_id: string | null;
+}
+
+export interface CreditMemosTable {
+  id: Generated<string>;
+  business_id: string;
+  customer_id: string;
+  memo_date: ColumnType<string, string, string>;
+  status: Generated<CreditMemoStatus>;
+  amount: ColumnType<string, string | number, string | number>;
+  remaining_amount: ColumnType<string, string | number, string | number>;
+  source_payment_id: string | null;
+  ar_account_id: string;
+  revenue_account_id: string;
+  posted_journal_entry_id: string | null;
+  memo: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
@@ -144,4 +275,12 @@ export interface DB {
   fiscal_periods: FiscalPeriodsTable;
   journal_entries: JournalEntriesTable;
   journal_entry_lines: JournalEntryLinesTable;
+  customers: CustomersTable;
+  tax_codes: TaxCodesTable;
+  tax_rates: TaxRatesTable;
+  invoices: InvoicesTable;
+  invoice_lines: InvoiceLinesTable;
+  payments: PaymentsTable;
+  payment_applications: PaymentApplicationsTable;
+  credit_memos: CreditMemosTable;
 }
