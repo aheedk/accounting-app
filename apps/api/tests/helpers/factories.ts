@@ -1,6 +1,6 @@
 // apps/api/tests/helpers/factories.ts
-import { Kysely } from 'kysely';
-import type { DB, UserRole } from '../../src/db/types.js';
+import { Kysely, sql } from 'kysely';
+import type { DB, UserRole, AccountType } from '../../src/db/types.js';
 import { hashPassword } from '../../src/services/auth/passwordHasher.js';
 
 export async function makeFirm(db: Kysely<DB>, name = 'Test Firm'): Promise<{ id: string; name: string }> {
@@ -37,4 +37,39 @@ export async function grantAccess(db: Kysely<DB>, user_id: string, business_id: 
     .values({ user_id, business_id, role_override })
     .returningAll()
     .executeTakeFirstOrThrow();
+}
+
+export async function makeAccount(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: Partial<{ code: string; name: string; account_type: AccountType; is_system: boolean }> = {},
+) {
+  const code = opts.code ?? `ACC${Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0')}`;
+  return db.insertInto('chart_of_accounts').values({
+    business_id,
+    code,
+    name: opts.name ?? `Account ${code}`,
+    account_type: opts.account_type ?? 'asset',
+    is_system: opts.is_system ?? false,
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function seedCoa(db: Kysely<DB>, business_id: string) {
+  await sql`SELECT seed_default_coa(${business_id}::uuid)`.execute(db);
+}
+
+export async function makePeriod(
+  db: Kysely<DB>,
+  business_id: string,
+  starts_on: string,
+  ends_on: string,
+  status: 'open' | 'closed' = 'open',
+) {
+  return db.insertInto('fiscal_periods').values({
+    business_id, starts_on, ends_on, status,
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function seedYearPeriods(db: Kysely<DB>, business_id: string, year: number) {
+  await sql`SELECT seed_calendar_year_periods(${business_id}::uuid, ${year}::int)`.execute(db);
 }

@@ -57,6 +57,10 @@ async function runMigrations(pool: pg.Pool) {
 export async function truncateAll(db: Kysely<DB>) {
   await sql`
     TRUNCATE
+      journal_entry_lines,
+      journal_entries,
+      fiscal_periods,
+      chart_of_accounts,
       audit_logs,
       refresh_tokens,
       user_business_access,
