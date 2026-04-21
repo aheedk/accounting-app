@@ -8,6 +8,8 @@ import { errorHandler } from './middleware/error.js';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import healthRoutes from './routes/health.js';
+import coaRoutes from './routes/chartOfAccounts.js';
+import periodRoutes from './routes/fiscalPeriods.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -25,6 +27,8 @@ export function makeApp(): Express {
   app.use(healthRoutes);
   app.use(authRoutes);
   app.use(meRoutes);
+  app.use(coaRoutes);
+  app.use(periodRoutes);
   app.use(errorHandler);
   return app;
 }
