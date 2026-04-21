@@ -1306,9 +1306,12 @@ npm -w @accounting/shared test
 - [ ] **Step 3: Implement `packages/shared/src/decimal.ts`**
 
 ```ts
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 
 // 4dp money, half-even rounding (banker's rounding) — the standard for accounting.
+// NOTE: named import (not default) is required under NodeNext + esModuleInterop —
+// the default import does not merge with the namespace, so `Decimal.set` and
+// `Decimal.ROUND_HALF_EVEN` would fail to resolve at compile time.
 Decimal.set({ precision: 40, rounding: Decimal.ROUND_HALF_EVEN });
 
 export type MoneyInput = Decimal | string | number;

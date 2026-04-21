@@ -2621,7 +2621,7 @@ The web pages for Plan 1.1 are intentionally functional, not flashy: tables, for
 - [ ] **Step 1: Write `apps/web/src/lib/money.ts`**
 
 ```ts
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 
 Decimal.set({ precision: 40, rounding: Decimal.ROUND_HALF_EVEN });
 
