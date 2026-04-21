@@ -2213,7 +2213,13 @@ router.post('/businesses/:businessId/coa', requireMinRole('accountant'), async (
 
 router.patch('/businesses/:businessId/coa/:accountId', requireMinRole('accountant'), async (req, res, next) => {
   try {
-    const patch = schemas.accountUpdateSchema.parse(req.body);
+    // exactOptionalPropertyTypes: zod's .optional() yields T|undefined which
+    // doesn't fit the service's { name?: string; ... } shape. Build conditionally.
+    const parsed = schemas.accountUpdateSchema.parse(req.body);
+    const patch: { name?: string; parent_id?: string | null; is_active?: boolean } = {};
+    if (parsed.name !== undefined) patch.name = parsed.name;
+    if (parsed.parent_id !== undefined) patch.parent_id = parsed.parent_id;
+    if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;
     const updated = await db.transaction().execute(trx =>
       coa.updateAccount(trx, ctxFromReq(req), {
         account_id: req.params['accountId']!,
