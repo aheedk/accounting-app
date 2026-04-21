@@ -1893,8 +1893,9 @@ export async function startTestDb(): Promise<TestDb> {
 
 export async function stopTestDb(): Promise<void> {
   if (!shared) return;
+  // Kysely's db.destroy() ends the underlying pg pool that PostgresDialect owns.
+  // Calling pool.end() again would throw "Called end on pool more than once".
   await shared.db.destroy();
-  await shared.pool.end();
   await shared.container.stop();
   shared = null;
 }
