@@ -15,3 +15,9 @@ npm run dev
 ```
 
 Then visit http://localhost:5173.
+
+## Manual smoke test (Slice 1 Foundation)
+1. `docker compose up -d postgres && npm run db:migrate && npm run db:seed`
+2. `npm run dev`
+3. Open http://localhost:5173, log in with the seeded admin account.
+4. Verify: dashboard loads, "Sign out" returns to login, reload keeps the anonymous state.
