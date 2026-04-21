@@ -1,1 +1,13 @@
 .worktrees/
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+.vite/
+.turbo/
+apps/web/dist/
+apps/api/dist/
+packages/shared/dist/

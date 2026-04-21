@@ -1,0 +1,25 @@
+{
+  "name": "accounting-app",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm -w @accounting/api run dev\" \"npm -w @accounting/web run dev\"",
+    "build": "npm -w @accounting/shared run build && npm -w @accounting/api run build && npm -w @accounting/web run build",
+    "lint": "npm -ws run lint --if-present",
+    "typecheck": "npm -ws run typecheck --if-present",
+    "test": "npm -ws run test --if-present",
+    "test:integration": "npm -w @accounting/api run test:integration",
+    "db:migrate": "tsx bin/migrate.ts",
+    "db:seed": "tsx bin/seed.ts",
+    "db:reset": "tsx bin/migrate.ts --reset && tsx bin/seed.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}
