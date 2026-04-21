@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import type { Request } from 'express';
+import type { Transaction } from 'kysely';
 import { schemas, ERR } from '@accounting/shared';
 import { db } from '../db/index.js';
+import type { DB, JournalEntryStatus } from '../db/types.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
@@ -11,7 +14,7 @@ import { BusinessRuleError } from '../lib/errors.js';
 
 const router = Router({ mergeParams: true });
 
-function ctxFromReq(req: any): ServiceCtx {
+function ctxFromReq(req: Request): ServiceCtx {
   return {
     user_id: req.auth!.user_id, firm_id: req.auth!.firm_id,
     business_id: req.tenancy!.business_id, effective_role: req.tenancy!.effective_role,
@@ -28,7 +31,7 @@ router.get('/businesses/:businessId/journal-entries', async (req, res, next) => 
     const offset = parseInt(String(req.query['offset'] ?? 0), 10) || 0;
     const status = req.query['status'] as string | undefined;
     let q = db.selectFrom('journal_entries').selectAll().where('business_id', '=', req.tenancy!.business_id);
-    if (status) q = q.where('status', '=', status as any);
+    if (status) q = q.where('status', '=', status as JournalEntryStatus);
     const rows = await q.orderBy('entry_date', 'desc').orderBy('created_at', 'desc').limit(limit).offset(offset).execute();
     res.json({ entries: rows, limit, offset });
   } catch (e) { next(e); }
@@ -57,7 +60,7 @@ router.post('/businesses/:businessId/journal-entries', requireMinRole('accountan
     const ctx = ctxFromReq(req);
     const force = req.query['admin_override'] === 'true';
     const reason = (req.body?.admin_override_reason as string | undefined) ?? '';
-    const work = (trx: any) =>
+    const work = (trx: Transaction<DB>) =>
       ledger.postJournalEntry(trx, ctx, {
         business_id: req.tenancy!.business_id,
         entry_date: body.entry_date,
@@ -79,7 +82,7 @@ router.post('/businesses/:businessId/journal-entries/:id/void', requireMinRole('
     const ctx = ctxFromReq(req);
     const force = req.query['admin_override'] === 'true';
     const reason = (req.body?.admin_override_reason as string | undefined) ?? '';
-    const work = (trx: any) =>
+    const work = (trx: Transaction<DB>) =>
       ledger.voidJournalEntry(trx, ctx, { journal_entry_id: req.params['id']!, void_reason: body.void_reason });
     const reversal = force
       ? await runWithClosedPeriodOverride(db, ctx, reason, work)

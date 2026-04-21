@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request } from 'express';
 import { schemas } from '@accounting/shared';
 import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -9,7 +10,7 @@ import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
 
-function ctxFromReq(req: any): ServiceCtx {
+function ctxFromReq(req: Request): ServiceCtx {
   return {
     user_id: req.auth!.user_id,
     firm_id: req.auth!.firm_id,

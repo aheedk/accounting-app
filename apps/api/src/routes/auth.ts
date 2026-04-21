@@ -1,4 +1,4 @@
-import { Router, type Request, type Response, type NextFunction } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { schemas } from '@accounting/shared';
 import { db } from '../db/index.js';
 import { login, refresh, logout } from '../services/auth/authService.js';
