@@ -312,42 +312,40 @@ This is the most important migration in the entire system. Test it carefully (Ta
 -- =====================================================================
 -- 1) Deferred balance check: per JE, sum(debits) must equal sum(credits)
 --    Fires at COMMIT so we can insert lines incrementally inside one trx.
+--
+--    PostgreSQL CONSTRAINT TRIGGERs must be AFTER ... FOR EACH ROW and do
+--    NOT support REFERENCING transition tables, so we use a per-row
+--    constraint trigger that re-aggregates the touched JE at commit time.
 -- =====================================================================
 CREATE OR REPLACE FUNCTION je_check_balance()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_je_ids uuid[];
   v_je_id uuid;
   v_debits numeric(19,4);
   v_credits numeric(19,4);
   v_status journal_entry_status;
 BEGIN
-  -- Collect distinct JE ids touched by this statement.
-  IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
-    SELECT array_agg(DISTINCT journal_entry_id) INTO v_je_ids FROM new_table;
-  ELSIF (TG_OP = 'DELETE') THEN
-    SELECT array_agg(DISTINCT journal_entry_id) INTO v_je_ids FROM old_table;
-  END IF;
+  v_je_id := COALESCE(NEW.journal_entry_id, OLD.journal_entry_id);
+  IF v_je_id IS NULL THEN RETURN NULL; END IF;
 
-  IF v_je_ids IS NULL THEN RETURN NULL; END IF;
+  -- The parent JE may have been deleted (cascade); skip in that case.
+  SELECT status INTO v_status FROM journal_entries WHERE id = v_je_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
 
-  FOREACH v_je_id IN ARRAY v_je_ids LOOP
-    SELECT status INTO v_status FROM journal_entries WHERE id = v_je_id;
-    -- Voided entries can be unbalanced because their reversal exists separately.
-    -- Drafts are allowed to be unbalanced (still being authored).
-    -- Only POSTED entries are required to balance.
-    IF v_status = 'posted' THEN
-      SELECT COALESCE(SUM(debit), 0), COALESCE(SUM(credit), 0)
-        INTO v_debits, v_credits
-        FROM journal_entry_lines
-        WHERE journal_entry_id = v_je_id;
-      IF v_debits <> v_credits THEN
-        RAISE EXCEPTION 'journal entry % is unbalanced: debits=% credits=%',
-          v_je_id, v_debits, v_credits
-          USING ERRCODE = '23514';
-      END IF;
+  -- Voided entries can be unbalanced because their reversal exists separately.
+  -- Drafts are allowed to be unbalanced (still being authored).
+  -- Only POSTED entries are required to balance.
+  IF v_status = 'posted' THEN
+    SELECT COALESCE(SUM(debit), 0), COALESCE(SUM(credit), 0)
+      INTO v_debits, v_credits
+      FROM journal_entry_lines
+      WHERE journal_entry_id = v_je_id;
+    IF v_debits <> v_credits THEN
+      RAISE EXCEPTION 'journal entry % is unbalanced: debits=% credits=%',
+        v_je_id, v_debits, v_credits
+        USING ERRCODE = '23514';
     END IF;
-  END LOOP;
+  END IF;
 
   RETURN NULL;
 END;
@@ -356,20 +354,17 @@ $$ LANGUAGE plpgsql;
 CREATE CONSTRAINT TRIGGER trg_jel_balance_insert
   AFTER INSERT ON journal_entry_lines
   DEFERRABLE INITIALLY DEFERRED
-  REFERENCING NEW TABLE AS new_table
-  FOR EACH STATEMENT EXECUTE FUNCTION je_check_balance();
+  FOR EACH ROW EXECUTE FUNCTION je_check_balance();
 
 CREATE CONSTRAINT TRIGGER trg_jel_balance_update
   AFTER UPDATE ON journal_entry_lines
   DEFERRABLE INITIALLY DEFERRED
-  REFERENCING NEW TABLE AS new_table OLD TABLE AS old_table
-  FOR EACH STATEMENT EXECUTE FUNCTION je_check_balance();
+  FOR EACH ROW EXECUTE FUNCTION je_check_balance();
 
 CREATE CONSTRAINT TRIGGER trg_jel_balance_delete
   AFTER DELETE ON journal_entry_lines
   DEFERRABLE INITIALLY DEFERRED
-  REFERENCING OLD TABLE AS old_table
-  FOR EACH STATEMENT EXECUTE FUNCTION je_check_balance();
+  FOR EACH ROW EXECUTE FUNCTION je_check_balance();
 
 -- Also fire when a JE flips draft -> posted (lines may have been balanced
 -- earlier, but we want to recheck at the moment of posting).
