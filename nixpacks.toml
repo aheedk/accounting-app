@@ -1,0 +1,15 @@
+providers = ["node"]
+
+# Override default Node phases to avoid EBUSY when Railway's
+# /app/node_modules/.cache build cache is mounted while `npm ci`
+# tries to remove the existing node_modules tree. `npm install`
+# merges instead of nuking, so the mountpoint survives.
+
+[phases.install]
+cmds = ["npm install --no-audit --prefer-offline --include=dev"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run migrate:prod && npm run start:api"
