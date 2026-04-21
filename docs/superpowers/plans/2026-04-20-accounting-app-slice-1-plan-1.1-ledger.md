@@ -417,7 +417,7 @@ BEGIN
     -- Allowed transitions on posted rows:
     --   posted -> voided  (only when app.allow_void='on')
     IF NEW.status = 'voided' THEN
-      IF current_setting('app.allow_void', true) <> 'on' THEN
+      IF COALESCE(current_setting('app.allow_void', true), '') <> 'on' THEN
         RAISE EXCEPTION 'cannot void posted JE % outside controlled void path', OLD.id
           USING ERRCODE = '23514';
       END IF;
@@ -447,7 +447,7 @@ DECLARE
 BEGIN
   v_je_id := COALESCE(NEW.journal_entry_id, OLD.journal_entry_id);
   SELECT status INTO v_status FROM journal_entries WHERE id = v_je_id;
-  IF v_status = 'posted' AND current_setting('app.allow_void', true) <> 'on' THEN
+  IF v_status = 'posted' AND COALESCE(current_setting('app.allow_void', true), '') <> 'on' THEN
     RAISE EXCEPTION 'cannot mutate lines of posted journal entry %', v_je_id
       USING ERRCODE = '23514';
   END IF;
@@ -482,7 +482,7 @@ BEGIN
   END IF;
   -- Only enforce closed-period block for posted/voided transitions.
   IF NEW.status IN ('posted', 'voided') AND v_period_status = 'closed' THEN
-    IF current_setting('app.admin_override', true) <> 'on' THEN
+    IF COALESCE(current_setting('app.admin_override', true), '') <> 'on' THEN
       RAISE EXCEPTION 'cannot post into closed period %', NEW.period_id
         USING ERRCODE = '23514';
     END IF;
