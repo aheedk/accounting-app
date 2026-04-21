@@ -17,6 +17,7 @@ import taxCodeRoutes from './routes/taxCodes.js';
 import invoiceRoutes from './routes/invoices.js';
 import paymentRoutes from './routes/payments.js';
 import creditMemoRoutes from './routes/creditMemos.js';
+import agingReportRoutes from './routes/agingReport.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -43,6 +44,7 @@ export function makeApp(): Express {
   app.use(invoiceRoutes);
   app.use(paymentRoutes);
   app.use(creditMemoRoutes);
+  app.use(agingReportRoutes);
   app.use(errorHandler);
   return app;
 }
