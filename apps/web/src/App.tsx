@@ -11,6 +11,7 @@ import JournalDetailPage from '@/pages/journal/JournalDetailPage';
 import JournalNewPage from '@/pages/journal/JournalNewPage';
 import TrialBalancePage from '@/pages/reports/TrialBalancePage';
 import AgingReportPage from '@/pages/reports/AgingReportPage';
+import StandardReportsPage from '@/pages/reports/StandardReportsPage';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
 import CustomerDetailPage from '@/pages/customers/CustomerDetailPage';
@@ -24,6 +25,7 @@ import CreditMemoListPage from '@/pages/credit-memos/CreditMemoListPage';
 import CreditMemoNewPage from '@/pages/credit-memos/CreditMemoNewPage';
 import CreditMemoDetailPage from '@/pages/credit-memos/CreditMemoDetailPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
+import ComingSoonPage from '@/pages/ComingSoonPage';
 
 export default function App() {
   return (
@@ -33,6 +35,8 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
+
+            {/* Accounts Receivable */}
             <Route path="/customers" element={<CustomerListPage />} />
             <Route path="/customers/new" element={<CustomerNewPage />} />
             <Route path="/customers/:id" element={<CustomerDetailPage />} />
@@ -45,14 +49,67 @@ export default function App() {
             <Route path="/credit-memos" element={<CreditMemoListPage />} />
             <Route path="/credit-memos/new" element={<CreditMemoNewPage />} />
             <Route path="/credit-memos/:id" element={<CreditMemoDetailPage />} />
+
+            {/* Accounting */}
             <Route path="/journal" element={<JournalListPage />} />
             <Route path="/journal/new" element={<JournalNewPage />} />
             <Route path="/journal/:id" element={<JournalDetailPage />} />
+
+            {/* Reports */}
+            <Route path="/reports/standard" element={<StandardReportsPage />} />
             <Route path="/reports/trial-balance" element={<TrialBalancePage />} />
             <Route path="/reports/aging" element={<AgingReportPage />} />
+            <Route path="/reports/custom" element={<ComingSoonPage title="Custom Reports" description="Build reports with custom filters, columns, and grouping." eta="Slice 3" />} />
+            <Route path="/reports/management" element={<ComingSoonPage title="Management Reports" description="Executive dashboards and KPI-driven management views." eta="Slice 3" />} />
+            <Route path="/reports/performance" element={<ComingSoonPage title="Performance Center" description="Benchmarks and performance analytics across clients." eta="Slice 4" />} />
+            <Route path="/reports/financial-planning" element={<ComingSoonPage title="Financial Planning" description="Budgets, forecasts, and scenario planning." eta="Slice 4" />} />
+            <Route path="/reports/spreadsheet-sync" element={<ComingSoonPage title="Spreadsheet Sync" description="Two-way sync between your ledger and Google Sheets / Excel." eta="Slice 4" />} />
+
+            {/* Settings (existing) */}
             <Route path="/settings/coa" element={<CoaListPage />} />
             <Route path="/settings/tax-codes" element={<TaxCodesPage />} />
             <Route path="/settings/periods" element={<PeriodsPage />} />
+
+            {/* Accounts Payable (placeholders) */}
+            <Route path="/ap/overview" element={<ComingSoonPage title="AP Overview" description="A single view of outstanding bills, upcoming payments, and vendor health." eta="Slice 2" />} />
+            <Route path="/ap/expenses" element={<ComingSoonPage title="Expense Transactions" description="Capture and categorize expenses as they hit the ledger." eta="Slice 2" />} />
+            <Route path="/ap/vendors" element={<ComingSoonPage title="Vendors" description="Vendor master list with contact info, payment terms, and balances." eta="Slice 2" />} />
+            <Route path="/ap/bills" element={<ComingSoonPage title="Bills" description="Enter and approve vendor bills before they are paid." eta="Slice 2" />} />
+            <Route path="/ap/bill-payments" element={<ComingSoonPage title="Bill Payments" description="Record payments against one or many vendor bills." eta="Slice 2" />} />
+            <Route path="/ap/contractors" element={<ComingSoonPage title="Contractors" description="Manage 1099 contractors and track their payments." eta="Slice 2" />} />
+            <Route path="/ap/1099s" element={<ComingSoonPage title="1099s" description="Generate and file 1099-NEC and 1099-MISC forms." eta="Slice 2" />} />
+
+            {/* Accounting (placeholders) */}
+            <Route path="/accounting/client-overview" element={<ComingSoonPage title="Client Overview" description="A workspace-level view of all your clients' books." eta="Slice 3" />} />
+            <Route path="/accounting/books-review" element={<ComingSoonPage title="Books Review" description="Review checklists and month-end close workflows." eta="Slice 3" />} />
+            <Route path="/accounting/bank-transactions" element={<ComingSoonPage title="Bank Transactions" description="Review, categorize, and match transactions from connected banks." eta="Slice 3" />} />
+            <Route path="/accounting/integrations" element={<ComingSoonPage title="Integration Transactions" description="Activity coming in from third-party integrations." eta="Slice 3" />} />
+            <Route path="/accounting/receipts" element={<ComingSoonPage title="Receipts" description="Upload and match receipts to transactions." eta="Slice 3" />} />
+            <Route path="/accounting/reconcile" element={<ComingSoonPage title="Reconcile" description="Bank and credit card reconciliation workflows." eta="Slice 3" />} />
+            <Route path="/accounting/rules" element={<ComingSoonPage title="Rules" description="Auto-categorization rules for transactions." eta="Slice 3" />} />
+            <Route path="/accounting/recurring" element={<ComingSoonPage title="Recurring Transactions" description="Schedule recurring journal entries, invoices, and bills." eta="Slice 3" />} />
+            <Route path="/accounting/fixed-assets" element={<ComingSoonPage title="Fixed Assets" description="Register, depreciate, and dispose of fixed assets." eta="Slice 4" />} />
+
+            {/* Setup (placeholders) */}
+            <Route path="/setup/entity" element={<ComingSoonPage title="Entity" description="Legal entity, addresses, fiscal year, and tax IDs." eta="Slice 2" />} />
+            <Route path="/setup/coa" element={<CoaListPage />} />
+            <Route path="/setup/cost-centers" element={<ComingSoonPage title="Cost Centers" description="Departments, classes, and locations for segment reporting." eta="Slice 3" />} />
+            <Route path="/setup/users" element={<ComingSoonPage title="Users" description="Invite team members and assign roles." eta="Slice 2" />} />
+
+            {/* Payroll (placeholders) */}
+            <Route path="/payroll/overview" element={<ComingSoonPage title="Payroll Overview" description="Upcoming runs, liabilities, and payroll health." eta="Slice 5" />} />
+            <Route path="/payroll/employees" element={<ComingSoonPage title="Employees" description="W-2 employees, pay rates, and deductions." eta="Slice 5" />} />
+            <Route path="/payroll/contractors" element={<ComingSoonPage title="Payroll Contractors" description="1099 contractors paid through payroll." eta="Slice 5" />} />
+            <Route path="/payroll/taxes" element={<ComingSoonPage title="Payroll Taxes" description="Federal, state, and local payroll tax filings." eta="Slice 5" />} />
+            <Route path="/payroll/compliance" element={<ComingSoonPage title="Compliance" description="State registrations, new-hire reporting, and labor-law notices." eta="Slice 5" />} />
+
+            {/* Inventory (placeholders) */}
+            <Route path="/inventory/overview" element={<ComingSoonPage title="Inventory Overview" description="Stock levels, on-order quantity, and low-stock alerts." eta="Slice 6" />} />
+            <Route path="/inventory/items" element={<ComingSoonPage title="Inventory" description="Item master with cost, pricing, and tracking method." eta="Slice 6" />} />
+            <Route path="/inventory/purchase-orders" element={<ComingSoonPage title="Purchase Orders" description="Issue POs to vendors for inventory replenishment." eta="Slice 6" />} />
+            <Route path="/inventory/item-receipts" element={<ComingSoonPage title="Item Receipts" description="Receive inventory from purchase orders." eta="Slice 6" />} />
+            <Route path="/inventory/sales-orders" element={<ComingSoonPage title="Sales Orders" description="Confirm customer orders before fulfillment." eta="Slice 6" />} />
+            <Route path="/inventory/shipping-labels" element={<ComingSoonPage title="Shipping Labels" description="Buy and print shipping labels from connected carriers." eta="Slice 6" />} />
           </Route>
         </Route>
       </Routes>
