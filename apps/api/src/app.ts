@@ -19,6 +19,9 @@ import paymentRoutes from './routes/payments.js';
 import creditMemoRoutes from './routes/creditMemos.js';
 import agingReportRoutes from './routes/agingReport.js';
 import vendorRoutes from './routes/vendors.js';
+import billRoutes from './routes/bills.js';
+import billPaymentRoutes from './routes/billPayments.js';
+import vendorCreditRoutes from './routes/vendorCredits.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -47,6 +50,9 @@ export function makeApp(): Express {
   app.use(creditMemoRoutes);
   app.use(agingReportRoutes);
   app.use(vendorRoutes);
+  app.use(billRoutes);
+  app.use(billPaymentRoutes);
+  app.use(vendorCreditRoutes);
   app.use(errorHandler);
   return app;
 }
