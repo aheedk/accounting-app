@@ -9,3 +9,8 @@ export * from './invoice.js';
 export * from './payment.js';
 export * from './creditMemo.js';
 export * from './aging.js';
+export * from './vendor.js';
+export * from './bill.js';
+export * from './billPayment.js';
+export * from './vendorCredit.js';
+export * from './tenNinetyNine.js';
