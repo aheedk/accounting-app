@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await api.get('/me');
         setUser(me.data.user);
-        setBusinesses(me.data.businesses);
+        setBusinesses(me.data.businesses ?? []);
         setStatus('authenticated');
       } catch { setStatus('anonymous'); }
     })();
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const r = await api.post('/auth/login', { email, password });
     setAccessToken(r.data.access_token);
     setUser(r.data.user);
-    setBusinesses(r.data.businesses);
+    setBusinesses(r.data.businesses ?? []);
     setStatus('authenticated');
   }, []);
 
