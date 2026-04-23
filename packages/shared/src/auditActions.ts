@@ -68,6 +68,32 @@ export const AUDIT = {
   CREDIT_MEMO_VOID: 'credit_memo.void',
   CREDIT_MEMO_APPLY: 'credit_memo.apply',
   CREDIT_MEMO_UNAPPLY: 'credit_memo.unapply',
+
+  // Vendors
+  VENDOR_CREATE: 'vendor.create',
+  VENDOR_UPDATE: 'vendor.update',
+  VENDOR_DELETE: 'vendor.delete',
+
+  // Bills
+  BILL_CREATE: 'bill.create',
+  BILL_UPDATE: 'bill.update',
+  BILL_ADD_LINE: 'bill.add_line',
+  BILL_REMOVE_LINE: 'bill.remove_line',
+  BILL_POST: 'bill.post',
+  BILL_VOID: 'bill.void',
+
+  // Bill payments
+  BILL_PAYMENT_CREATE: 'bill_payment.create',
+  BILL_PAYMENT_POST: 'bill_payment.post',
+  BILL_PAYMENT_VOID: 'bill_payment.void',
+  BILL_PAYMENT_APPLY: 'bill_payment.apply',
+  BILL_PAYMENT_UNAPPLY: 'bill_payment.unapply',
+
+  // Vendor credits
+  VENDOR_CREDIT_CREATE: 'vendor_credit.create',
+  VENDOR_CREDIT_POST: 'vendor_credit.post',
+  VENDOR_CREDIT_APPLY: 'vendor_credit.apply',
+  VENDOR_CREDIT_VOID: 'vendor_credit.void',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
