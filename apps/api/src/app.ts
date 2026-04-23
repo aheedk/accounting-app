@@ -22,6 +22,7 @@ import vendorRoutes from './routes/vendors.js';
 import billRoutes from './routes/bills.js';
 import billPaymentRoutes from './routes/billPayments.js';
 import vendorCreditRoutes from './routes/vendorCredits.js';
+import tenNinetyNineReportRoutes from './routes/tenNinetyNineReport.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -53,6 +54,7 @@ export function makeApp(): Express {
   app.use(billRoutes);
   app.use(billPaymentRoutes);
   app.use(vendorCreditRoutes);
+  app.use(tenNinetyNineReportRoutes);
   app.use(errorHandler);
   return app;
 }
