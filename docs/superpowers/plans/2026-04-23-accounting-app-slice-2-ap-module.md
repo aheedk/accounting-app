@@ -341,44 +341,57 @@ CREATE TRIGGER trg_bills_protect_posted BEFORE UPDATE OR DELETE ON bills FOR EAC
 CREATE TRIGGER trg_bill_payments_protect_posted BEFORE UPDATE OR DELETE ON bill_payments FOR EACH ROW EXECUTE FUNCTION ap_protect_posted('bill_payment');
 CREATE TRIGGER trg_vendor_credits_protect_posted BEFORE UPDATE OR DELETE ON vendor_credits FOR EACH ROW EXECUTE FUNCTION ap_protect_posted('vendor_credit');
 
--- Extend je_check_source to accept the new AP source_types
+-- Extend journal_entry_source_type ENUM with AP source types.
+-- (source_type is an ENUM column, not a CHECK constraint — ALTER TYPE, not ALTER TABLE.)
+ALTER TYPE journal_entry_source_type ADD VALUE IF NOT EXISTS 'bill';
+ALTER TYPE journal_entry_source_type ADD VALUE IF NOT EXISTS 'bill_payment';
+ALTER TYPE journal_entry_source_type ADD VALUE IF NOT EXISTS 'vendor_credit';
+
+-- Extend je_check_source to validate AP polymorphic source FKs.
+-- Keeps Slice 1 guardrails (manual must not have source_id, reversal must
+-- match reversed_entry_id) and adds bill / bill_payment / vendor_credit.
 CREATE OR REPLACE FUNCTION je_check_source()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.source_type = 'reversal' THEN
     IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM journal_entries WHERE id = NEW.source_id) THEN
-      RAISE EXCEPTION 'reversal entry must reference an existing journal_entries row' USING ERRCODE = '23514';
+      RAISE EXCEPTION 'reversal entry must reference an existing journal_entries row'
+        USING ERRCODE = '23514';
     END IF;
     IF NEW.reversed_entry_id IS NULL OR NEW.reversed_entry_id <> NEW.source_id THEN
-      RAISE EXCEPTION 'reversal entry reversed_entry_id must match source_id' USING ERRCODE = '23514';
+      RAISE EXCEPTION 'reversal entry: reversed_entry_id must equal source_id'
+        USING ERRCODE = '23514';
     END IF;
-    RETURN NEW;
-  END IF;
-  IF NEW.source_type = 'manual' THEN RETURN NEW; END IF;
-  IF NEW.source_id IS NULL THEN
-    RAISE EXCEPTION 'source_id required for source_type %', NEW.source_type USING ERRCODE = '23514';
-  END IF;
-  IF NEW.source_type = 'invoice' AND NOT EXISTS (SELECT 1 FROM invoices WHERE id = NEW.source_id) THEN
-    RAISE EXCEPTION 'invoice % not found', NEW.source_id USING ERRCODE = '23514';
-  ELSIF NEW.source_type = 'payment' AND NOT EXISTS (SELECT 1 FROM payments WHERE id = NEW.source_id) THEN
-    RAISE EXCEPTION 'payment % not found', NEW.source_id USING ERRCODE = '23514';
-  ELSIF NEW.source_type = 'credit_memo' AND NOT EXISTS (SELECT 1 FROM credit_memos WHERE id = NEW.source_id) THEN
-    RAISE EXCEPTION 'credit_memo % not found', NEW.source_id USING ERRCODE = '23514';
-  ELSIF NEW.source_type = 'bill' AND NOT EXISTS (SELECT 1 FROM bills WHERE id = NEW.source_id) THEN
-    RAISE EXCEPTION 'bill % not found', NEW.source_id USING ERRCODE = '23514';
-  ELSIF NEW.source_type = 'bill_payment' AND NOT EXISTS (SELECT 1 FROM bill_payments WHERE id = NEW.source_id) THEN
-    RAISE EXCEPTION 'bill_payment % not found', NEW.source_id USING ERRCODE = '23514';
-  ELSIF NEW.source_type = 'vendor_credit' AND NOT EXISTS (SELECT 1 FROM vendor_credits WHERE id = NEW.source_id) THEN
-    RAISE EXCEPTION 'vendor_credit % not found', NEW.source_id USING ERRCODE = '23514';
+  ELSIF NEW.source_type = 'invoice' THEN
+    IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM invoices WHERE id = NEW.source_id) THEN
+      RAISE EXCEPTION 'invoice-sourced JE must reference invoices(id) in source_id' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.source_type = 'payment' THEN
+    IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM payments WHERE id = NEW.source_id) THEN
+      RAISE EXCEPTION 'payment-sourced JE must reference payments(id) in source_id' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.source_type = 'credit_memo' THEN
+    IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM credit_memos WHERE id = NEW.source_id) THEN
+      RAISE EXCEPTION 'credit_memo-sourced JE must reference credit_memos(id) in source_id' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.source_type = 'bill' THEN
+    IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM bills WHERE id = NEW.source_id) THEN
+      RAISE EXCEPTION 'bill-sourced JE must reference bills(id) in source_id' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.source_type = 'bill_payment' THEN
+    IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM bill_payments WHERE id = NEW.source_id) THEN
+      RAISE EXCEPTION 'bill_payment-sourced JE must reference bill_payments(id) in source_id' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.source_type = 'vendor_credit' THEN
+    IF NEW.source_id IS NULL OR NOT EXISTS (SELECT 1 FROM vendor_credits WHERE id = NEW.source_id) THEN
+      RAISE EXCEPTION 'vendor_credit-sourced JE must reference vendor_credits(id) in source_id' USING ERRCODE = '23514';
+    END IF;
+  ELSIF NEW.source_type = 'manual' AND NEW.source_id IS NOT NULL THEN
+    RAISE EXCEPTION 'manual entry must not have source_id' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
--- Expand the journal_entries.source_type CHECK to accept new source_types
-ALTER TABLE journal_entries DROP CONSTRAINT IF EXISTS journal_entries_source_type_check;
-ALTER TABLE journal_entries ADD CONSTRAINT journal_entries_source_type_check
-  CHECK (source_type IN ('manual', 'invoice', 'payment', 'credit_memo', 'bill', 'bill_payment', 'vendor_credit', 'reversal'));
 ```
 
 - [ ] **Step 2: Apply + commit**
