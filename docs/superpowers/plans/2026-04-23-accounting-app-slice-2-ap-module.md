@@ -860,7 +860,7 @@ async function setup(t: TestDb) {
   const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
   await seedYearPeriods(t.db, biz.id, 2026);
   await seedCoa(t.db, biz.id);
-  const ap = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '2000').executeTakeFirstOrThrow();
+  const ap = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '2010').executeTakeFirstOrThrow();
   const expense = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '5010').executeTakeFirstOrThrow();
   const vendor = await makeVendor(t.db, biz.id, { name: 'Acme Supply' });
   return { firm, biz, user, ctx, ap, expense, vendor };
@@ -978,7 +978,7 @@ describe('billService', () => {
 Mirror `apps/api/src/services/ar/invoiceService.ts`. Mapping:
 - `invoices` → `bills`, `invoice_lines` → `bill_lines`, `invoice_number` → `bill_number`, `issue_date` → `bill_date`
 - `customer_id` → `vendor_id`, `revenue_account_id` → `expense_account_id`
-- `ar_account_id` → `ap_account_id`, code `'1100'` → `'2000'`
+- `ar_account_id` → `ap_account_id`, code `'1100'` → `'2010'` (AP account code in default CoA — NOT `'2000'`)
 - Remove all tax handling (no `tax_code_id`, no `tax_amount`, no `tax_total`, no `getEffectiveRate`)
 - Simple `total = subtotal = SUM(line_subtotal)` where `line_subtotal = quantity * unit_price`
 - JE shape: DR expense per distinct expense_account_id (sum of line_subtotals), CR AP for total
@@ -1093,7 +1093,7 @@ Tests:
 
 - [ ] **Step 2: Write service mirroring paymentService.ts**
 
-Map: `payments` → `bill_payments`, `payment_applications` → `bill_payment_applications`, `customer_id` → `vendor_id`, `invoice_id` → `bill_id`, `invoices` → `bills`, `credit_memos` → `vendor_credits`, `source_type: 'payment'` → `'bill_payment'`. JE: cash_account_id as credit (amount), ap_account as debit. AP account lookup: `getSystemAccount(..., business_id, '2000')`.
+Map: `payments` → `bill_payments`, `payment_applications` → `bill_payment_applications`, `customer_id` → `vendor_id`, `invoice_id` → `bill_id`, `invoices` → `bills`, `credit_memos` → `vendor_credits`, `source_type: 'payment'` → `'bill_payment'`. JE: cash_account_id as credit (amount), ap_account as debit. AP account lookup: `getSystemAccount(..., business_id, '2010')` (default CoA code for AP — NOT `'2000'`).
 
 Apply same reduce-as-string pattern learned in Slice 1 Task 15.
 
@@ -1122,7 +1122,7 @@ Tests:
 
 - [ ] **Step 2: Write service mirroring creditMemoService.ts**
 
-Map: `credit_memos` → `vendor_credits`, `customer_id` → `vendor_id`, `revenue_account_id` (Sales Returns) → `offset_account_id`, `ar_account_id` → `ap_account_id`, code `'1100'` → `'2000'`, `source_type: 'credit_memo'` → `'vendor_credit'`, `payment_applications` → `bill_payment_applications`, `payments` → `bill_payments`, `invoices` → `bills`, `invoice_id` → `bill_id`, `credit_memo_id` → `vendor_credit_id`.
+Map: `credit_memos` → `vendor_credits`, `customer_id` → `vendor_id`, `revenue_account_id` (Sales Returns) → `offset_account_id`, `ar_account_id` → `ap_account_id`, code `'1100'` → `'2010'` (default CoA AP code — NOT `'2000'`), `source_type: 'credit_memo'` → `'vendor_credit'`, `payment_applications` → `bill_payment_applications`, `payments` → `bill_payments`, `invoices` → `bills`, `invoice_id` → `bill_id`, `credit_memo_id` → `vendor_credit_id`.
 
 JE flips: `DR AP / CR offset_account` (the offset account is typically an expense contra).
 
