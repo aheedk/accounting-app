@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, FileBarChart, Users } from 'lucide-react';
+import { ArrowRight, FileBarChart, Users, Receipt } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type ReportCard = {
@@ -22,6 +22,12 @@ const reports: ReportCard[] = [
     name: 'AR Aging',
     description: 'Outstanding customer invoices bucketed by days past due.',
     icon: Users,
+  },
+  {
+    to: '/reports/1099',
+    name: '1099 Report',
+    description: 'Annual payments to 1099 vendors, grouped by vendor and tax ID.',
+    icon: Receipt,
   },
 ];
 

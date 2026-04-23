@@ -24,6 +24,19 @@ import PaymentDetailPage from '@/pages/payments/PaymentDetailPage';
 import CreditMemoListPage from '@/pages/credit-memos/CreditMemoListPage';
 import CreditMemoNewPage from '@/pages/credit-memos/CreditMemoNewPage';
 import CreditMemoDetailPage from '@/pages/credit-memos/CreditMemoDetailPage';
+import VendorListPage from '@/pages/vendors/VendorListPage';
+import VendorNewPage from '@/pages/vendors/VendorNewPage';
+import VendorDetailPage from '@/pages/vendors/VendorDetailPage';
+import BillListPage from '@/pages/bills/BillListPage';
+import BillNewPage from '@/pages/bills/BillNewPage';
+import BillDetailPage from '@/pages/bills/BillDetailPage';
+import BillPaymentListPage from '@/pages/bill-payments/BillPaymentListPage';
+import BillPaymentNewPage from '@/pages/bill-payments/BillPaymentNewPage';
+import BillPaymentDetailPage from '@/pages/bill-payments/BillPaymentDetailPage';
+import VendorCreditListPage from '@/pages/vendor-credits/VendorCreditListPage';
+import VendorCreditNewPage from '@/pages/vendor-credits/VendorCreditNewPage';
+import VendorCreditDetailPage from '@/pages/vendor-credits/VendorCreditDetailPage';
+import TenNinetyNineReportPage from '@/pages/reports/TenNinetyNineReportPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 import ComingSoonPage from '@/pages/ComingSoonPage';
 
@@ -70,14 +83,23 @@ export default function App() {
             <Route path="/settings/tax-codes" element={<TaxCodesPage />} />
             <Route path="/settings/periods" element={<PeriodsPage />} />
 
-            {/* Accounts Payable (placeholders) */}
-            <Route path="/ap/overview" element={<ComingSoonPage title="AP Overview" description="A single view of outstanding bills, upcoming payments, and vendor health." eta="Slice 2" />} />
-            <Route path="/ap/expenses" element={<ComingSoonPage title="Expense Transactions" description="Capture and categorize expenses as they hit the ledger." eta="Slice 2" />} />
-            <Route path="/ap/vendors" element={<ComingSoonPage title="Vendors" description="Vendor master list with contact info, payment terms, and balances." eta="Slice 2" />} />
-            <Route path="/ap/bills" element={<ComingSoonPage title="Bills" description="Enter and approve vendor bills before they are paid." eta="Slice 2" />} />
-            <Route path="/ap/bill-payments" element={<ComingSoonPage title="Bill Payments" description="Record payments against one or many vendor bills." eta="Slice 2" />} />
-            <Route path="/ap/contractors" element={<ComingSoonPage title="Contractors" description="Manage 1099 contractors and track their payments." eta="Slice 2" />} />
-            <Route path="/ap/1099s" element={<ComingSoonPage title="1099s" description="Generate and file 1099-NEC and 1099-MISC forms." eta="Slice 2" />} />
+            {/* Accounts Payable */}
+            <Route path="/ap/overview" element={<ComingSoonPage title="AP Overview" description="A single view of outstanding bills, upcoming payments, and vendor health." eta="Slice 3" />} />
+            <Route path="/ap/expenses" element={<ComingSoonPage title="Expense Transactions" description="Capture and categorize expenses as they hit the ledger." eta="Slice 3" />} />
+            <Route path="/ap/vendors" element={<VendorListPage />} />
+            <Route path="/ap/vendors/new" element={<VendorNewPage />} />
+            <Route path="/ap/vendors/:id" element={<VendorDetailPage />} />
+            <Route path="/ap/bills" element={<BillListPage />} />
+            <Route path="/ap/bills/new" element={<BillNewPage />} />
+            <Route path="/ap/bills/:id" element={<BillDetailPage />} />
+            <Route path="/ap/bill-payments" element={<BillPaymentListPage />} />
+            <Route path="/ap/bill-payments/new" element={<BillPaymentNewPage />} />
+            <Route path="/ap/bill-payments/:id" element={<BillPaymentDetailPage />} />
+            <Route path="/ap/vendor-credits" element={<VendorCreditListPage />} />
+            <Route path="/ap/vendor-credits/new" element={<VendorCreditNewPage />} />
+            <Route path="/ap/vendor-credits/:id" element={<VendorCreditDetailPage />} />
+            <Route path="/ap/contractors" element={<ComingSoonPage title="Contractors" description="Manage 1099 contractors and track their payments." eta="Slice 3" />} />
+            <Route path="/reports/1099" element={<TenNinetyNineReportPage />} />
 
             {/* Accounting (placeholders) */}
             <Route path="/accounting/client-overview" element={<ComingSoonPage title="Client Overview" description="A workspace-level view of all your clients' books." eta="Slice 3" />} />
