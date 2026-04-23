@@ -105,6 +105,32 @@ describe('billService', () => {
     ).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
   });
 
+  it('addLine and removeLine work on drafts; refused on posted', async () => {
+    const { biz, ctx, vendor, expense } = await setup(t);
+    const draft = await t.db.transaction().execute(trx =>
+      billSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id,
+        bill_number: 'BILL-006', bill_date: '2026-04-15', due_date: '2026-05-15',
+        memo: null, terms: null,
+        lines: [{ description: 'A', quantity: '1', unit_price: '10', expense_account_id: expense.id }],
+      }),
+    );
+    const after = await t.db.transaction().execute(trx =>
+      billSvc.addLine(trx, ctx, { bill_id: draft.bill.id,
+        line: { description: 'B', quantity: '2', unit_price: '5', expense_account_id: expense.id } }),
+    );
+    expect(after.lines).toHaveLength(2);
+    expect(after.bill.subtotal).toBe('20.0000');
+
+    await t.db.transaction().execute(trx => billSvc.postBill(trx, ctx, { bill_id: draft.bill.id }));
+    await expect(
+      t.db.transaction().execute(trx =>
+        billSvc.addLine(trx, ctx, { bill_id: draft.bill.id,
+          line: { description: 'C', quantity: '1', unit_price: '1', expense_account_id: expense.id } }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
+  });
+
   it('voidBill creates reversing JE and flips bill to voided', async () => {
     const { biz, ctx, vendor, expense } = await setup(t);
     const draft = await t.db.transaction().execute(trx =>
