@@ -73,7 +73,9 @@ export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expens
 export type FiscalPeriodStatus = 'open' | 'closed';
 export type JournalEntryStatus = 'draft' | 'posted' | 'voided';
 export type JournalEntrySourceType =
-  | 'manual' | 'invoice' | 'payment' | 'credit_memo' | 'reversal' | 'adjustment';
+  | 'manual' | 'invoice' | 'payment' | 'credit_memo'
+  | 'bill' | 'bill_payment' | 'vendor_credit'
+  | 'reversal' | 'adjustment';
 
 export interface ChartOfAccountsTable {
   id: Generated<string>;
@@ -264,6 +266,113 @@ export interface CreditMemosTable {
   updated_at: Generated<Timestamp>;
 }
 
+export type BillStatus = 'draft' | 'posted' | 'paid' | 'voided';
+export type BillPaymentStatus = 'draft' | 'posted' | 'voided';
+export type VendorCreditStatus = 'draft' | 'posted' | 'applied' | 'voided';
+
+export interface VendorsTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  billing_address: ColumnType<unknown, unknown, unknown> | null;
+  tax_id: string | null;
+  is_1099: Generated<boolean>;
+  default_terms_days: Generated<number>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface BillsTable {
+  id: Generated<string>;
+  business_id: string;
+  vendor_id: string;
+  bill_number: string;
+  bill_date: ColumnType<string, string, string>;
+  due_date: ColumnType<string, string, string>;
+  status: Generated<BillStatus>;
+  subtotal: ColumnType<string, string | number | undefined, string | number>;
+  total: ColumnType<string, string | number | undefined, string | number>;
+  ap_account_id: string;
+  posted_journal_entry_id: string | null;
+  memo: string | null;
+  terms: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface BillLinesTable {
+  id: Generated<string>;
+  bill_id: string;
+  line_number: number;
+  description: string;
+  quantity: ColumnType<string, string | number, string | number>;
+  unit_price: ColumnType<string, string | number, string | number>;
+  expense_account_id: string;
+  line_subtotal: ColumnType<string, string | number, string | number>;
+}
+
+export interface BillPaymentsTable {
+  id: Generated<string>;
+  business_id: string;
+  vendor_id: string;
+  payment_date: ColumnType<string, string, string>;
+  payment_method: PaymentMethod;
+  reference: string | null;
+  amount: ColumnType<string, string | number, string | number>;
+  unapplied_amount: ColumnType<string, string | number | undefined, string | number>;
+  cash_account_id: string;
+  status: Generated<BillPaymentStatus>;
+  posted_journal_entry_id: string | null;
+  memo: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface BillPaymentApplicationsTable {
+  id: Generated<string>;
+  bill_payment_id: string | null;
+  vendor_credit_id: string | null;
+  bill_id: string;
+  applied_amount: ColumnType<string, string | number, string | number>;
+  applied_at: Generated<Timestamp>;
+  applied_by_user_id: string | null;
+}
+
+export interface VendorCreditsTable {
+  id: Generated<string>;
+  business_id: string;
+  vendor_id: string;
+  credit_date: ColumnType<string, string, string>;
+  amount: ColumnType<string, string | number, string | number>;
+  remaining_amount: ColumnType<string, string | number, string | number>;
+  offset_account_id: string;
+  ap_account_id: string;
+  status: Generated<VendorCreditStatus>;
+  posted_journal_entry_id: string | null;
+  memo: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
@@ -283,4 +392,10 @@ export interface DB {
   payments: PaymentsTable;
   payment_applications: PaymentApplicationsTable;
   credit_memos: CreditMemosTable;
+  vendors: VendorsTable;
+  bills: BillsTable;
+  bill_lines: BillLinesTable;
+  bill_payments: BillPaymentsTable;
+  bill_payment_applications: BillPaymentApplicationsTable;
+  vendor_credits: VendorCreditsTable;
 }
