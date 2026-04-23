@@ -119,12 +119,12 @@ CREATE TABLE bills (
   created_by_user_id uuid REFERENCES users(id),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz,
-  UNIQUE (business_id, bill_number) WHERE deleted_at IS NULL,
   CONSTRAINT bills_posted_has_je CHECK (
     (status = 'draft' AND posted_journal_entry_id IS NULL)
     OR (status <> 'draft')
   )
 );
+CREATE UNIQUE INDEX uq_bills_business_number ON bills(business_id, bill_number) WHERE deleted_at IS NULL;
 CREATE INDEX idx_bills_biz_status ON bills(business_id, status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_bills_vendor ON bills(vendor_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_bills_due_date ON bills(business_id, due_date) WHERE deleted_at IS NULL AND status IN ('posted','paid');
