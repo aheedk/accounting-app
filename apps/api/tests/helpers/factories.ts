@@ -99,3 +99,16 @@ export async function makeTaxCode(
   }).execute();
   return tc;
 }
+
+export async function makeVendor(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: Partial<{ name: string; email: string | null; is_1099: boolean }> = {},
+) {
+  return db.insertInto('vendors').values({
+    business_id,
+    name: opts.name ?? `Vendor ${Math.random().toString(36).slice(2, 8)}`,
+    email: opts.email ?? null,
+    is_1099: opts.is_1099 ?? false,
+  }).returningAll().executeTakeFirstOrThrow();
+}
