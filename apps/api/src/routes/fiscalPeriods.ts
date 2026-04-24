@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as periods from '../services/core/fiscalPeriodService.js';
+import * as periodClose from '../services/core/periodCloseService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -38,21 +39,23 @@ router.post('/businesses/:businessId/periods/seed-year', requireMinRole('firm_ad
   } catch (e) { next(e); }
 });
 
-router.post('/businesses/:businessId/periods/:periodId/close', requireMinRole('firm_admin'), async (req, res, next) => {
+router.post('/businesses/:businessId/periods/:id/close', requireMinRole('accountant'), async (req, res, next) => {
   try {
-    const updated = await db.transaction().execute(trx =>
-      periods.closePeriod(trx, ctxFromReq(req), { period_id: req.params['periodId']! }),
+    const body = schemas.periodCloseBodySchema.parse(req.body ?? {});
+    const result = await db.transaction().execute(trx =>
+      periodClose.closePeriod(trx, ctxFromReq(req), { period_id: req.params['id']!, memo: body.memo ?? null }),
     );
-    res.json(updated);
+    res.json(result);
   } catch (e) { next(e); }
 });
 
-router.post('/businesses/:businessId/periods/:periodId/reopen', requireMinRole('firm_admin'), async (req, res, next) => {
+router.post('/businesses/:businessId/periods/:id/reopen', requireMinRole('firm_admin'), async (req, res, next) => {
   try {
-    const updated = await db.transaction().execute(trx =>
-      periods.reopenPeriod(trx, ctxFromReq(req), { period_id: req.params['periodId']! }),
+    const body = schemas.periodReopenBodySchema.parse(req.body);
+    const result = await db.transaction().execute(trx =>
+      periodClose.reopenPeriod(trx, ctxFromReq(req), { period_id: req.params['id']!, reason: body.reason }),
     );
-    res.json(updated);
+    res.json(result);
   } catch (e) { next(e); }
 });
 
