@@ -23,6 +23,12 @@ npm run dev
 
 Then visit http://localhost:5173.
 
+## Required env vars
+
+- `DATABASE_URL` — Postgres connection string.
+- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` — JWT signing secrets.
+- `FIELD_ENCRYPTION_KEY` — 32-byte hex key for sensitive-field encryption (vendor tax IDs, employee SSNs). Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Rotating this key invalidates all encrypted fields — back them up first.
+
 ## Manual smoke test (Slice 1 Foundation)
 1. `docker compose up -d postgres && npm run db:migrate && npm run db:seed`
 2. `npm run dev`
