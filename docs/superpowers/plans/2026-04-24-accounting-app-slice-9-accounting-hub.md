@@ -15,6 +15,11 @@
 
 ## Locked decisions
 
+> **Plan-impl drift log** (patched after Phase A/B execution):
+> - `payment_applications.applied_amount` is the actual column name (verified at `db/migrations/0013_payments_and_applications.sql:39`). Same convention as `bill_payment_applications.applied_amount`.
+> - The first Phase A commit `f7419d3` accidentally omitted `packages/shared/src/auditActions.ts`; the periodReview agent re-added the entries and a follow-up commit `4759abd` captured them. The file now contains slice 9 audit actions exactly once.
+> - Slice 9's `recurringTemplateService.runDue` ships **journal_entry materialization only**. Invoice + bill template_types pass through the create schema but throw `PRECONDITION_FAILED` at materialization time. A future polish slice will plug those in.
+
 1. **Lazy materialization, no cron.** "Run all due" is user-triggered (button in UI + API endpoint). Each materialization advances `next_run_date` by the recurrence interval; loops until `next_run_date > today`. All in one transaction per template.
 2. **Default review tasks** are seeded automatically when a fiscal_period is created (via DB function or service hook). For existing periods, a one-shot seed function backfills.
 3. **Cross-business reads:** `firm_admin` already bypasses the tenancy check via `effective_role`. The `firmDashboardService` selects across all businesses in the firm. Other roles get a 403 from the route.
