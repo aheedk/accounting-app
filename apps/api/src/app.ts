@@ -49,6 +49,8 @@ import inventoryOverviewRouter from './routes/inventoryOverview.js';
 import managementReportsRouter from './routes/managementReports.js';
 import performanceReportsRouter from './routes/performanceReports.js';
 import customReportsRouter from './routes/customReports.js';
+import budgetsRouter from './routes/budgets.js';
+import csvExportsRouter from './routes/csvExports.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -107,6 +109,8 @@ export function makeApp(): Express {
   app.use(managementReportsRouter);
   app.use(performanceReportsRouter);
   app.use(customReportsRouter);
+  app.use(budgetsRouter);
+  app.use(csvExportsRouter);
   app.use(errorHandler);
   return app;
 }
