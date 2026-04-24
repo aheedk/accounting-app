@@ -18,3 +18,5 @@ export * from './bankAccount.js';
 export * from './bankTransaction.js';
 export * from './reconciliation.js';
 export * from './financialReports.js';
+export * from './bankTransactionRule.js';
+export * from './fixedAsset.js';

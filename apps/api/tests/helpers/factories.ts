@@ -127,3 +127,37 @@ export async function makeBankAccount(
     account_last_four: opts.account_last_four ?? null,
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeBankRule(
+  db: Kysely<DB>,
+  business_id: string,
+  offset_account_id: string,
+  opts: Partial<{ name: string; description_contains: string; sign_filter: 'any' | 'inflow_only' | 'outflow_only' }> = {},
+) {
+  return db.insertInto('bank_transaction_rules').values({
+    business_id,
+    offset_account_id,
+    name: opts.name ?? 'Test Rule',
+    description_contains: opts.description_contains ?? 'stripe',
+    sign_filter: opts.sign_filter ?? 'any',
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function makeFixedAsset(
+  db: Kysely<DB>,
+  business_id: string,
+  accounts: { asset: string; dep_expense: string; accumulated: string },
+  opts: Partial<{ name: string; cost: string; salvage_value: string; useful_life_years: number; purchase_date: string }> = {},
+) {
+  return db.insertInto('fixed_assets').values({
+    business_id,
+    name: opts.name ?? 'Laptop',
+    asset_account_id: accounts.asset,
+    depreciation_expense_account_id: accounts.dep_expense,
+    accumulated_depreciation_account_id: accounts.accumulated,
+    purchase_date: opts.purchase_date ?? '2026-01-01',
+    cost: opts.cost ?? '2400.00',
+    salvage_value: opts.salvage_value ?? '0',
+    useful_life_years: opts.useful_life_years ?? 2,
+  }).returningAll().executeTakeFirstOrThrow();
+}

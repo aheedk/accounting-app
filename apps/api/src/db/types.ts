@@ -419,6 +419,55 @@ export interface BankReconciliationsTable {
   memo: string | null;
 }
 
+export type BankRuleSignFilter = 'any' | 'inflow_only' | 'outflow_only';
+export type FixedAssetStatus = 'active' | 'disposed';
+export type DepreciationMethod = 'straight_line';
+
+export interface BankTransactionRulesTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  description_contains: string;
+  min_amount: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  max_amount: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  sign_filter: Generated<BankRuleSignFilter>;
+  offset_account_id: string;
+  priority: Generated<number>;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface FixedAssetsTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  asset_account_id: string;
+  depreciation_expense_account_id: string;
+  accumulated_depreciation_account_id: string;
+  purchase_date: ColumnType<string, string, string>;
+  cost: ColumnType<string, string | number, string | number>;
+  salvage_value: ColumnType<string, string | number | undefined, string | number>;
+  useful_life_years: number;
+  depreciation_method: Generated<DepreciationMethod>;
+  status: Generated<FixedAssetStatus>;
+  memo: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface DepreciationEntriesTable {
+  id: Generated<string>;
+  fixed_asset_id: string;
+  period_end: ColumnType<string, string, string>;
+  amount: ColumnType<string, string | number, string | number>;
+  journal_entry_id: string;
+  posted_at: Generated<Timestamp>;
+  posted_by_user_id: string | null;
+}
+
 export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
@@ -447,4 +496,7 @@ export interface DB {
   bank_accounts: BankAccountsTable;
   bank_transactions: BankTransactionsTable;
   bank_reconciliations: BankReconciliationsTable;
+  bank_transaction_rules: BankTransactionRulesTable;
+  fixed_assets: FixedAssetsTable;
+  depreciation_entries: DepreciationEntriesTable;
 }

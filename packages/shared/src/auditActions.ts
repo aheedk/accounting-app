@@ -105,6 +105,17 @@ export const AUDIT = {
   BANK_TRANSACTION_UNREVIEW: 'bank_transaction.unreview',
   RECONCILIATION_CREATE: 'reconciliation.create',
   RECONCILIATION_DELETE: 'reconciliation.delete',
+
+  // Bank rules
+  BANK_RULE_CREATE: 'bank_rule.create',
+  BANK_RULE_UPDATE: 'bank_rule.update',
+  BANK_RULE_DELETE: 'bank_rule.delete',
+  BANK_RULE_APPLY: 'bank_rule.apply',
+
+  // Fixed assets
+  FIXED_ASSET_CREATE: 'fixed_asset.create',
+  FIXED_ASSET_UPDATE: 'fixed_asset.update',
+  FIXED_ASSET_DEPRECIATE: 'fixed_asset.depreciate',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
