@@ -116,6 +116,11 @@ export const AUDIT = {
   FIXED_ASSET_CREATE: 'fixed_asset.create',
   FIXED_ASSET_UPDATE: 'fixed_asset.update',
   FIXED_ASSET_DEPRECIATE: 'fixed_asset.depreciate',
+
+  // Cost centers
+  COST_CENTER_CREATE: 'cost_center.create',
+  COST_CENTER_UPDATE: 'cost_center.update',
+  COST_CENTER_DELETE: 'cost_center.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

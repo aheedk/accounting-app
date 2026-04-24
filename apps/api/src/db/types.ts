@@ -11,12 +11,23 @@ export interface FirmsTable {
   updated_at: Generated<Timestamp>;
 }
 
+export interface BusinessAddress {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
 export interface BusinessesTable {
   id: Generated<string>;
   firm_id: string;
   name: string;
   legal_name: string | null;
+  tax_id: string | null;
   fiscal_year_start_month: Generated<number>;
+  address: ColumnType<BusinessAddress | null, string | null, string | null>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;
@@ -458,6 +469,17 @@ export interface FixedAssetsTable {
   deleted_at: Timestamp | null;
 }
 
+export interface CostCentersTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  code: string | null;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
 export interface DepreciationEntriesTable {
   id: Generated<string>;
   fixed_asset_id: string;
@@ -499,4 +521,5 @@ export interface DB {
   bank_transaction_rules: BankTransactionRulesTable;
   fixed_assets: FixedAssetsTable;
   depreciation_entries: DepreciationEntriesTable;
+  cost_centers: CostCentersTable;
 }
