@@ -23,6 +23,9 @@ import billRoutes from './routes/bills.js';
 import billPaymentRoutes from './routes/billPayments.js';
 import vendorCreditRoutes from './routes/vendorCredits.js';
 import tenNinetyNineReportRoutes from './routes/tenNinetyNineReport.js';
+import bankAccountRoutes from './routes/bankAccounts.js';
+import bankTransactionRoutes from './routes/bankTransactions.js';
+import reconciliationRoutes from './routes/reconciliations.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -55,6 +58,9 @@ export function makeApp(): Express {
   app.use(billPaymentRoutes);
   app.use(vendorCreditRoutes);
   app.use(tenNinetyNineReportRoutes);
+  app.use(bankAccountRoutes);
+  app.use(bankTransactionRoutes);
+  app.use(reconciliationRoutes);
   app.use(errorHandler);
   return app;
 }
