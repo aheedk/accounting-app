@@ -12,12 +12,12 @@ export interface FirmsTable {
 }
 
 export interface BusinessAddress {
-  line1?: string;
-  line2?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  country?: string;
+  line1?: string | undefined;
+  line2?: string | undefined;
+  city?: string | undefined;
+  state?: string | undefined;
+  postal_code?: string | undefined;
+  country?: string | undefined;
 }
 
 export interface BusinessesTable {

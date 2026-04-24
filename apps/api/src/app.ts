@@ -29,6 +29,9 @@ import bankTransactionRoutes from './routes/bankTransactions.js';
 import reconciliationRoutes from './routes/reconciliations.js';
 import bankRuleRoutes from './routes/bankRules.js';
 import fixedAssetRoutes from './routes/fixedAssets.js';
+import businessesRoutes from './routes/businesses.js';
+import usersRoutes from './routes/users.js';
+import costCentersRoutes from './routes/costCenters.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -67,6 +70,9 @@ export function makeApp(): Express {
   app.use(reconciliationRoutes);
   app.use(bankRuleRoutes);
   app.use(fixedAssetRoutes);
+  app.use(businessesRoutes);
+  app.use(usersRoutes);
+  app.use(costCentersRoutes);
   app.use(errorHandler);
   return app;
 }
