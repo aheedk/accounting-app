@@ -188,3 +188,18 @@ export async function makeExpenseTransaction(
     transaction_date: opts.transaction_date ?? '2026-04-01',
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeRecurringTemplate(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: Partial<{ name: string; template_type: 'journal_entry'|'invoice'|'bill'; payload: unknown; recurrence: 'weekly'|'monthly'|'quarterly'|'yearly'; next_run_date: string }> = {},
+) {
+  return db.insertInto('recurring_templates').values({
+    business_id,
+    name: opts.name ?? 'Template',
+    template_type: opts.template_type ?? 'journal_entry',
+    payload: (opts.payload ?? {}) as object,
+    recurrence: opts.recurrence ?? 'monthly',
+    next_run_date: opts.next_run_date ?? '2026-04-01',
+  }).returningAll().executeTakeFirstOrThrow();
+}
