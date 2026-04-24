@@ -262,3 +262,34 @@ export async function makeSalesOrder(
     order_date: opts.order_date ?? '2026-04-01',
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeBudget(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: Partial<{ name: string; fiscal_year: number; status: 'draft'|'active'|'archived' }> = {},
+) {
+  return db.insertInto('budgets').values({
+    business_id,
+    name: opts.name ?? `Budget ${Math.random().toString(36).slice(2, 6)}`,
+    fiscal_year: opts.fiscal_year ?? 2026,
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function makeCustomReport(
+  db: Kysely<DB>,
+  business_id: string,
+  owner_user_id: string,
+  opts: Partial<{ name: string; definition: unknown }> = {},
+) {
+  return db.insertInto('custom_report_definitions').values({
+    business_id,
+    owner_user_id,
+    name: opts.name ?? 'Test Report',
+    definition: (opts.definition ?? {
+      account_ids: [],
+      date_range: { from: '2026-01-01', to: '2026-12-31' },
+      group_by: 'account',
+      columns: ['debit', 'credit', 'net'],
+    }) as object,
+  }).returningAll().executeTakeFirstOrThrow();
+}

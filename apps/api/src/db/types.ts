@@ -482,6 +482,37 @@ export interface ShippingLabelsTable {
   created_by_user_id: string | null;
 }
 
+export interface CustomReportDefinitionsTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  owner_user_id: string;
+  definition: ColumnType<unknown, unknown, unknown>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export type BudgetStatus = 'draft' | 'active' | 'archived';
+
+export interface BudgetsTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  fiscal_year: number;
+  status: Generated<BudgetStatus>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
+export interface BudgetLinesTable {
+  id: Generated<string>;
+  budget_id: string;
+  account_id: string;
+  month_offset: number;
+  amount: ColumnType<string, string | number, string | number>;
+}
+
 export interface BillsTable {
   id: Generated<string>;
   business_id: string;
@@ -757,4 +788,7 @@ export interface DB {
   sales_orders: SalesOrdersTable;
   sales_order_lines: SalesOrderLinesTable;
   shipping_labels: ShippingLabelsTable;
+  custom_report_definitions: CustomReportDefinitionsTable;
+  budgets: BudgetsTable;
+  budget_lines: BudgetLinesTable;
 }
