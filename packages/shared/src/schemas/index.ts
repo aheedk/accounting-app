@@ -35,3 +35,7 @@ export * from './salesOrder.js';
 export * from './shippingLabel.js';
 export * from './customReport.js';
 export * from './budget.js';
+export * from './employee.js';
+export * from './payRun.js';
+export * from './payrollTax.js';
+export * from './complianceItem.js';

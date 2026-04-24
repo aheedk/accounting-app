@@ -180,6 +180,19 @@ export const AUDIT = {
   BUDGET_UPDATE: 'budget.update',
   BUDGET_DELETE: 'budget.delete',
   CSV_EXPORT: 'csv.export',
+
+  // Slice 13 — Payroll
+  EMPLOYEE_CREATE: 'employee.create',
+  EMPLOYEE_UPDATE: 'employee.update',
+  EMPLOYEE_DELETE: 'employee.delete',
+  EMPLOYEE_SSN_REVEAL: 'employee.ssn_reveal',
+  PAY_RUN_CREATE: 'pay_run.create',
+  PAY_RUN_UPDATE: 'pay_run.update',
+  PAY_RUN_FINALIZE: 'pay_run.finalize',
+  PAY_RUN_VOID: 'pay_run.void',
+  PAYROLL_TAX_RECORD: 'payroll_tax.record',
+  PAYROLL_TAX_PAY: 'payroll_tax.pay',
+  COMPLIANCE_ITEM_UPDATE: 'compliance_item.update',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
