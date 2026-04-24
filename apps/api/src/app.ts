@@ -44,6 +44,8 @@ import filesRouter from './routes/files.js';
 import receiptsRouter from './routes/receipts.js';
 import integrationInboxRouter from './routes/integrationInbox.js';
 import salesOrdersRoutes from './routes/salesOrders.js';
+import shippingLabelsRouter from './routes/shippingLabels.js';
+import inventoryOverviewRouter from './routes/inventoryOverview.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -97,6 +99,8 @@ export function makeApp(): Express {
   app.use(receiptsRouter);
   app.use(integrationInboxRouter);
   app.use(salesOrdersRoutes);
+  app.use(shippingLabelsRouter);
+  app.use(inventoryOverviewRouter);
   app.use(errorHandler);
   return app;
 }
