@@ -134,6 +134,16 @@ export const AUDIT = {
   EXPENSE_TRANSACTION_POST: 'expense_transaction.post',
   EXPENSE_TRANSACTION_VOID: 'expense_transaction.void',
   VENDOR_TAX_ID_REVEAL: 'vendor.tax_id_reveal',
+
+  // Slice 9 — Period review tasks
+  PERIOD_REVIEW_TASK_UPDATE: 'period_review_task.update',
+  PERIOD_REVIEW_TASK_SIGN_OFF: 'period_review_task.sign_off',
+
+  // Slice 9 — Recurring templates
+  RECURRING_TEMPLATE_CREATE: 'recurring_template.create',
+  RECURRING_TEMPLATE_UPDATE: 'recurring_template.update',
+  RECURRING_TEMPLATE_DELETE: 'recurring_template.delete',
+  RECURRING_TEMPLATE_RUN: 'recurring_template.run',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
