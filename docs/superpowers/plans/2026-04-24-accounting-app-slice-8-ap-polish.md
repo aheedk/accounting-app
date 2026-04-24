@@ -20,6 +20,8 @@
 > - Default seeded CoA already includes code `1010 Cash on Hand`. New tests use `1015` for a manually-created cash row to avoid the `(business_id, code)` unique-constraint collision.
 > - Vendor existing test file `vendor.test.ts` was updated by Task 7 to use `tax_id_type: 'EIN'` and assert on `tax_id_last_four` / `tax_id_type` / `tax_id_encrypted` instead of the dropped plaintext field.
 > - Test runs use `--pool=forks --poolOptions.forks.singleFork=true` to avoid Docker testcontainer resource exhaustion when running in parallel with other workspaces. The default parallel pool spawned 16+ Postgres containers and timed out hooks.
+> - `apps/api/src/app.ts` mounts routers WITHOUT a `/api/v1` prefix; route paths start with `/businesses/:businessId/...` directly. The plan's snippets that used `app.use('/api/v1', someRouter)` are incorrect — use `app.use(someRouter)` and let the route declarations carry the full path.
+> - Two pre-existing lint errors live on `main` and slice 8 inherits them: `apps/api/src/services/core/ledgerService.ts:243` (no-explicit-any) and `apps/api/tests/unit/tokenService.test.ts:1` (unused `vi` import). Will be addressed in the pre-merge cleanup task.
 
 1. **Field encryption uses xchacha20poly1305 from `@noble/ciphers`** (pure JS). Avoids the libsodium native-build risk on Railway. 24-byte nonce stored as the prefix of the bytea blob: `nonce || ciphertext_with_tag`. Key from env `FIELD_ENCRYPTION_KEY` (32 bytes hex).
 2. **Vendor `tax_id` migration is destructive of any existing plaintext data.** Slice 7 hasn't shipped real tenant data yet (still demo-only); we drop the old text column outright. `0030` includes a `WARNING` comment.
