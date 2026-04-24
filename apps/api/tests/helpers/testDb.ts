@@ -60,6 +60,11 @@ async function runMigrations(pool: pg.Pool) {
 export async function truncateAll(db: Kysely<DB>) {
   await sql`
     TRUNCATE
+      compliance_items,
+      payroll_tax_liabilities,
+      pay_run_lines,
+      pay_runs,
+      employees,
       budget_lines,
       budgets,
       custom_report_definitions,

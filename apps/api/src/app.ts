@@ -51,6 +51,11 @@ import performanceReportsRouter from './routes/performanceReports.js';
 import customReportsRouter from './routes/customReports.js';
 import budgetsRouter from './routes/budgets.js';
 import csvExportsRouter from './routes/csvExports.js';
+import employeesRouter from './routes/employees.js';
+import complianceRouter from './routes/compliance.js';
+import payrollTaxesRouter from './routes/payrollTaxes.js';
+import payrollOverviewRouter from './routes/payrollOverview.js';
+import payRunsRouter from './routes/payRuns.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -111,6 +116,11 @@ export function makeApp(): Express {
   app.use(customReportsRouter);
   app.use(budgetsRouter);
   app.use(csvExportsRouter);
+  app.use(employeesRouter);
+  app.use(complianceRouter);
+  app.use(payrollTaxesRouter);
+  app.use(payrollOverviewRouter);
+  app.use(payRunsRouter);
   app.use(errorHandler);
   return app;
 }

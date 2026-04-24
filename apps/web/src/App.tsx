@@ -81,7 +81,14 @@ import BooksReviewPage from '@/pages/accounting/BooksReviewPage';
 import RecurringTransactionsPage from '@/pages/accounting/RecurringTransactionsPage';
 import ReceiptsPage from '@/pages/accounting/ReceiptsPage';
 import IntegrationInboxPage from '@/pages/accounting/IntegrationInboxPage';
-import ComingSoonPage from '@/pages/ComingSoonPage';
+import PayrollOverviewPage from '@/pages/payroll/PayrollOverviewPage';
+import EmployeeListPage from '@/pages/payroll/EmployeeListPage';
+import EmployeeNewPage from '@/pages/payroll/EmployeeNewPage';
+import EmployeeDetailPage from '@/pages/payroll/EmployeeDetailPage';
+import PayrollContractorsPage from '@/pages/payroll/PayrollContractorsPage';
+import PayrollTaxesPage from '@/pages/payroll/PayrollTaxesPage';
+import CompliancePage from '@/pages/payroll/CompliancePage';
+// ComingSoonPage component intentionally kept in apps/web/src/pages/ for future stubs.
 
 export default function App() {
   return (
@@ -171,11 +178,13 @@ export default function App() {
             <Route path="/setup/users" element={<UsersPage />} />
 
             {/* Payroll (placeholders) */}
-            <Route path="/payroll/overview" element={<ComingSoonPage title="Payroll Overview" description="Upcoming runs, liabilities, and payroll health." eta="Slice 13" />} />
-            <Route path="/payroll/employees" element={<ComingSoonPage title="Employees" description="W-2 employees, pay rates, and deductions." eta="Slice 13" />} />
-            <Route path="/payroll/contractors" element={<ComingSoonPage title="Payroll Contractors" description="1099 contractors paid through payroll." eta="Slice 13" />} />
-            <Route path="/payroll/taxes" element={<ComingSoonPage title="Payroll Taxes" description="Federal, state, and local payroll tax filings." eta="Slice 13" />} />
-            <Route path="/payroll/compliance" element={<ComingSoonPage title="Compliance" description="State registrations, new-hire reporting, and labor-law notices." eta="Slice 13" />} />
+            <Route path="/payroll/overview" element={<PayrollOverviewPage />} />
+            <Route path="/payroll/employees" element={<EmployeeListPage />} />
+            <Route path="/payroll/employees/new" element={<EmployeeNewPage />} />
+            <Route path="/payroll/employees/:id" element={<EmployeeDetailPage />} />
+            <Route path="/payroll/contractors" element={<PayrollContractorsPage />} />
+            <Route path="/payroll/taxes" element={<PayrollTaxesPage />} />
+            <Route path="/payroll/compliance" element={<CompliancePage />} />
 
             {/* Inventory */}
             <Route path="/inventory/overview" element={<InventoryOverviewPage />} />

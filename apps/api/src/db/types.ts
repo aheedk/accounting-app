@@ -513,6 +513,102 @@ export interface BudgetLinesTable {
   amount: ColumnType<string, string | number, string | number>;
 }
 
+export type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+export type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
+
+export interface EmployeesTable {
+  id: Generated<string>;
+  business_id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  address: ColumnType<unknown, unknown, unknown> | null;
+  ssn_encrypted: Buffer | null;
+  ssn_last_four: string | null;
+  hire_date: ColumnType<string, string, string>;
+  termination_date: ColumnType<string, string, string> | null;
+  default_pay_rate_cents: Generated<string>;
+  default_pay_frequency: Generated<PayFrequency>;
+  w4_filing_status: W4FilingStatus | null;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export type PayRunStatus = 'draft' | 'finalized' | 'void';
+
+export interface PayRunsTable {
+  id: Generated<string>;
+  business_id: string;
+  pay_period_start: ColumnType<string, string, string>;
+  pay_period_end: ColumnType<string, string, string>;
+  pay_date: ColumnType<string, string, string>;
+  status: Generated<PayRunStatus>;
+  journal_entry_id: string | null;
+  wages_expense_account_id: string;
+  payroll_tax_expense_account_id: string;
+  cash_account_id: string;
+  fed_tax_liability_account_id: string;
+  state_tax_liability_account_id: string | null;
+  fica_liability_account_id: string;
+  memo: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  finalized_at: Timestamp | null;
+  finalized_by_user_id: string | null;
+}
+
+export interface PayRunLinesTable {
+  id: Generated<string>;
+  pay_run_id: string;
+  employee_id: string;
+  gross: ColumnType<string, string | number, string | number>;
+  federal_wh: Generated<string>;
+  state_wh: Generated<string>;
+  fica_employee: Generated<string>;
+  fica_employer: Generated<string>;
+  medicare_employee: Generated<string>;
+  medicare_employer: Generated<string>;
+  other_deductions: Generated<string>;
+  net: ColumnType<string, string | number, string | number>;
+}
+
+export type PayrollTaxPeriod = 'monthly' | 'quarterly' | 'annual';
+export type PayrollTaxStatus = 'accrued' | 'paid';
+
+export interface PayrollTaxLiabilitiesTable {
+  id: Generated<string>;
+  business_id: string;
+  period: PayrollTaxPeriod;
+  period_start: ColumnType<string, string, string>;
+  period_end: ColumnType<string, string, string>;
+  liability_account_id: string;
+  amount: ColumnType<string, string | number, string | number>;
+  status: Generated<PayrollTaxStatus>;
+  paid_at: Timestamp | null;
+  payment_journal_entry_id: string | null;
+  notes: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export type ComplianceItemKey = 'state_registration' | 'new_hire_report' | 'labor_law_poster' | 'annual_filing';
+export type ComplianceItemStatus = 'open' | 'in_progress' | 'done' | 'na';
+
+export interface ComplianceItemsTable {
+  id: Generated<string>;
+  business_id: string;
+  item_key: ComplianceItemKey;
+  status: Generated<ComplianceItemStatus>;
+  due_date: ColumnType<string, string, string> | null;
+  notes: string | null;
+  document_file_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface BillsTable {
   id: Generated<string>;
   business_id: string;
@@ -791,4 +887,9 @@ export interface DB {
   custom_report_definitions: CustomReportDefinitionsTable;
   budgets: BudgetsTable;
   budget_lines: BudgetLinesTable;
+  employees: EmployeesTable;
+  pay_runs: PayRunsTable;
+  pay_run_lines: PayRunLinesTable;
+  payroll_tax_liabilities: PayrollTaxLiabilitiesTable;
+  compliance_items: ComplianceItemsTable;
 }

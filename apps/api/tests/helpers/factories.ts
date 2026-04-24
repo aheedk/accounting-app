@@ -293,3 +293,15 @@ export async function makeCustomReport(
     }) as object,
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeEmployee(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: Partial<{ full_name: string; hire_date: string }> = {},
+) {
+  return db.insertInto('employees').values({
+    business_id,
+    full_name: opts.full_name ?? `Employee ${Math.random().toString(36).slice(2, 6)}`,
+    hire_date: opts.hire_date ?? '2026-01-01',
+  }).returningAll().executeTakeFirstOrThrow();
+}
