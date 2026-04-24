@@ -373,6 +373,51 @@ export interface VendorCreditsTable {
   updated_at: Generated<Timestamp>;
 }
 
+export type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
+
+export interface BankAccountsTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  institution: string | null;
+  account_last_four: string | null;
+  cash_account_id: string;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface BankTransactionsTable {
+  id: Generated<string>;
+  business_id: string;
+  bank_account_id: string;
+  transaction_date: ColumnType<string, string, string>;
+  description: string;
+  amount: ColumnType<string, string | number, string | number>;
+  external_id: string | null;
+  status: Generated<BankTransactionStatus>;
+  matched_journal_entry_id: string | null;
+  excluded_reason: string | null;
+  is_reconciled: Generated<boolean>;
+  reconciliation_id: string | null;
+  imported_at: Generated<Timestamp>;
+  reviewed_at: Timestamp | null;
+  reviewed_by_user_id: string | null;
+}
+
+export interface BankReconciliationsTable {
+  id: Generated<string>;
+  business_id: string;
+  bank_account_id: string;
+  period_start: ColumnType<string, string, string>;
+  period_end: ColumnType<string, string, string>;
+  statement_ending_balance: ColumnType<string, string | number, string | number>;
+  reconciled_at: Generated<Timestamp>;
+  reconciled_by_user_id: string | null;
+  memo: string | null;
+}
+
 export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
@@ -398,4 +443,7 @@ export interface DB {
   bill_payments: BillPaymentsTable;
   bill_payment_applications: BillPaymentApplicationsTable;
   vendor_credits: VendorCreditsTable;
+  bank_accounts: BankAccountsTable;
+  bank_transactions: BankTransactionsTable;
+  bank_reconciliations: BankReconciliationsTable;
 }
