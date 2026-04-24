@@ -234,3 +234,31 @@ export async function makeIntegrationInboxRow(
     raw_payload: {} as object,
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makePurchaseOrder(
+  db: Kysely<DB>,
+  business_id: string,
+  vendor_id: string,
+  opts: Partial<{ po_number: string; order_date: string }> = {},
+) {
+  return db.insertInto('purchase_orders').values({
+    business_id,
+    vendor_id,
+    po_number: opts.po_number ?? `PO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    order_date: opts.order_date ?? '2026-04-01',
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function makeSalesOrder(
+  db: Kysely<DB>,
+  business_id: string,
+  customer_id: string,
+  opts: Partial<{ so_number: string; order_date: string }> = {},
+) {
+  return db.insertInto('sales_orders').values({
+    business_id,
+    customer_id,
+    so_number: opts.so_number ?? `SO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    order_date: opts.order_date ?? '2026-04-01',
+  }).returningAll().executeTakeFirstOrThrow();
+}

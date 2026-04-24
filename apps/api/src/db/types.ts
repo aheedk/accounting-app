@@ -402,6 +402,86 @@ export interface IntegrationInboxTable {
   reviewed_by_user_id: string | null;
 }
 
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
+
+export interface PurchaseOrdersTable {
+  id: Generated<string>;
+  business_id: string;
+  po_number: string;
+  vendor_id: string;
+  order_date: ColumnType<string, string, string>;
+  expected_delivery_date: ColumnType<string, string, string> | null;
+  status: Generated<PurchaseOrderStatus>;
+  memo: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
+export interface PurchaseOrderLinesTable {
+  id: Generated<string>;
+  purchase_order_id: string;
+  line_number: number;
+  inventory_item_id: string;
+  description: string | null;
+  quantity: ColumnType<string, string | number, string | number>;
+  unit_cost: ColumnType<string, string | number, string | number>;
+}
+
+export interface ItemReceiptsTable {
+  id: Generated<string>;
+  business_id: string;
+  purchase_order_id: string;
+  receipt_date: ColumnType<string, string, string>;
+  bill_id: string | null;
+  memo: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
+export type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
+
+export interface SalesOrdersTable {
+  id: Generated<string>;
+  business_id: string;
+  so_number: string;
+  customer_id: string;
+  order_date: ColumnType<string, string, string>;
+  status: Generated<SalesOrderStatus>;
+  invoice_id: string | null;
+  memo: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
+export interface SalesOrderLinesTable {
+  id: Generated<string>;
+  sales_order_id: string;
+  line_number: number;
+  inventory_item_id: string;
+  description: string | null;
+  quantity: ColumnType<string, string | number, string | number>;
+  unit_price: ColumnType<string, string | number, string | number>;
+}
+
+export interface ShippingLabelsTable {
+  id: Generated<string>;
+  business_id: string;
+  invoice_id: string | null;
+  sales_order_id: string | null;
+  carrier: string;
+  tracking_number: string;
+  shipped_at: ColumnType<string, string, string>;
+  cost: ColumnType<string, string | number, string | number> | null;
+  label_file_id: string | null;
+  notes: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
 export interface BillsTable {
   id: Generated<string>;
   business_id: string;
@@ -671,4 +751,10 @@ export interface DB {
   files: FilesTable;
   receipts: ReceiptsTable;
   integration_inbox: IntegrationInboxTable;
+  purchase_orders: PurchaseOrdersTable;
+  purchase_order_lines: PurchaseOrderLinesTable;
+  item_receipts: ItemReceiptsTable;
+  sales_orders: SalesOrdersTable;
+  sales_order_lines: SalesOrderLinesTable;
+  shipping_labels: ShippingLabelsTable;
 }
