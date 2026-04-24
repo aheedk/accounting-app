@@ -144,6 +144,9 @@ export const AUDIT = {
   RECURRING_TEMPLATE_UPDATE: 'recurring_template.update',
   RECURRING_TEMPLATE_DELETE: 'recurring_template.delete',
   RECURRING_TEMPLATE_RUN: 'recurring_template.run',
+
+  // Slice 10 — Files
+  FILE_UPLOAD: 'file.upload',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
