@@ -1,7 +1,7 @@
 # Fill the 23 Remaining ComingSoon Tabs — Design Spec
 
 **Date:** 2026-04-24
-**Status:** approved (defaults locked in via brainstorming)
+**Status:** **completed 2026-04-24** — all 6 slices (8–13) merged to `main`. Final commit: `96104aa`. 157 integration tests passing.
 **Scope:** Slices 8–13. Bring every nav item under sidebar groups Reports, AP, Accounting, Setup, Payroll, Inventory to a real, ledger-posting feature at the same depth as previously shipped slices (1–7).
 
 ---

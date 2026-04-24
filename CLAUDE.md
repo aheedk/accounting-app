@@ -16,9 +16,9 @@ The only acceptable reason to interrupt the user is: a destructive irreversible 
 
 Production-grade accounting system for an accounting firm.
 
-- **Slices 1–7 shipped:** Foundation, AR, AP, Banking, Reports, Rules+Assets, Setup pages, Inventory.
-- **Slices 8–13 in progress:** filling the 23 remaining ComingSoon tabs. See the spec at `docs/superpowers/specs/2026-04-24-fill-coming-soon-tabs-design.md` and per-slice plans under `docs/superpowers/plans/`.
+- **Slices 1–13 shipped.** All 23 originally-stubbed ComingSoon tabs replaced. 47 migrations, 157 integration tests, full sidebar coverage. See per-slice plans under `docs/superpowers/plans/`.
 - Design specs live in `docs/superpowers/specs/`. Implementation plans live in `docs/superpowers/plans/`.
+- New features beyond the 23 tabs: write a fresh spec → plan → impl following the same pattern documented here.
 
 ## Architecture conventions (DO follow these)
 
