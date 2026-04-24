@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -12,6 +13,7 @@ function pickErr(e: unknown): string {
 
 export default function PeriodsPage() {
   const [bizId] = useActiveBusinessId();
+  const { user } = useAuth();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -24,15 +26,24 @@ export default function PeriodsPage() {
   useEffect(() => { reload(); }, [bizId]);
 
   async function close(p: Period) {
+    const memo = window.prompt('Optional memo for closing this period:');
     setBusy(p.id); setErr(null);
-    try { await api.post(`/businesses/${bizId}/periods/${p.id}/close`); await reload(); }
+    try {
+      await api.post(`/businesses/${bizId}/periods/${p.id}/close`, { memo: memo && memo.length > 0 ? memo : null });
+      await reload();
+    }
     catch (e: unknown) { setErr(pickErr(e)); }
     finally { setBusy(null); }
   }
 
   async function reopen(p: Period) {
+    const reason = window.prompt('Reason for reopening:');
+    if (!reason || reason.length === 0) return;
     setBusy(p.id); setErr(null);
-    try { await api.post(`/businesses/${bizId}/periods/${p.id}/reopen`); await reload(); }
+    try {
+      await api.post(`/businesses/${bizId}/periods/${p.id}/reopen`, { reason });
+      await reload();
+    }
     catch (e: unknown) { setErr(pickErr(e)); }
     finally { setBusy(null); }
   }
@@ -46,6 +57,8 @@ export default function PeriodsPage() {
   }
 
   if (!bizId) return <div>Pick a business.</div>;
+
+  const canReopen = user?.role === 'firm_admin';
 
   return (
     <div className="space-y-6">
@@ -73,9 +86,12 @@ export default function PeriodsPage() {
                 <td className="p-3">{p.status}</td>
                 <td className="p-3">{p.closed_at ? new Date(p.closed_at).toLocaleString() : ''}</td>
                 <td className="p-3">
-                  {p.status === 'open'
-                    ? <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => close(p)}>Close</Button>
-                    : <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => reopen(p)}>Reopen (admin)</Button>}
+                  {p.status === 'open' && (
+                    <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => close(p)}>Close</Button>
+                  )}
+                  {p.status === 'closed' && canReopen && (
+                    <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => reopen(p)}>Reopen</Button>
+                  )}
                 </td>
               </tr>
             ))}
