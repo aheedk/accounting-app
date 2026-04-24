@@ -171,6 +171,15 @@ export const AUDIT = {
   SHIPPING_LABEL_CREATE: 'shipping_label.create',
   SHIPPING_LABEL_UPDATE: 'shipping_label.update',
   SHIPPING_LABEL_DELETE: 'shipping_label.delete',
+
+  // Slice 12 — Reports polish
+  CUSTOM_REPORT_CREATE: 'custom_report.create',
+  CUSTOM_REPORT_UPDATE: 'custom_report.update',
+  CUSTOM_REPORT_DELETE: 'custom_report.delete',
+  BUDGET_CREATE: 'budget.create',
+  BUDGET_UPDATE: 'budget.update',
+  BUDGET_DELETE: 'budget.delete',
+  CSV_EXPORT: 'csv.export',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
