@@ -98,6 +98,7 @@ export interface FiscalPeriodsTable {
   status: Generated<FiscalPeriodStatus>;
   closed_at: Timestamp | null;
   closed_by_user_id: string | null;
+  close_memo: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
