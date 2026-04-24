@@ -60,6 +60,9 @@ import ExpenseTransactionListPage from '@/pages/ap/ExpenseTransactionListPage';
 import ExpenseTransactionNewPage from '@/pages/ap/ExpenseTransactionNewPage';
 import ExpenseTransactionDetailPage from '@/pages/ap/ExpenseTransactionDetailPage';
 import ContractorsPage from '@/pages/ap/ContractorsPage';
+import ClientOverviewPage from '@/pages/accounting/ClientOverviewPage';
+import BooksReviewPage from '@/pages/accounting/BooksReviewPage';
+import RecurringTransactionsPage from '@/pages/accounting/RecurringTransactionsPage';
 import ComingSoonPage from '@/pages/ComingSoonPage';
 
 export default function App() {
@@ -129,8 +132,8 @@ export default function App() {
             <Route path="/reports/1099" element={<TenNinetyNineReportPage />} />
 
             {/* Accounting (placeholders) */}
-            <Route path="/accounting/client-overview" element={<ComingSoonPage title="Client Overview" description="A workspace-level view of all your clients' books." eta="Slice 9" />} />
-            <Route path="/accounting/books-review" element={<ComingSoonPage title="Books Review" description="Review checklists and month-end close workflows." eta="Slice 9" />} />
+            <Route path="/accounting/client-overview" element={<ClientOverviewPage />} />
+            <Route path="/accounting/books-review" element={<BooksReviewPage />} />
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
             <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />
@@ -138,7 +141,7 @@ export default function App() {
             <Route path="/accounting/receipts" element={<ComingSoonPage title="Receipts" description="Upload and match receipts to transactions." eta="Slice 10" />} />
             <Route path="/accounting/reconcile" element={<ReconcilePage />} />
             <Route path="/accounting/rules" element={<RulesPage />} />
-            <Route path="/accounting/recurring" element={<ComingSoonPage title="Recurring Transactions" description="Schedule recurring journal entries, invoices, and bills." eta="Slice 9" />} />
+            <Route path="/accounting/recurring" element={<RecurringTransactionsPage />} />
             <Route path="/accounting/fixed-assets" element={<FixedAssetListPage />} />
             <Route path="/accounting/fixed-assets/new" element={<FixedAssetNewPage />} />
             <Route path="/accounting/fixed-assets/:id" element={<FixedAssetDetailPage />} />
