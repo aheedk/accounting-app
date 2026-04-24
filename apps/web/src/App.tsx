@@ -49,6 +49,9 @@ import RulesPage from '@/pages/accounting/RulesPage';
 import FixedAssetListPage from '@/pages/accounting/FixedAssetListPage';
 import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
 import FixedAssetDetailPage from '@/pages/accounting/FixedAssetDetailPage';
+import EntityPage from '@/pages/setup/EntityPage';
+import UsersPage from '@/pages/setup/UsersPage';
+import CostCentersPage from '@/pages/setup/CostCentersPage';
 import ComingSoonPage from '@/pages/ComingSoonPage';
 
 export default function App() {
@@ -130,11 +133,11 @@ export default function App() {
             <Route path="/accounting/fixed-assets/new" element={<FixedAssetNewPage />} />
             <Route path="/accounting/fixed-assets/:id" element={<FixedAssetDetailPage />} />
 
-            {/* Setup (placeholders) */}
-            <Route path="/setup/entity" element={<ComingSoonPage title="Entity" description="Legal entity, addresses, fiscal year, and tax IDs." eta="Slice 2" />} />
+            {/* Setup */}
+            <Route path="/setup/entity" element={<EntityPage />} />
             <Route path="/setup/coa" element={<CoaListPage />} />
-            <Route path="/setup/cost-centers" element={<ComingSoonPage title="Cost Centers" description="Departments, classes, and locations for segment reporting." eta="Slice 3" />} />
-            <Route path="/setup/users" element={<ComingSoonPage title="Users" description="Invite team members and assign roles." eta="Slice 2" />} />
+            <Route path="/setup/cost-centers" element={<CostCentersPage />} />
+            <Route path="/setup/users" element={<UsersPage />} />
 
             {/* Payroll (placeholders) */}
             <Route path="/payroll/overview" element={<ComingSoonPage title="Payroll Overview" description="Upcoming runs, liabilities, and payroll health." eta="Slice 5" />} />
