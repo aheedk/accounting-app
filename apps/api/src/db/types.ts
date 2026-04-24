@@ -480,6 +480,42 @@ export interface CostCentersTable {
   deleted_at: Timestamp | null;
 }
 
+export type StockMovementReason =
+  | 'adjustment'
+  | 'opening_balance'
+  | 'manual_in'
+  | 'manual_out'
+  | 'write_off';
+
+export interface InventoryItemsTable {
+  id: Generated<string>;
+  business_id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  unit_of_measure: Generated<string>;
+  purchase_cost: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  sale_price: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  income_account_id: string | null;
+  expense_account_id: string | null;
+  inventory_asset_account_id: string | null;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+}
+
+export interface StockMovementsTable {
+  id: Generated<string>;
+  inventory_item_id: string;
+  movement_date: ColumnType<string, string, string>;
+  quantity_delta: ColumnType<string, string | number, string | number>;
+  reason: StockMovementReason;
+  memo: string | null;
+  posted_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+}
+
 export interface DepreciationEntriesTable {
   id: Generated<string>;
   fixed_asset_id: string;
@@ -522,4 +558,6 @@ export interface DB {
   fixed_assets: FixedAssetsTable;
   depreciation_entries: DepreciationEntriesTable;
   cost_centers: CostCentersTable;
+  inventory_items: InventoryItemsTable;
+  stock_movements: StockMovementsTable;
 }

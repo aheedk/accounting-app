@@ -23,3 +23,4 @@ export * from './fixedAsset.js';
 export * from './business.js';
 export * from './userManagement.js';
 export * from './costCenter.js';
+export * from './inventoryItem.js';

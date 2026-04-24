@@ -121,6 +121,12 @@ export const AUDIT = {
   COST_CENTER_CREATE: 'cost_center.create',
   COST_CENTER_UPDATE: 'cost_center.update',
   COST_CENTER_DELETE: 'cost_center.delete',
+
+  // Inventory
+  INVENTORY_ITEM_CREATE: 'inventory_item.create',
+  INVENTORY_ITEM_UPDATE: 'inventory_item.update',
+  INVENTORY_ITEM_DELETE: 'inventory_item.delete',
+  STOCK_MOVEMENT_CREATE: 'stock_movement.create',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
