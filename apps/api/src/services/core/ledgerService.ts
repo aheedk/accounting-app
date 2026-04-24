@@ -240,7 +240,7 @@ export async function computeTrialBalance(
       account_id: r.account_id,
       code: r.code,
       name: r.name,
-      account_type: r.account_type as any,
+      account_type: r.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
       total_debit: toMoneyString(r.total_debit ?? '0'),
       total_credit: toMoneyString(r.total_credit ?? '0'),
       net,
