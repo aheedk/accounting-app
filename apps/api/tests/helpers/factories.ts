@@ -132,7 +132,14 @@ export async function makeBankRule(
   db: Kysely<DB>,
   business_id: string,
   offset_account_id: string,
-  opts: Partial<{ name: string; description_contains: string; sign_filter: 'any' | 'inflow_only' | 'outflow_only' }> = {},
+  opts: Partial<{
+    name: string;
+    description_contains: string;
+    sign_filter: 'any' | 'inflow_only' | 'outflow_only';
+    priority: number;
+    min_amount: string | number | null;
+    max_amount: string | number | null;
+  }> = {},
 ) {
   return db.insertInto('bank_transaction_rules').values({
     business_id,
@@ -140,6 +147,9 @@ export async function makeBankRule(
     name: opts.name ?? 'Test Rule',
     description_contains: opts.description_contains ?? 'stripe',
     sign_filter: opts.sign_filter ?? 'any',
+    ...(opts.priority !== undefined ? { priority: opts.priority } : {}),
+    ...(opts.min_amount !== undefined ? { min_amount: opts.min_amount } : {}),
+    ...(opts.max_amount !== undefined ? { max_amount: opts.max_amount } : {}),
   }).returningAll().executeTakeFirstOrThrow();
 }
 
