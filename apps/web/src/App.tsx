@@ -38,6 +38,10 @@ import VendorCreditNewPage from '@/pages/vendor-credits/VendorCreditNewPage';
 import VendorCreditDetailPage from '@/pages/vendor-credits/VendorCreditDetailPage';
 import TenNinetyNineReportPage from '@/pages/reports/TenNinetyNineReportPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
+import BankAccountListPage from '@/pages/banking/BankAccountListPage';
+import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
+import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage';
+import ReconcilePage from '@/pages/banking/ReconcilePage';
 import ComingSoonPage from '@/pages/ComingSoonPage';
 
 export default function App() {
@@ -104,10 +108,12 @@ export default function App() {
             {/* Accounting (placeholders) */}
             <Route path="/accounting/client-overview" element={<ComingSoonPage title="Client Overview" description="A workspace-level view of all your clients' books." eta="Slice 3" />} />
             <Route path="/accounting/books-review" element={<ComingSoonPage title="Books Review" description="Review checklists and month-end close workflows." eta="Slice 3" />} />
-            <Route path="/accounting/bank-transactions" element={<ComingSoonPage title="Bank Transactions" description="Review, categorize, and match transactions from connected banks." eta="Slice 3" />} />
-            <Route path="/accounting/integrations" element={<ComingSoonPage title="Integration Transactions" description="Activity coming in from third-party integrations." eta="Slice 3" />} />
-            <Route path="/accounting/receipts" element={<ComingSoonPage title="Receipts" description="Upload and match receipts to transactions." eta="Slice 3" />} />
-            <Route path="/accounting/reconcile" element={<ComingSoonPage title="Reconcile" description="Bank and credit card reconciliation workflows." eta="Slice 3" />} />
+            <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
+            <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
+            <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />
+            <Route path="/accounting/integrations" element={<ComingSoonPage title="Integration Transactions" description="Activity coming in from third-party integrations." eta="Slice 4" />} />
+            <Route path="/accounting/receipts" element={<ComingSoonPage title="Receipts" description="Upload and match receipts to transactions." eta="Slice 4" />} />
+            <Route path="/accounting/reconcile" element={<ReconcilePage />} />
             <Route path="/accounting/rules" element={<ComingSoonPage title="Rules" description="Auto-categorization rules for transactions." eta="Slice 3" />} />
             <Route path="/accounting/recurring" element={<ComingSoonPage title="Recurring Transactions" description="Schedule recurring journal entries, invoices, and bills." eta="Slice 3" />} />
             <Route path="/accounting/fixed-assets" element={<ComingSoonPage title="Fixed Assets" description="Register, depreciate, and dispose of fixed assets." eta="Slice 4" />} />

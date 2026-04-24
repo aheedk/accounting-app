@@ -78,6 +78,7 @@ const groups: NavGroup[] = [
     children: [
       { to: '/accounting/client-overview', label: 'Client Overview' },
       { to: '/accounting/books-review', label: 'Books Review' },
+      { to: '/accounting/bank-accounts', label: 'Bank Accounts' },
       { to: '/accounting/bank-transactions', label: 'Bank Transactions' },
       { to: '/accounting/integrations', label: 'Integration Transactions' },
       { to: '/accounting/receipts', label: 'Receipts' },
