@@ -198,6 +198,8 @@ describe('P&L report', () => {
 
 - [ ] **Step 2: Write service**
 
+Note: reversal JEs (those with `reversed_entry_id IS NOT NULL`) are explicitly excluded so that a voided invoice (voided original + posted reversal) nets to zero on the report — the voided original is already filtered by `status='posted'`, but the reversal would otherwise show as a stand-alone negative amount.
+
 ```ts
 import { type Kysely, sql } from 'kysely';
 import { addMoney, subMoney, toMoneyString } from '@accounting/shared';
@@ -241,6 +243,9 @@ export async function profitLoss(db: Kysely<DB>, q: { business_id: string; perio
         eb('je.status', '=', 'posted'),
         eb('je.entry_date', '>=', q.period_start),
         eb('je.entry_date', '<=', q.period_end),
+        // Exclude reversal JEs so voided entries net out entirely (reversal itself is skipped;
+        // the voided original is already filtered by the status='posted' guard above).
+        eb('je.reversed_entry_id', 'is', null),
       ]),
     ]))
     .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type'])
