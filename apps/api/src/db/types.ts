@@ -322,6 +322,42 @@ export interface ExpenseTransactionsTable {
   voided_by_user_id: string | null;
 }
 
+export type PeriodReviewTaskKey = 'reconcile_bank' | 'post_adjustments' | 'review_unreviewed_txns' | 'close_period';
+export type PeriodReviewTaskStatus = 'todo' | 'in_progress' | 'done';
+
+export interface PeriodReviewTasksTable {
+  id: Generated<string>;
+  business_id: string;
+  period_id: string;
+  task_key: PeriodReviewTaskKey;
+  status: Generated<PeriodReviewTaskStatus>;
+  assignee_user_id: string | null;
+  notes: string | null;
+  signed_off_at: Timestamp | null;
+  signed_off_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill';
+export type RecurringTemplateRecurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface RecurringTemplatesTable {
+  id: Generated<string>;
+  business_id: string;
+  name: string;
+  template_type: RecurringTemplateType;
+  payload: ColumnType<unknown, unknown, unknown>;
+  recurrence: RecurringTemplateRecurrence;
+  next_run_date: ColumnType<string, string, string>;
+  end_date: ColumnType<string, string, string> | null;
+  last_run_at: Timestamp | null;
+  is_active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
 export interface BillsTable {
   id: Generated<string>;
   business_id: string;
@@ -586,4 +622,6 @@ export interface DB {
   inventory_items: InventoryItemsTable;
   stock_movements: StockMovementsTable;
   expense_transactions: ExpenseTransactionsTable;
+  period_review_tasks: PeriodReviewTasksTable;
+  recurring_templates: RecurringTemplatesTable;
 }
