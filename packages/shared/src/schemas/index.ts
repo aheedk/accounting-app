@@ -27,3 +27,5 @@ export * from './inventoryItem.js';
 export * from './expenseTransaction.js';
 export * from './periodReview.js';
 export * from './recurringTemplate.js';
+export * from './receipt.js';
+export * from './integrationInbox.js';

@@ -203,3 +203,34 @@ export async function makeRecurringTemplate(
     next_run_date: opts.next_run_date ?? '2026-04-01',
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeFile(
+  db: Kysely<DB>,
+  business_id: string,
+  uploaded_by_user_id: string,
+  opts: Partial<{ original_name: string; mime_type: string; byte_size: number; storage_path: string }> = {},
+) {
+  return db.insertInto('files').values({
+    business_id,
+    uploaded_by_user_id,
+    original_name: opts.original_name ?? 'receipt.png',
+    mime_type: opts.mime_type ?? 'image/png',
+    byte_size: opts.byte_size ?? 1024,
+    storage_path: opts.storage_path ?? `aa/bbccddeeff${Math.random().toString(36).slice(2)}.png`,
+  }).returningAll().executeTakeFirstOrThrow();
+}
+
+export async function makeIntegrationInboxRow(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: Partial<{ source: 'stripe_csv'|'paypal_csv'|'shopify_csv'|'generic'; description: string; amount: string; occurred_at: string }> = {},
+) {
+  return db.insertInto('integration_inbox').values({
+    business_id,
+    source: opts.source ?? 'stripe_csv',
+    description: opts.description ?? 'Test row',
+    amount: opts.amount ?? '10.00',
+    occurred_at: opts.occurred_at ?? '2026-04-15',
+    raw_payload: {} as object,
+  }).returningAll().executeTakeFirstOrThrow();
+}
