@@ -78,10 +78,12 @@ Every new feature must include:
 - A separate "Run all due" endpoint (`POST /businesses/:businessId/recurring-templates/run-due`) iterates over due templates: for each, materializes one JE/invoice/bill at its `next_run_date`, advances `next_run_date` by the recurrence interval, repeats while `next_run_date <= today`. All in one transaction per template.
 - Materialization fans through existing services (`postJournalEntry`, `createDraftInvoice` then `postInvoice`, `createBill` then `postBill`).
 
-### 3.3 Payroll SSN encryption
-- New env var `PAYROLL_FIELD_KEY` (32-byte hex). Add to `.env.example` with a placeholder, document in README.
-- Encrypt/decrypt helpers in `apps/api/src/lib/fieldCrypto.ts` using libsodium `crypto_secretbox_easy`. Returns `bytea` for storage.
-- API only ever returns `ssn_last_four` to the client; full SSN exposed only when `firm_admin` explicitly hits a `GET /employees/:id/ssn-reveal` endpoint (audit-logged).
+### 3.3 Field-level encryption (introduced in slice 8, reused in slice 13)
+- New env var `FIELD_ENCRYPTION_KEY` (32-byte hex). Add to `.env.example` with a placeholder, document in README.
+- Encrypt/decrypt helpers in `apps/api/src/lib/fieldCrypto.ts` using libsodium (`@noble/ciphers` xchacha20poly1305 — pure JS, no native deps to break Railway build). Returns `bytea` for storage.
+- First consumer: vendor `tax_id` (slice 8) — can hold SSN for sole-prop 1099 contractors.
+- Slice 13 reuses for `employees.ssn_encrypted`.
+- API only ever returns `*_last_four` to clients; full value exposed only when `firm_admin` explicitly hits a reveal endpoint (audit-logged with action `*.reveal`).
 
 ### 3.4 Cross-business reads (Client Overview)
 - `firm_admin` already has a tenancy bypass via `effective_role`. Add a service `firmDashboardService.getFirmOverview(db, ctx)` that lists every business in the firm with computed metrics. Other roles get a 403 from the route.
@@ -97,11 +99,12 @@ Every new feature must include:
 Each slice will be developed in its own worktree (see Section 6) and merged sequentially into `main` in priority order: 8 → 9 → 10 → 11 → 12 → 13.
 
 ### Slice 8 — AP polish (3 tabs)
+- New: `apps/api/src/lib/fieldCrypto.ts` (introduces `FIELD_ENCRYPTION_KEY` env var; libsodium-style xchacha20poly1305 via `@noble/ciphers`)
 - Migrations: `0030_vendor_1099_fields.sql`, `0031_expense_transactions.sql`
-- Services: `apService/expenseTransactionService.ts`; extend `vendorService.ts` for 1099 flag
-- Routes: `expenseTransactions.ts`; extend `vendors.ts` with 1099 fields + filter
-- Pages: `ApOverviewPage.tsx`, `ExpenseTransactionListPage.tsx` + new/edit, `ContractorsPage.tsx` (filter)
-- Tests: ~6 new (3 expenseTransaction + 2 vendor 1099 + 1 ap overview)
+- Services: `ap/expenseTransactionService.ts`, `ap/apOverviewService.ts`; extend `ap/vendorService.ts` for 1099 flag + tax_id encrypt/decrypt
+- Routes: `expenseTransactions.ts`, `apOverview.ts`; extend `vendors.ts` with 1099 fields, filter, `/tax-id-reveal` endpoint
+- Pages: `ApOverviewPage.tsx`, `ExpenseTransactionListPage.tsx` + new + detail, `ContractorsPage.tsx` (filter)
+- Tests: ~8 new (3 expenseTransaction + 2 vendor 1099 + 1 ap overview + 2 fieldCrypto)
 
 ### Slice 9 — Accounting hub (3 tabs)
 - Migrations: `0032_period_review_tasks.sql`, `0033_recurring_templates.sql`
@@ -135,7 +138,7 @@ Each slice will be developed in its own worktree (see Section 6) and merged sequ
 
 ### Slice 13 — Payroll (5 tabs)
 - Migrations: `0044_employees.sql`, `0045_pay_runs.sql` (with lines), `0046_payroll_tax_liabilities.sql`, `0047_compliance_items.sql`
-- New: `apps/api/src/lib/fieldCrypto.ts`; add `PAYROLL_FIELD_KEY` env var
+- Reuses: `apps/api/src/lib/fieldCrypto.ts` from slice 8 (for `employees.ssn_encrypted`)
 - Services: `payroll/employeeService.ts` (with SSN encryption), `payroll/payRunService.ts` (creates JE on finalize), `payroll/payrollTaxService.ts`, `payroll/complianceService.ts`, `payroll/payrollOverviewService.ts`
 - Routes: `employees.ts` (with `/ssn-reveal` audit-logged endpoint), `payRuns.ts`, `payrollTaxes.ts`, `compliance.ts`, `payrollOverview.ts`
 - Pages: `PayrollOverviewPage.tsx`, `EmployeeListPage.tsx` + new + detail (SSN masked), `PayrollContractorsPage.tsx` (vendor filter + pay action), `PayrollTaxesPage.tsx`, `CompliancePage.tsx`
