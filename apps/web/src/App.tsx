@@ -40,6 +40,11 @@ import TenNinetyNineReportPage from '@/pages/reports/TenNinetyNineReportPage';
 import ProfitLossPage from '@/pages/reports/ProfitLossPage';
 import BalanceSheetPage from '@/pages/reports/BalanceSheetPage';
 import CashFlowPage from '@/pages/reports/CashFlowPage';
+import CustomReportsPage from '@/pages/reports/CustomReportsPage';
+import ManagementReportsPage from '@/pages/reports/ManagementReportsPage';
+import PerformanceCenterPage from '@/pages/reports/PerformanceCenterPage';
+import FinancialPlanningPage from '@/pages/reports/FinancialPlanningPage';
+import SpreadsheetSyncPage from '@/pages/reports/SpreadsheetSyncPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 import BankAccountListPage from '@/pages/banking/BankAccountListPage';
 import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
@@ -113,11 +118,11 @@ export default function App() {
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
-            <Route path="/reports/custom" element={<ComingSoonPage title="Custom Reports" description="Build reports with custom filters, columns, and grouping." eta="Slice 12" />} />
-            <Route path="/reports/management" element={<ComingSoonPage title="Management Reports" description="Executive dashboards and KPI-driven management views." eta="Slice 12" />} />
-            <Route path="/reports/performance" element={<ComingSoonPage title="Performance Center" description="Benchmarks and performance analytics across clients." eta="Slice 12" />} />
-            <Route path="/reports/financial-planning" element={<ComingSoonPage title="Financial Planning" description="Budgets, forecasts, and scenario planning." eta="Slice 12" />} />
-            <Route path="/reports/spreadsheet-sync" element={<ComingSoonPage title="Spreadsheet Sync" description="CSV export hub for trial balance, JE lines, AR/AP aging, and reports." eta="Slice 12" />} />
+            <Route path="/reports/custom" element={<CustomReportsPage />} />
+            <Route path="/reports/management" element={<ManagementReportsPage />} />
+            <Route path="/reports/performance" element={<PerformanceCenterPage />} />
+            <Route path="/reports/financial-planning" element={<FinancialPlanningPage />} />
+            <Route path="/reports/spreadsheet-sync" element={<SpreadsheetSyncPage />} />
 
             {/* Settings (existing) */}
             <Route path="/settings/coa" element={<CoaListPage />} />
