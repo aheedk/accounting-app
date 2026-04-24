@@ -14,3 +14,6 @@ export * from './bill.js';
 export * from './billPayment.js';
 export * from './vendorCredit.js';
 export * from './tenNinetyNine.js';
+export * from './bankAccount.js';
+export * from './bankTransaction.js';
+export * from './reconciliation.js';

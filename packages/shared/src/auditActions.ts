@@ -94,6 +94,17 @@ export const AUDIT = {
   VENDOR_CREDIT_POST: 'vendor_credit.post',
   VENDOR_CREDIT_APPLY: 'vendor_credit.apply',
   VENDOR_CREDIT_VOID: 'vendor_credit.void',
+
+  // Banking
+  BANK_ACCOUNT_CREATE: 'bank_account.create',
+  BANK_ACCOUNT_UPDATE: 'bank_account.update',
+  BANK_TRANSACTION_IMPORT: 'bank_transaction.import',
+  BANK_TRANSACTION_MATCH: 'bank_transaction.match',
+  BANK_TRANSACTION_CATEGORIZE: 'bank_transaction.categorize',
+  BANK_TRANSACTION_EXCLUDE: 'bank_transaction.exclude',
+  BANK_TRANSACTION_UNREVIEW: 'bank_transaction.unreview',
+  RECONCILIATION_CREATE: 'reconciliation.create',
+  RECONCILIATION_DELETE: 'reconciliation.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

@@ -112,3 +112,18 @@ export async function makeVendor(
     is_1099: opts.is_1099 ?? false,
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeBankAccount(
+  db: Kysely<DB>,
+  business_id: string,
+  cash_account_id: string,
+  opts: Partial<{ name: string; institution: string; account_last_four: string }> = {},
+) {
+  return db.insertInto('bank_accounts').values({
+    business_id,
+    cash_account_id,
+    name: opts.name ?? 'Checking',
+    institution: opts.institution ?? null,
+    account_last_four: opts.account_last_four ?? null,
+  }).returningAll().executeTakeFirstOrThrow();
+}
