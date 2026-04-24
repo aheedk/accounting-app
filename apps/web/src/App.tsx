@@ -55,6 +55,17 @@ import CostCentersPage from '@/pages/setup/CostCentersPage';
 import InventoryListPage from '@/pages/inventory/InventoryListPage';
 import InventoryNewPage from '@/pages/inventory/InventoryNewPage';
 import InventoryDetailPage from '@/pages/inventory/InventoryDetailPage';
+import InventoryOverviewPage from '@/pages/inventory/InventoryOverviewPage';
+import PurchaseOrderListPage from '@/pages/inventory/PurchaseOrderListPage';
+import PurchaseOrderNewPage from '@/pages/inventory/PurchaseOrderNewPage';
+import PurchaseOrderDetailPage from '@/pages/inventory/PurchaseOrderDetailPage';
+import ItemReceiptListPage from '@/pages/inventory/ItemReceiptListPage';
+import ItemReceiptNewPage from '@/pages/inventory/ItemReceiptNewPage';
+import SalesOrderListPage from '@/pages/inventory/SalesOrderListPage';
+import SalesOrderNewPage from '@/pages/inventory/SalesOrderNewPage';
+import SalesOrderDetailPage from '@/pages/inventory/SalesOrderDetailPage';
+import ShippingLabelListPage from '@/pages/inventory/ShippingLabelListPage';
+import ShippingLabelNewPage from '@/pages/inventory/ShippingLabelNewPage';
 import ApOverviewPage from '@/pages/ap/ApOverviewPage';
 import ExpenseTransactionListPage from '@/pages/ap/ExpenseTransactionListPage';
 import ExpenseTransactionNewPage from '@/pages/ap/ExpenseTransactionNewPage';
@@ -162,14 +173,20 @@ export default function App() {
             <Route path="/payroll/compliance" element={<ComingSoonPage title="Compliance" description="State registrations, new-hire reporting, and labor-law notices." eta="Slice 13" />} />
 
             {/* Inventory */}
-            <Route path="/inventory/overview" element={<ComingSoonPage title="Inventory Overview" description="Stock levels, on-order quantity, and low-stock alerts." eta="Slice 11" />} />
+            <Route path="/inventory/overview" element={<InventoryOverviewPage />} />
             <Route path="/inventory/items" element={<InventoryListPage />} />
             <Route path="/inventory/items/new" element={<InventoryNewPage />} />
             <Route path="/inventory/items/:id" element={<InventoryDetailPage />} />
-            <Route path="/inventory/purchase-orders" element={<ComingSoonPage title="Purchase Orders" description="Issue POs to vendors for inventory replenishment." eta="Slice 11" />} />
-            <Route path="/inventory/item-receipts" element={<ComingSoonPage title="Item Receipts" description="Receive inventory from purchase orders." eta="Slice 11" />} />
-            <Route path="/inventory/sales-orders" element={<ComingSoonPage title="Sales Orders" description="Confirm customer orders before fulfillment." eta="Slice 11" />} />
-            <Route path="/inventory/shipping-labels" element={<ComingSoonPage title="Shipping Labels" description="Manual entry of carrier label + tracking number." eta="Slice 11" />} />
+            <Route path="/inventory/purchase-orders" element={<PurchaseOrderListPage />} />
+            <Route path="/inventory/purchase-orders/new" element={<PurchaseOrderNewPage />} />
+            <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+            <Route path="/inventory/item-receipts" element={<ItemReceiptListPage />} />
+            <Route path="/inventory/item-receipts/new" element={<ItemReceiptNewPage />} />
+            <Route path="/inventory/sales-orders" element={<SalesOrderListPage />} />
+            <Route path="/inventory/sales-orders/new" element={<SalesOrderNewPage />} />
+            <Route path="/inventory/sales-orders/:id" element={<SalesOrderDetailPage />} />
+            <Route path="/inventory/shipping-labels" element={<ShippingLabelListPage />} />
+            <Route path="/inventory/shipping-labels/new" element={<ShippingLabelNewPage />} />
           </Route>
         </Route>
       </Routes>
