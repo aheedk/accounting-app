@@ -33,6 +33,8 @@ import businessesRoutes from './routes/businesses.js';
 import usersRoutes from './routes/users.js';
 import costCentersRoutes from './routes/costCenters.js';
 import inventoryItemsRoutes from './routes/inventoryItems.js';
+import purchaseOrdersRoutes from './routes/purchaseOrders.js';
+import itemReceiptsRoutes from './routes/itemReceipts.js';
 import expenseTransactionsRouter from './routes/expenseTransactions.js';
 import apOverviewRouter from './routes/apOverview.js';
 import firmOverviewRouter from './routes/firmOverview.js';
@@ -41,6 +43,9 @@ import recurringTemplatesRouter from './routes/recurringTemplates.js';
 import filesRouter from './routes/files.js';
 import receiptsRouter from './routes/receipts.js';
 import integrationInboxRouter from './routes/integrationInbox.js';
+import salesOrdersRoutes from './routes/salesOrders.js';
+import shippingLabelsRouter from './routes/shippingLabels.js';
+import inventoryOverviewRouter from './routes/inventoryOverview.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -83,6 +88,8 @@ export function makeApp(): Express {
   app.use(usersRoutes);
   app.use(costCentersRoutes);
   app.use(inventoryItemsRoutes);
+  app.use(purchaseOrdersRoutes);
+  app.use(itemReceiptsRoutes);
   app.use(expenseTransactionsRouter);
   app.use(apOverviewRouter);
   app.use(firmOverviewRouter);
@@ -91,6 +98,9 @@ export function makeApp(): Express {
   app.use(filesRouter);
   app.use(receiptsRouter);
   app.use(integrationInboxRouter);
+  app.use(salesOrdersRoutes);
+  app.use(shippingLabelsRouter);
+  app.use(inventoryOverviewRouter);
   app.use(errorHandler);
   return app;
 }

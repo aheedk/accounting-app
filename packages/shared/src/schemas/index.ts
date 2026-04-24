@@ -29,3 +29,7 @@ export * from './periodReview.js';
 export * from './recurringTemplate.js';
 export * from './receipt.js';
 export * from './integrationInbox.js';
+export * from './purchaseOrder.js';
+export * from './itemReceipt.js';
+export * from './salesOrder.js';
+export * from './shippingLabel.js';

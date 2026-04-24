@@ -60,6 +60,12 @@ async function runMigrations(pool: pg.Pool) {
 export async function truncateAll(db: Kysely<DB>) {
   await sql`
     TRUNCATE
+      shipping_labels,
+      sales_order_lines,
+      sales_orders,
+      item_receipts,
+      purchase_order_lines,
+      purchase_orders,
       integration_inbox,
       receipts,
       files,

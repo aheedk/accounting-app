@@ -158,6 +158,19 @@ export const AUDIT = {
   INTEGRATION_INBOX_MATCH: 'integration_inbox.match',
   INTEGRATION_INBOX_CATEGORIZE: 'integration_inbox.categorize',
   INTEGRATION_INBOX_EXCLUDE: 'integration_inbox.exclude',
+
+  // Slice 11 — Inventory workflow
+  PURCHASE_ORDER_CREATE: 'purchase_order.create',
+  PURCHASE_ORDER_UPDATE: 'purchase_order.update',
+  PURCHASE_ORDER_VOID: 'purchase_order.void',
+  ITEM_RECEIPT_CREATE: 'item_receipt.create',
+  SALES_ORDER_CREATE: 'sales_order.create',
+  SALES_ORDER_UPDATE: 'sales_order.update',
+  SALES_ORDER_FULFILL: 'sales_order.fulfill',
+  SALES_ORDER_VOID: 'sales_order.void',
+  SHIPPING_LABEL_CREATE: 'shipping_label.create',
+  SHIPPING_LABEL_UPDATE: 'shipping_label.update',
+  SHIPPING_LABEL_DELETE: 'shipping_label.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
