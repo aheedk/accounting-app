@@ -45,6 +45,10 @@ import BankAccountListPage from '@/pages/banking/BankAccountListPage';
 import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
 import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage';
 import ReconcilePage from '@/pages/banking/ReconcilePage';
+import RulesPage from '@/pages/accounting/RulesPage';
+import FixedAssetListPage from '@/pages/accounting/FixedAssetListPage';
+import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
+import FixedAssetDetailPage from '@/pages/accounting/FixedAssetDetailPage';
 import ComingSoonPage from '@/pages/ComingSoonPage';
 
 export default function App() {
@@ -120,9 +124,11 @@ export default function App() {
             <Route path="/accounting/integrations" element={<ComingSoonPage title="Integration Transactions" description="Activity coming in from third-party integrations." eta="Slice 4" />} />
             <Route path="/accounting/receipts" element={<ComingSoonPage title="Receipts" description="Upload and match receipts to transactions." eta="Slice 4" />} />
             <Route path="/accounting/reconcile" element={<ReconcilePage />} />
-            <Route path="/accounting/rules" element={<ComingSoonPage title="Rules" description="Auto-categorization rules for transactions." eta="Slice 3" />} />
+            <Route path="/accounting/rules" element={<RulesPage />} />
             <Route path="/accounting/recurring" element={<ComingSoonPage title="Recurring Transactions" description="Schedule recurring journal entries, invoices, and bills." eta="Slice 3" />} />
-            <Route path="/accounting/fixed-assets" element={<ComingSoonPage title="Fixed Assets" description="Register, depreciate, and dispose of fixed assets." eta="Slice 4" />} />
+            <Route path="/accounting/fixed-assets" element={<FixedAssetListPage />} />
+            <Route path="/accounting/fixed-assets/new" element={<FixedAssetNewPage />} />
+            <Route path="/accounting/fixed-assets/:id" element={<FixedAssetDetailPage />} />
 
             {/* Setup (placeholders) */}
             <Route path="/setup/entity" element={<ComingSoonPage title="Entity" description="Legal entity, addresses, fiscal year, and tax IDs." eta="Slice 2" />} />
