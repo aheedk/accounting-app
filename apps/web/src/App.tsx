@@ -63,6 +63,8 @@ import ContractorsPage from '@/pages/ap/ContractorsPage';
 import ClientOverviewPage from '@/pages/accounting/ClientOverviewPage';
 import BooksReviewPage from '@/pages/accounting/BooksReviewPage';
 import RecurringTransactionsPage from '@/pages/accounting/RecurringTransactionsPage';
+import ReceiptsPage from '@/pages/accounting/ReceiptsPage';
+import IntegrationInboxPage from '@/pages/accounting/IntegrationInboxPage';
 import ComingSoonPage from '@/pages/ComingSoonPage';
 
 export default function App() {
@@ -137,8 +139,8 @@ export default function App() {
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
             <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />
-            <Route path="/accounting/integrations" element={<ComingSoonPage title="Integration Transactions" description="CSV imports from Stripe, PayPal, Shopify and other sources." eta="Slice 10" />} />
-            <Route path="/accounting/receipts" element={<ComingSoonPage title="Receipts" description="Upload and match receipts to transactions." eta="Slice 10" />} />
+            <Route path="/accounting/integrations" element={<IntegrationInboxPage />} />
+            <Route path="/accounting/receipts" element={<ReceiptsPage />} />
             <Route path="/accounting/reconcile" element={<ReconcilePage />} />
             <Route path="/accounting/rules" element={<RulesPage />} />
             <Route path="/accounting/recurring" element={<RecurringTransactionsPage />} />

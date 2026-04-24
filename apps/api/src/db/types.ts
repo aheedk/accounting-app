@@ -358,6 +358,50 @@ export interface RecurringTemplatesTable {
   created_by_user_id: string | null;
 }
 
+export interface FilesTable {
+  id: Generated<string>;
+  business_id: string;
+  original_name: string;
+  mime_type: string;
+  byte_size: ColumnType<string, string | number, string | number>;
+  storage_path: string;
+  uploaded_by_user_id: string;
+  created_at: Generated<Timestamp>;
+}
+
+export type ReceiptLinkedEntityType = 'bank_transaction' | 'bill' | 'expense_transaction' | 'invoice' | 'journal_entry' | 'unlinked';
+
+export interface ReceiptsTable {
+  id: Generated<string>;
+  business_id: string;
+  file_id: string;
+  uploaded_by_user_id: string;
+  linked_entity_type: Generated<ReceiptLinkedEntityType>;
+  linked_entity_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
+export type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
+
+export interface IntegrationInboxTable {
+  id: Generated<string>;
+  business_id: string;
+  source: IntegrationSource;
+  external_id: string | null;
+  occurred_at: ColumnType<string, string, string>;
+  description: string;
+  amount: ColumnType<string, string | number, string | number>;
+  raw_payload: ColumnType<unknown, unknown, unknown>;
+  status: Generated<IntegrationInboxStatus>;
+  matched_journal_entry_id: string | null;
+  excluded_reason: string | null;
+  imported_at: Generated<Timestamp>;
+  reviewed_at: Timestamp | null;
+  reviewed_by_user_id: string | null;
+}
+
 export interface BillsTable {
   id: Generated<string>;
   business_id: string;
@@ -624,4 +668,7 @@ export interface DB {
   expense_transactions: ExpenseTransactionsTable;
   period_review_tasks: PeriodReviewTasksTable;
   recurring_templates: RecurringTemplatesTable;
+  files: FilesTable;
+  receipts: ReceiptsTable;
+  integration_inbox: IntegrationInboxTable;
 }

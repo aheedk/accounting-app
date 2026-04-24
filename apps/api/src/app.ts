@@ -38,6 +38,9 @@ import apOverviewRouter from './routes/apOverview.js';
 import firmOverviewRouter from './routes/firmOverview.js';
 import periodReviewRouter from './routes/periodReview.js';
 import recurringTemplatesRouter from './routes/recurringTemplates.js';
+import filesRouter from './routes/files.js';
+import receiptsRouter from './routes/receipts.js';
+import integrationInboxRouter from './routes/integrationInbox.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -85,6 +88,9 @@ export function makeApp(): Express {
   app.use(firmOverviewRouter);
   app.use(periodReviewRouter);
   app.use(recurringTemplatesRouter);
+  app.use(filesRouter);
+  app.use(receiptsRouter);
+  app.use(integrationInboxRouter);
   app.use(errorHandler);
   return app;
 }
