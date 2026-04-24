@@ -36,6 +36,8 @@ import inventoryItemsRoutes from './routes/inventoryItems.js';
 import expenseTransactionsRouter from './routes/expenseTransactions.js';
 import apOverviewRouter from './routes/apOverview.js';
 import firmOverviewRouter from './routes/firmOverview.js';
+import periodReviewRouter from './routes/periodReview.js';
+import recurringTemplatesRouter from './routes/recurringTemplates.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -81,6 +83,8 @@ export function makeApp(): Express {
   app.use(expenseTransactionsRouter);
   app.use(apOverviewRouter);
   app.use(firmOverviewRouter);
+  app.use(periodReviewRouter);
+  app.use(recurringTemplatesRouter);
   app.use(errorHandler);
   return app;
 }
