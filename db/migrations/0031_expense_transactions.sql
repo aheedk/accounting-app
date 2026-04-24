@@ -21,8 +21,12 @@ CREATE TABLE expense_transactions (
   voided_at timestamptz,
   voided_by_user_id uuid REFERENCES users(id),
   CONSTRAINT et_payee CHECK (payee_text IS NOT NULL OR vendor_id IS NOT NULL),
+  -- One-way implications so void rows can preserve the JE back-link for audit.
+  CONSTRAINT et_draft_no_je CHECK (
+    status <> 'draft' OR (journal_entry_id IS NULL AND posted_at IS NULL)
+  ),
   CONSTRAINT et_posted_has_je CHECK (
-    (status = 'posted') = (journal_entry_id IS NOT NULL AND posted_at IS NOT NULL)
+    status <> 'posted' OR (journal_entry_id IS NOT NULL AND posted_at IS NOT NULL)
   ),
   CONSTRAINT et_voided_state CHECK (
     (status = 'void') = (voided_at IS NOT NULL)

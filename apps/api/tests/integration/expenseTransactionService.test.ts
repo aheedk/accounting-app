@@ -76,5 +76,8 @@ describe('expenseTransactionService', () => {
     );
     expect(voided.status).toBe('void');
     expect(voided.voided_at).not.toBeNull();
+    // Audit trail: void preserves the original JE link
+    expect(voided.journal_entry_id).toBe(posted.journal_entry_id);
+    expect(voided.posted_at).not.toBeNull();
   });
 });

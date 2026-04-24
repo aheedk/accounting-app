@@ -101,15 +101,13 @@ export async function voidExpense(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     });
   }
 
-  // The et_posted_has_je CHECK constraint requires:
-  //   (status = 'posted') = (journal_entry_id IS NOT NULL AND posted_at IS NOT NULL)
-  // When flipping to 'void' we must null out journal_entry_id and posted_at.
+  // CHECK constraints are now one-way implications: posted requires JE+posted_at,
+  // draft forbids both, void allows either. We KEEP journal_entry_id + posted_at on
+  // void rows so the audit trail can see what was reversed.
   const updated = await trx.updateTable('expense_transactions').set({
     status: 'void',
     voided_at: sql`now()`,
     voided_by_user_id: ctx.user_id,
-    journal_entry_id: null,
-    posted_at: null,
   }).where('id', '=', input.expense_transaction_id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
