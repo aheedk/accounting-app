@@ -12,6 +12,15 @@
 
 ## Locked decisions
 
+> **Plan-impl drift log** (patched after Phase A/B execution):
+> - `bill_payment_applications` column is `applied_amount`, not `amount_applied` (verified at `db/migrations/0018_bill_payments.sql:36`). All queries using it have been updated.
+> - `PreconditionError` lives in `apps/api/src/lib/ledgerErrors.js`, not `lib/errors.js`. Service files import from there.
+> - `voidJournalEntry` signature is `(trx, ctx, { journal_entry_id, void_reason })`. The service supplies `void_reason ?? 'expense voided'`.
+> - The original `et_posted_has_je` biconditional CHECK on `expense_transactions` was loosened to two one-way implications so void rows preserve the JE back-link for audit. Migration 0031 reflects the loosened constraints; voidExpense no longer nulls `journal_entry_id`/`posted_at`.
+> - Default seeded CoA already includes code `1010 Cash on Hand`. New tests use `1015` for a manually-created cash row to avoid the `(business_id, code)` unique-constraint collision.
+> - Vendor existing test file `vendor.test.ts` was updated by Task 7 to use `tax_id_type: 'EIN'` and assert on `tax_id_last_four` / `tax_id_type` / `tax_id_encrypted` instead of the dropped plaintext field.
+> - Test runs use `--pool=forks --poolOptions.forks.singleFork=true` to avoid Docker testcontainer resource exhaustion when running in parallel with other workspaces. The default parallel pool spawned 16+ Postgres containers and timed out hooks.
+
 1. **Field encryption uses xchacha20poly1305 from `@noble/ciphers`** (pure JS). Avoids the libsodium native-build risk on Railway. 24-byte nonce stored as the prefix of the bytea blob: `nonce || ciphertext_with_tag`. Key from env `FIELD_ENCRYPTION_KEY` (32 bytes hex).
 2. **Vendor `tax_id` migration is destructive of any existing plaintext data.** Slice 7 hasn't shipped real tenant data yet (still demo-only); we drop the old text column outright. `0030` includes a `WARNING` comment.
 3. **`tax_id_type` is required when `tax_id_encrypted` is set.** Enforced by CHECK constraint.
