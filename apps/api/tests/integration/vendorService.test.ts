@@ -9,7 +9,11 @@ const meta = { request_id: '00000000-0000-0000-0000-0000000bbb10', ip_address: '
 
 describe('vendorService', () => {
   let t: TestDb;
-  beforeAll(async () => { t = await startTestDb(); });
+  beforeAll(async () => {
+    t = await startTestDb();
+    process.env['FIELD_ENCRYPTION_KEY'] =
+      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  });
   afterAll(async () => { await stopTestDb(); });
   beforeEach(async () => { await truncateAll(t.db); });
 
@@ -24,11 +28,13 @@ describe('vendorService', () => {
   it('creates and lists vendors, scoped to business', async () => {
     const { biz, ctx } = await setup();
     const v = await t.db.transaction().execute(trx =>
-      vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Supply', email: 'ap@acme.com', is_1099: true, tax_id: '12-3456789' }),
+      vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Supply', email: 'ap@acme.com', is_1099: true, tax_id: '12-3456789', tax_id_type: 'EIN' }),
     );
     expect(v.name).toBe('Acme Supply');
     expect(v.is_1099).toBe(true);
-    expect(v.tax_id).toBe('12-3456789');
+    expect(v.tax_id_last_four).toBe('6789');
+    expect(v.tax_id_type).toBe('EIN');
+    expect(v.tax_id_encrypted).toBeInstanceOf(Buffer);
     const list = await vend.listVendors(t.db, biz.id);
     expect(list).toHaveLength(1);
   });
