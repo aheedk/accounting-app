@@ -26,30 +26,17 @@ export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: Updat
   if (!before) throw new NotFoundError('period_review_task', input.task_id);
 
   const isSigningOff = input.patch.status === 'done' && before.status !== 'done';
+  const isUnSigningOff = input.patch.status !== undefined && input.patch.status !== 'done' && before.status === 'done';
 
-  // Build conditional patch (no undefined values; exactOptionalPropertyTypes-safe).
-  const patch: {
-    status?: 'todo' | 'in_progress' | 'done';
-    assignee_user_id?: string | null;
-    notes?: string | null;
-    signed_off_at?: ReturnType<typeof sql> | null;
-    signed_off_by_user_id?: string | null;
-  } = {};
-  if (input.patch.status !== undefined) patch.status = input.patch.status;
-  if (input.patch.assignee_user_id !== undefined) patch.assignee_user_id = input.patch.assignee_user_id;
-  if (input.patch.notes !== undefined) patch.notes = input.patch.notes;
-  if (isSigningOff) {
-    patch.signed_off_at = sql`now()`;
-    patch.signed_off_by_user_id = ctx.user_id;
-  }
-  // If status is moving AWAY from 'done', null out signoff to keep the CHECK constraint happy.
-  if (input.patch.status !== undefined && input.patch.status !== 'done' && before.status === 'done') {
-    patch.signed_off_at = null;
-    patch.signed_off_by_user_id = null;
-  }
-
-  const updated = await trx.updateTable('period_review_tasks')
-    .set(patch).where('id', '=', input.task_id).returningAll().executeTakeFirstOrThrow();
+  // Use Kysely's set() builder so the sql`now()` value typechecks via the column-aware
+  // expression context. Construct conditional spreads to honor exactOptionalPropertyTypes.
+  const updated = await trx.updateTable('period_review_tasks').set({
+    ...(input.patch.status !== undefined ? { status: input.patch.status } : {}),
+    ...(input.patch.assignee_user_id !== undefined ? { assignee_user_id: input.patch.assignee_user_id } : {}),
+    ...(input.patch.notes !== undefined ? { notes: input.patch.notes } : {}),
+    ...(isSigningOff ? { signed_off_at: sql`now()`, signed_off_by_user_id: ctx.user_id } : {}),
+    ...(isUnSigningOff ? { signed_off_at: null, signed_off_by_user_id: null } : {}),
+  }).where('id', '=', input.task_id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
     action: isSigningOff ? AUDIT.PERIOD_REVIEW_TASK_SIGN_OFF : AUDIT.PERIOD_REVIEW_TASK_UPDATE,
