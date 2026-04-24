@@ -33,6 +33,8 @@ import businessesRoutes from './routes/businesses.js';
 import usersRoutes from './routes/users.js';
 import costCentersRoutes from './routes/costCenters.js';
 import inventoryItemsRoutes from './routes/inventoryItems.js';
+import expenseTransactionsRouter from './routes/expenseTransactions.js';
+import apOverviewRouter from './routes/apOverview.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -75,6 +77,8 @@ export function makeApp(): Express {
   app.use(usersRoutes);
   app.use(costCentersRoutes);
   app.use(inventoryItemsRoutes);
+  app.use(expenseTransactionsRouter);
+  app.use(apOverviewRouter);
   app.use(errorHandler);
   return app;
 }

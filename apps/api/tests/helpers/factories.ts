@@ -171,3 +171,20 @@ export async function makeFixedAsset(
     useful_life_years: opts.useful_life_years ?? 2,
   }).returningAll().executeTakeFirstOrThrow();
 }
+
+export async function makeExpenseTransaction(
+  db: Kysely<DB>,
+  business_id: string,
+  expense_account_id: string,
+  payment_account_id: string,
+  opts: Partial<{ amount: string; payee_text: string; transaction_date: string }> = {},
+) {
+  return db.insertInto('expense_transactions').values({
+    business_id,
+    expense_account_id,
+    payment_account_id,
+    amount: opts.amount ?? '50.00',
+    payee_text: opts.payee_text ?? 'Test Payee',
+    transaction_date: opts.transaction_date ?? '2026-04-01',
+  }).returningAll().executeTakeFirstOrThrow();
+}

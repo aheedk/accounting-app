@@ -42,6 +42,7 @@ router.post('/businesses/:businessId/vendors', requireMinRole('staff'), async (r
     if (body.phone !== undefined) input.phone = body.phone ?? null;
     if (body.is_1099 !== undefined) input.is_1099 = body.is_1099;
     if (body.tax_id !== undefined) input.tax_id = body.tax_id ?? null;
+    if (body.tax_id_type !== undefined) input.tax_id_type = body.tax_id_type ?? null;
     if (body.default_terms_days !== undefined) input.default_terms_days = body.default_terms_days;
     const created = await db.transaction().execute(trx =>
       vend.createVendor(trx, ctxFromReq(req), input),
@@ -59,6 +60,7 @@ router.patch('/businesses/:businessId/vendors/:id', requireMinRole('accountant')
     if (parsed.phone !== undefined) patch.phone = parsed.phone ?? null;
     if (parsed.is_1099 !== undefined) patch.is_1099 = parsed.is_1099;
     if (parsed.tax_id !== undefined) patch.tax_id = parsed.tax_id ?? null;
+    if (parsed.tax_id_type !== undefined) patch.tax_id_type = parsed.tax_id_type ?? null;
     if (parsed.default_terms_days !== undefined) patch.default_terms_days = parsed.default_terms_days;
     const updated = await db.transaction().execute(trx =>
       vend.updateVendor(trx, ctxFromReq(req), { vendor_id: req.params['id']!, patch }),
@@ -71,6 +73,18 @@ router.delete('/businesses/:businessId/vendors/:id', requireMinRole('firm_admin'
   try {
     await db.transaction().execute(trx => vend.deleteVendor(trx, ctxFromReq(req), { vendor_id: req.params['id']! }));
     res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/contractors', async (req, res, next) => {
+  try { res.json({ vendors: await vend.listContractors(db, req.tenancy!.business_id) }); }
+  catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/vendors/:id/tax-id-reveal', requireMinRole('firm_admin'), async (req, res, next) => {
+  try {
+    const tax_id = await vend.revealTaxId(db, ctxFromReq(req), { vendor_id: req.params['id']! });
+    res.json({ tax_id });
   } catch (e) { next(e); }
 });
 

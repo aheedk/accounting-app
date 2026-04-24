@@ -4,6 +4,7 @@ import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { encryptField, decryptField, lastFour } from '../../lib/fieldCrypto.js';
 
 export type CreateVendorInput = {
   business_id: string;
@@ -13,7 +14,8 @@ export type CreateVendorInput = {
   billing_address?: unknown;
   default_terms_days?: number;
   is_1099?: boolean;
-  tax_id?: string | null;
+  tax_id?: string | null;        // plaintext; service encrypts
+  tax_id_type?: 'SSN' | 'EIN' | null;
 };
 
 export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateVendorInput) {
@@ -21,6 +23,16 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
     .where('business_id', '=', input.business_id).where('name', '=', input.name).where('deleted_at', 'is', null)
     .executeTakeFirst();
   if (dup) throw new BusinessRuleError(ERR.DUPLICATE_RESOURCE, `Vendor "${input.name}" already exists`);
+
+  let tax_id_encrypted: Buffer | null = null;
+  let tax_id_last_four: string | null = null;
+  let tax_id_type: 'SSN' | 'EIN' | null = null;
+  if (input.tax_id) {
+    if (!input.tax_id_type) throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'tax_id_type is required when tax_id is set');
+    tax_id_encrypted = encryptField(input.tax_id);
+    tax_id_last_four = lastFour(input.tax_id);
+    tax_id_type = input.tax_id_type;
+  }
 
   const values: {
     business_id: string;
@@ -30,14 +42,18 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
     billing_address: unknown | null;
     default_terms_days?: number;
     is_1099?: boolean;
-    tax_id: string | null;
+    tax_id_encrypted: Buffer | null;
+    tax_id_last_four: string | null;
+    tax_id_type: 'SSN' | 'EIN' | null;
   } = {
     business_id: input.business_id,
     name: input.name,
     email: input.email ?? null,
     phone: input.phone ?? null,
     billing_address: input.billing_address === undefined ? null : (input.billing_address ?? null),
-    tax_id: input.tax_id ?? null,
+    tax_id_encrypted,
+    tax_id_last_four,
+    tax_id_type,
   };
   if (input.default_terms_days !== undefined) values.default_terms_days = input.default_terms_days;
   if (input.is_1099 !== undefined) values.is_1099 = input.is_1099;
@@ -55,6 +71,24 @@ export async function updateVendor(
   const before = await trx.selectFrom('vendors').selectAll().where('id', '=', input.vendor_id).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('vendor', input.vendor_id);
 
+  let taxIdPatch: Partial<{
+    tax_id_encrypted: Buffer | null;
+    tax_id_last_four: string | null;
+    tax_id_type: 'SSN' | 'EIN' | null;
+  }> = {};
+  if (input.patch.tax_id !== undefined) {
+    if (input.patch.tax_id === null) {
+      taxIdPatch = { tax_id_encrypted: null, tax_id_last_four: null, tax_id_type: null };
+    } else {
+      if (!input.patch.tax_id_type) throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'tax_id_type is required when tax_id is set');
+      taxIdPatch = {
+        tax_id_encrypted: encryptField(input.patch.tax_id),
+        tax_id_last_four: lastFour(input.patch.tax_id),
+        tax_id_type: input.patch.tax_id_type,
+      };
+    }
+  }
+
   const updated = await trx.updateTable('vendors').set({
     ...(input.patch.name !== undefined ? { name: input.patch.name } : {}),
     ...(input.patch.email !== undefined ? { email: input.patch.email ?? null } : {}),
@@ -62,7 +96,7 @@ export async function updateVendor(
     ...(input.patch.billing_address !== undefined ? { billing_address: input.patch.billing_address ?? null } : {}),
     ...(input.patch.default_terms_days !== undefined ? { default_terms_days: input.patch.default_terms_days } : {}),
     ...(input.patch.is_1099 !== undefined ? { is_1099: input.patch.is_1099 } : {}),
-    ...(input.patch.tax_id !== undefined ? { tax_id: input.patch.tax_id ?? null } : {}),
+    ...taxIdPatch,
   }).where('id', '=', input.vendor_id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, { action: AUDIT.VENDOR_UPDATE, entity_type: 'vendor', entity_id: input.vendor_id, before, after: updated });
@@ -98,4 +132,28 @@ export async function getVendor(db: Kysely<DB>, business_id: string, vendor_id: 
     .executeTakeFirst();
   if (!v) throw new NotFoundError('vendor', vendor_id);
   return v;
+}
+
+export async function revealTaxId(db: Kysely<DB>, ctx: ServiceCtx, input: { vendor_id: string }): Promise<string | null> {
+  const v = await db.selectFrom('vendors').selectAll()
+    .where('id', '=', input.vendor_id).where('business_id', '=', ctx.business_id ?? '').where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  if (!v) throw new NotFoundError('vendor', input.vendor_id);
+  await db.transaction().execute(async trx => {
+    await auditRecord(trx, ctx, {
+      action: AUDIT.VENDOR_TAX_ID_REVEAL,
+      entity_type: 'vendor',
+      entity_id: v.id,
+      before: null,
+      after: { revealed_by: ctx.user_id, last_four: v.tax_id_last_four },
+    });
+  });
+  return v.tax_id_encrypted ? decryptField(Buffer.from(v.tax_id_encrypted)) : null;
+}
+
+export async function listContractors(db: Kysely<DB>, business_id: string) {
+  return db.selectFrom('vendors').selectAll()
+    .where('business_id', '=', business_id).where('deleted_at', 'is', null)
+    .where('is_1099', '=', true)
+    .orderBy('name').execute();
 }

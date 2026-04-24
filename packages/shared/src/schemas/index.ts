@@ -24,3 +24,4 @@ export * from './business.js';
 export * from './userManagement.js';
 export * from './costCenter.js';
 export * from './inventoryItem.js';
+export * from './expenseTransaction.js';

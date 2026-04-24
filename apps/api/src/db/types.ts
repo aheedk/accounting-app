@@ -289,12 +289,37 @@ export interface VendorsTable {
   email: string | null;
   phone: string | null;
   billing_address: ColumnType<unknown, unknown, unknown> | null;
-  tax_id: string | null;
+  tax_id_encrypted: Buffer | null;
+  tax_id_last_four: string | null;
+  tax_id_type: 'SSN' | 'EIN' | null;
   is_1099: Generated<boolean>;
   default_terms_days: Generated<number>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;
+}
+
+export type ExpenseTransactionStatus = 'draft' | 'posted' | 'void';
+
+export interface ExpenseTransactionsTable {
+  id: Generated<string>;
+  business_id: string;
+  transaction_date: ColumnType<string, string, string>;
+  payee_text: string | null;
+  vendor_id: string | null;
+  expense_account_id: string;
+  payment_account_id: string;
+  amount: ColumnType<string, string | number, string | number>;
+  memo: string | null;
+  status: Generated<ExpenseTransactionStatus>;
+  journal_entry_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
 }
 
 export interface BillsTable {
@@ -560,4 +585,5 @@ export interface DB {
   cost_centers: CostCentersTable;
   inventory_items: InventoryItemsTable;
   stock_movements: StockMovementsTable;
+  expense_transactions: ExpenseTransactionsTable;
 }

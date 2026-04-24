@@ -127,6 +127,13 @@ export const AUDIT = {
   INVENTORY_ITEM_UPDATE: 'inventory_item.update',
   INVENTORY_ITEM_DELETE: 'inventory_item.delete',
   STOCK_MOVEMENT_CREATE: 'stock_movement.create',
+
+  // Slice 8 — AP polish
+  EXPENSE_TRANSACTION_CREATE: 'expense_transaction.create',
+  EXPENSE_TRANSACTION_UPDATE: 'expense_transaction.update',
+  EXPENSE_TRANSACTION_POST: 'expense_transaction.post',
+  EXPENSE_TRANSACTION_VOID: 'expense_transaction.void',
+  VENDOR_TAX_ID_REVEAL: 'vendor.tax_id_reveal',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

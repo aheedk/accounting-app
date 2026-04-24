@@ -5,7 +5,8 @@ import type { DB } from '../../../db/types.js';
 export type TenNinetyNineRow = {
   vendor_id: string;
   vendor_name: string;
-  tax_id: string | null;
+  tax_id_last_four: string | null;
+  tax_id_type: 'SSN' | 'EIN' | null;
   total_paid: string;
 };
 
@@ -15,7 +16,8 @@ export async function tenNinetyNine(db: Kysely<DB>, q: { business_id: string; ye
   const rows = await db.selectFrom('bill_payments as bp')
     .innerJoin('vendors as v', 'v.id', 'bp.vendor_id')
     .select(({ fn }) => [
-      'v.id as vendor_id', 'v.name as vendor_name', 'v.tax_id',
+      'v.id as vendor_id', 'v.name as vendor_name',
+      'v.tax_id_last_four', 'v.tax_id_type',
       fn.coalesce(fn.sum<string>('bp.amount'), sql.lit('0')).as('total_paid'),
     ])
     .where('bp.business_id', '=', q.business_id)
@@ -24,13 +26,14 @@ export async function tenNinetyNine(db: Kysely<DB>, q: { business_id: string; ye
     .where('bp.payment_date', '<=', end)
     .where('v.is_1099', '=', true)
     .where('v.deleted_at', 'is', null)
-    .groupBy(['v.id', 'v.name', 'v.tax_id'])
+    .groupBy(['v.id', 'v.name', 'v.tax_id_last_four', 'v.tax_id_type'])
     .orderBy('v.name')
     .execute();
   return rows.map(r => ({
     vendor_id: r.vendor_id,
     vendor_name: r.vendor_name,
-    tax_id: r.tax_id,
+    tax_id_last_four: r.tax_id_last_four,
+    tax_id_type: r.tax_id_type,
     total_paid: toMoneyString(addMoney(r.total_paid ?? '0', '0')),
   }));
 }
