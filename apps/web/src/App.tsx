@@ -37,6 +37,9 @@ import VendorCreditListPage from '@/pages/vendor-credits/VendorCreditListPage';
 import VendorCreditNewPage from '@/pages/vendor-credits/VendorCreditNewPage';
 import VendorCreditDetailPage from '@/pages/vendor-credits/VendorCreditDetailPage';
 import TenNinetyNineReportPage from '@/pages/reports/TenNinetyNineReportPage';
+import ProfitLossPage from '@/pages/reports/ProfitLossPage';
+import BalanceSheetPage from '@/pages/reports/BalanceSheetPage';
+import CashFlowPage from '@/pages/reports/CashFlowPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 import BankAccountListPage from '@/pages/banking/BankAccountListPage';
 import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
@@ -76,6 +79,9 @@ export default function App() {
             <Route path="/reports/standard" element={<StandardReportsPage />} />
             <Route path="/reports/trial-balance" element={<TrialBalancePage />} />
             <Route path="/reports/aging" element={<AgingReportPage />} />
+            <Route path="/reports/pnl" element={<ProfitLossPage />} />
+            <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
+            <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/custom" element={<ComingSoonPage title="Custom Reports" description="Build reports with custom filters, columns, and grouping." eta="Slice 3" />} />
             <Route path="/reports/management" element={<ComingSoonPage title="Management Reports" description="Executive dashboards and KPI-driven management views." eta="Slice 3" />} />
             <Route path="/reports/performance" element={<ComingSoonPage title="Performance Center" description="Benchmarks and performance analytics across clients." eta="Slice 4" />} />

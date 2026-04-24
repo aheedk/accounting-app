@@ -37,6 +37,9 @@ const groups: NavGroup[] = [
     icon: FileBarChart,
     children: [
       { to: '/reports/standard', label: 'Standard Reports' },
+      { to: '/reports/pnl', label: 'Profit & Loss' },
+      { to: '/reports/balance-sheet', label: 'Balance Sheet' },
+      { to: '/reports/cash-flow', label: 'Cash Flow' },
       { to: '/reports/custom', label: 'Custom Reports' },
       { to: '/reports/management', label: 'Management Reports' },
       { to: '/reports/performance', label: 'Performance Center' },
