@@ -2,7 +2,12 @@ import { ERR } from '@accounting/shared';
 import { BusinessRuleError } from './errors.js';
 
 export class OverApplicationError extends BusinessRuleError {
-  constructor(kind: 'payment' | 'invoice' | 'credit_memo', id: string, attempted: string, available: string) {
+  constructor(
+    kind: 'payment' | 'invoice' | 'credit_memo' | 'bill' | 'bill_payment' | 'vendor_credit',
+    id: string,
+    attempted: string,
+    available: string,
+  ) {
     super(ERR.OVERAPPLICATION,
       `Cannot apply ${attempted}: ${kind} ${id} has only ${available} available`,
       { kind, id, attempted, available });

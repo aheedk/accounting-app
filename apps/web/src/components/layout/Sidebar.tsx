@@ -37,6 +37,9 @@ const groups: NavGroup[] = [
     icon: FileBarChart,
     children: [
       { to: '/reports/standard', label: 'Standard Reports' },
+      { to: '/reports/pnl', label: 'Profit & Loss' },
+      { to: '/reports/balance-sheet', label: 'Balance Sheet' },
+      { to: '/reports/cash-flow', label: 'Cash Flow' },
       { to: '/reports/custom', label: 'Custom Reports' },
       { to: '/reports/management', label: 'Management Reports' },
       { to: '/reports/performance', label: 'Performance Center' },
@@ -66,8 +69,9 @@ const groups: NavGroup[] = [
       { to: '/ap/vendors', label: 'Vendors' },
       { to: '/ap/bills', label: 'Bills' },
       { to: '/ap/bill-payments', label: 'Bill Payments' },
+      { to: '/ap/vendor-credits', label: 'Vendor Credits' },
       { to: '/ap/contractors', label: 'Contractors' },
-      { to: '/ap/1099s', label: '1099s' },
+      { to: '/reports/1099', label: '1099s' },
     ],
   },
   {
@@ -77,6 +81,7 @@ const groups: NavGroup[] = [
     children: [
       { to: '/accounting/client-overview', label: 'Client Overview' },
       { to: '/accounting/books-review', label: 'Books Review' },
+      { to: '/accounting/bank-accounts', label: 'Bank Accounts' },
       { to: '/accounting/bank-transactions', label: 'Bank Transactions' },
       { to: '/accounting/integrations', label: 'Integration Transactions' },
       { to: '/accounting/receipts', label: 'Receipts' },

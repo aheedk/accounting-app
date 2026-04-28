@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, FileBarChart, Users } from 'lucide-react';
+import { ArrowRight, FileBarChart, Users, Receipt, TrendingUp, Scale, Activity } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type ReportCard = {
@@ -12,6 +12,24 @@ type ReportCard = {
 
 const reports: ReportCard[] = [
   {
+    to: '/reports/pnl',
+    name: 'Profit & Loss',
+    description: 'Revenue and expenses for a period, with gross profit and net income.',
+    icon: TrendingUp,
+  },
+  {
+    to: '/reports/balance-sheet',
+    name: 'Balance Sheet',
+    description: 'Assets, liabilities, and equity as of a point in time.',
+    icon: Scale,
+  },
+  {
+    to: '/reports/cash-flow',
+    name: 'Cash Flow Statement',
+    description: 'Cash account activity over a period with beginning and ending balances.',
+    icon: Activity,
+  },
+  {
     to: '/reports/trial-balance',
     name: 'Trial Balance',
     description: 'Debit and credit balances for every account as of a chosen date.',
@@ -22,6 +40,12 @@ const reports: ReportCard[] = [
     name: 'AR Aging',
     description: 'Outstanding customer invoices bucketed by days past due.',
     icon: Users,
+  },
+  {
+    to: '/reports/1099',
+    name: '1099 Report',
+    description: 'Annual payments to 1099 vendors, grouped by vendor and tax ID.',
+    icon: Receipt,
   },
 ];
 
