@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
 
 type Vendor = { id: string; name: string };
@@ -48,7 +49,7 @@ export default function BillPaymentNewPage() {
         <CardContent className="grid grid-cols-2 gap-3">
           <div><Label>Vendor</Label>
             <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.vendor_id} onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))} required>
-              <option value="">Select…</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              <option value="">Select a vendor…</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
           <div><Label>Date</Label><Input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} required /></div>
@@ -57,14 +58,18 @@ export default function BillPaymentNewPage() {
               {['cash','check','ach','wire','card','other'].map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
-          <div><Label>Reference</Label><Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} /></div>
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required /></div>
-          <div><Label>Cash account</Label>
-            <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.cash_account_id} onChange={e => setForm(f => ({ ...f, cash_account_id: e.target.value }))} required>
-              <option value="">Select…</option>{cashAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-            </select>
+          <div><Label>Reference</Label><Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="Check #, transaction ID, etc." /></div>
+          <div><Label>Amount</Label><Input type="number" step="0.01" inputMode="decimal" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" required className="text-right font-mono" /></div>
+          <div><Label>Cash account (credit)</Label>
+            <AccountSelect
+              accounts={cashAccounts}
+              value={form.cash_account_id}
+              onChange={(id) => setForm(f => ({ ...f, cash_account_id: id }))}
+              required
+              placeholder="Search cash account…"
+            />
           </div>
-          <div className="col-span-2"><Label>Memo</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} /></div>
+          <div className="col-span-2"><Label>Memo</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="Optional note" /></div>
         </CardContent>
       </Card>
       {err && <p className="text-sm text-destructive">{err}</p>}

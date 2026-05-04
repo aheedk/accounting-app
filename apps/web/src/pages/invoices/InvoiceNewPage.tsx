@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
 
 type Line = { description: string; quantity: string; unit_price: string; revenue_account_id: string; tax_code_id: string | null };
@@ -63,33 +64,59 @@ export default function InvoiceNewPage() {
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Customer</Label>
             <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required>
-              <option value="">Select…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div><Label>Invoice #</Label><Input value={hdr.invoice_number} onChange={e => setHdr(h => ({ ...h, invoice_number: e.target.value }))} required /></div>
-          <div><Label>Memo</Label><Input value={hdr.memo} onChange={e => setHdr(h => ({ ...h, memo: e.target.value }))} /></div>
+          <div><Label>Invoice #</Label><Input value={hdr.invoice_number} onChange={e => setHdr(h => ({ ...h, invoice_number: e.target.value }))} placeholder="e.g. INV-1042" required /></div>
+          <div><Label>Memo</Label><Input value={hdr.memo} onChange={e => setHdr(h => ({ ...h, memo: e.target.value }))} placeholder="Optional note (visible on invoice)" /></div>
           <div><Label>Issue date</Label><Input type="date" value={hdr.issue_date} onChange={e => setHdr(h => ({ ...h, issue_date: e.target.value }))} required /></div>
           <div><Label>Due date</Label><Input type="date" value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
         </CardContent>
       </Card>
       <Card><CardHeader><CardTitle>Lines</CardTitle></CardHeader>
         <CardContent className="space-y-3">
+          <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="col-span-3">Description</div>
+            <div className="col-span-1 text-right">Qty</div>
+            <div className="col-span-2 text-right">Unit price</div>
+            <div className="col-span-3">Revenue account (credit)</div>
+            <div className="col-span-2">Tax</div>
+            <div className="col-span-1" />
+          </div>
           {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-end">
-              <div className="col-span-3"><Label className="sr-only">Desc</Label><Input value={l.description} onChange={e => update(i, { description: e.target.value })} placeholder="Description" required /></div>
-              <div className="col-span-1"><Label className="sr-only">Qty</Label><Input type="number" step="0.01" value={l.quantity} onChange={e => update(i, { quantity: e.target.value })} /></div>
-              <div className="col-span-2"><Label className="sr-only">Unit</Label><Input type="number" step="0.01" value={l.unit_price} onChange={e => update(i, { unit_price: e.target.value })} /></div>
-              <div className="col-span-3"><Label className="sr-only">Revenue acct</Label>
-                <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={l.revenue_account_id} onChange={e => update(i, { revenue_account_id: e.target.value })} required>
-                  <option value="">Account…</option>{revenueAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+            <div key={i} className="grid grid-cols-12 gap-2 items-start">
+              <div className="col-span-3">
+                <Label htmlFor={`line-${i}-desc`} className="sr-only">Description</Label>
+                <Input id={`line-${i}-desc`} value={l.description} onChange={e => update(i, { description: e.target.value })} placeholder="What was sold" required />
               </div>
-              <div className="col-span-2"><Label className="sr-only">Tax</Label>
-                <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={l.tax_code_id ?? ''} onChange={e => update(i, { tax_code_id: e.target.value || null })}>
+              <div className="col-span-1">
+                <Label htmlFor={`line-${i}-qty`} className="sr-only">Quantity</Label>
+                <Input id={`line-${i}-qty`} type="number" step="0.01" inputMode="decimal" value={l.quantity} onChange={e => update(i, { quantity: e.target.value })} placeholder="1" className="text-right font-mono" />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor={`line-${i}-unit`} className="sr-only">Unit price</Label>
+                <Input id={`line-${i}-unit`} type="number" step="0.01" inputMode="decimal" value={l.unit_price} onChange={e => update(i, { unit_price: e.target.value })} placeholder="0.00" className="text-right font-mono" />
+              </div>
+              <div className="col-span-3">
+                <Label htmlFor={`line-${i}-revenue`} className="sr-only">Revenue account</Label>
+                <AccountSelect
+                  id={`line-${i}-revenue`}
+                  accounts={revenueAccounts}
+                  value={l.revenue_account_id}
+                  onChange={(id) => update(i, { revenue_account_id: id })}
+                  required
+                  placeholder="Search revenue account…"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor={`line-${i}-tax`} className="sr-only">Tax code</Label>
+                <select id={`line-${i}-tax`} className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={l.tax_code_id ?? ''} onChange={e => update(i, { tax_code_id: e.target.value || null })}>
                   <option value="">No tax</option>{taxCodes.map((tc: TaxCode) => <option key={tc.id} value={tc.id}>{tc.code}</option>)}
                 </select>
               </div>
-              <div className="col-span-1"><Button type="button" variant="ghost" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 1}>×</Button></div>
+              <div className="col-span-1 flex items-center justify-end">
+                <Button type="button" variant="ghost" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 1} aria-label="Remove line">×</Button>
+              </div>
             </div>
           ))}
           <Button type="button" variant="outline" onClick={() => setLines(ls => [...ls, blank()])}>Add line</Button>

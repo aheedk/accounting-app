@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
 
 type Customer = { id: string; name: string };
@@ -49,17 +50,21 @@ export default function CreditMemoNewPage() {
         <CardContent className="grid grid-cols-2 gap-3">
           <div><Label>Customer</Label>
             <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.customer_id} onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))} required>
-              <option value="">Select…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div><Label>Date</Label><Input type="date" value={form.memo_date} onChange={e => setForm(f => ({ ...f, memo_date: e.target.value }))} required /></div>
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required /></div>
-          <div><Label>Revenue/contra account</Label>
-            <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.revenue_account_id} onChange={e => setForm(f => ({ ...f, revenue_account_id: e.target.value }))} required>
-              <option value="">Select…</option>{revenueAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-            </select>
+          <div><Label>Amount</Label><Input type="number" step="0.01" inputMode="decimal" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" required className="text-right font-mono" /></div>
+          <div><Label>Revenue/contra account (debit)</Label>
+            <AccountSelect
+              accounts={revenueAccounts}
+              value={form.revenue_account_id}
+              onChange={(id) => setForm(f => ({ ...f, revenue_account_id: id }))}
+              required
+              placeholder="Search revenue account (e.g. Sales Returns)…"
+            />
           </div>
-          <div className="col-span-2"><Label>Memo</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} /></div>
+          <div className="col-span-2"><Label>Memo</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="Reason for credit (optional)" /></div>
         </CardContent>
       </Card>
       {err && <p className="text-sm text-destructive">{err}</p>}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
@@ -109,60 +110,39 @@ export default function FixedAssetNewPage() {
             <Input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Delivery van #2"
               required
             />
           </div>
           <div>
-            <Label>Asset account</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            <Label>Asset account (debit)</Label>
+            <AccountSelect
+              accounts={assetAccounts}
               value={form.asset_account_id}
-              onChange={(e) => setForm((f) => ({ ...f, asset_account_id: e.target.value }))}
+              onChange={(id) => setForm((f) => ({ ...f, asset_account_id: id }))}
               required
-            >
-              <option value="">Select…</option>
-              {assetAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} — {a.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Search asset account…"
+            />
           </div>
           <div>
-            <Label>Depreciation expense account</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            <Label>Depreciation expense account (debit)</Label>
+            <AccountSelect
+              accounts={expenseAccounts}
               value={form.depreciation_expense_account_id}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, depreciation_expense_account_id: e.target.value }))
-              }
+              onChange={(id) => setForm((f) => ({ ...f, depreciation_expense_account_id: id }))}
               required
-            >
-              <option value="">Select…</option>
-              {expenseAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} — {a.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Search depreciation expense…"
+            />
           </div>
           <div>
-            <Label>Accumulated depreciation account</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            <Label>Accumulated depreciation account (credit)</Label>
+            <AccountSelect
+              accounts={assetAccounts}
               value={form.accumulated_depreciation_account_id}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, accumulated_depreciation_account_id: e.target.value }))
-              }
+              onChange={(id) => setForm((f) => ({ ...f, accumulated_depreciation_account_id: id }))}
               required
-            >
-              <option value="">Select…</option>
-              {assetAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} — {a.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Search accumulated depreciation…"
+            />
           </div>
           <div>
             <Label>Purchase date</Label>
@@ -179,8 +159,11 @@ export default function FixedAssetNewPage() {
               type="number"
               step="0.01"
               min="0"
+              inputMode="decimal"
               value={form.cost}
               onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))}
+              placeholder="0.00"
+              className="text-right font-mono"
               required
             />
           </div>
@@ -190,8 +173,11 @@ export default function FixedAssetNewPage() {
               type="number"
               step="0.01"
               min="0"
+              inputMode="decimal"
               value={form.salvage_value}
               onChange={(e) => setForm((f) => ({ ...f, salvage_value: e.target.value }))}
+              placeholder="0.00"
+              className="text-right font-mono"
             />
           </div>
           <div>
@@ -203,6 +189,7 @@ export default function FixedAssetNewPage() {
               max="100"
               value={form.useful_life_years}
               onChange={(e) => setForm((f) => ({ ...f, useful_life_years: e.target.value }))}
+              placeholder="5"
               required
             />
           </div>
@@ -211,6 +198,7 @@ export default function FixedAssetNewPage() {
             <Input
               value={form.memo}
               onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
+              placeholder="Optional note (serial #, location, etc.)"
             />
           </div>
         </CardContent>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountSelect } from '@/components/ui/AccountSelect';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -140,6 +141,7 @@ export default function ExpenseTransactionNewPage() {
               value={form.amount}
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
               placeholder="42.50"
+              className="text-right font-mono"
               required
             />
           </div>
@@ -153,43 +155,31 @@ export default function ExpenseTransactionNewPage() {
             />
           </div>
           <div>
-            <Label>Expense account</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            <Label>Expense account (debit)</Label>
+            <AccountSelect
+              accounts={expenseAccounts}
               value={form.expense_account_id}
-              onChange={(e) => setForm((f) => ({ ...f, expense_account_id: e.target.value }))}
+              onChange={(id) => setForm((f) => ({ ...f, expense_account_id: id }))}
               required
-            >
-              <option value="">Select account…</option>
-              {expenseAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} — {a.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Search expense account…"
+            />
           </div>
           <div>
-            <Label>Payment account</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            <Label>Payment account (credit)</Label>
+            <AccountSelect
+              accounts={paymentAccounts}
               value={form.payment_account_id}
-              onChange={(e) => setForm((f) => ({ ...f, payment_account_id: e.target.value }))}
+              onChange={(id) => setForm((f) => ({ ...f, payment_account_id: id }))}
               required
-            >
-              <option value="">Select account…</option>
-              {paymentAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} — {a.name} ({a.account_type})
-                </option>
-              ))}
-            </select>
+              placeholder="Search cash or credit account…"
+            />
           </div>
           <div className="col-span-2">
             <Label>Memo</Label>
             <Input
               value={form.memo}
               onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              placeholder="Optional"
+              placeholder="Optional note"
             />
           </div>
         </CardContent>
