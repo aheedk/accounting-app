@@ -9,11 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 
-type Line = { description: string; quantity: string; unit_price: string; revenue_account_id: string; tax_code_id: string | null };
+type Line = { description: string; revenue_account_id: string; amount: string };
 type Customer = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null };
-const blank = (): Line => ({ description: '', quantity: '1', unit_price: '0.00', revenue_account_id: '', tax_code_id: null });
+const blank = (): Line => ({ description: '', revenue_account_id: '', amount: '' });
 
 const STANDARD_TERMS = ['Due on receipt', 'Net 15', 'Net 30', 'Net 45', 'Net 60'];
 
@@ -25,7 +25,8 @@ export default function InvoiceNewPage() {
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const today = new Date().toISOString().slice(0, 10);
   const [hdr, setHdr] = useState({ customer_id: '', invoice_number: '', issue_date: today, due_date: today, memo: '', terms: 'Net 30' });
-  const [lines, setLines] = useState<Line[]>([blank()]);
+  const [taxCodeId, setTaxCodeId] = useState<string | null>(null);
+  const [lines, setLines] = useState<Line[]>([blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,34 +44,31 @@ export default function InvoiceNewPage() {
 
   const totals = useMemo(() => {
     let subtotal = 0;
-    let tax = 0;
-    for (const l of lines) {
-      const qty = Number(l.quantity) || 0;
-      const rate = Number(l.unit_price) || 0;
-      const lineSub = qty * rate;
-      subtotal += lineSub;
-      if (l.tax_code_id) {
-        const tc = taxCodes.find(t => t.id === l.tax_code_id);
-        const r = tc?.current_rate ? Number(tc.current_rate) : 0;
-        tax += lineSub * r;
-      }
-    }
+    for (const l of lines) subtotal += Number(l.amount) || 0;
+    const tc = taxCodes.find(t => t.id === taxCodeId);
+    const taxRate = tc?.current_rate ? Number(tc.current_rate) : 0;
+    const tax = subtotal * taxRate;
     return { subtotal, tax, total: subtotal + tax };
-  }, [lines, taxCodes]);
+  }, [lines, taxCodes, taxCodeId]);
 
-  function lineAmount(l: Line): number {
-    return (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
+  function isLineEmpty(l: Line) {
+    return !l.description && !l.revenue_account_id && !l.amount;
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setErr(null); setBusy(true);
     try {
+      const filled = lines.filter(l => !isLineEmpty(l));
+      if (filled.length === 0) { setErr('Add at least one line.'); setBusy(false); return; }
       const body = {
         customer_id: hdr.customer_id, invoice_number: hdr.invoice_number,
         issue_date: hdr.issue_date, due_date: hdr.due_date, memo: hdr.memo || null, terms: hdr.terms || null,
-        lines: lines.map(l => ({
-          description: l.description, quantity: parseMoneyInput(l.quantity), unit_price: parseMoneyInput(l.unit_price),
-          revenue_account_id: l.revenue_account_id, tax_code_id: l.tax_code_id,
+        lines: filled.map(l => ({
+          description: l.description,
+          quantity: '1',
+          unit_price: parseMoneyInput(l.amount || '0'),
+          revenue_account_id: l.revenue_account_id,
+          tax_code_id: taxCodeId,
         })),
       };
       const r = await api.post(`/businesses/${bizId}/invoices`, body);
@@ -107,11 +105,8 @@ export default function InvoiceNewPage() {
         <CardContent className="space-y-2">
           <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground border-b pb-2">
             <div className="col-span-1">#</div>
-            <div className="col-span-3">Product/service</div>
-            <div className="col-span-3">Description</div>
-            <div className="col-span-1 text-right">Qty</div>
-            <div className="col-span-1 text-right">Rate</div>
-            <div className="col-span-1">Tax</div>
+            <div className="col-span-4">Product/service</div>
+            <div className="col-span-5">Description</div>
             <div className="col-span-2 text-right">Amount</div>
           </div>
           {lines.map((l, i) => (
@@ -120,50 +115,43 @@ export default function InvoiceNewPage() {
                 <span className="cursor-grab select-none text-base leading-none" aria-hidden="true">⋮⋮</span>
                 <span className="font-mono">{i + 1}</span>
               </div>
-              <div className="col-span-3">
+              <div className="col-span-4">
                 <Label htmlFor={`line-${i}-revenue`} className="sr-only">Product/service</Label>
                 <AccountSelect
                   id={`line-${i}-revenue`}
                   accounts={revenueAccounts}
                   value={l.revenue_account_id}
                   onChange={(id) => update(i, { revenue_account_id: id })}
-                  required
+                  required={!isLineEmpty(l)}
                   placeholder="Select product/service…"
                 />
               </div>
-              <div className="col-span-3">
+              <div className="col-span-5">
                 <Label htmlFor={`line-${i}-desc`} className="sr-only">Description</Label>
-                <Input id={`line-${i}-desc`} value={l.description} onChange={e => update(i, { description: e.target.value })} placeholder="Description" required />
+                <Input id={`line-${i}-desc`} value={l.description} onChange={e => update(i, { description: e.target.value })} placeholder="Description" required={!isLineEmpty(l)} />
               </div>
-              <div className="col-span-1">
-                <Label htmlFor={`line-${i}-qty`} className="sr-only">Quantity</Label>
-                <Input id={`line-${i}-qty`} type="number" step="0.01" inputMode="decimal" value={l.quantity} onChange={e => update(i, { quantity: e.target.value })} placeholder="1" className="text-right font-mono" />
-              </div>
-              <div className="col-span-1">
-                <Label htmlFor={`line-${i}-unit`} className="sr-only">Rate</Label>
-                <Input id={`line-${i}-unit`} type="number" step="0.01" inputMode="decimal" value={l.unit_price} onChange={e => update(i, { unit_price: e.target.value })} placeholder="0.00" className="text-right font-mono" />
-              </div>
-              <div className="col-span-1">
-                <Label htmlFor={`line-${i}-tax`} className="sr-only">Tax code</Label>
-                <select id={`line-${i}-tax`} className="h-10 w-full rounded-md border bg-background px-2 text-sm" value={l.tax_code_id ?? ''} onChange={e => update(i, { tax_code_id: e.target.value || null })}>
-                  <option value="">—</option>{taxCodes.map((tc: TaxCode) => <option key={tc.id} value={tc.id}>{tc.code}</option>)}
-                </select>
-              </div>
-              <div className="col-span-2 flex items-center justify-end gap-1">
-                <span className="font-mono text-sm">{fmtMoney(lineAmount(l).toFixed(2))}</span>
-                <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 1} aria-label="Remove line">×</Button>
+              <div className="col-span-2 flex items-center gap-1">
+                <Label htmlFor={`line-${i}-amount`} className="sr-only">Amount</Label>
+                <Input id={`line-${i}-amount`} type="number" step="0.01" inputMode="decimal" value={l.amount} onChange={e => update(i, { amount: e.target.value })} placeholder="0.00" className="text-right font-mono" />
+                <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 1} aria-label="Remove line">×</Button>
               </div>
             </div>
           ))}
           <div className="flex justify-between items-start pt-3">
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => setLines(ls => [...ls, blank()])}>Add product or service</Button>
-              <Button type="button" variant="ghost" onClick={() => setLines([blank()])} disabled={lines.length === 1 && !lines[0]?.description && !lines[0]?.revenue_account_id}>Clear all lines</Button>
+              <Button type="button" variant="ghost" onClick={() => setLines([blank()])} disabled={lines.length === 1 && isLineEmpty(lines[0]!)}>Clear all lines</Button>
             </div>
-            <div className="w-72 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{fmtMoney(totals.subtotal.toFixed(2))}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Sales tax</span><span className="font-mono">{fmtMoney(totals.tax.toFixed(2))}</span></div>
-              <div className="flex justify-between border-t pt-1 font-semibold"><span>Invoice total</span><span className="font-mono">{fmtMoney(totals.total.toFixed(2))}</span></div>
+            <div className="w-80 space-y-2 text-sm">
+              <div className="flex justify-between items-center"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{fmtMoney(totals.subtotal.toFixed(2))}</span></div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-muted-foreground shrink-0">Sales tax</span>
+                <select className="h-8 flex-1 rounded-md border bg-background px-2 text-xs" value={taxCodeId ?? ''} onChange={e => setTaxCodeId(e.target.value || null)}>
+                  <option value="">No tax</option>{taxCodes.map(tc => <option key={tc.id} value={tc.id}>{tc.code}{tc.current_rate ? ` (${(Number(tc.current_rate) * 100).toFixed(2)}%)` : ''}</option>)}
+                </select>
+                <span className="font-mono w-20 text-right">{fmtMoney(totals.tax.toFixed(2))}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 font-semibold"><span>Invoice total</span><span className="font-mono">{fmtMoney(totals.total.toFixed(2))}</span></div>
             </div>
           </div>
         </CardContent>
