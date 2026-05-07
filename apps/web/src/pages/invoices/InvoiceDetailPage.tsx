@@ -13,6 +13,7 @@ type Invoice = {
   due_date: string;
   status: string;
   memo: string | null;
+  terms: string | null;
   subtotal: string;
   tax_total: string;
   total: string;
@@ -84,18 +85,19 @@ export default function InvoiceDetailPage() {
       <Card><CardHeader><CardTitle>Header</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 text-sm">
           <div>Status: {inv.status}</div>
-          <div>Issue: {inv.issue_date}</div>
-          <div>Due: {inv.due_date}</div>
-          <div>Memo: {inv.memo ?? '—'}</div>
+          <div>Invoice date: {inv.issue_date}</div>
+          <div>Due date: {inv.due_date}</div>
+          <div>Terms: {inv.terms ?? '—'}</div>
+          <div>Note to customer: {inv.memo ?? '—'}</div>
           <div>Subtotal: {fmtMoney(inv.subtotal)}</div>
-          <div>Tax: {fmtMoney(inv.tax_total)}</div>
-          <div className="font-semibold">Total: {fmtMoney(inv.total)}</div>
-          <div>Amount due: {fmtMoney(data.amount_due)}</div>
+          <div>Sales tax: {fmtMoney(inv.tax_total)}</div>
+          <div className="font-semibold">Invoice total: {fmtMoney(inv.total)}</div>
+          <div>Balance due: {fmtMoney(data.amount_due)}</div>
         </CardContent>
       </Card>
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40"><tr><th className="text-left p-3">#</th><th className="text-left p-3">Description</th><th className="text-right p-3">Qty</th><th className="text-right p-3">Unit</th><th className="text-right p-3">Subtotal</th><th className="text-right p-3">Tax</th><th className="text-right p-3">Total</th></tr></thead>
+          <thead className="border-b bg-muted/40"><tr><th className="text-left p-3">#</th><th className="text-left p-3">Description</th><th className="text-right p-3">Qty</th><th className="text-right p-3">Rate</th><th className="text-right p-3">Subtotal</th><th className="text-right p-3">Tax</th><th className="text-right p-3">Amount</th></tr></thead>
           <tbody>{data.lines.map((l: InvoiceLine) => (
             <tr key={l.id} className="border-b last:border-b-0">
               <td className="p-3">{l.line_number}</td>
