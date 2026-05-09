@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
 
 type Account = { id: string; code: string; name: string; account_type: string };
@@ -71,26 +72,73 @@ export default function JournalNewPage() {
       <Card><CardHeader><CardTitle>Header</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Date</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} required /></div>
-          <div><Label>Reference</Label><Input value={reference} onChange={e => setReference(e.target.value)} /></div>
-          <div><Label>Memo</Label><Input value={memo} onChange={e => setMemo(e.target.value)} /></div>
+          <div><Label>Reference</Label><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. INV-1042 or check #" /></div>
+          <div><Label>Memo</Label><Input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Description for this entry" /></div>
         </CardContent>
       </Card>
 
       <Card><CardHeader><CardTitle>Lines</CardTitle></CardHeader>
         <CardContent className="space-y-3">
+          <div className="grid grid-cols-12 gap-2 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="col-span-4">Account</div>
+            <div className="col-span-2 text-right">Debit</div>
+            <div className="col-span-2 text-right">Credit</div>
+            <div className="col-span-3">Memo</div>
+            <div className="col-span-1" />
+          </div>
           {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-end">
+            <div key={i} className="grid grid-cols-12 gap-2 items-start">
               <div className="col-span-4">
-                <Label className="sr-only">Account</Label>
-                <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={l.account_id} onChange={e => update(i, { account_id: e.target.value })} required>
-                  <option value="">Select account…</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                <Label htmlFor={`line-${i}-account`} className="sr-only">Account</Label>
+                <AccountSelect
+                  id={`line-${i}-account`}
+                  accounts={accounts}
+                  value={l.account_id}
+                  onChange={(id) => update(i, { account_id: id })}
+                  required
+                  placeholder="Search account…"
+                />
               </div>
-              <div className="col-span-2"><Label className="sr-only">Debit</Label><Input type="number" step="0.0001" min="0" value={l.debit} onChange={e => update(i, { debit: e.target.value, credit: '0.00' })} /></div>
-              <div className="col-span-2"><Label className="sr-only">Credit</Label><Input type="number" step="0.0001" min="0" value={l.credit} onChange={e => update(i, { credit: e.target.value, debit: '0.00' })} /></div>
-              <div className="col-span-3"><Label className="sr-only">Memo</Label><Input value={l.memo} onChange={e => update(i, { memo: e.target.value })} placeholder="Line memo" /></div>
-              <div className="col-span-1"><Button type="button" variant="ghost" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 2}>×</Button></div>
+              <div className="col-span-2">
+                <Label htmlFor={`line-${i}-debit`} className="sr-only">Debit</Label>
+                <Input
+                  id={`line-${i}-debit`}
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  inputMode="decimal"
+                  value={l.debit}
+                  onChange={e => update(i, { debit: e.target.value, credit: '0.00' })}
+                  placeholder="0.00"
+                  className="text-right font-mono"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor={`line-${i}-credit`} className="sr-only">Credit</Label>
+                <Input
+                  id={`line-${i}-credit`}
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  inputMode="decimal"
+                  value={l.credit}
+                  onChange={e => update(i, { credit: e.target.value, debit: '0.00' })}
+                  placeholder="0.00"
+                  className="text-right font-mono"
+                />
+              </div>
+              <div className="col-span-3">
+                <Label htmlFor={`line-${i}-memo`} className="sr-only">Memo</Label>
+                <Input
+                  id={`line-${i}-memo`}
+                  value={l.memo}
+                  onChange={e => update(i, { memo: e.target.value })}
+                  placeholder="Line description (optional)"
+                />
+              </div>
+              <div className="col-span-1 flex items-center justify-end">
+                <Button type="button" variant="ghost" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 2} aria-label="Remove line">×</Button>
+              </div>
             </div>
           ))}
           <Button type="button" variant="outline" onClick={() => setLines(ls => [...ls, blank()])}>Add line</Button>

@@ -33,6 +33,13 @@ router.get('/businesses/:businessId/invoices', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/businesses/:businessId/invoices/next-number', async (req, res, next) => {
+  try {
+    const next_number = await inv.getNextInvoiceNumber(db, req.tenancy!.business_id);
+    res.json({ next_number });
+  } catch (e) { next(e); }
+});
+
 router.get('/businesses/:businessId/invoices/:id', async (req, res, next) => {
   try { res.json(await inv.getInvoiceWithLines(db, req.tenancy!.business_id, req.params['id']!)); }
   catch (e) { next(e); }

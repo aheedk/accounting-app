@@ -217,7 +217,19 @@ export async function listInvoices(db: Kysely<DB>, q: { business_id: string; sta
   let qb = db.selectFrom('invoices').selectAll().where('business_id', '=', q.business_id).where('deleted_at', 'is', null);
   if (q.status) qb = qb.where('status', '=', q.status as InvoiceStatus);
   if (q.customer_id) qb = qb.where('customer_id', '=', q.customer_id);
-  return qb.orderBy('issue_date', 'desc').limit(q.limit ?? 50).offset(q.offset ?? 0).execute();
+  return qb
+    .orderBy(sql`COALESCE(NULLIF(regexp_replace(invoice_number, '[^0-9]', '', 'g'), '')::bigint, 0)`, 'desc')
+    .orderBy('invoice_number', 'desc')
+    .limit(q.limit ?? 50).offset(q.offset ?? 0).execute();
+}
+
+export async function getNextInvoiceNumber(db: Kysely<DB>, business_id: string): Promise<string> {
+  const row = await db.selectFrom('invoices')
+    .select(sql<string>`COALESCE(MAX(NULLIF(regexp_replace(invoice_number, '[^0-9]', '', 'g'), '')::bigint), 1000) + 1`.as('next_number'))
+    .where('business_id', '=', business_id)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  return String(row?.next_number ?? 1001);
 }
 
 async function recomputeInvoiceTotals(trx: Transaction<DB>, invoice_id: string) {
