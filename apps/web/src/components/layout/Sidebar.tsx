@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
   Briefcase,
-  ChevronDown,
   ChevronRight,
   FileBarChart,
   LayoutDashboard,
@@ -134,22 +133,6 @@ const groups: NavGroup[] = [
   },
 ];
 
-const STORAGE_KEY = 'acct_sidebar_expanded';
-
-function loadExpanded(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') {
-      return parsed as Record<string, boolean>;
-    }
-    return {};
-  } catch {
-    return {};
-  }
-}
-
 function pathMatchesChild(pathname: string, child: NavChild): boolean {
   if (pathname === child.to) return true;
   // treat list roots as prefix matches for detail/new sub-routes
@@ -169,27 +152,7 @@ export function Sidebar() {
     return null;
   }, [pathname]);
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => loadExpanded());
-
-  // Auto-expand active group once, without collapsing user's manual choices.
-  useEffect(() => {
-    if (activeGroupId && !expanded[activeGroupId]) {
-      setExpanded(prev => ({ ...prev, [activeGroupId]: true }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGroupId]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(expanded));
-    } catch {
-      /* ignore quota errors */
-    }
-  }, [expanded]);
-
-  function toggle(id: string) {
-    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-  }
+  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
 
   return (
     <aside className="w-64 shrink-0 border-r bg-card flex flex-col h-full overflow-hidden">
@@ -200,11 +163,16 @@ export function Sidebar() {
         <span className="font-semibold tracking-tight">Accounting</span>
       </div>
 
-      <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
+      <nav
+        className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto"
+        onMouseLeave={() => setHoveredGroupId(null)}
+      >
         {groups.map(group => {
           const Icon = group.icon;
           const isActiveGroup = activeGroupId === group.id;
-          const isOpen = expanded[group.id] ?? isActiveGroup;
+          const isOpen =
+            hoveredGroupId === group.id ||
+            (hoveredGroupId === null && isActiveGroup);
 
           if (!group.children || group.children.length === 0) {
             const to = group.to ?? '/';
@@ -230,17 +198,17 @@ export function Sidebar() {
           }
 
           return (
-            <div key={group.id} className="flex flex-col">
+            <div
+              key={group.id}
+              className="flex flex-col"
+              onMouseEnter={() => setHoveredGroupId(group.id)}
+              onFocus={() => setHoveredGroupId(group.id)}
+            >
               <button
                 type="button"
-                onClick={() => toggle(group.id)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggle(group.id);
-                  }
-                  if (e.key === 'ArrowRight' && !isOpen) toggle(group.id);
-                  if (e.key === 'ArrowLeft' && isOpen) toggle(group.id);
+                onClick={() => {
+                  const first = group.children?.[0];
+                  if (first) navigate(first.to);
                 }}
                 aria-expanded={isOpen}
                 className={cn(
@@ -253,35 +221,51 @@ export function Sidebar() {
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="flex-1 text-left">{group.label}</span>
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
+                <ChevronRight
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out',
+                    isOpen && 'rotate-90',
+                  )}
+                />
               </button>
 
-              {isOpen && (
-                <div className="mt-0.5 flex flex-col gap-0.5 pl-6">
-                  {group.children.map(child => {
-                    const childActive = pathMatchesChild(pathname, child);
-                    return (
-                      <button
-                        key={`${group.id}-${child.to}`}
-                        type="button"
-                        onClick={() => navigate(child.to)}
-                        className={cn(
-                          'flex items-center rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-colors',
-                          childActive
-                            ? 'border-primary bg-secondary font-medium text-secondary-foreground'
-                            : 'border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                        )}
-                      >
-                        {child.label}
-                      </button>
-                    );
-                  })}
+              <div
+                className={cn(
+                  'grid transition-all duration-200 ease-out',
+                  isOpen
+                    ? 'grid-rows-[1fr] opacity-100 mt-0.5'
+                    : 'grid-rows-[0fr] opacity-0 mt-0',
+                )}
+                aria-hidden={!isOpen}
+              >
+                <div className="overflow-hidden">
+                  <div className="flex flex-col gap-0.5 pl-6">
+                    {group.children.map((child, idx) => {
+                      const childActive = pathMatchesChild(pathname, child);
+                      return (
+                        <button
+                          key={`${group.id}-${child.to}`}
+                          type="button"
+                          tabIndex={isOpen ? 0 : -1}
+                          onClick={() => navigate(child.to)}
+                          style={{
+                            transitionDelay: isOpen ? `${idx * 20}ms` : '0ms',
+                          }}
+                          className={cn(
+                            'flex items-center rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
+                            isOpen ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
+                            childActive
+                              ? 'border-primary bg-secondary font-medium text-secondary-foreground'
+                              : 'border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                          )}
+                        >
+                          {child.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
