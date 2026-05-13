@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -12,11 +13,42 @@ function pickErr(e: unknown): string {
     ?.response?.data?.error?.message ?? 'Failed';
 }
 
-// Reuses the blob-download pattern from ReceiptsPage so users get a real CSV file
-// rather than an in-browser navigation that strips the Content-Disposition filename.
-async function downloadBlob(url: string, params: Record<string, string>, filename: string) {
-  const r = await api.get(url, { params, responseType: 'blob' });
-  const blob = r.data as Blob;
+function parseCSVLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      cells.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
+}
+
+async function fetchAndParseCSV(url: string, params: Record<string, string>): Promise<string[][]> {
+  const r = await api.get(url, { params, responseType: 'text' });
+  const text = r.data as string;
+  return text.trim().split('\n').map(parseCSVLine);
+}
+
+async function downloadExcel(url: string, params: Record<string, string>, filename: string) {
+  const rows = await fetchAndParseCSV(url, params);
+  const [header, ...body] = rows;
+  const thStyle = 'border:1px solid #ccc;padding:6px 10px;background:#f0f0f0;font-weight:bold;text-align:left';
+  const tdStyle = 'border:1px solid #ccc;padding:6px 10px';
+  const ths = (header ?? []).map(h => `<th style="${thStyle}">${h}</th>`).join('');
+  const trs = body
+    .filter(r => r.some(c => c.trim() !== ''))
+    .map(row => `<tr>${row.map(cell => `<td style="${tdStyle}">${cell}</td>`).join('')}</tr>`)
+    .join('');
+  const html = `<html><body><table style="border-collapse:collapse;font-family:sans-serif;font-size:12px"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></body></html>`;
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
   const objUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objUrl;
@@ -27,53 +59,79 @@ async function downloadBlob(url: string, params: Record<string, string>, filenam
   setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
 }
 
+async function downloadPdf(url: string, params: Record<string, string>, title: string, filename: string) {
+  const rows = await fetchAndParseCSV(url, params);
+  const [header, ...body] = rows;
+  const cleanBody = body.filter(r => r.some(c => c.trim() !== ''));
+  const doc = new jsPDF({ orientation: 'landscape' });
+  doc.setFontSize(13);
+  doc.text(title, 14, 14);
+  autoTable(doc, {
+    head: [header ?? []],
+    body: cleanBody,
+    startY: 20,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [230, 230, 230], textColor: [0, 0, 0], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [250, 250, 250] },
+  });
+  doc.save(filename);
+}
+
 export default function SpreadsheetSyncPage() {
   const [bizId] = useActiveBusinessId();
   const today = new Date().toISOString().slice(0, 10);
 
   const [tbAsOf, setTbAsOf] = useState(today);
-  const [tbBusy, setTbBusy] = useState(false);
+  const [tbExcelBusy, setTbExcelBusy] = useState(false);
+  const [tbPdfBusy, setTbPdfBusy] = useState(false);
   const [tbErr, setTbErr] = useState<string | null>(null);
 
   const [jeFrom, setJeFrom] = useState('');
   const [jeTo, setJeTo] = useState(today);
-  const [jeBusy, setJeBusy] = useState(false);
+  const [jeExcelBusy, setJeExcelBusy] = useState(false);
+  const [jePdfBusy, setJePdfBusy] = useState(false);
   const [jeErr, setJeErr] = useState<string | null>(null);
 
   if (!bizId) return <div>Pick a business.</div>;
 
-  async function downloadTrialBalance() {
-    setTbBusy(true);
+  async function handleTb(format: 'excel' | 'pdf') {
+    const setBusy = format === 'excel' ? setTbExcelBusy : setTbPdfBusy;
+    setBusy(true);
     setTbErr(null);
     try {
-      await downloadBlob(
-        `/businesses/${bizId}/csv-exports/trial-balance`,
-        { as_of: tbAsOf },
-        `trial-balance-${tbAsOf}.csv`,
-      );
+      const url = `/businesses/${bizId}/csv-exports/trial-balance`;
+      const params = { as_of: tbAsOf };
+      if (format === 'excel') {
+        await downloadExcel(url, params, `trial-balance-${tbAsOf}.xls`);
+      } else {
+        await downloadPdf(url, params, `Trial Balance — ${tbAsOf}`, `trial-balance-${tbAsOf}.pdf`);
+      }
     } catch (e: unknown) {
       setTbErr(pickErr(e));
     } finally {
-      setTbBusy(false);
+      setBusy(false);
     }
   }
 
-  async function downloadJournalEntries() {
-    setJeBusy(true);
+  async function handleJe(format: 'excel' | 'pdf') {
+    const setBusy = format === 'excel' ? setJeExcelBusy : setJePdfBusy;
+    setBusy(true);
     setJeErr(null);
     try {
+      const url = `/businesses/${bizId}/csv-exports/journal-entries`;
       const params: Record<string, string> = {};
       if (jeFrom) params.from = jeFrom;
       if (jeTo) params.to = jeTo;
-      await downloadBlob(
-        `/businesses/${bizId}/csv-exports/journal-entries`,
-        params,
-        `journal-entries-${jeFrom || 'all'}-to-${jeTo || 'all'}.csv`,
-      );
+      const label = `${jeFrom || 'all'}-to-${jeTo || 'all'}`;
+      if (format === 'excel') {
+        await downloadExcel(url, params, `journal-entries-${label}.xls`);
+      } else {
+        await downloadPdf(url, params, `Journal Entry Lines — ${label}`, `journal-entries-${label}.pdf`);
+      }
     } catch (e: unknown) {
       setJeErr(pickErr(e));
     } finally {
-      setJeBusy(false);
+      setBusy(false);
     }
   }
 
@@ -81,7 +139,7 @@ export default function SpreadsheetSyncPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Spreadsheet Sync</h1>
       <p className="text-sm text-muted-foreground">
-        Download canned CSV exports for use in spreadsheets. Custom reports can be exported via the Custom Reports page.
+        Download exports as Excel or PDF. Custom reports can be exported via the Custom Reports page.
       </p>
 
       <Card>
@@ -92,8 +150,21 @@ export default function SpreadsheetSyncPage() {
               <Label>As of date</Label>
               <DateInput value={tbAsOf} onChange={e => setTbAsOf(e.target.value)} />
             </div>
-            <Button type="button" disabled={tbBusy || !tbAsOf} onClick={downloadTrialBalance}>
-              {tbBusy ? 'Downloading…' : 'Download CSV'}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={tbExcelBusy || !tbAsOf}
+              onClick={() => void handleTb('excel')}
+            >
+              {tbExcelBusy ? 'Downloading…' : 'Download Excel'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={tbPdfBusy || !tbAsOf}
+              onClick={() => void handleTb('pdf')}
+            >
+              {tbPdfBusy ? 'Downloading…' : 'Download PDF'}
             </Button>
           </div>
           {tbErr && <p className="text-sm text-destructive">{tbErr}</p>}
@@ -112,8 +183,21 @@ export default function SpreadsheetSyncPage() {
               <Label>To date</Label>
               <DateInput value={jeTo} onChange={e => setJeTo(e.target.value)} />
             </div>
-            <Button type="button" disabled={jeBusy} onClick={downloadJournalEntries}>
-              {jeBusy ? 'Downloading…' : 'Download CSV'}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={jeExcelBusy}
+              onClick={() => void handleJe('excel')}
+            >
+              {jeExcelBusy ? 'Downloading…' : 'Download Excel'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={jePdfBusy}
+              onClick={() => void handleJe('pdf')}
+            >
+              {jePdfBusy ? 'Downloading…' : 'Download PDF'}
             </Button>
           </div>
           {jeErr && <p className="text-sm text-destructive">{jeErr}</p>}

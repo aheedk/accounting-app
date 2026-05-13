@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { fmtMoney } from '@/lib/money';
 
 type RevenueByMonth = {
   month: string;
@@ -59,11 +60,11 @@ export default function ManagementReportsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Total revenue (12m)</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${data.total_revenue_last_12}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">${fmtMoney(data.total_revenue_last_12)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Total expense (12m)</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${data.total_expense_last_12}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">${fmtMoney(data.total_expense_last_12)}</div></CardContent>
         </Card>
       </div>
 
@@ -96,7 +97,7 @@ export default function ManagementReportsPage() {
                           />
                         </div>
                       </td>
-                      <td className="p-3 text-right font-mono">${row.amount}</td>
+                      <td className="p-3 text-right font-mono">${fmtMoney(row.amount)}</td>
                     </tr>
                   );
                 })}
@@ -125,7 +126,7 @@ export default function ManagementReportsPage() {
                   <tr key={row.account_code} className="border-b last:border-b-0">
                     <td className="p-3 font-mono">{row.account_code}</td>
                     <td className="p-3">{row.account_name}</td>
-                    <td className="p-3 text-right font-mono">${row.amount}</td>
+                    <td className="p-3 text-right font-mono">${fmtMoney(row.amount)}</td>
                   </tr>
                 ))}
               </tbody>
