@@ -191,7 +191,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 shrink-0 border-r bg-card">
+    <aside className="w-64 shrink-0 border-r bg-card flex flex-col h-full overflow-hidden">
       <div className="flex h-14 items-center gap-2 border-b px-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <BookOpen className="h-4 w-4" />
@@ -199,7 +199,7 @@ export function Sidebar() {
         <span className="font-semibold tracking-tight">Accounting</span>
       </div>
 
-      <nav className="flex flex-col gap-0.5 p-3">
+      <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {groups.map(group => {
           const Icon = group.icon;
           const isActiveGroup = activeGroupId === group.id;
