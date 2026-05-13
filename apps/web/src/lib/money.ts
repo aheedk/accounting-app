@@ -5,13 +5,14 @@ Decimal.set({ precision: 40, rounding: Decimal.ROUND_HALF_EVEN });
 export function fmtMoney(value: string | number): string {
   if (value === '' || value == null) return '0.00';
   const d = new Decimal(value);
-  return d.toFixed(2); // display 2dp; storage is 4dp
+  return d.toNumber().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function fmtSigned(value: string | number): string {
   const d = new Decimal(value);
-  if (d.isNegative()) return `(${d.abs().toFixed(2)})`;
-  return d.toFixed(2);
+  const abs = d.abs().toNumber().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (d.isNegative()) return `(${abs})`;
+  return abs;
 }
 
 export function parseMoneyInput(value: string): string {

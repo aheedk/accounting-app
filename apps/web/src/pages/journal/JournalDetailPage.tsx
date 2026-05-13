@@ -79,8 +79,8 @@ export default function JournalDetailPage() {
             ))}
             <tr className="font-semibold bg-muted/20">
               <td colSpan={2} className="p-3 text-right">Totals</td>
-              <td className="p-3 text-right">{totalD.toFixed(2)}</td>
-              <td className="p-3 text-right">{totalC.toFixed(2)}</td>
+              <td className="p-3 text-right">{fmtMoney(totalD)}</td>
+              <td className="p-3 text-right">{fmtMoney(totalC)}</td>
               <td></td>
             </tr>
           </tbody>

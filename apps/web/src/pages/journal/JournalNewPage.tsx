@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
-import { parseMoneyInput } from '@/lib/money';
+import { fmtMoney, parseMoneyInput } from '@/lib/money';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 type Line = { account_id: string; debit: string; credit: string; memo: string };
@@ -144,8 +144,8 @@ export default function JournalNewPage() {
           <Button type="button" variant="outline" onClick={() => setLines(ls => [...ls, blank()])}>Add line</Button>
 
           <div className="flex justify-end gap-8 pt-4 border-t font-mono">
-            <div>Total Debit: {totalD.toFixed(2)}</div>
-            <div>Total Credit: {totalC.toFixed(2)}</div>
+            <div>Total Debit: {fmtMoney(totalD)}</div>
+            <div>Total Credit: {fmtMoney(totalC)}</div>
             <div className={balanced ? 'text-green-600' : 'text-destructive'}>{balanced ? 'BALANCED' : 'UNBALANCED'}</div>
           </div>
         </CardContent>

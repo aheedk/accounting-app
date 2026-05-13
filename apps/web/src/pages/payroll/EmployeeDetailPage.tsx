@@ -31,7 +31,7 @@ function maskSSN(lastFour: string | null): string {
 
 function fmtRate(cents: string): string {
   const dollars = Number(cents) / 100;
-  return `$${dollars.toFixed(2)}`;
+  return `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function EmployeeDetailPage() {

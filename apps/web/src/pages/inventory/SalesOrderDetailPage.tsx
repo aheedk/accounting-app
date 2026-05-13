@@ -135,7 +135,7 @@ export default function SalesOrderDetailPage() {
     const it = items.find((x) => x.id === lineItemId);
     return it ? `${it.sku} — ${it.name}` : lineItemId;
   };
-  const total = data.lines.reduce((s, l) => s + lineTotal(l), 0).toFixed(2);
+  const total = fmtMoney(data.lines.reduce((s, l) => s + lineTotal(l), 0));
 
   const canFulfill = data.status === 'draft' || data.status === 'confirmed';
   const canVoid = data.status !== 'fulfilled' && data.status !== 'void';

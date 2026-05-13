@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
-import { parseMoneyInput } from '@/lib/money';
+import { fmtMoney, parseMoneyInput } from '@/lib/money';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 
@@ -396,8 +396,8 @@ export default function RecurringTransactionsPage() {
                 ))}
 
                 <div className="flex justify-end gap-8 pt-3 border-t font-mono text-sm">
-                  <div>Total Debit: {totalD.toFixed(2)}</div>
-                  <div>Total Credit: {totalC.toFixed(2)}</div>
+                  <div>Total Debit: {fmtMoney(totalD)}</div>
+                  <div>Total Credit: {fmtMoney(totalC)}</div>
                   <div className={balanced ? 'text-green-600' : 'text-destructive'}>
                     {balanced ? 'BALANCED' : 'UNBALANCED'}
                   </div>

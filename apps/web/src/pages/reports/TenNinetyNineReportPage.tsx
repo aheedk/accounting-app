@@ -36,7 +36,7 @@ export default function TenNinetyNineReportPage() {
           ))}
           <tr className="font-semibold bg-muted/20">
             <td className="p-3 text-right" colSpan={2}>Total</td>
-            <td className="p-3 text-right">{total.toFixed(2)}</td>
+            <td className="p-3 text-right">{fmtMoney(total)}</td>
           </tr>
           </tbody>
         </table>

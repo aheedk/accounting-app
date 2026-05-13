@@ -42,11 +42,11 @@ export default function AgingReportPage() {
           ))}
           <tr className="font-semibold bg-muted/20">
             <td className="p-3 text-right">Totals</td>
-            <td className="p-3 text-right">{totals.current.toFixed(2)}</td>
-            <td className="p-3 text-right">{totals.over_30.toFixed(2)}</td>
-            <td className="p-3 text-right">{totals.over_60.toFixed(2)}</td>
-            <td className="p-3 text-right">{totals.over_90.toFixed(2)}</td>
-            <td className="p-3 text-right">{totals.total.toFixed(2)}</td>
+            <td className="p-3 text-right">{fmtMoney(totals.current)}</td>
+            <td className="p-3 text-right">{fmtMoney(totals.over_30)}</td>
+            <td className="p-3 text-right">{fmtMoney(totals.over_60)}</td>
+            <td className="p-3 text-right">{fmtMoney(totals.over_90)}</td>
+            <td className="p-3 text-right">{fmtMoney(totals.total)}</td>
           </tr>
           </tbody>
         </table>
