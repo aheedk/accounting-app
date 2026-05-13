@@ -81,11 +81,6 @@ export default function SpreadsheetSyncPage() {
   const [bizId] = useActiveBusinessId();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [tbAsOf, setTbAsOf] = useState(today);
-  const [tbExcelBusy, setTbExcelBusy] = useState(false);
-  const [tbPdfBusy, setTbPdfBusy] = useState(false);
-  const [tbErr, setTbErr] = useState<string | null>(null);
-
   const [jeFrom, setJeFrom] = useState('');
   const [jeTo, setJeTo] = useState(today);
   const [jeExcelBusy, setJeExcelBusy] = useState(false);
@@ -93,25 +88,6 @@ export default function SpreadsheetSyncPage() {
   const [jeErr, setJeErr] = useState<string | null>(null);
 
   if (!bizId) return <div>Pick a business.</div>;
-
-  async function handleTb(format: 'excel' | 'pdf') {
-    const setBusy = format === 'excel' ? setTbExcelBusy : setTbPdfBusy;
-    setBusy(true);
-    setTbErr(null);
-    try {
-      const url = `/businesses/${bizId}/csv-exports/trial-balance`;
-      const params = { as_of: tbAsOf };
-      if (format === 'excel') {
-        await downloadExcel(url, params, `trial-balance-${tbAsOf}.xls`);
-      } else {
-        await downloadPdf(url, params, `Trial Balance — ${tbAsOf}`, `trial-balance-${tbAsOf}.pdf`);
-      }
-    } catch (e: unknown) {
-      setTbErr(pickErr(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleJe(format: 'excel' | 'pdf') {
     const setBusy = format === 'excel' ? setJeExcelBusy : setJePdfBusy;
@@ -139,37 +115,8 @@ export default function SpreadsheetSyncPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Spreadsheet Sync</h1>
       <p className="text-sm text-muted-foreground">
-        Download exports as Excel or PDF. Custom reports can be exported via the Custom Reports page.
+        Download Journal Entry Lines as Excel or PDF. Trial Balance exports are available on the Trial Balance page.
       </p>
-
-      <Card>
-        <CardHeader><CardTitle>Trial Balance</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <Label>As of date</Label>
-              <DateInput value={tbAsOf} onChange={e => setTbAsOf(e.target.value)} />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={tbExcelBusy || !tbAsOf}
-              onClick={() => void handleTb('excel')}
-            >
-              {tbExcelBusy ? 'Downloading…' : 'Download Excel'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={tbPdfBusy || !tbAsOf}
-              onClick={() => void handleTb('pdf')}
-            >
-              {tbPdfBusy ? 'Downloading…' : 'Download PDF'}
-            </Button>
-          </div>
-          {tbErr && <p className="text-sm text-destructive">{tbErr}</p>}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader><CardTitle>Journal Entry Lines</CardTitle></CardHeader>

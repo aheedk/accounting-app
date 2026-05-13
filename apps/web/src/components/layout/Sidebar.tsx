@@ -91,6 +91,7 @@ const groups: NavGroup[] = [
       { to: '/reports/performance', label: 'Performance Center' },
       { to: '/reports/financial-planning', label: 'Financial Planning' },
       { to: '/reports/spreadsheet-sync', label: 'Spreadsheet Sync' },
+      { to: '/reports/trial-balance', label: 'Trial Balance' },
     ],
   },
   {
