@@ -94,19 +94,6 @@ const groups: NavGroup[] = [
     ],
   },
   {
-    id: 'setup',
-    label: 'Setup',
-    icon: Settings,
-    children: [
-      { to: '/setup/entity', label: 'Entity' },
-      { to: '/setup/coa', label: 'Chart of Accounts' },
-      { to: '/setup/cost-centers', label: 'Cost Centers' },
-      { to: '/setup/users', label: 'Users' },
-      { to: '/settings/tax-codes', label: 'Tax Codes' },
-      { to: '/settings/periods', label: 'Fiscal Periods' },
-    ],
-  },
-  {
     id: 'payroll',
     label: 'Payroll',
     icon: Briefcase,
@@ -129,6 +116,19 @@ const groups: NavGroup[] = [
       { to: '/inventory/item-receipts', label: 'Item Receipts' },
       { to: '/inventory/sales-orders', label: 'Sales Orders' },
       { to: '/inventory/shipping-labels', label: 'Shipping Labels' },
+    ],
+  },
+  {
+    id: 'setup',
+    label: 'Setup',
+    icon: Settings,
+    children: [
+      { to: '/setup/entity', label: 'Entity' },
+      { to: '/setup/coa', label: 'Chart of Accounts' },
+      { to: '/setup/cost-centers', label: 'Cost Centers' },
+      { to: '/setup/users', label: 'Users' },
+      { to: '/settings/tax-codes', label: 'Tax Codes' },
+      { to: '/settings/periods', label: 'Fiscal Periods' },
     ],
   },
 ];
