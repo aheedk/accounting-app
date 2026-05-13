@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -309,8 +310,7 @@ export default function CustomReportsPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div>
                   <Label>From</Label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={form.definition.date_range.from}
                     onChange={e => setForm(f => ({
                       ...f,
@@ -320,8 +320,7 @@ export default function CustomReportsPage() {
                 </div>
                 <div>
                   <Label>To</Label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={form.definition.date_range.to}
                     onChange={e => setForm(f => ({
                       ...f,

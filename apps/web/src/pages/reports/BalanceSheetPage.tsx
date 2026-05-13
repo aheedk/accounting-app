@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { Decimal } from 'decimal.js';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -87,7 +88,7 @@ export default function BalanceSheetPage() {
         <div className="flex items-end gap-2">
           <div>
             <Label>As of</Label>
-            <Input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} />
+            <DateInput value={asOf} onChange={e => setAsOf(e.target.value)} />
           </div>
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}

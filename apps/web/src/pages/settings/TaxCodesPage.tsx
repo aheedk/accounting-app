@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ export default function TaxCodesPage() {
                 </select>
               </div>
               <div><Label>Rate (decimal, e.g. 0.0875)</Label><Input type="number" step="0.000001" value={form.rate} onChange={e => setForm(f => ({ ...f, rate: e.target.value }))} required /></div>
-              <div><Label>Effective from</Label><Input type="date" value={form.effective_from} onChange={e => setForm(f => ({ ...f, effective_from: e.target.value }))} required /></div>
+              <div><Label>Effective from</Label><DateInput value={form.effective_from} onChange={e => setForm(f => ({ ...f, effective_from: e.target.value }))} required /></div>
               <Button type="submit">Create</Button>
               {err && <p className="text-sm text-destructive col-span-3">{err}</p>}
             </form>

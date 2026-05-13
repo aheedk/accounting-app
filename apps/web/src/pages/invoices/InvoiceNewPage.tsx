@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -96,8 +97,8 @@ export default function InvoiceNewPage() {
             <Input list="invoice-terms" value={hdr.terms} onChange={e => setHdr(h => ({ ...h, terms: e.target.value }))} placeholder="e.g. Net 30" />
             <datalist id="invoice-terms">{STANDARD_TERMS.map(t => <option key={t} value={t} />)}</datalist>
           </div>
-          <div><Label>Invoice date</Label><Input type="date" value={hdr.issue_date} onChange={e => setHdr(h => ({ ...h, issue_date: e.target.value }))} required /></div>
-          <div><Label>Due date</Label><Input type="date" value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
+          <div><Label>Invoice date</Label><DateInput value={hdr.issue_date} onChange={e => setHdr(h => ({ ...h, issue_date: e.target.value }))} required /></div>
+          <div><Label>Due date</Label><DateInput value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
           <div><Label>Note to customer</Label><Input value={hdr.memo} onChange={e => setHdr(h => ({ ...h, memo: e.target.value }))} placeholder="Thank you for your business." /></div>
         </CardContent>
       </Card>

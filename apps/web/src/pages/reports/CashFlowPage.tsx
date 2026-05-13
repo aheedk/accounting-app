@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -110,11 +111,11 @@ export default function CashFlowPage() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div>
               <Label>Period start</Label>
-              <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
+              <DateInput value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
             </div>
             <div>
               <Label>Period end</Label>
-              <Input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+              <DateInput value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
             </div>
             <div>
               <Label>Cash account</Label>

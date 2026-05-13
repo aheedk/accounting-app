@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -173,8 +174,7 @@ export default function FixedAssetDetailPage() {
           <form className="flex items-end gap-3" onSubmit={run}>
             <div>
               <Label>Period end</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={periodEnd}
                 onChange={(e) => setPeriodEnd(e.target.value)}
                 required

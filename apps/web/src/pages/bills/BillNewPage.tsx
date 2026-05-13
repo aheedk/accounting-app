@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -66,8 +67,8 @@ export default function BillNewPage() {
           </div>
           <div><Label>Bill #</Label><Input value={hdr.bill_number} onChange={e => setHdr(h => ({ ...h, bill_number: e.target.value }))} placeholder="Vendor's bill number" required /></div>
           <div><Label>Memo</Label><Input value={hdr.memo} onChange={e => setHdr(h => ({ ...h, memo: e.target.value }))} placeholder="Optional note" /></div>
-          <div><Label>Bill date</Label><Input type="date" value={hdr.bill_date} onChange={e => setHdr(h => ({ ...h, bill_date: e.target.value }))} required /></div>
-          <div><Label>Due date</Label><Input type="date" value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
+          <div><Label>Bill date</Label><DateInput value={hdr.bill_date} onChange={e => setHdr(h => ({ ...h, bill_date: e.target.value }))} required /></div>
+          <div><Label>Due date</Label><DateInput value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
         </CardContent>
       </Card>
       <Card><CardHeader><CardTitle>Lines</CardTitle></CardHeader>

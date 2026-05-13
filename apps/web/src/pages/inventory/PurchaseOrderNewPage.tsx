@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -112,8 +113,7 @@ export default function PurchaseOrderNewPage() {
           </div>
           <div>
             <Label>Order date</Label>
-            <Input
-              type="date"
+            <DateInput
               value={hdr.order_date}
               onChange={(e) => setHdr((h) => ({ ...h, order_date: e.target.value }))}
               required
@@ -121,8 +121,7 @@ export default function PurchaseOrderNewPage() {
           </div>
           <div>
             <Label>Expected delivery</Label>
-            <Input
-              type="date"
+            <DateInput
               value={hdr.expected_delivery_date}
               onChange={(e) => setHdr((h) => ({ ...h, expected_delivery_date: e.target.value }))}
             />

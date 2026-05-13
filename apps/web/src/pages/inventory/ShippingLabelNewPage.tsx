@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -230,8 +231,7 @@ export default function ShippingLabelNewPage() {
           </div>
           <div>
             <Label>Shipped at</Label>
-            <Input
-              type="date"
+            <DateInput
               value={shippedAt}
               onChange={(e) => setShippedAt(e.target.value)}
               required

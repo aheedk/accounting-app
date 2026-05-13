@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -53,7 +54,7 @@ export default function VendorCreditNewPage() {
               <option value="">Select a vendor…</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
-          <div><Label>Date</Label><Input type="date" value={form.credit_date} onChange={e => setForm(f => ({ ...f, credit_date: e.target.value }))} required /></div>
+          <div><Label>Date</Label><DateInput value={form.credit_date} onChange={e => setForm(f => ({ ...f, credit_date: e.target.value }))} required /></div>
           <div><Label>Amount</Label><Input type="number" step="0.01" inputMode="decimal" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" required className="text-right font-mono" /></div>
           <div><Label>Offset account (credit)</Label>
             <AccountSelect

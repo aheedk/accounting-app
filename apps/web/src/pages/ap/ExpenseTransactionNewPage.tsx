@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -126,8 +127,7 @@ export default function ExpenseTransactionNewPage() {
         <CardContent className="grid grid-cols-2 gap-3">
           <div>
             <Label>Date</Label>
-            <Input
-              type="date"
+            <DateInput
               value={form.transaction_date}
               onChange={(e) => setForm((f) => ({ ...f, transaction_date: e.target.value }))}
               required

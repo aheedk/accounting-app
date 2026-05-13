@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -146,8 +147,7 @@ export default function FixedAssetNewPage() {
           </div>
           <div>
             <Label>Purchase date</Label>
-            <Input
-              type="date"
+            <DateInput
               value={form.purchase_date}
               onChange={(e) => setForm((f) => ({ ...f, purchase_date: e.target.value }))}
               required

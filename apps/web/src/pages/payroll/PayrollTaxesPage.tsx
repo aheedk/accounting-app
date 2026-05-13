@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -217,8 +218,7 @@ export default function PayrollTaxesPage() {
             </div>
             <div>
               <Label>Period start</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={form.period_start}
                 onChange={e => setForm(f => ({ ...f, period_start: e.target.value }))}
                 required
@@ -226,8 +226,7 @@ export default function PayrollTaxesPage() {
             </div>
             <div>
               <Label>Period end</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={form.period_end}
                 onChange={e => setForm(f => ({ ...f, period_end: e.target.value }))}
                 required
@@ -344,8 +343,7 @@ export default function PayrollTaxesPage() {
                 </div>
                 <div>
                   <Label>Payment date</Label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={payDate}
                     onChange={e => setPayDate(e.target.value)}
                     required

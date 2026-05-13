@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -52,7 +53,7 @@ export default function BillPaymentNewPage() {
               <option value="">Select a vendor…</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
-          <div><Label>Date</Label><Input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} required /></div>
+          <div><Label>Date</Label><DateInput value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} required /></div>
           <div><Label>Method</Label>
             <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
               {['cash','check','ach','wire','card','other'].map(m => <option key={m}>{m}</option>)}

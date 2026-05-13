@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -242,8 +243,7 @@ export default function ItemReceiptNewPage() {
         <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
             <Label>Receipt date</Label>
-            <Input
-              type="date"
+            <DateInput
               value={receiptDate}
               onChange={(e) => setReceiptDate(e.target.value)}
               required

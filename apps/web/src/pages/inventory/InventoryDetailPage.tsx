@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -212,8 +213,7 @@ export default function InventoryDetailPage() {
           <form className="grid grid-cols-2 gap-3" onSubmit={submitAdjust}>
             <div>
               <Label>Movement date</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={adjForm.movement_date}
                 onChange={(e) => setAdjForm((f) => ({ ...f, movement_date: e.target.value }))}
                 required

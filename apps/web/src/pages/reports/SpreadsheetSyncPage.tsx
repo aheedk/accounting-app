@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -89,7 +90,7 @@ export default function SpreadsheetSyncPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <Label>As of date</Label>
-              <Input type="date" value={tbAsOf} onChange={e => setTbAsOf(e.target.value)} />
+              <DateInput value={tbAsOf} onChange={e => setTbAsOf(e.target.value)} />
             </div>
             <Button type="button" disabled={tbBusy || !tbAsOf} onClick={downloadTrialBalance}>
               {tbBusy ? 'Downloading…' : 'Download CSV'}
@@ -105,11 +106,11 @@ export default function SpreadsheetSyncPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <Label>From date</Label>
-              <Input type="date" value={jeFrom} onChange={e => setJeFrom(e.target.value)} />
+              <DateInput value={jeFrom} onChange={e => setJeFrom(e.target.value)} />
             </div>
             <div>
               <Label>To date</Label>
-              <Input type="date" value={jeTo} onChange={e => setJeTo(e.target.value)} />
+              <DateInput value={jeTo} onChange={e => setJeTo(e.target.value)} />
             </div>
             <Button type="button" disabled={jeBusy} onClick={downloadJournalEntries}>
               {jeBusy ? 'Downloading…' : 'Download CSV'}

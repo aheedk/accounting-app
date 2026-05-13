@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -71,7 +72,7 @@ export default function JournalNewPage() {
 
       <Card><CardHeader><CardTitle>Header</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
-          <div><Label>Date</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} required /></div>
+          <div><Label>Date</Label><DateInput value={date} onChange={e => setDate(e.target.value)} required /></div>
           <div><Label>Reference</Label><Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. INV-1042 or check #" /></div>
           <div><Label>Memo</Label><Input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Description for this entry" /></div>
         </CardContent>

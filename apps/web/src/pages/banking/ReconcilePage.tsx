@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -231,8 +232,7 @@ export default function ReconcilePage() {
           <CardContent className="grid grid-cols-4 gap-3">
             <div>
               <Label>Period start</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={form.period_start}
                 onChange={e => setForm(f => ({ ...f, period_start: e.target.value }))}
                 required
@@ -240,8 +240,7 @@ export default function ReconcilePage() {
             </div>
             <div>
               <Label>Period end</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={form.period_end}
                 onChange={e => setForm(f => ({ ...f, period_end: e.target.value }))}
                 required

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,7 +26,7 @@ export default function AgingReportPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">AR Aging</h1>
-        <div><Label>As of</Label><Input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} /></div>
+        <div><Label>As of</Label><DateInput value={asOf} onChange={e => setAsOf(e.target.value)} /></div>
       </div>
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">

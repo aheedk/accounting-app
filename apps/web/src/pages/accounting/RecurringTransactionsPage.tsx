@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -291,8 +292,7 @@ export default function RecurringTransactionsPage() {
                 </div>
                 <div>
                   <Label>Next run date</Label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={form.next_run_date}
                     onChange={(e) => setForm((f) => ({ ...f, next_run_date: e.target.value }))}
                     required
@@ -300,8 +300,7 @@ export default function RecurringTransactionsPage() {
                 </div>
                 <div>
                   <Label>End date (optional)</Label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={form.end_date}
                     onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
                   />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -53,7 +54,7 @@ export default function CreditMemoNewPage() {
               <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div><Label>Date</Label><Input type="date" value={form.memo_date} onChange={e => setForm(f => ({ ...f, memo_date: e.target.value }))} required /></div>
+          <div><Label>Date</Label><DateInput value={form.memo_date} onChange={e => setForm(f => ({ ...f, memo_date: e.target.value }))} required /></div>
           <div><Label>Amount</Label><Input type="number" step="0.01" inputMode="decimal" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" required className="text-right font-mono" /></div>
           <div><Label>Revenue/contra account (debit)</Label>
             <AccountSelect

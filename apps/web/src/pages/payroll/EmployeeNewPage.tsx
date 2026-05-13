@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -124,8 +125,7 @@ export default function EmployeeNewPage() {
           </div>
           <div>
             <Label>Hire date</Label>
-            <Input
-              type="date"
+            <DateInput
               value={form.hire_date}
               onChange={(e) => setForm((f) => ({ ...f, hire_date: e.target.value }))}
               required
