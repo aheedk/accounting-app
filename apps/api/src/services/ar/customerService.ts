@@ -9,9 +9,32 @@ export type CreateCustomerInput = {
   business_id: string;
   name: string;
   company_name?: string | null;
+  title?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  suffix?: string | null;
   email?: string | null;
+  email_cc?: string | null;
+  email_bcc?: string | null;
   phone?: string | null;
+  mobile?: string | null;
+  fax?: string | null;
+  other_phone?: string | null;
+  website?: string | null;
+  name_on_checks?: string | null;
   billing_address?: unknown;
+  shipping_address?: unknown;
+  shipping_same_as_billing?: boolean;
+  notes?: string | null;
+  primary_payment_method?: string | null;
+  sales_form_delivery?: string | null;
+  invoice_language?: string;
+  credit_limit?: string | null;
+  customer_type?: string | null;
+  tax_exemption_details?: string | null;
+  opening_balance?: string | null;
+  opening_balance_as_of?: string | null;
   default_terms_days?: number;
 };
 
@@ -25,18 +48,64 @@ export async function createCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
     business_id: string;
     name: string;
     company_name: string | null;
+    title: string | null;
+    first_name: string | null;
+    middle_name: string | null;
+    last_name: string | null;
+    suffix: string | null;
     email: string | null;
+    email_cc: string | null;
+    email_bcc: string | null;
     phone: string | null;
+    mobile: string | null;
+    fax: string | null;
+    other_phone: string | null;
+    website: string | null;
+    name_on_checks: string | null;
     billing_address: unknown | null;
+    shipping_address: unknown | null;
+    notes: string | null;
+    primary_payment_method: string | null;
+    sales_form_delivery: string | null;
+    credit_limit: string | null;
+    customer_type: string | null;
+    tax_exemption_details: string | null;
+    opening_balance: string | null;
+    opening_balance_as_of: string | null;
+    shipping_same_as_billing?: boolean;
+    invoice_language?: string;
     default_terms_days?: number;
   } = {
     business_id: input.business_id,
     name: input.name,
     company_name: input.company_name ?? null,
+    title: input.title ?? null,
+    first_name: input.first_name ?? null,
+    middle_name: input.middle_name ?? null,
+    last_name: input.last_name ?? null,
+    suffix: input.suffix ?? null,
     email: input.email ?? null,
+    email_cc: input.email_cc ?? null,
+    email_bcc: input.email_bcc ?? null,
     phone: input.phone ?? null,
+    mobile: input.mobile ?? null,
+    fax: input.fax ?? null,
+    other_phone: input.other_phone ?? null,
+    website: input.website ?? null,
+    name_on_checks: input.name_on_checks ?? null,
     billing_address: input.billing_address === undefined ? null : (input.billing_address ?? null),
+    shipping_address: input.shipping_address === undefined ? null : (input.shipping_address ?? null),
+    notes: input.notes ?? null,
+    primary_payment_method: input.primary_payment_method ?? null,
+    sales_form_delivery: input.sales_form_delivery ?? null,
+    credit_limit: input.credit_limit ?? null,
+    customer_type: input.customer_type ?? null,
+    tax_exemption_details: input.tax_exemption_details ?? null,
+    opening_balance: input.opening_balance ?? null,
+    opening_balance_as_of: input.opening_balance_as_of ?? null,
   };
+  if (input.shipping_same_as_billing !== undefined) values.shipping_same_as_billing = input.shipping_same_as_billing;
+  if (input.invoice_language !== undefined) values.invoice_language = input.invoice_language;
   if (input.default_terms_days !== undefined) values.default_terms_days = input.default_terms_days;
 
   const row = await trx.insertInto('customers').values(values).returningAll().executeTakeFirstOrThrow();
@@ -55,9 +124,32 @@ export async function updateCustomer(
   const updated = await trx.updateTable('customers').set({
     ...(input.patch.name !== undefined ? { name: input.patch.name } : {}),
     ...(input.patch.company_name !== undefined ? { company_name: input.patch.company_name ?? null } : {}),
+    ...(input.patch.title !== undefined ? { title: input.patch.title ?? null } : {}),
+    ...(input.patch.first_name !== undefined ? { first_name: input.patch.first_name ?? null } : {}),
+    ...(input.patch.middle_name !== undefined ? { middle_name: input.patch.middle_name ?? null } : {}),
+    ...(input.patch.last_name !== undefined ? { last_name: input.patch.last_name ?? null } : {}),
+    ...(input.patch.suffix !== undefined ? { suffix: input.patch.suffix ?? null } : {}),
     ...(input.patch.email !== undefined ? { email: input.patch.email ?? null } : {}),
+    ...(input.patch.email_cc !== undefined ? { email_cc: input.patch.email_cc ?? null } : {}),
+    ...(input.patch.email_bcc !== undefined ? { email_bcc: input.patch.email_bcc ?? null } : {}),
     ...(input.patch.phone !== undefined ? { phone: input.patch.phone ?? null } : {}),
+    ...(input.patch.mobile !== undefined ? { mobile: input.patch.mobile ?? null } : {}),
+    ...(input.patch.fax !== undefined ? { fax: input.patch.fax ?? null } : {}),
+    ...(input.patch.other_phone !== undefined ? { other_phone: input.patch.other_phone ?? null } : {}),
+    ...(input.patch.website !== undefined ? { website: input.patch.website ?? null } : {}),
+    ...(input.patch.name_on_checks !== undefined ? { name_on_checks: input.patch.name_on_checks ?? null } : {}),
     ...(input.patch.billing_address !== undefined ? { billing_address: input.patch.billing_address ?? null } : {}),
+    ...(input.patch.shipping_address !== undefined ? { shipping_address: input.patch.shipping_address ?? null } : {}),
+    ...(input.patch.shipping_same_as_billing !== undefined ? { shipping_same_as_billing: input.patch.shipping_same_as_billing } : {}),
+    ...(input.patch.notes !== undefined ? { notes: input.patch.notes ?? null } : {}),
+    ...(input.patch.primary_payment_method !== undefined ? { primary_payment_method: input.patch.primary_payment_method ?? null } : {}),
+    ...(input.patch.sales_form_delivery !== undefined ? { sales_form_delivery: input.patch.sales_form_delivery ?? null } : {}),
+    ...(input.patch.invoice_language !== undefined ? { invoice_language: input.patch.invoice_language } : {}),
+    ...(input.patch.credit_limit !== undefined ? { credit_limit: input.patch.credit_limit ?? null } : {}),
+    ...(input.patch.customer_type !== undefined ? { customer_type: input.patch.customer_type ?? null } : {}),
+    ...(input.patch.tax_exemption_details !== undefined ? { tax_exemption_details: input.patch.tax_exemption_details ?? null } : {}),
+    ...(input.patch.opening_balance !== undefined ? { opening_balance: input.patch.opening_balance ?? null } : {}),
+    ...(input.patch.opening_balance_as_of !== undefined ? { opening_balance_as_of: input.patch.opening_balance_as_of ?? null } : {}),
     ...(input.patch.default_terms_days !== undefined ? { default_terms_days: input.patch.default_terms_days } : {}),
   }).where('id', '=', input.customer_id).returningAll().executeTakeFirstOrThrow();
 

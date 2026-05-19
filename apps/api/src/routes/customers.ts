@@ -31,18 +31,36 @@ router.get('/businesses/:businessId/customers/:id', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+type CustomerBodyKey = Exclude<keyof cust.CreateCustomerInput, 'business_id'>;
+const PASSTHROUGH_KEYS = [
+  'name', 'company_name', 'title', 'first_name', 'middle_name', 'last_name', 'suffix',
+  'email', 'email_cc', 'email_bcc',
+  'phone', 'mobile', 'fax', 'other_phone',
+  'website', 'name_on_checks',
+  'billing_address', 'shipping_address', 'shipping_same_as_billing',
+  'notes',
+  'primary_payment_method', 'sales_form_delivery', 'invoice_language', 'credit_limit',
+  'customer_type', 'tax_exemption_details',
+  'opening_balance', 'opening_balance_as_of',
+  'default_terms_days',
+] as const satisfies readonly CustomerBodyKey[];
+
+function buildPatch(parsed: Record<string, unknown>): Partial<cust.CreateCustomerInput> {
+  const patch: Record<string, unknown> = {};
+  for (const k of PASSTHROUGH_KEYS) {
+    if (parsed[k] !== undefined) patch[k] = parsed[k];
+  }
+  return patch as Partial<cust.CreateCustomerInput>;
+}
+
 router.post('/businesses/:businessId/customers', requireMinRole('staff'), async (req, res, next) => {
   try {
     const body = schemas.customerCreateSchema.parse(req.body);
     const input: cust.CreateCustomerInput = {
       business_id: req.tenancy!.business_id,
       name: body.name,
-      company_name: body.company_name ?? null,
-      email: body.email ?? null,
-      phone: body.phone ?? null,
-      billing_address: body.billing_address ?? null,
+      ...buildPatch(body as unknown as Record<string, unknown>),
     };
-    if (body.default_terms_days !== undefined) input.default_terms_days = body.default_terms_days;
     const created = await db.transaction().execute(trx =>
       cust.createCustomer(trx, ctxFromReq(req), input),
     );
@@ -53,13 +71,7 @@ router.post('/businesses/:businessId/customers', requireMinRole('staff'), async 
 router.patch('/businesses/:businessId/customers/:id', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const parsed = schemas.customerUpdateSchema.parse(req.body);
-    const patch: Partial<cust.CreateCustomerInput> = {};
-    if (parsed.name !== undefined) patch.name = parsed.name;
-    if (parsed.company_name !== undefined) patch.company_name = parsed.company_name ?? null;
-    if (parsed.email !== undefined) patch.email = parsed.email ?? null;
-    if (parsed.phone !== undefined) patch.phone = parsed.phone ?? null;
-    if (parsed.billing_address !== undefined) patch.billing_address = parsed.billing_address ?? null;
-    if (parsed.default_terms_days !== undefined) patch.default_terms_days = parsed.default_terms_days;
+    const patch = buildPatch(parsed as unknown as Record<string, unknown>);
     const updated = await db.transaction().execute(trx =>
       cust.updateCustomer(trx, ctxFromReq(req), { customer_id: req.params['id']!, patch }),
     );
