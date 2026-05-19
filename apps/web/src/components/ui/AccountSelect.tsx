@@ -168,7 +168,7 @@ export function AccountSelect({
         />
       )}
       {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-background shadow-md">
           <div className="max-h-72 overflow-auto">
             {filtered.length === 0 ? (
               <div className="px-3 py-2 text-sm text-muted-foreground">{emptyText}</div>
