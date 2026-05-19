@@ -16,7 +16,7 @@ type Account = { id: string; code: string; name: string; account_type: string; i
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null };
 const blank = (): Line => ({ description: '', revenue_account_id: '', amount: '' });
 
-const STANDARD_TERMS = ['Due on receipt', 'Net 15', 'Net 30', 'Net 45', 'Net 60'];
+const STANDARD_TERMS = ['Net 30', 'Net 60', 'Net 90', '2/10 Net 30'];
 
 export default function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
@@ -94,8 +94,9 @@ export default function InvoiceNewPage() {
           </div>
           <div><Label>Invoice no.</Label><Input value={hdr.invoice_number} onChange={e => setHdr(h => ({ ...h, invoice_number: e.target.value }))} placeholder="e.g. 1042" required /></div>
           <div><Label>Terms</Label>
-            <Input list="invoice-terms" value={hdr.terms} onChange={e => setHdr(h => ({ ...h, terms: e.target.value }))} placeholder="e.g. Net 30" />
-            <datalist id="invoice-terms">{STANDARD_TERMS.map(t => <option key={t} value={t} />)}</datalist>
+            <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms} onChange={e => setHdr(h => ({ ...h, terms: e.target.value }))}>
+              {STANDARD_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
           <div><Label>Invoice date</Label><DateInput value={hdr.issue_date} onChange={e => setHdr(h => ({ ...h, issue_date: e.target.value }))} required /></div>
           <div><Label>Due date</Label><DateInput value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
