@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
@@ -7,14 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AccountSelect } from '@/components/ui/AccountSelect';
+import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/ProductServiceSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 
-type Line = { description: string; revenue_account_id: string; amount: string };
+type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
-type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null };
-const blank = (): Line => ({ description: '', revenue_account_id: '', amount: '' });
+const blank = (): Line => ({ description: '', inventory_item_id: '', amount: '' });
 
 const STANDARD_TERMS = ['Net 30', 'Net 60', 'Net 90', '2/10 Net 30'];
 
@@ -22,7 +21,7 @@ export default function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [revenueAccounts, setRevenueAccounts] = useState<Account[]>([]);
+  const [items, setItems] = useState<ProductServiceItem[]>([]);
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const today = new Date().toISOString().slice(0, 10);
   const [hdr, setHdr] = useState({ customer_id: '', invoice_number: '', issue_date: today, due_date: today, memo: '', terms: 'Net 30' });
@@ -31,17 +30,41 @@ export default function InvoiceNewPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const refetchItems = useCallback(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}/inventory-items`).then(r => setItems(r.data.items));
+  }, [bizId]);
+
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/customers`).then(r => setCustomers(r.data.customers));
-    api.get(`/businesses/${bizId}/coa`).then(r => setRevenueAccounts(r.data.accounts.filter((a: Account) => a.account_type === 'revenue' && a.is_active)));
+    refetchItems();
     api.get(`/businesses/${bizId}/tax-codes`).then(r => setTaxCodes(r.data.tax_codes ?? []));
     api.get(`/businesses/${bizId}/invoices/next-number`).then(r => {
       setHdr(h => h.invoice_number ? h : { ...h, invoice_number: r.data.next_number });
     });
-  }, [bizId]);
+  }, [bizId, refetchItems]);
+
+  useEffect(() => {
+    function onFocus() { refetchItems(); }
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refetchItems]);
 
   function update(i: number, patch: Partial<Line>) { setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l)); }
+
+  function pickItem(i: number, item_id: string) {
+    const item = items.find(it => it.id === item_id);
+    setLines(ls => ls.map((l, idx) => {
+      if (idx !== i) return l;
+      const next: Line = { ...l, inventory_item_id: item_id };
+      if (item) {
+        if (!l.description && item.name) next.description = item.name;
+        if (!l.amount && item.sale_price) next.amount = String(item.sale_price);
+      }
+      return next;
+    }));
+  }
 
   const totals = useMemo(() => {
     let subtotal = 0;
@@ -53,7 +76,7 @@ export default function InvoiceNewPage() {
   }, [lines, taxCodes, taxCodeId]);
 
   function isLineEmpty(l: Line) {
-    return !l.description && !l.revenue_account_id && !l.amount;
+    return !l.description && !l.inventory_item_id && !l.amount;
   }
 
   async function submit(e: React.FormEvent) {
@@ -61,16 +84,23 @@ export default function InvoiceNewPage() {
     try {
       const filled = lines.filter(l => !isLineEmpty(l));
       if (filled.length === 0) { setErr('Add at least one line.'); setBusy(false); return; }
-      const body = {
-        customer_id: hdr.customer_id, invoice_number: hdr.invoice_number,
-        issue_date: hdr.issue_date, due_date: hdr.due_date, memo: hdr.memo || null, terms: hdr.terms || null,
-        lines: filled.map(l => ({
+      const mapped: { description: string; quantity: string; unit_price: string; revenue_account_id: string; tax_code_id: string | null }[] = [];
+      for (const l of filled) {
+        const item = items.find(it => it.id === l.inventory_item_id);
+        if (!item) { setErr('Pick a product/service for every line.'); setBusy(false); return; }
+        if (!item.income_account_id) { setErr(`"${item.name}" has no income account set. Edit the item and assign one.`); setBusy(false); return; }
+        mapped.push({
           description: l.description,
           quantity: '1',
           unit_price: parseMoneyInput(l.amount || '0'),
-          revenue_account_id: l.revenue_account_id,
+          revenue_account_id: item.income_account_id,
           tax_code_id: taxCodeId,
-        })),
+        });
+      }
+      const body = {
+        customer_id: hdr.customer_id, invoice_number: hdr.invoice_number,
+        issue_date: hdr.issue_date, due_date: hdr.due_date, memo: hdr.memo || null, terms: hdr.terms || null,
+        lines: mapped,
       };
       const r = await api.post(`/businesses/${bizId}/invoices`, body);
       nav(`/invoices/${r.data.invoice.id}`);
@@ -118,12 +148,13 @@ export default function InvoiceNewPage() {
                 <span className="font-mono">{i + 1}</span>
               </div>
               <div className="col-span-4">
-                <Label htmlFor={`line-${i}-revenue`} className="sr-only">Product/service</Label>
-                <AccountSelect
-                  id={`line-${i}-revenue`}
-                  accounts={revenueAccounts}
-                  value={l.revenue_account_id}
-                  onChange={(id) => update(i, { revenue_account_id: id })}
+                <Label htmlFor={`line-${i}-item`} className="sr-only">Product/service</Label>
+                <ProductServiceSelect
+                  id={`line-${i}-item`}
+                  items={items}
+                  value={l.inventory_item_id}
+                  onChange={(id) => pickItem(i, id)}
+                  onAddNew={() => window.open('/inventory/items/new', '_blank')}
                   required={!isLineEmpty(l)}
                   placeholder="Select product/service…"
                 />
