@@ -5,7 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 
-type Customer = { id: string; name: string; email: string | null; phone: string | null; default_terms_days: number };
+type Customer = { id: string; name: string; company_name: string | null; email: string | null; phone: string | null; default_terms_days: number };
 type InvoiceSummary = { id: string; invoice_number: string; issue_date: string; due_date: string; status: string; total: string };
 
 export default function CustomerDetailPage() {
@@ -24,7 +24,10 @@ export default function CustomerDetailPage() {
       <h1 className="text-2xl font-semibold">{customer.name}</h1>
       <Card><CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent className="text-sm space-y-1">
-          <div>Email: {customer.email ?? '—'}</div><div>Phone: {customer.phone ?? '—'}</div><div>Terms: {customer.default_terms_days}d</div>
+          <div>Company: {customer.company_name ?? '—'}</div>
+          <div>Email: {customer.email ?? '—'}</div>
+          <div>Phone: {customer.phone ?? '—'}</div>
+          <div>Terms: {customer.default_terms_days}d</div>
         </CardContent>
       </Card>
       <Card><CardHeader><CardTitle>Invoices</CardTitle></CardHeader>
