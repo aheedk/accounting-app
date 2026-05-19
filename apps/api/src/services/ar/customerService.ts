@@ -8,6 +8,7 @@ import type { ServiceCtx } from '../../lib/ctx.js';
 export type CreateCustomerInput = {
   business_id: string;
   name: string;
+  company_name?: string | null;
   email?: string | null;
   phone?: string | null;
   billing_address?: unknown;
@@ -23,6 +24,7 @@ export async function createCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   const values: {
     business_id: string;
     name: string;
+    company_name: string | null;
     email: string | null;
     phone: string | null;
     billing_address: unknown | null;
@@ -30,6 +32,7 @@ export async function createCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   } = {
     business_id: input.business_id,
     name: input.name,
+    company_name: input.company_name ?? null,
     email: input.email ?? null,
     phone: input.phone ?? null,
     billing_address: input.billing_address === undefined ? null : (input.billing_address ?? null),
@@ -51,6 +54,7 @@ export async function updateCustomer(
 
   const updated = await trx.updateTable('customers').set({
     ...(input.patch.name !== undefined ? { name: input.patch.name } : {}),
+    ...(input.patch.company_name !== undefined ? { company_name: input.patch.company_name ?? null } : {}),
     ...(input.patch.email !== undefined ? { email: input.patch.email ?? null } : {}),
     ...(input.patch.phone !== undefined ? { phone: input.patch.phone ?? null } : {}),
     ...(input.patch.billing_address !== undefined ? { billing_address: input.patch.billing_address ?? null } : {}),
@@ -79,9 +83,30 @@ export async function deleteCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
 }
 
 export async function listCustomers(db: Kysely<DB>, business_id: string) {
-  return db.selectFrom('customers').selectAll()
-    .where('business_id', '=', business_id).where('deleted_at', 'is', null)
-    .orderBy('name').execute();
+  return db.selectFrom('customers as c')
+    .selectAll('c')
+    .select(eb => eb
+      .selectFrom('invoices as i')
+      .select(({ fn }) => fn.coalesce(
+        sql<string>`SUM(i.total - COALESCE((
+          SELECT SUM(pa.applied_amount)
+          FROM payment_applications pa
+          LEFT JOIN payments p ON p.id = pa.payment_id
+          LEFT JOIN credit_memos cm ON cm.id = pa.credit_memo_id
+          WHERE pa.invoice_id = i.id
+            AND (p.status = 'posted' OR cm.status IN ('posted','applied'))
+        ), 0))`,
+        sql.lit('0'),
+      ).as('open_balance'))
+      .whereRef('i.customer_id', '=', 'c.id')
+      .where('i.deleted_at', 'is', null)
+      .where('i.status', 'in', ['posted', 'paid'])
+      .as('open_balance')
+    )
+    .where('c.business_id', '=', business_id)
+    .where('c.deleted_at', 'is', null)
+    .orderBy('c.name')
+    .execute();
 }
 
 export async function getCustomer(db: Kysely<DB>, business_id: string, customer_id: string) {

@@ -156,6 +156,7 @@ export interface CustomersTable {
   id: Generated<string>;
   business_id: string;
   name: string;
+  company_name: string | null;
   email: string | null;
   phone: string | null;
   billing_address: unknown | null;

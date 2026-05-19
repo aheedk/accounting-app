@@ -37,6 +37,7 @@ router.post('/businesses/:businessId/customers', requireMinRole('staff'), async 
     const input: cust.CreateCustomerInput = {
       business_id: req.tenancy!.business_id,
       name: body.name,
+      company_name: body.company_name ?? null,
       email: body.email ?? null,
       phone: body.phone ?? null,
       billing_address: body.billing_address ?? null,
@@ -54,6 +55,7 @@ router.patch('/businesses/:businessId/customers/:id', requireMinRole('accountant
     const parsed = schemas.customerUpdateSchema.parse(req.body);
     const patch: Partial<cust.CreateCustomerInput> = {};
     if (parsed.name !== undefined) patch.name = parsed.name;
+    if (parsed.company_name !== undefined) patch.company_name = parsed.company_name ?? null;
     if (parsed.email !== undefined) patch.email = parsed.email ?? null;
     if (parsed.phone !== undefined) patch.phone = parsed.phone ?? null;
     if (parsed.billing_address !== undefined) patch.billing_address = parsed.billing_address ?? null;
