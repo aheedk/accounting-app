@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
 
@@ -14,6 +15,7 @@ export default function CoaListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', account_type: 'asset' });
   const [err, setErr] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState('');
 
   async function reload() {
     if (!bizId) return;
@@ -34,13 +36,29 @@ export default function CoaListPage() {
     }
   }
 
+  const filtered = typeFilter ? accounts.filter(a => a.account_type === typeFilter) : accounts;
+
+  const columns: Column<Account>[] = [
+    { key: 'code', header: 'Code', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono">{r.code}</span> },
+    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => r.name },
+    { key: 'account_type', header: 'Type', sortable: true, sortValue: r => r.account_type, render: r => <span className="capitalize">{r.account_type}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => <span className="capitalize">{r.is_active ? 'active' : 'inactive'}</span> },
+    { key: 'system', header: 'System', sortable: true, sortValue: r => r.is_system ? 'yes' : 'no', render: r => r.is_system ? 'yes' : 'no' },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Chart of Accounts</h1>
-        <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add account'}</Button>
+        <div className="flex items-center gap-3">
+          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+            <option value="">All types</option>
+            {['asset','liability','equity','revenue','expense'].map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add account'}</Button>
+        </div>
       </div>
 
       {showCreate && (
@@ -65,28 +83,14 @@ export default function CoaListPage() {
       )}
 
       <Card><CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40">
-            <tr>
-              <th className="text-left p-3">Code</th>
-              <th className="text-left p-3">Name</th>
-              <th className="text-left p-3">Type</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">System</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map(a => (
-              <tr key={a.id} className="border-b last:border-b-0">
-                <td className="p-3 font-mono">{a.code}</td>
-                <td className="p-3">{a.name}</td>
-                <td className="p-3">{a.account_type}</td>
-                <td className="p-3">{a.is_active ? 'active' : 'inactive'}</td>
-                <td className="p-3">{a.is_system ? 'yes' : 'no'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          rows={filtered}
+          getRowId={r => r.id}
+          columns={columns}
+          defaultSortKey="code"
+          defaultSortDir="asc"
+          emptyMessage="No accounts."
+        />
       </CardContent></Card>
     </div>
   );

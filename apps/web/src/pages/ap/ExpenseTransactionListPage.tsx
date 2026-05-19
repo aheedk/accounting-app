@@ -7,6 +7,7 @@ import type { Role } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
@@ -68,6 +69,12 @@ function statusBadge(status: ExpenseStatus) {
   }
 }
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 export default function ExpenseTransactionListPage() {
   const [bizId] = useActiveBusinessId();
   const { user } = useAuth();
@@ -125,6 +132,38 @@ export default function ExpenseTransactionListPage() {
     }
   }
 
+  const columns: Column<ExpenseTransaction>[] = [
+    {
+      key: 'transaction_date',
+      header: 'Date',
+      sortable: true,
+      sortValue: r => Date.parse(r.transaction_date) || 0,
+      render: r => <span className="whitespace-nowrap">{fmtShortDate(r.transaction_date)}</span>,
+    },
+    {
+      key: 'payee',
+      header: 'Payee',
+      sortable: true,
+      sortValue: r => r.payee_text ?? '',
+      render: r => r.payee_text ?? <span className="text-muted-foreground">(vendor)</span>,
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      sortable: true,
+      sortValue: r => Number(r.amount),
+      render: r => <span className="font-mono">{fmtMoney(r.amount)}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      sortValue: r => r.status,
+      render: r => statusBadge(r.status),
+    },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
@@ -157,41 +196,25 @@ export default function ExpenseTransactionListPage() {
       {err && <p className="text-sm text-destructive">{err}</p>}
 
       <Card><CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40">
-            <tr>
-              <th className="text-left p-3">Date</th>
-              <th className="text-left p-3">Payee</th>
-              <th className="text-right p-3">Amount</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 && (
-              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No expense transactions match the current filter.</td></tr>
-            )}
-            {items.map(t => (
-              <tr key={t.id} className="border-b last:border-b-0">
-                <td className="p-3">{t.transaction_date}</td>
-                <td className="p-3">{t.payee_text ?? '(vendor)'}</td>
-                <td className="p-3 text-right font-mono">{fmtMoney(t.amount)}</td>
-                <td className="p-3">{statusBadge(t.status)}</td>
-                <td className="p-3">
-                  <div className="flex flex-wrap gap-1">
-                    <Link to={`/ap/expenses/${t.id}`} className="text-primary underline text-xs">View</Link>
-                    {canMutate && t.status === 'draft' && (
-                      <Button size="sm" variant="outline" onClick={() => postExpense(t)} disabled={busy}>Post</Button>
-                    )}
-                    {canMutate && (t.status === 'draft' || t.status === 'posted') && (
-                      <Button size="sm" variant="ghost" onClick={() => voidExpense(t)} disabled={busy}>Void</Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          rows={items}
+          getRowId={r => r.id}
+          columns={columns}
+          defaultSortKey="transaction_date"
+          defaultSortDir="desc"
+          actions={r => (
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <Link to={`/ap/expenses/${r.id}`} className="text-primary underline text-xs">View</Link>
+              {canMutate && r.status === 'draft' && (
+                <Button size="sm" variant="outline" onClick={() => postExpense(r)} disabled={busy}>Post</Button>
+              )}
+              {canMutate && (r.status === 'draft' || r.status === 'posted') && (
+                <Button size="sm" variant="ghost" onClick={() => voidExpense(r)} disabled={busy}>Void</Button>
+              )}
+            </span>
+          )}
+          emptyMessage="No expense transactions match the current filter."
+        />
       </CardContent></Card>
     </div>
   );

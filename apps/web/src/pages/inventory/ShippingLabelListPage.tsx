@@ -4,6 +4,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 
 type ShippingLabel = {
@@ -24,6 +25,12 @@ type ListResponse = { labels: ShippingLabel[] };
 function pickErr(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
     ?.response?.data?.error?.message ?? 'Failed';
+}
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
 export default function ShippingLabelListPage() {
@@ -64,6 +71,51 @@ export default function ShippingLabelListPage() {
     }
   }
 
+  const columns: Column<ShippingLabel>[] = [
+    {
+      key: 'shipped_at',
+      header: 'Shipped at',
+      sortable: true,
+      sortValue: r => Date.parse(r.shipped_at) || 0,
+      render: r => <span className="whitespace-nowrap">{fmtShortDate(r.shipped_at)}</span>,
+    },
+    {
+      key: 'carrier',
+      header: 'Carrier',
+      sortable: true,
+      sortValue: r => r.carrier,
+      render: r => r.carrier,
+    },
+    {
+      key: 'tracking_number',
+      header: 'Tracking #',
+      sortable: true,
+      sortValue: r => r.tracking_number,
+      render: r => <span className="font-mono text-xs">{r.tracking_number}</span>,
+    },
+    {
+      key: 'linked',
+      header: 'Linked entity',
+      render: r => (
+        <span className="font-mono text-xs">
+          {r.invoice_id
+            ? <span><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">invoice</span> {r.invoice_id.slice(0, 8)}</span>
+            : r.sales_order_id
+              ? <span><span className="rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">SO</span> {r.sales_order_id.slice(0, 8)}</span>
+              : <span className="text-muted-foreground">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'cost',
+      header: 'Cost',
+      align: 'right',
+      sortable: true,
+      sortValue: r => Number(r.cost ?? 0),
+      render: r => <span className="font-mono">{r.cost ? fmtMoney(r.cost) : <span className="text-muted-foreground">—</span>}</span>,
+    },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
@@ -79,50 +131,25 @@ export default function ShippingLabelListPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-          ) : labels.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">
-              No shipping labels yet.
-            </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3">Shipped At</th>
-                  <th className="text-left p-3">Carrier</th>
-                  <th className="text-left p-3">Tracking #</th>
-                  <th className="text-left p-3">Linked entity</th>
-                  <th className="text-right p-3">Cost</th>
-                  <th className="text-right p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {labels.map((l) => (
-                  <tr key={l.id} className="border-b last:border-b-0">
-                    <td className="p-3">{l.shipped_at}</td>
-                    <td className="p-3">{l.carrier}</td>
-                    <td className="p-3 font-mono text-xs">{l.tracking_number}</td>
-                    <td className="p-3 font-mono text-xs">
-                      {l.invoice_id
-                        ? <span><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">invoice</span> {l.invoice_id.slice(0, 8)}</span>
-                        : l.sales_order_id
-                        ? <span><span className="rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">SO</span> {l.sales_order_id.slice(0, 8)}</span>
-                        : '—'}
-                    </td>
-                    <td className="p-3 text-right">{l.cost ? fmtMoney(l.cost) : '—'}</td>
-                    <td className="p-3 text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => deleteLabel(l.id)}
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              rows={labels}
+              getRowId={r => r.id}
+              columns={columns}
+              defaultSortKey="shipped_at"
+              defaultSortDir="desc"
+              actions={r => (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => deleteLabel(r.id)}
+                >
+                  Delete
+                </Button>
+              )}
+              emptyMessage="No shipping labels yet."
+            />
           )}
         </CardContent>
       </Card>

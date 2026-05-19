@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type JE = { id: string; entry_date: string; memo: string | null; status: string; source_type: string };
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
 
 export default function JournalListPage() {
   const [bizId] = useActiveBusinessId();
@@ -14,6 +22,14 @@ export default function JournalListPage() {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/journal-entries`).then(r => setEntries(r.data.entries));
   }, [bizId]);
+
+  const columns: Column<JE>[] = [
+    { key: 'entry_date', header: 'Date', sortable: true, sortValue: r => Date.parse(r.entry_date), render: r => <span className="whitespace-nowrap">{fmtShortDate(r.entry_date)}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.status, render: r => <span className="capitalize">{r.status}</span> },
+    { key: 'source_type', header: 'Source', sortable: true, sortValue: r => r.source_type, render: r => <span className="capitalize">{r.source_type}</span> },
+    { key: 'memo', header: 'Memo', sortable: true, sortValue: r => r.memo ?? '', render: r => r.memo || <span className="text-muted-foreground">—</span> },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
   return (
     <div className="space-y-6">
@@ -22,28 +38,20 @@ export default function JournalListPage() {
         <Button asChild><Link to="/journal/new">New entry</Link></Button>
       </div>
       <Card><CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40">
-            <tr>
-              <th className="text-left p-3">Date</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">Source</th>
-              <th className="text-left p-3">Memo</th>
-              <th className="text-left p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map(e => (
-              <tr key={e.id} className="border-b last:border-b-0">
-                <td className="p-3">{e.entry_date}</td>
-                <td className="p-3">{e.status}</td>
-                <td className="p-3">{e.source_type}</td>
-                <td className="p-3">{e.memo ?? ''}</td>
-                <td className="p-3"><Link className="text-primary underline" to={`/journal/${e.id}`}>view</Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          rows={entries}
+          getRowId={r => r.id}
+          columns={columns}
+          defaultSortKey="entry_date"
+          defaultSortDir="desc"
+          actions={r => (
+            <span className="inline-flex items-center gap-2">
+              <Link className="text-primary hover:underline" to={`/journal/${r.id}`}>View/Edit</Link>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </span>
+          )}
+          emptyMessage="No journal entries."
+        />
       </CardContent></Card>
     </div>
   );

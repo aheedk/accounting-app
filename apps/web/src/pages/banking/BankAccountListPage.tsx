@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type Account = {
   id: string;
@@ -34,6 +35,7 @@ export default function BankAccountListPage() {
   const [form, setForm] = useState({ name: '', institution: '', account_last_four: '', cash_account_id: '' });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
 
   async function reload() {
     if (!bizId) return;
@@ -72,13 +74,32 @@ export default function BankAccountListPage() {
     }
   }
 
+  const filtered = statusFilter
+    ? accounts.filter(a => (statusFilter === 'active' ? a.is_active : !a.is_active))
+    : accounts;
+
+  const columns: Column<Account>[] = [
+    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => r.name },
+    { key: 'institution', header: 'Institution', sortable: true, sortValue: r => r.institution ?? '', render: r => r.institution || <span className="text-muted-foreground">—</span> },
+    { key: 'account_last_four', header: 'Last 4', sortable: true, sortValue: r => r.account_last_four ?? '', render: r => <span className="font-mono">{r.account_last_four || <span className="text-muted-foreground">—</span>}</span> },
+    { key: 'cash_account', header: 'Linked CoA', sortable: true, sortValue: r => `${r.cash_account_code} ${r.cash_account_name}`, render: r => <span className="font-mono">{r.cash_account_code} — {r.cash_account_name}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => <span className="capitalize">{r.is_active ? 'active' : 'inactive'}</span> },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bank Accounts</h1>
-        <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add bank account'}</Button>
+        <div className="flex items-center gap-3">
+          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+          <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add bank account'}</Button>
+        </div>
       </div>
 
       {showCreate && (
@@ -121,28 +142,14 @@ export default function BankAccountListPage() {
 
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40">
-              <tr>
-                <th className="text-left p-3">Name</th>
-                <th className="text-left p-3">Institution</th>
-                <th className="text-left p-3">Last 4</th>
-                <th className="text-left p-3">Linked CoA</th>
-                <th className="text-left p-3">Active</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map(a => (
-                <tr key={a.id} className="border-b last:border-b-0">
-                  <td className="p-3">{a.name}</td>
-                  <td className="p-3">{a.institution ?? ''}</td>
-                  <td className="p-3 font-mono">{a.account_last_four ?? ''}</td>
-                  <td className="p-3 font-mono">{a.cash_account_code} — {a.cash_account_name}</td>
-                  <td className="p-3">{a.is_active ? 'yes' : 'no'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            rows={filtered}
+            getRowId={r => r.id}
+            columns={columns}
+            defaultSortKey="name"
+            defaultSortDir="asc"
+            emptyMessage="No bank accounts."
+          />
         </CardContent>
       </Card>
     </div>

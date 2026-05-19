@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type ItemReceipt = {
   id: string;
@@ -27,6 +28,12 @@ type BillSummary = {
 type ListResponse = { item_receipts: ItemReceipt[] };
 type POListResponse = { purchase_orders: PurchaseOrderSummary[] };
 type BillsListResponse = { bills: BillSummary[] };
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
 
 function pickErr(e: unknown): string {
   return (
@@ -61,6 +68,27 @@ export default function ItemReceiptListPage() {
       .finally(() => setLoading(false));
   }, [bizId]);
 
+  type Row = ItemReceipt & { po_number: string; bill_number: string | null };
+  const rows: Row[] = useMemo(
+    () => receipts.map(r => ({
+      ...r,
+      po_number: poMap.get(r.purchase_order_id) ?? '',
+      bill_number: r.bill_id ? (billMap.get(r.bill_id) ?? null) : null,
+    })),
+    [receipts, poMap, billMap],
+  );
+
+  const columns: Column<Row>[] = [
+    { key: 'receipt_date', header: 'Receipt Date', sortable: true, sortValue: r => Date.parse(r.receipt_date), render: r => <span className="whitespace-nowrap">{fmtShortDate(r.receipt_date)}</span> },
+    { key: 'po_number', header: 'PO #', sortable: true, sortValue: r => r.po_number, render: r => <span className="font-mono">{r.po_number || <span className="text-muted-foreground">—</span>}</span> },
+    { key: 'bill_number', header: 'Bill #', sortable: true, sortValue: r => r.bill_number ?? '', render: r => r.bill_id ? (
+      <Link className="font-mono text-primary hover:underline" to={`/ap/bills/${r.bill_id}`}>
+        {r.bill_number ?? r.bill_id.slice(0, 8)}
+      </Link>
+    ) : <span className="text-muted-foreground">—</span> },
+    { key: 'memo', header: 'Memo', render: r => r.memo || <span className="text-muted-foreground">—</span> },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
@@ -76,42 +104,15 @@ export default function ItemReceiptListPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-          ) : receipts.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">
-              No item receipts yet. Receive against a sent purchase order to record one.
-            </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3">Receipt Date</th>
-                  <th className="text-left p-3">PO #</th>
-                  <th className="text-left p-3">Bill #</th>
-                  <th className="text-left p-3">Memo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.map((r) => {
-                  const billNumber = r.bill_id ? billMap.get(r.bill_id) : null;
-                  return (
-                    <tr key={r.id} className="border-b last:border-b-0">
-                      <td className="p-3">{r.receipt_date}</td>
-                      <td className="p-3 font-mono">{poMap.get(r.purchase_order_id) ?? '—'}</td>
-                      <td className="p-3 font-mono">
-                        {r.bill_id ? (
-                          <Link className="text-primary underline" to={`/ap/bills/${r.bill_id}`}>
-                            {billNumber ?? r.bill_id.slice(0, 8)}
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="p-3">{r.memo ?? '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              rows={rows}
+              getRowId={r => r.id}
+              columns={columns}
+              defaultSortKey="receipt_date"
+              defaultSortDir="desc"
+              emptyMessage="No item receipts yet. Receive against a sent purchase order to record one."
+            />
           )}
         </CardContent>
       </Card>

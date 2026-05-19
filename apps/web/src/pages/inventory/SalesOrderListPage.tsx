@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -36,6 +37,12 @@ function statusBadgeClass(status: SalesOrderStatus): string {
     default:
       return 'inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800';
   }
+}
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
 export default function SalesOrderListPage() {
@@ -77,7 +84,7 @@ export default function SalesOrderListPage() {
       .catch(() => setCustomers([]));
   }, [bizId]);
 
-  const customerName = (id: string): string => customers.find((c) => c.id === id)?.name ?? id;
+  const customerMap = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers]);
 
   async function fulfill(id: string) {
     if (!bizId) return;
@@ -110,6 +117,50 @@ export default function SalesOrderListPage() {
     }
   }
 
+  type Row = SalesOrderRow & { customer_name: string };
+  const rows: Row[] = useMemo(
+    () => items.map((so) => ({ ...so, customer_name: customerMap.get(so.customer_id) ?? so.customer_id })),
+    [items, customerMap],
+  );
+
+  const columns: Column<Row>[] = [
+    {
+      key: 'so_number',
+      header: 'SO #',
+      sortable: true,
+      sortValue: r => r.so_number,
+      render: r => <span className="font-mono">{r.so_number}</span>,
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      sortable: true,
+      sortValue: r => r.customer_name,
+      render: r => r.customer_name || <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: 'order_date',
+      header: 'Order date',
+      sortable: true,
+      sortValue: r => Date.parse(r.order_date) || 0,
+      render: r => <span className="whitespace-nowrap">{fmtShortDate(r.order_date)}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      sortValue: r => r.status,
+      render: r => <span className={statusBadgeClass(r.status)}>{r.status}</span>,
+    },
+    {
+      key: 'invoice',
+      header: 'Invoice',
+      render: r => r.invoice_id
+        ? <Link className="text-primary underline" to={`/invoices/${r.invoice_id}`}>view invoice</Link>
+        : <span className="text-muted-foreground">—</span>,
+    },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
@@ -140,71 +191,42 @@ export default function SalesOrderListPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">
-              No sales orders yet.
-            </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3">SO #</th>
-                  <th className="text-left p-3">Customer</th>
-                  <th className="text-left p-3">Order Date</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-left p-3">Invoice</th>
-                  <th className="text-left p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((so) => {
-                  const canFulfill = so.status === 'draft' || so.status === 'confirmed';
-                  const canVoid = so.status !== 'fulfilled' && so.status !== 'void';
-                  const busy = busyId === so.id;
-                  return (
-                    <tr key={so.id} className="border-b last:border-b-0">
-                      <td className="p-3 font-mono">{so.so_number}</td>
-                      <td className="p-3">{customerName(so.customer_id)}</td>
-                      <td className="p-3">{so.order_date}</td>
-                      <td className="p-3">
-                        <span className={statusBadgeClass(so.status)}>{so.status}</span>
-                      </td>
-                      <td className="p-3">
-                        {so.invoice_id ? (
-                          <Link className="text-primary underline" to={`/invoices/${so.invoice_id}`}>
-                            view invoice
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Link className="text-primary underline" to={`/inventory/sales-orders/${so.id}`}>
-                            view
-                          </Link>
-                          {canFulfill && (
-                            <Button size="sm" disabled={busy} onClick={() => fulfill(so.id)}>
-                              {busy ? 'Working…' : 'Fulfill'}
-                            </Button>
-                          )}
-                          {canVoid && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              disabled={busy}
-                              onClick={() => voidIt(so.id)}
-                            >
-                              Void
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              rows={rows}
+              getRowId={r => r.id}
+              columns={columns}
+              defaultSortKey="order_date"
+              defaultSortDir="desc"
+              actions={r => {
+                const canFulfill = r.status === 'draft' || r.status === 'confirmed';
+                const canVoid = r.status !== 'fulfilled' && r.status !== 'void';
+                const busy = busyId === r.id;
+                return (
+                  <span className="inline-flex items-center gap-2">
+                    <Link className="text-primary underline" to={`/inventory/sales-orders/${r.id}`}>
+                      view
+                    </Link>
+                    {canFulfill && (
+                      <Button size="sm" disabled={busy} onClick={() => fulfill(r.id)}>
+                        {busy ? 'Working…' : 'Fulfill'}
+                      </Button>
+                    )}
+                    {canVoid && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={busy}
+                        onClick={() => voidIt(r.id)}
+                      >
+                        Void
+                      </Button>
+                    )}
+                  </span>
+                );
+              }}
+              emptyMessage="No sales orders yet."
+            />
           )}
         </CardContent>
       </Card>

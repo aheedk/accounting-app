@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
@@ -36,6 +37,12 @@ function maskSSN(lastFour: string | null): string {
 function fmtRate(cents: string): string {
   const dollars = Number(cents) / 100;
   return `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
 export default function EmployeeListPage() {
@@ -85,6 +92,74 @@ export default function EmployeeListPage() {
     }
   }
 
+  const columns: Column<Employee>[] = [
+    {
+      key: 'full_name',
+      header: 'Name',
+      sortable: true,
+      sortValue: r => r.full_name,
+      render: r => <Link className="font-medium hover:underline" to={`/payroll/employees/${r.id}`}>{r.full_name}</Link>,
+    },
+    {
+      key: 'hire_date',
+      header: 'Hire date',
+      sortable: true,
+      sortValue: r => Date.parse(r.hire_date) || 0,
+      render: r => <span className="whitespace-nowrap">{fmtShortDate(r.hire_date)}</span>,
+    },
+    {
+      key: 'pay_rate',
+      header: 'Pay rate',
+      align: 'right',
+      sortable: true,
+      sortValue: r => Number(r.default_pay_rate_cents),
+      render: r => <span className="font-mono">{fmtRate(r.default_pay_rate_cents)}</span>,
+    },
+    {
+      key: 'frequency',
+      header: 'Frequency',
+      sortable: true,
+      sortValue: r => r.default_pay_frequency,
+      render: r => <span className="capitalize">{r.default_pay_frequency}</span>,
+    },
+    {
+      key: 'ssn',
+      header: 'SSN',
+      render: r => {
+        const showRevealed = reveal && reveal.id === r.id;
+        return (
+          <span className="font-mono">
+            {showRevealed ? (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">
+                {reveal.ssn ?? '—'}
+                <span className="ml-2 text-xs text-amber-700">(hides in 30s)</span>
+              </span>
+            ) : (
+              maskSSN(r.ssn_last_four)
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      sortValue: r => r.is_active ? 1 : 0,
+      render: r => (
+        <span
+          className={
+            r.is_active
+              ? 'inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800'
+              : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
+          }
+        >
+          {r.is_active ? 'active' : 'inactive'}
+        </span>
+      ),
+    },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
@@ -104,70 +179,32 @@ export default function EmployeeListPage() {
         <CardContent className="p-0">
           {loading && items.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">
-              No employees yet.{isFirmAdmin && ' Add one to get started.'}
-            </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3">Name</th>
-                  <th className="text-left p-3">Hire Date</th>
-                  <th className="text-right p-3">Pay Rate</th>
-                  <th className="text-left p-3">Frequency</th>
-                  <th className="text-left p-3">SSN</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-right p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((emp) => {
-                  const showRevealed = reveal && reveal.id === emp.id;
-                  return (
-                    <tr key={emp.id} className="border-b last:border-b-0 align-top">
-                      <td className="p-3">{emp.full_name}</td>
-                      <td className="p-3">{emp.hire_date}</td>
-                      <td className="p-3 text-right font-mono">{fmtRate(emp.default_pay_rate_cents)}</td>
-                      <td className="p-3">{emp.default_pay_frequency}</td>
-                      <td className="p-3 font-mono">
-                        {showRevealed ? (
-                          <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">
-                            {reveal!.ssn ?? '—'}
-                            <span className="ml-2 text-xs text-amber-700">(hides in 30s)</span>
-                          </span>
-                        ) : (
-                          maskSSN(emp.ssn_last_four)
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={
-                            emp.is_active
-                              ? 'inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800'
-                              : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
-                          }
-                        >
-                          {emp.is_active ? 'active' : 'inactive'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right space-x-2">
-                        <Link className="text-primary underline" to={`/payroll/employees/${emp.id}`}>
-                          View
-                        </Link>
-                        {isFirmAdmin && emp.ssn_last_four && (
-                          showRevealed ? (
-                            <Button size="sm" variant="outline" onClick={() => setReveal(null)}>Hide</Button>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => handleReveal(emp)}>Reveal SSN</Button>
-                          )
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              rows={items}
+              getRowId={r => r.id}
+              columns={columns}
+              defaultSortKey="full_name"
+              defaultSortDir="asc"
+              actions={r => {
+                const showRevealed = reveal && reveal.id === r.id;
+                return (
+                  <span className="inline-flex items-center gap-2">
+                    <Link className="text-primary underline" to={`/payroll/employees/${r.id}`}>
+                      View
+                    </Link>
+                    {isFirmAdmin && r.ssn_last_four && (
+                      showRevealed ? (
+                        <Button size="sm" variant="outline" onClick={() => setReveal(null)}>Hide</Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => handleReveal(r)}>Reveal SSN</Button>
+                      )
+                    )}
+                  </span>
+                );
+              }}
+              emptyMessage={isFirmAdmin ? 'No employees yet. Add one to get started.' : 'No employees yet.'}
+            />
           )}
         </CardContent>
       </Card>

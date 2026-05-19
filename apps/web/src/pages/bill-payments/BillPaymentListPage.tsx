@@ -1,17 +1,34 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 
 type BillPaymentSummary = { id: string; payment_date: string; payment_method: string; status: string; amount: string; unapplied_amount: string };
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
 
 export default function BillPaymentListPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<BillPaymentSummary[]>([]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/bill-payments`).then(r => setItems(r.data.bill_payments)); }, [bizId]);
+
+  const columns: Column<BillPaymentSummary>[] = [
+    { key: 'payment_date', header: 'Date', sortable: true, sortValue: r => Date.parse(r.payment_date), render: r => <span className="whitespace-nowrap">{fmtShortDate(r.payment_date)}</span> },
+    { key: 'payment_method', header: 'Method', sortable: true, sortValue: r => r.payment_method, render: r => <span className="capitalize">{r.payment_method}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.status, render: r => <span className="capitalize">{r.status}</span> },
+    { key: 'amount', header: 'Amount', sortable: true, align: 'right', sortValue: r => Number(r.amount), render: r => <span className="font-mono">{fmtMoney(r.amount)}</span> },
+    { key: 'unapplied_amount', header: 'Unapplied', sortable: true, align: 'right', sortValue: r => Number(r.unapplied_amount), render: r => <span className="font-mono">{fmtMoney(r.unapplied_amount)}</span> },
+  ];
+
   if (!bizId) return <div>Pick a business.</div>;
   return (
     <div className="space-y-6">
@@ -20,19 +37,20 @@ export default function BillPaymentListPage() {
         <Button asChild><Link to="/ap/bill-payments/new">Record payment</Link></Button>
       </div>
       <Card><CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40"><tr><th className="text-left p-3">Date</th><th className="text-left p-3">Method</th><th className="text-left p-3">Status</th><th className="text-right p-3">Amount</th><th className="text-right p-3">Unapplied</th><th></th></tr></thead>
-          <tbody>{items.map(p => (
-            <tr key={p.id} className="border-b last:border-b-0">
-              <td className="p-3">{p.payment_date}</td>
-              <td className="p-3">{p.payment_method}</td>
-              <td className="p-3">{p.status}</td>
-              <td className="p-3 text-right">{fmtMoney(p.amount)}</td>
-              <td className="p-3 text-right">{fmtMoney(p.unapplied_amount)}</td>
-              <td className="p-3"><Link className="text-primary underline" to={`/ap/bill-payments/${p.id}`}>view</Link></td>
-            </tr>
-          ))}</tbody>
-        </table>
+        <DataTable
+          rows={items}
+          getRowId={r => r.id}
+          columns={columns}
+          defaultSortKey="payment_date"
+          defaultSortDir="desc"
+          actions={r => (
+            <span className="inline-flex items-center gap-2">
+              <Link className="text-primary hover:underline" to={`/ap/bill-payments/${r.id}`}>View/Edit</Link>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </span>
+          )}
+          emptyMessage="No bill payments."
+        />
       </CardContent></Card>
     </div>
   );

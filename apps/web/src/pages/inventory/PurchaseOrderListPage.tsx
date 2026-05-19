@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -37,6 +38,12 @@ function statusBadgeClass(status: POStatus): string {
     case 'void':
       return 'inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800';
   }
+}
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
 export default function PurchaseOrderListPage() {
@@ -84,9 +91,55 @@ export default function PurchaseOrderListPage() {
     }
   }
 
-  if (!bizId) return <div>Pick a business.</div>;
+  const vendorMap = useMemo(() => new Map(vendors.map((v) => [v.id, v.name])), [vendors]);
 
-  const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+  type Row = PurchaseOrder & { vendor_name: string };
+  const rows: Row[] = useMemo(
+    () => items.map((po) => ({ ...po, vendor_name: vendorMap.get(po.vendor_id) ?? '' })),
+    [items, vendorMap],
+  );
+
+  const columns: Column<Row>[] = [
+    {
+      key: 'po_number',
+      header: 'PO #',
+      sortable: true,
+      sortValue: r => r.po_number,
+      render: r => <span className="font-mono">{r.po_number}</span>,
+    },
+    {
+      key: 'vendor',
+      header: 'Vendor',
+      sortable: true,
+      sortValue: r => r.vendor_name,
+      render: r => r.vendor_name || <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: 'order_date',
+      header: 'Order date',
+      sortable: true,
+      sortValue: r => Date.parse(r.order_date) || 0,
+      render: r => <span className="whitespace-nowrap">{fmtShortDate(r.order_date)}</span>,
+    },
+    {
+      key: 'expected_delivery_date',
+      header: 'Expected',
+      sortable: true,
+      sortValue: r => r.expected_delivery_date ? Date.parse(r.expected_delivery_date) || 0 : 0,
+      render: r => r.expected_delivery_date
+        ? <span className="whitespace-nowrap">{fmtShortDate(r.expected_delivery_date)}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      sortValue: r => r.status,
+      render: r => <span className={statusBadgeClass(r.status)}>{r.status}</span>,
+    },
+  ];
+
+  if (!bizId) return <div>Pick a business.</div>;
 
   return (
     <div className="space-y-6">
@@ -113,52 +166,31 @@ export default function PurchaseOrderListPage() {
       {err && <p className="text-sm text-destructive">{err}</p>}
       <Card>
         <CardContent className="p-0">
-          {items.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">No purchase orders yet.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3">PO #</th>
-                  <th className="text-left p-3">Vendor</th>
-                  <th className="text-left p-3">Order Date</th>
-                  <th className="text-left p-3">Expected</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-left p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((po) => (
-                  <tr key={po.id} className="border-b last:border-b-0">
-                    <td className="p-3 font-mono">{po.po_number}</td>
-                    <td className="p-3">{vendorMap.get(po.vendor_id) ?? '—'}</td>
-                    <td className="p-3">{po.order_date}</td>
-                    <td className="p-3">{po.expected_delivery_date ?? '—'}</td>
-                    <td className="p-3">
-                      <span className={statusBadgeClass(po.status)}>{po.status}</span>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex gap-3">
-                        <Link className="text-primary underline" to={`/inventory/purchase-orders/${po.id}`}>
-                          view
-                        </Link>
-                        {po.status !== 'received' && po.status !== 'void' && (
-                          <button
-                            type="button"
-                            className="text-destructive underline disabled:opacity-50"
-                            disabled={busyId === po.id}
-                            onClick={() => voidIt(po.id)}
-                          >
-                            {busyId === po.id ? 'voiding…' : 'void'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <DataTable
+            rows={rows}
+            getRowId={r => r.id}
+            columns={columns}
+            defaultSortKey="order_date"
+            defaultSortDir="desc"
+            actions={r => (
+              <span className="inline-flex items-center gap-3">
+                <Link className="text-primary underline" to={`/inventory/purchase-orders/${r.id}`}>
+                  view
+                </Link>
+                {r.status !== 'received' && r.status !== 'void' && (
+                  <button
+                    type="button"
+                    className="text-destructive underline disabled:opacity-50"
+                    disabled={busyId === r.id}
+                    onClick={() => voidIt(r.id)}
+                  >
+                    {busyId === r.id ? 'voiding…' : 'void'}
+                  </button>
+                )}
+              </span>
+            )}
+            emptyMessage="No purchase orders yet."
+          />
         </CardContent>
       </Card>
     </div>
