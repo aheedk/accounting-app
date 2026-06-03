@@ -3,9 +3,9 @@ import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type Row = { customer_id: string; customer_name: string; current: string; over_30: string; over_60: string; over_90: string; total: string };
 
@@ -22,11 +22,17 @@ export default function AgingReportPage() {
     over_90: acc.over_90 + parseFloat(r.over_90),
     total: acc.total + parseFloat(r.total),
   }), { current: 0, over_30: 0, over_60: 0, over_90: 0, total: 0 });
+  const dlHeaders = ['Customer', 'Current', '1-30', '31-60', '60+', 'Total'];
+  const dlRows = () => rows.map(r => [r.customer_name, r.current, r.over_30, r.over_60, r.over_90, r.total]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold">AR Aging</h1>
-        <div><Label>As of</Label><DateInput value={asOf} onChange={e => setAsOf(e.target.value)} /></div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div><Label>As of</Label><DateInput value={asOf} onChange={e => setAsOf(e.target.value)} /></div>
+          <DownloadButtons headers={dlHeaders} getRows={dlRows} filename="ar-aging" title={`AR Aging — ${asOf}`} />
+        </div>
       </div>
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">

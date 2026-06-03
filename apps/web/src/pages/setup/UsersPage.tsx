@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type Role = 'firm_admin' | 'accountant' | 'staff' | 'client';
 const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'client'];
@@ -169,9 +170,17 @@ export default function UsersPage() {
             Invite team members, assign firm-level roles, and grant access to specific businesses.
           </p>
         </div>
-        <Button onClick={() => setShowInvite(s => !s)}>
-          {showInvite ? 'Cancel' : 'Invite user'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <DownloadButtons
+            headers={['Email', 'Name', 'Firm Role', 'Business Access']}
+            getRows={() => users.map(u => [u.email, u.full_name, u.role, u.business_access?.map((b: BusinessAccess) => b.business_name).join(', ') ?? ''])}
+            filename="users"
+            title="Users"
+          />
+          <Button onClick={() => setShowInvite(s => !s)}>
+            {showInvite ? 'Cancel' : 'Invite user'}
+          </Button>
+        </div>
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}

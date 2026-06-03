@@ -4,9 +4,9 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney, fmtSigned } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type PnlLine = {
   account_id: string;
@@ -78,6 +78,15 @@ export default function ProfitLossPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
 
+  const dlHeaders = ['Section', 'Code', 'Account', 'Amount'];
+  const dlRows = () => report ? [
+    ...report.revenue_lines.map(l => ['Revenue', l.account_code, l.account_name, l.amount]),
+    ['Revenue', '', 'Total Revenue', report.revenue_total],
+    ...report.expense_lines.map(l => ['Expense', l.account_code, l.account_name, l.amount]),
+    ['Expense', '', 'Total Expense', report.expense_total],
+    ['', '', 'Net Income', report.net_income],
+  ] : [];
+
   const netIncomeNum = report ? parseFloat(report.net_income) : 0;
   const netIncomeClass = netIncomeNum >= 0 ? 'text-emerald-600' : 'text-destructive';
   const hasActivity = report && (report.revenue_lines.length > 0 || report.expense_lines.length > 0);
@@ -102,6 +111,12 @@ export default function ProfitLossPage() {
             <Button onClick={() => { void load(); }} disabled={loading}>
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
+            <DownloadButtons
+              headers={dlHeaders}
+              getRows={dlRows}
+              filename={`pnl-${periodStart}-${periodEnd}`}
+              title={`Profit & Loss — ${periodStart} to ${periodEnd}`}
+            />
           </div>
         </CardContent>
       </Card>

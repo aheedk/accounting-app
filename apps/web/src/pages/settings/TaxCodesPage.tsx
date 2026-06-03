@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null; is_active: boolean };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -45,7 +46,7 @@ export default function TaxCodesPage() {
   if (!bizId) return <div>Pick a business.</div>;
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between"><h1 className="text-2xl font-semibold">Tax Codes</h1><Button onClick={() => setShow(s => !s)}>{show ? 'Cancel' : 'New tax code'}</Button></div>
+      <div className="flex items-center justify-between"><h1 className="text-2xl font-semibold">Tax Codes</h1><div className="flex items-center gap-2"><DownloadButtons headers={['Code', 'Name', 'Current Rate', 'Active']} getRows={() => items.map(c => [c.code, c.name, c.current_rate ? String(parseFloat((parseFloat(c.current_rate) * 100).toFixed(4))) + '%' : '—', c.is_active ? 'Yes' : 'No'])} filename="tax-codes" title="Tax Codes" /><Button onClick={() => setShow(s => !s)}>{show ? 'Cancel' : 'New tax code'}</Button></div></div>
       {show && (
         <Card><CardHeader><CardTitle>Create</CardTitle></CardHeader>
           <CardContent>
@@ -71,7 +72,7 @@ export default function TaxCodesPage() {
           <tbody>{items.map(c => (<tr key={c.id} className="border-b last:border-b-0">
             <td className="p-3 font-mono">{c.code}</td>
             <td className="p-3">{c.name}</td>
-            <td className="p-3 text-right">{c.current_rate ? `${(parseFloat(c.current_rate) * 100).toFixed(4)}%` : '—'}</td>
+            <td className="p-3 text-right">{c.current_rate ? `${parseFloat((parseFloat(c.current_rate) * 100).toFixed(4))}%` : '—'}</td>
             <td className="p-3">{c.is_active ? 'yes' : 'no'}</td>
           </tr>))}</tbody>
         </table>

@@ -89,6 +89,7 @@ export default function CoaListPage() {
           columns={columns}
           defaultSortKey="code"
           defaultSortDir="asc"
+          downloadable={{ filename: 'chart-of-accounts', title: 'Chart of Accounts' }}
           emptyMessage="No accounts."
         />
       </CardContent></Card>

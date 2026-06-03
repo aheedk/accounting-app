@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type Row = { vendor_id: string; vendor_name: string; tax_id: string | null; total_paid: string };
 
@@ -15,13 +16,18 @@ export default function TenNinetyNineReportPage() {
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/reports/1099`, { params: { year } }).then(r => setRows(r.data.rows)); }, [bizId, year]);
   if (!bizId) return <div>Pick a business.</div>;
   const total = rows.reduce((acc, r) => acc + parseFloat(r.total_paid), 0);
+  const dlHeaders = ['Vendor', 'Tax ID', 'Total Paid'];
+  const dlRows = () => rows.map(r => [r.vendor_name, r.tax_id ?? '—', r.total_paid]);
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold">1099 Report</h1>
-        <div>
-          <Label>Year</Label>
-          <Input type="number" value={year} onChange={e => setYear(parseInt(e.target.value, 10) || new Date().getFullYear())} />
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <Label>Year</Label>
+            <Input type="number" value={year} onChange={e => setYear(parseInt(e.target.value, 10) || new Date().getFullYear())} />
+          </div>
+          <DownloadButtons headers={dlHeaders} getRows={dlRows} filename={`1099-${year}`} title={`1099 Report — ${year}`} />
         </div>
       </div>
       <Card><CardContent className="p-0">

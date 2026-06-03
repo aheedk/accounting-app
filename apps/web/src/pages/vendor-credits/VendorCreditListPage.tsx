@@ -42,6 +42,7 @@ export default function VendorCreditListPage() {
           columns={columns}
           defaultSortKey="credit_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'vendor-credits', title: 'Vendor Credits' }}
           actions={r => (
             <span className="inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/ap/vendor-credits/${r.id}`}>View/Edit</Link>

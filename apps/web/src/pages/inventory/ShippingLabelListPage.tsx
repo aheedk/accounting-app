@@ -138,6 +138,7 @@ export default function ShippingLabelListPage() {
               columns={columns}
               defaultSortKey="shipped_at"
               defaultSortDir="desc"
+              downloadable={{ filename: 'shipping-labels', title: 'Shipping Labels' }}
               actions={r => (
                 <Button
                   size="sm"

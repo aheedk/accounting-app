@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { downloadAsExcel, downloadAsPdf } from '@/lib/download';
 
 export type Column<T> = {
   key: string;
@@ -20,6 +22,7 @@ export interface DataTableProps<T> {
   actions?: (row: T) => ReactNode;
   actionsHeader?: ReactNode;
   emptyMessage?: string;
+  downloadable?: { filename: string; title: string };
 }
 
 export function DataTable<T>({
@@ -32,11 +35,14 @@ export function DataTable<T>({
   actions,
   actionsHeader,
   emptyMessage = 'No records.',
+  downloadable,
 }: DataTableProps<T>) {
   const firstSortable = columns.find(c => c.sortable);
   const [sortKey, setSortKey] = useState<string>(defaultSortKey ?? firstSortable?.key ?? '');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSortDir);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [excelBusy, setExcelBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const sortedRows = useMemo(() => {
     const col = columns.find(c => c.key === sortKey);
@@ -69,7 +75,33 @@ export function DataTable<T>({
 
   const colSpan = (selectable ? 1 : 0) + columns.length + (actions ? 1 : 0);
 
+  function handleDownload(format: 'excel' | 'pdf') {
+    if (!downloadable) return;
+    const headers = columns.map(c => c.header);
+    const exportRows = sortedRows.map(row =>
+      columns.map(col => (col.sortValue ? String(col.sortValue(row)) : '')),
+    );
+    if (format === 'excel') {
+      setExcelBusy(true);
+      try { downloadAsExcel(headers, exportRows, downloadable.filename); } finally { setExcelBusy(false); }
+    } else {
+      setPdfBusy(true);
+      try { downloadAsPdf(headers, exportRows, downloadable.title, downloadable.filename); } finally { setPdfBusy(false); }
+    }
+  }
+
   return (
+    <>
+      {downloadable && (
+        <div className="flex justify-end gap-2 border-b px-3 py-2">
+          <Button size="sm" variant="outline" disabled={excelBusy} onClick={() => handleDownload('excel')}>
+            {excelBusy ? 'Downloading…' : 'Download Excel'}
+          </Button>
+          <Button size="sm" variant="outline" disabled={pdfBusy} onClick={() => handleDownload('pdf')}>
+            {pdfBusy ? 'Downloading…' : 'Download PDF'}
+          </Button>
+        </div>
+      )}
     <table className="w-full text-sm">
       <thead className="border-b">
         <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -130,5 +162,6 @@ export function DataTable<T>({
         )}
       </tbody>
     </table>
+    </>
   );
 }

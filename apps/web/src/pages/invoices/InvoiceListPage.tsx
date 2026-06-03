@@ -80,6 +80,7 @@ export default function InvoiceListPage() {
           columns={columns}
           defaultSortKey="issue_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'invoices', title: 'Invoices' }}
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="inline-flex items-center gap-2">

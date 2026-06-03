@@ -4,9 +4,9 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type CashFlowLine = {
   entry_date: string;
@@ -142,6 +142,12 @@ export default function CashFlowPage() {
 
       {report && (
         <>
+          <DownloadButtons
+            headers={['Date', 'Source', 'Memo', 'Debit', 'Credit', 'Net', 'Running Balance']}
+            getRows={() => report.lines.map(l => [l.entry_date, l.source_type, l.memo ?? '', l.debit, l.credit, l.net_amount, l.running_balance])}
+            filename={`cash-flow-${periodStart}-${periodEnd}`}
+            title={`Cash Flow — ${periodStart} to ${periodEnd}`}
+          />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Beginning Balance</CardTitle></CardHeader>

@@ -4,6 +4,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 // Read-only payroll-side view of 1099 contractors. W-9 management lives on the
 // AP Contractors page; this page focuses on initiating payment via a Bill.
@@ -69,7 +70,23 @@ export default function PayrollContractorsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Payroll Contractors</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Payroll Contractors</h1>
+          <DownloadButtons
+            headers={['Name', 'Email', 'Tax ID Type', 'Tax ID (last 4)', '1099 Status']}
+            getRows={() =>
+              items.map(c => [
+                c.name,
+                c.email ?? '',
+                c.tax_id_type ?? '—',
+                c.tax_id_last_four ?? '—',
+                c.is_1099 ? 'Active 1099' : 'Inactive',
+              ])
+            }
+            filename="payroll-contractors"
+            title="Payroll Contractors"
+          />
+        </div>
         <p className="text-sm text-muted-foreground">
           1099 contractors paid through payroll. To manage W-9 details (tax ID, type, 1099
           flag), use the{' '}

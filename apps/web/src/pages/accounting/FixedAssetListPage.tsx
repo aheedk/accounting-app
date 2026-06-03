@@ -91,6 +91,7 @@ export default function FixedAssetListPage() {
               columns={columns}
               defaultSortKey="purchase_date"
               defaultSortDir="desc"
+              downloadable={{ filename: 'fixed-assets', title: 'Fixed Assets' }}
               actions={r => (
                 <Link className="text-primary hover:underline" to={`/accounting/fixed-assets/${r.id}`}>
                   View/Edit

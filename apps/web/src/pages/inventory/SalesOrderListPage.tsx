@@ -198,6 +198,7 @@ export default function SalesOrderListPage() {
               columns={columns}
               defaultSortKey="order_date"
               defaultSortDir="desc"
+              downloadable={{ filename: 'sales-orders', title: 'Sales Orders' }}
               actions={r => {
                 const canFulfill = r.status === 'draft' || r.status === 'confirmed';
                 const canVoid = r.status !== 'fulfilled' && r.status !== 'void';

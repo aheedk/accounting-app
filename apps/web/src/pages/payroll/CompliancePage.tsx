@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type ItemKey =
   | 'state_registration'
@@ -196,7 +197,22 @@ export default function CompliancePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Compliance</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Compliance</h1>
+        <DownloadButtons
+          headers={['Item', 'Status', 'Due Date', 'Notes']}
+          getRows={() =>
+            items.map(i => [
+              ITEM_LABELS[i.item_key],
+              STATUS_LABELS[i.status],
+              i.due_date ?? '—',
+              i.notes ?? '',
+            ])
+          }
+          filename="payroll-compliance"
+          title="Compliance"
+        />
+      </div>
 
       {err && (
         <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">

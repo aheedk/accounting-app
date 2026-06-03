@@ -148,6 +148,7 @@ export default function BankAccountListPage() {
             columns={columns}
             defaultSortKey="name"
             defaultSortDir="asc"
+            downloadable={{ filename: 'bank-accounts', title: 'Bank Accounts' }}
             emptyMessage="No bank accounts."
           />
         </CardContent>

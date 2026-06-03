@@ -44,6 +44,7 @@ export default function JournalListPage() {
           columns={columns}
           defaultSortKey="entry_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'journal-entries', title: 'Journal Entries' }}
           actions={r => (
             <span className="inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/journal/${r.id}`}>View/Edit</Link>

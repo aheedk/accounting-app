@@ -111,6 +111,7 @@ export default function ItemReceiptListPage() {
               columns={columns}
               defaultSortKey="receipt_date"
               defaultSortDir="desc"
+              downloadable={{ filename: 'item-receipts', title: 'Item Receipts' }}
               emptyMessage="No item receipts yet. Receive against a sent purchase order to record one."
             />
           )}

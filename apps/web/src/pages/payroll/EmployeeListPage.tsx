@@ -6,6 +6,16 @@ import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
+
+const IMPORT_COLS = [
+  { key: 'full_name', header: 'Full Name', required: true },
+  { key: 'email', header: 'Email' },
+  { key: 'phone', header: 'Phone' },
+  { key: 'hire_date', header: 'Hire Date', required: true },
+  { key: 'default_pay_rate_cents', header: 'Pay Rate (cents)' },
+  { key: 'default_pay_frequency', header: 'Pay Frequency' },
+];
 
 type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
@@ -160,17 +170,33 @@ export default function EmployeeListPage() {
     },
   ];
 
+  async function importRow(row: Record<string, string>) {
+    await api.post(`/businesses/${bizId}/employees`, {
+      full_name: row['full_name'],
+      email: row['email'] || null,
+      phone: row['phone'] || null,
+      hire_date: row['hire_date'],
+      default_pay_rate_cents: row['default_pay_rate_cents'] ? parseInt(row['default_pay_rate_cents'], 10) : undefined,
+      default_pay_frequency: row['default_pay_frequency'] || undefined,
+    });
+  }
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Employees</h1>
-        {isFirmAdmin && (
-          <Button asChild>
-            <Link to="/payroll/employees/new">Add employee</Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isFirmAdmin && (
+            <UploadExcelButton columns={IMPORT_COLS} entityName="Employees" onImportRow={importRow} onDone={reload} />
+          )}
+          {isFirmAdmin && (
+            <Button asChild>
+              <Link to="/payroll/employees/new">Add employee</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -186,6 +212,7 @@ export default function EmployeeListPage() {
               columns={columns}
               defaultSortKey="full_name"
               defaultSortDir="asc"
+              downloadable={{ filename: 'employees', title: 'Employees' }}
               actions={r => {
                 const showRevealed = reveal && reveal.id === r.id;
                 return (

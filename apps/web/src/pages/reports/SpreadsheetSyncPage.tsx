@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DateInput } from '@/components/ui/date-input';
@@ -40,23 +41,10 @@ async function fetchAndParseCSV(url: string, params: Record<string, string>): Pr
 async function downloadExcel(url: string, params: Record<string, string>, filename: string) {
   const rows = await fetchAndParseCSV(url, params);
   const [header, ...body] = rows;
-  const thStyle = 'border:1px solid #ccc;padding:6px 10px;background:#f0f0f0;font-weight:bold;text-align:left';
-  const tdStyle = 'border:1px solid #ccc;padding:6px 10px';
-  const ths = (header ?? []).map(h => `<th style="${thStyle}">${h}</th>`).join('');
-  const trs = body
-    .filter(r => r.some(c => c.trim() !== ''))
-    .map(row => `<tr>${row.map(cell => `<td style="${tdStyle}">${cell}</td>`).join('')}</tr>`)
-    .join('');
-  const html = `<html><body><table style="border-collapse:collapse;font-family:sans-serif;font-size:12px"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></body></html>`;
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-  const objUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = objUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+  const ws = XLSX.utils.aoa_to_sheet([header ?? [], ...body.filter(r => r.some(c => c.trim() !== ''))]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
 }
 
 async function downloadPdf(url: string, params: Record<string, string>, title: string, filename: string) {
@@ -100,7 +88,7 @@ export default function SpreadsheetSyncPage() {
       if (jeTo) params.to = jeTo;
       const label = `${jeFrom || 'all'}-to-${jeTo || 'all'}`;
       if (format === 'excel') {
-        await downloadExcel(url, params, `journal-entries-${label}.xls`);
+        await downloadExcel(url, params, `journal-entries-${label}.xlsx`);
       } else {
         await downloadPdf(url, params, `Journal Entry Lines — ${label}`, `journal-entries-${label}.pdf`);
       }

@@ -5,9 +5,9 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type BsLine = {
   account_id: string;
@@ -81,11 +81,23 @@ export default function BalanceSheetPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
 
+  const dlHeaders = ['Section', 'Code', 'Account', 'Amount'];
+  const dlRows = () => [
+    ...report.asset_lines.map(l => ['Assets', l.account_code, l.account_name, l.amount]),
+    ['Assets', '', 'Total Assets', report.assets_total],
+    ...report.liability_lines.map(l => ['Liabilities', l.account_code, l.account_name, l.amount]),
+    ['Liabilities', '', 'Total Liabilities', report.liabilities_total],
+    ...report.equity_lines.map(l => ['Equity', l.account_code, l.account_name, l.amount]),
+    ['Equity', '—', 'Net Income YTD', report.net_income_ytd],
+    ['Equity', '', 'Total Equity + Net Income', equityPlusNi],
+    ['', '', 'Total Liabilities + Equity', report.liabilities_equity_total],
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Balance Sheet</h1>
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <div>
             <Label>As of</Label>
             <DateInput value={asOf} onChange={e => setAsOf(e.target.value)} />
@@ -93,6 +105,7 @@ export default function BalanceSheetPage() {
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </Button>
+          <DownloadButtons headers={dlHeaders} getRows={dlRows} filename={`balance-sheet-${asOf}`} title={`Balance Sheet — ${asOf}`} />
         </div>
       </div>
 

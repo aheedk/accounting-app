@@ -43,6 +43,7 @@ export default function BillPaymentListPage() {
           columns={columns}
           defaultSortKey="payment_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'bill-payments', title: 'Bill Payments' }}
           actions={r => (
             <span className="inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/ap/bill-payments/${r.id}`}>View/Edit</Link>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type Period = 'monthly' | 'quarterly' | 'annual';
 type Status = 'accrued' | 'paid';
@@ -182,7 +183,15 @@ export default function PayrollTaxesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Payroll Taxes</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Payroll Taxes</h1>
+        <DownloadButtons
+          headers={['Period', 'Start', 'End', 'Amount', 'Status', 'Notes']}
+          getRows={() => liabilities.map(l => [l.period, l.period_start, l.period_end, l.amount, l.status, l.notes ?? ''])}
+          filename="payroll-taxes"
+          title="Payroll Tax Liabilities"
+        />
+      </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
 

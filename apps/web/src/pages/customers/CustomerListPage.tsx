@@ -7,6 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
+import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
+
+const IMPORT_COLS = [
+  { key: 'name', header: 'Name', required: true },
+  { key: 'company_name', header: 'Company Name' },
+  { key: 'email', header: 'Email' },
+  { key: 'phone', header: 'Phone' },
+  { key: 'default_terms_days', header: 'Terms Days' },
+];
 
 type Customer = {
   id: string;
@@ -22,10 +31,13 @@ export default function CustomerListPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<Customer[]>([]);
 
-  useEffect(() => {
+  async function reload() {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/customers`).then(r => setItems(r.data.customers));
-  }, [bizId]);
+    const r = await api.get(`/businesses/${bizId}/customers`);
+    setItems(r.data.customers);
+  }
+
+  useEffect(() => { reload(); }, [bizId]);
 
   const columns: Column<Customer>[] = [
     { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <Link className="font-medium hover:underline" to={`/customers/${r.id}`}>{r.name}</Link> },
@@ -34,12 +46,25 @@ export default function CustomerListPage() {
     { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => Number(r.open_balance ?? 0), render: r => <span className="font-mono">{fmtMoney((r.open_balance ?? '0').toString())}</span> },
   ];
 
+  async function importRow(row: Record<string, string>) {
+    await api.post(`/businesses/${bizId}/customers`, {
+      name: row['name'],
+      company_name: row['company_name'] || null,
+      email: row['email'] || null,
+      phone: row['phone'] || null,
+      default_terms_days: row['default_terms_days'] ? parseInt(row['default_terms_days'], 10) : undefined,
+    });
+  }
+
   if (!bizId) return <div>Pick a business.</div>;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Customers</h1>
-        <Button asChild><Link to="/customers/new">New customer</Link></Button>
+        <div className="flex items-center gap-2">
+          <UploadExcelButton columns={IMPORT_COLS} entityName="Customers" onImportRow={importRow} onDone={reload} />
+          <Button asChild><Link to="/customers/new">New customer</Link></Button>
+        </div>
       </div>
       <Card><CardContent className="p-0">
         <DataTable
@@ -48,6 +73,7 @@ export default function CustomerListPage() {
           columns={columns}
           defaultSortKey="name"
           defaultSortDir="asc"
+          downloadable={{ filename: 'customers', title: 'Customers' }}
           actions={r => {
             const hasBalance = Number(r.open_balance ?? 0) > 0;
             return (

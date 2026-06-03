@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 
@@ -197,7 +198,15 @@ export default function RecurringTransactionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Recurring Transactions</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Recurring Transactions</h1>
+        <DownloadButtons
+          headers={['Name', 'Type', 'Next Run', 'Last Run', 'Active']}
+          getRows={() => templates.map(t => [t.name, t.template_type, t.next_run_date, t.last_run_at ?? '—', t.is_active ? 'Yes' : 'No'])}
+          filename="recurring-transactions"
+          title="Recurring Transactions"
+        />
+      </div>
 
       <Card>
         <CardHeader>

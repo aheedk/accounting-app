@@ -172,6 +172,7 @@ export default function PurchaseOrderListPage() {
             columns={columns}
             defaultSortKey="order_date"
             defaultSortDir="desc"
+            downloadable={{ filename: 'purchase-orders', title: 'Purchase Orders' }}
             actions={r => (
               <span className="inline-flex items-center gap-3">
                 <Link className="text-primary underline" to={`/inventory/purchase-orders/${r.id}`}>

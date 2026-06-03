@@ -42,6 +42,7 @@ export default function CreditMemoListPage() {
           columns={columns}
           defaultSortKey="memo_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'credit-memos', title: 'Credit Memos' }}
           actions={r => (
             <span className="inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/credit-memos/${r.id}`}>View/Edit</Link>

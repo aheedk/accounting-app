@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type CostCenter = {
   id: string;
@@ -135,11 +136,19 @@ export default function CostCentersPage() {
             for now this is master data only.
           </p>
         </div>
-        {canEdit && (
-          <Button onClick={() => setShowCreate(s => !s)}>
-            {showCreate ? 'Cancel' : 'Add cost center'}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <DownloadButtons
+            headers={['Name', 'Code', 'Active']}
+            getRows={() => items.map(c => [c.name, c.code ?? '', c.is_active ? 'Yes' : 'No'])}
+            filename="cost-centers"
+            title="Cost Centers"
+          />
+          {canEdit && (
+            <Button onClick={() => setShowCreate(s => !s)}>
+              {showCreate ? 'Cancel' : 'Add cost center'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}

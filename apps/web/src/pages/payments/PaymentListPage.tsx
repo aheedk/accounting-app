@@ -43,6 +43,7 @@ export default function PaymentListPage() {
           columns={columns}
           defaultSortKey="payment_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'payments', title: 'Payments' }}
           actions={r => (
             <span className="inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/payments/${r.id}`}>View/Edit</Link>

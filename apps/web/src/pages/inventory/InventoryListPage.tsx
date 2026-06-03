@@ -84,6 +84,7 @@ export default function InventoryListPage() {
               columns={columns}
               defaultSortKey="name"
               defaultSortDir="asc"
+              downloadable={{ filename: 'inventory', title: 'Inventory' }}
               actions={r => (
                 <Link className="text-primary hover:underline" to={`/inventory/items/${r.id}`}>
                   View/Edit

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -330,9 +331,17 @@ export default function RulesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bank Rules</h1>
-        <Button onClick={() => { setShowCreate(s => !s); setErr(null); }}>
-          {showCreate ? 'Cancel' : 'New rule'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <DownloadButtons
+            headers={['Name', 'Description Filter', 'Amount Min', 'Amount Max', 'Sign', 'Priority', 'Active']}
+            getRows={() => rules.map(r => [r.name, r.description_contains, r.min_amount ?? '', r.max_amount ?? '', r.sign_filter, String(r.priority), r.is_active ? 'Yes' : 'No'])}
+            filename="bank-rules"
+            title="Bank Rules"
+          />
+          <Button onClick={() => { setShowCreate(s => !s); setErr(null); }}>
+            {showCreate ? 'Cancel' : 'New rule'}
+          </Button>
+        </div>
       </div>
 
       <Card>

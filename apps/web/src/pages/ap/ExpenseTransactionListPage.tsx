@@ -202,6 +202,7 @@ export default function ExpenseTransactionListPage() {
           columns={columns}
           defaultSortKey="transaction_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'expense-transactions', title: 'Expense Transactions' }}
           actions={r => (
             <span className="inline-flex flex-wrap items-center gap-1">
               <Link to={`/ap/expenses/${r.id}`} className="text-primary underline text-xs">View</Link>

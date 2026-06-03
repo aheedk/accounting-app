@@ -67,6 +67,7 @@ export default function BillListPage() {
           columns={columns}
           defaultSortKey="bill_date"
           defaultSortDir="desc"
+          downloadable={{ filename: 'bills', title: 'Bills' }}
           actions={r => (
             <span className="inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/ap/bills/${r.id}`}>View/Edit</Link>

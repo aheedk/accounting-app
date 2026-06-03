@@ -3,6 +3,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type RevenueByMonth = {
   month: string;
@@ -50,11 +51,22 @@ export default function ManagementReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Management Reports</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Trailing 12-month KPIs sourced from the live ledger.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Management Reports</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Trailing 12-month KPIs sourced from the live ledger.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Revenue by month</span>
+          <DownloadButtons
+            headers={['Month', 'Revenue']}
+            getRows={() => data.revenue_by_month.map(r => [r.month, r.amount])}
+            filename="management-revenue-by-month"
+            title="Revenue by Month (Trailing 12m)"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

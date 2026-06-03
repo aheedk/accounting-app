@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DateInput } from '@/components/ui/date-input';
@@ -30,17 +31,10 @@ async function fetchCSV(url: string, params: Record<string, string>): Promise<st
 async function doDownloadExcel(url: string, params: Record<string, string>, filename: string) {
   const rows = await fetchCSV(url, params);
   const [header, ...body] = rows;
-  const th = 'border:1px solid #ccc;padding:6px 10px;background:#f0f0f0;font-weight:bold;text-align:left';
-  const td = 'border:1px solid #ccc;padding:6px 10px';
-  const ths = (header ?? []).map(h => `<th style="${th}">${h}</th>`).join('');
-  const trs = body.filter(r => r.some(c => c.trim())).map(row => `<tr>${row.map(c => `<td style="${td}">${c}</td>`).join('')}</tr>`).join('');
-  const blob = new Blob(
-    [`<html><body><table style="border-collapse:collapse;font-family:sans-serif;font-size:12px"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></body></html>`],
-    { type: 'application/vnd.ms-excel' },
-  );
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename });
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const ws = XLSX.utils.aoa_to_sheet([header ?? [], ...body.filter(r => r.some(c => c.trim()))]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
 }
 
 async function doDownloadPdf(url: string, params: Record<string, string>, title: string, filename: string) {
@@ -78,7 +72,7 @@ export default function TrialBalancePage() {
       const url = `/businesses/${bizId}/csv-exports/trial-balance`;
       const params = { as_of: asOf };
       if (format === 'excel') {
-        await doDownloadExcel(url, params, `trial-balance-${asOf}.xls`);
+        await doDownloadExcel(url, params, `trial-balance-${asOf}.xlsx`);
       } else {
         await doDownloadPdf(url, params, `Trial Balance — ${asOf}`, `trial-balance-${asOf}.pdf`);
       }

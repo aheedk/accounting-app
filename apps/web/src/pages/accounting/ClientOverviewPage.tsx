@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type FirmRow = {
   business_id: string;
@@ -56,9 +57,22 @@ export default function ClientOverviewPage() {
     navigate('/');
   }
 
+  const dlHeaders = ['Business', 'AR Balance', 'AP Balance', 'Unreviewed Bank Txns', 'Open Periods', 'Last Reconciliation'];
+  const dlRows = () => rows.map(r => [
+    r.business_name,
+    r.ar_balance,
+    r.ap_balance,
+    String(r.unreviewed_bank_txn_count),
+    String(r.open_period_count),
+    r.last_reconciliation_date ?? '—',
+  ]);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Client Overview</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Client Overview</h1>
+        <DownloadButtons headers={dlHeaders} getRows={dlRows} filename="client-overview" title="Client Overview" />
+      </div>
 
       <Card>
         <CardHeader>

@@ -4,6 +4,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
 type Period = { id: string; starts_on: string; ends_on: string; status: 'open' | 'closed'; closed_at: string | null };
 
@@ -64,7 +65,15 @@ export default function PeriodsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Fiscal Periods</h1>
-        <Button onClick={seedYear}>Seed a year</Button>
+        <div className="flex items-center gap-2">
+          <DownloadButtons
+            headers={['Start', 'End', 'Status', 'Closed At']}
+            getRows={() => periods.map(p => [p.starts_on, p.ends_on, p.status, p.closed_at ?? '—'])}
+            filename="fiscal-periods"
+            title="Fiscal Periods"
+          />
+          <Button onClick={seedYear}>Seed a year</Button>
+        </div>
       </div>
       {err && <p className="text-sm text-destructive">{err}</p>}
       <Card><CardContent className="p-0">
