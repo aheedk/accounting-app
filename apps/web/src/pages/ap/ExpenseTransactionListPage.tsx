@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown, Settings, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import type { Role } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
@@ -28,6 +28,8 @@ type ExpenseTransaction = {
 };
 
 type ListResponse = { expense_transactions: ExpenseTransaction[] };
+type Vendor = { id: string; name: string };
+type Account = { id: string; name: string };
 
 const ROLE_RANK: Record<Role, number> = {
   client: 0,
@@ -49,11 +51,18 @@ function pickErr(e: unknown): string {
 }
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'All transactions' },
   { value: 'draft', label: 'Draft' },
   { value: 'posted', label: 'Posted' },
   { value: 'void', label: 'Void' },
 ];
+
+const DATE_RANGES = [
+  { value: '30d', label: 'Last 30 days', days: 30 },
+  { value: '3m', label: 'Last 3 months', days: 92 },
+  { value: '12m', label: 'Last 12 months', days: 365 },
+  { value: 'all', label: 'All dates', days: 0 },
+] as const;
 
 function statusBadge(status: ExpenseStatus) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
@@ -74,6 +83,9 @@ function fmtShortDate(iso: string) {
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
+function isoDaysAgo(days: number) {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
 
 export default function ExpenseTransactionListPage() {
   const [bizId] = useActiveBusinessId();
@@ -81,14 +93,15 @@ export default function ExpenseTransactionListPage() {
   const canMutate = roleAtLeast(user?.role, 'accountant');
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [dateFilter, setDateFilter] = useState<string>('12m');
   const [items, setItems] = useState<ExpenseTransaction[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
     if (!bizId) { setItems([]); return; }
-    setLoading(true);
     setErr(null);
     try {
       const params: { status?: ExpenseStatus } = {};
@@ -97,12 +110,18 @@ export default function ExpenseTransactionListPage() {
       setItems(r.data.expense_transactions);
     } catch (e: unknown) {
       setErr(pickErr(e));
-    } finally {
-      setLoading(false);
     }
   }, [bizId, statusFilter]);
 
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}/vendors`).then(r => setVendors(r.data.vendors));
+    api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts));
+  }, [bizId]);
+
+  const vendorMap = useMemo(() => new Map(vendors.map(v => [v.id, v.name])), [vendors]);
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, a.name])), [accounts]);
 
   async function postExpense(t: ExpenseTransaction) {
     if (!bizId) return;
@@ -132,89 +151,94 @@ export default function ExpenseTransactionListPage() {
     }
   }
 
-  const columns: Column<ExpenseTransaction>[] = [
-    {
-      key: 'transaction_date',
-      header: 'Date',
-      sortable: true,
-      sortValue: r => Date.parse(r.transaction_date) || 0,
-      render: r => <span className="whitespace-nowrap">{fmtShortDate(r.transaction_date)}</span>,
-    },
-    {
-      key: 'payee',
-      header: 'Payee',
-      sortable: true,
-      sortValue: r => r.payee_text ?? '',
-      render: r => r.payee_text ?? <span className="text-muted-foreground">(vendor)</span>,
-    },
-    {
-      key: 'amount',
-      header: 'Amount',
-      align: 'right',
-      sortable: true,
-      sortValue: r => Number(r.amount),
-      render: r => <span className="font-mono">{fmtMoney(r.amount)}</span>,
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      sortable: true,
-      sortValue: r => r.status,
-      render: r => statusBadge(r.status),
-    },
+  type Row = ExpenseTransaction & { payee_name: string; category_name: string };
+  const rows: Row[] = useMemo(() => {
+    const range = DATE_RANGES.find(r => r.value === dateFilter);
+    const cutoff = range && range.days > 0 ? isoDaysAgo(range.days) : '';
+    return items
+      .filter(t => !cutoff || t.transaction_date >= cutoff)
+      .map(t => ({
+        ...t,
+        payee_name: t.payee_text ?? (t.vendor_id ? vendorMap.get(t.vendor_id) ?? '' : ''),
+        category_name: accountMap.get(t.expense_account_id) ?? '',
+      }));
+  }, [items, dateFilter, vendorMap, accountMap]);
+
+  const columns: Column<Row>[] = [
+    { key: 'transaction_date', header: 'Date', sortable: true, sortValue: r => r.transaction_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.transaction_date)}</span> },
+    { key: 'type', header: 'Type', sortable: false, render: () => 'Expense' },
+    { key: 'payee', header: 'Payee', sortable: true, sortValue: r => r.payee_name, render: r => r.payee_name || <span className="text-muted-foreground">—</span> },
+    { key: 'category', header: 'Category', sortable: true, sortValue: r => r.category_name, render: r => r.category_name || <span className="text-muted-foreground">—</span> },
+    { key: 'amount', header: 'Total', align: 'right', sortable: true, sortValue: r => Number(r.amount), render: r => <span className="font-mono">{fmtMoney(r.amount)}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.status, render: r => statusBadge(r.status) },
   ];
+
+  const range = DATE_RANGES.find(r => r.value === dateFilter);
 
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Expense Transactions</h1>
-        <Button asChild><Link to="/ap/expenses/new">+ New Expense</Link></Button>
+        <h1 className="text-2xl font-semibold">Expenses</h1>
+        <Button asChild><Link to="/ap/expenses/new">New transaction</Link></Button>
       </div>
 
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-          <div>
-            <Label>Status</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="outline" onClick={() => reload()} disabled={loading}>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+        >
+          {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={dateFilter}
+          onChange={e => setDateFilter(e.target.value)}
+        >
+          {DATE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        {range && range.days > 0 && (
+          <span className="inline-flex h-9 items-center gap-2 rounded-full border bg-muted/40 px-3 text-sm">
+            Dates: <span className="font-medium">{range.label}</span>
+            <button type="button" aria-label="Clear date filter" onClick={() => setDateFilter('all')}>
+              <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+            </button>
+          </span>
+        )}
+      </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
 
       <Card><CardContent className="p-0">
         <DataTable
-          rows={items}
+          rows={rows}
           getRowId={r => r.id}
           columns={columns}
           defaultSortKey="transaction_date"
           defaultSortDir="desc"
-          downloadable={{ filename: 'expense-transactions', title: 'Expense Transactions' }}
+          downloadable={{ filename: 'expense-transactions', title: 'Expenses' }}
+          actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
-            <span className="inline-flex flex-wrap items-center gap-1">
-              <Link to={`/ap/expenses/${r.id}`} className="text-primary underline text-xs">View</Link>
+            <span className="inline-flex items-center gap-2">
+              <Link className="text-primary hover:underline" to={`/ap/expenses/${r.id}`}>View/Edit</Link>
               {canMutate && r.status === 'draft' && (
-                <Button size="sm" variant="outline" onClick={() => postExpense(r)} disabled={busy}>Post</Button>
+                <>
+                  <span className="text-muted-foreground/50">|</span>
+                  <button type="button" className="text-primary hover:underline" onClick={() => postExpense(r)} disabled={busy}>Post</button>
+                </>
               )}
               {canMutate && (r.status === 'draft' || r.status === 'posted') && (
-                <Button size="sm" variant="ghost" onClick={() => voidExpense(r)} disabled={busy}>Void</Button>
+                <>
+                  <span className="text-muted-foreground/50">|</span>
+                  <button type="button" className="text-primary hover:underline" onClick={() => voidExpense(r)} disabled={busy}>Void</button>
+                </>
               )}
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No expense transactions match the current filter."
+          emptyMessage="No results found."
         />
       </CardContent></Card>
     </div>
