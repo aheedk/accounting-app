@@ -16,6 +16,25 @@ export type CreateVendorInput = {
   is_1099?: boolean;
   tax_id?: string | null;        // plaintext; service encrypts
   tax_id_type?: 'SSN' | 'EIN' | null;
+  // QBO-style expanded fields (mirrors customers).
+  company_name?: string | null;
+  title?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  suffix?: string | null;
+  email_cc?: string | null;
+  email_bcc?: string | null;
+  mobile?: string | null;
+  fax?: string | null;
+  other_phone?: string | null;
+  website?: string | null;
+  name_on_checks?: string | null;
+  notes?: string | null;
+  account_number?: string | null;
+  default_expense_account_id?: string | null;
+  opening_balance?: string | null;
+  opening_balance_as_of?: string | null;
 };
 
 export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateVendorInput) {
@@ -45,6 +64,24 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
     tax_id_encrypted: Buffer | null;
     tax_id_last_four: string | null;
     tax_id_type: 'SSN' | 'EIN' | null;
+    company_name: string | null;
+    title: string | null;
+    first_name: string | null;
+    middle_name: string | null;
+    last_name: string | null;
+    suffix: string | null;
+    email_cc: string | null;
+    email_bcc: string | null;
+    mobile: string | null;
+    fax: string | null;
+    other_phone: string | null;
+    website: string | null;
+    name_on_checks: string | null;
+    notes: string | null;
+    account_number: string | null;
+    default_expense_account_id: string | null;
+    opening_balance: string | null;
+    opening_balance_as_of: string | null;
   } = {
     business_id: input.business_id,
     name: input.name,
@@ -54,6 +91,24 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
     tax_id_encrypted,
     tax_id_last_four,
     tax_id_type,
+    company_name: input.company_name ?? null,
+    title: input.title ?? null,
+    first_name: input.first_name ?? null,
+    middle_name: input.middle_name ?? null,
+    last_name: input.last_name ?? null,
+    suffix: input.suffix ?? null,
+    email_cc: input.email_cc ?? null,
+    email_bcc: input.email_bcc ?? null,
+    mobile: input.mobile ?? null,
+    fax: input.fax ?? null,
+    other_phone: input.other_phone ?? null,
+    website: input.website ?? null,
+    name_on_checks: input.name_on_checks ?? null,
+    notes: input.notes ?? null,
+    account_number: input.account_number ?? null,
+    default_expense_account_id: input.default_expense_account_id ?? null,
+    opening_balance: input.opening_balance ?? null,
+    opening_balance_as_of: input.opening_balance_as_of ?? null,
   };
   if (input.default_terms_days !== undefined) values.default_terms_days = input.default_terms_days;
   if (input.is_1099 !== undefined) values.is_1099 = input.is_1099;
@@ -96,6 +151,24 @@ export async function updateVendor(
     ...(input.patch.billing_address !== undefined ? { billing_address: input.patch.billing_address ?? null } : {}),
     ...(input.patch.default_terms_days !== undefined ? { default_terms_days: input.patch.default_terms_days } : {}),
     ...(input.patch.is_1099 !== undefined ? { is_1099: input.patch.is_1099 } : {}),
+    ...(input.patch.company_name !== undefined ? { company_name: input.patch.company_name ?? null } : {}),
+    ...(input.patch.title !== undefined ? { title: input.patch.title ?? null } : {}),
+    ...(input.patch.first_name !== undefined ? { first_name: input.patch.first_name ?? null } : {}),
+    ...(input.patch.middle_name !== undefined ? { middle_name: input.patch.middle_name ?? null } : {}),
+    ...(input.patch.last_name !== undefined ? { last_name: input.patch.last_name ?? null } : {}),
+    ...(input.patch.suffix !== undefined ? { suffix: input.patch.suffix ?? null } : {}),
+    ...(input.patch.email_cc !== undefined ? { email_cc: input.patch.email_cc ?? null } : {}),
+    ...(input.patch.email_bcc !== undefined ? { email_bcc: input.patch.email_bcc ?? null } : {}),
+    ...(input.patch.mobile !== undefined ? { mobile: input.patch.mobile ?? null } : {}),
+    ...(input.patch.fax !== undefined ? { fax: input.patch.fax ?? null } : {}),
+    ...(input.patch.other_phone !== undefined ? { other_phone: input.patch.other_phone ?? null } : {}),
+    ...(input.patch.website !== undefined ? { website: input.patch.website ?? null } : {}),
+    ...(input.patch.name_on_checks !== undefined ? { name_on_checks: input.patch.name_on_checks ?? null } : {}),
+    ...(input.patch.notes !== undefined ? { notes: input.patch.notes ?? null } : {}),
+    ...(input.patch.account_number !== undefined ? { account_number: input.patch.account_number ?? null } : {}),
+    ...(input.patch.default_expense_account_id !== undefined ? { default_expense_account_id: input.patch.default_expense_account_id ?? null } : {}),
+    ...(input.patch.opening_balance !== undefined ? { opening_balance: input.patch.opening_balance ?? null } : {}),
+    ...(input.patch.opening_balance_as_of !== undefined ? { opening_balance_as_of: input.patch.opening_balance_as_of ?? null } : {}),
     ...taxIdPatch,
   }).where('id', '=', input.vendor_id).returningAll().executeTakeFirstOrThrow();
 

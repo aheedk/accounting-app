@@ -21,6 +21,14 @@ function ctxFromReq(req: Request): ServiceCtx {
 
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
+// QBO-style expanded vendor fields — all plain `string | null` pass-throughs.
+const EXPANDED_VENDOR_FIELDS = [
+  'company_name', 'title', 'first_name', 'middle_name', 'last_name', 'suffix',
+  'email_cc', 'email_bcc', 'mobile', 'fax', 'other_phone', 'website',
+  'name_on_checks', 'notes', 'account_number', 'default_expense_account_id',
+  'opening_balance', 'opening_balance_as_of',
+] as const;
+
 router.get('/businesses/:businessId/vendors', async (req, res, next) => {
   try { res.json({ vendors: await vend.listVendors(db, req.tenancy!.business_id) }); }
   catch (e) { next(e); }
@@ -44,6 +52,10 @@ router.post('/businesses/:businessId/vendors', requireMinRole('staff'), async (r
     if (body.tax_id !== undefined) input.tax_id = body.tax_id ?? null;
     if (body.tax_id_type !== undefined) input.tax_id_type = body.tax_id_type ?? null;
     if (body.default_terms_days !== undefined) input.default_terms_days = body.default_terms_days;
+    if (body.billing_address !== undefined) input.billing_address = body.billing_address ?? null;
+    for (const k of EXPANDED_VENDOR_FIELDS) {
+      if (body[k] !== undefined) input[k] = body[k] ?? null;
+    }
     const created = await db.transaction().execute(trx =>
       vend.createVendor(trx, ctxFromReq(req), input),
     );
@@ -62,6 +74,10 @@ router.patch('/businesses/:businessId/vendors/:id', requireMinRole('accountant')
     if (parsed.tax_id !== undefined) patch.tax_id = parsed.tax_id ?? null;
     if (parsed.tax_id_type !== undefined) patch.tax_id_type = parsed.tax_id_type ?? null;
     if (parsed.default_terms_days !== undefined) patch.default_terms_days = parsed.default_terms_days;
+    if (parsed.billing_address !== undefined) patch.billing_address = parsed.billing_address ?? null;
+    for (const k of EXPANDED_VENDOR_FIELDS) {
+      if (parsed[k] !== undefined) patch[k] = parsed[k] ?? null;
+    }
     const updated = await db.transaction().execute(trx =>
       vend.updateVendor(trx, ctxFromReq(req), { vendor_id: req.params['id']!, patch }),
     );
