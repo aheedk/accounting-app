@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
@@ -6,8 +6,9 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
+import { fmtMoney } from '@/lib/money';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -21,12 +22,13 @@ type Account = {
 };
 
 type CoaResponse = { accounts: Account[] };
-
+type Vendor = { id: string; name: string };
 type CreatedExpense = { id: string };
 
 type CreateBody = {
   transaction_date: string;
   payee_text: string | null;
+  vendor_id: string | null;
   expense_account_id: string;
   payment_account_id: string;
   amount: string;
@@ -43,6 +45,7 @@ export default function ExpenseTransactionNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [form, setForm] = useState({
     transaction_date: today(),
     payee_text: '',
@@ -57,144 +60,139 @@ export default function ExpenseTransactionNewPage() {
   useEffect(() => {
     if (!bizId) return;
     api.get<CoaResponse>(`/businesses/${bizId}/coa`).then((r) => setAccounts(r.data.accounts));
+    api.get(`/businesses/${bizId}/vendors`).then((r) => setVendors(r.data.vendors));
   }, [bizId]);
 
-  const expenseAccounts = accounts.filter((a) => a.account_type === 'expense' && a.is_active);
-  const paymentAccounts = accounts.filter(
-    (a) => (a.account_type === 'asset' || a.account_type === 'liability') && a.is_active,
+  const paymentAccounts = useMemo(
+    () => accounts.filter((a) => a.account_type === 'asset' && a.is_active),
+    [accounts],
+  );
+  const expenseAccounts = useMemo(
+    () => accounts.filter((a) => a.account_type === 'expense' && a.is_active),
+    [accounts],
   );
 
-  function buildBody(): CreateBody {
-    if (!AMOUNT_RE.test(form.amount)) {
-      throw new Error('Amount must be a positive number (e.g. 42.50)');
-    }
-    if (!form.expense_account_id) throw new Error('Expense account is required');
-    if (!form.payment_account_id) throw new Error('Payment account is required');
-    if (!form.payee_text.trim()) throw new Error('Payee is required');
-    return {
-      transaction_date: form.transaction_date,
-      payee_text: form.payee_text.trim() === '' ? null : form.payee_text.trim(),
-      expense_account_id: form.expense_account_id,
-      payment_account_id: form.payment_account_id,
-      amount: form.amount,
-      memo: form.memo.trim() === '' ? null : form.memo.trim(),
-    };
-  }
+  const amountNum = Number(form.amount) || 0;
 
-  async function saveDraft(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    if (!AMOUNT_RE.test(form.amount)) { setErr('Amount must be a positive number like 125.00'); return; }
     setBusy(true);
     try {
-      const body = buildBody();
-      await api.post<CreatedExpense>(`/businesses/${bizId}/expense-transactions`, body);
-      nav('/ap/expenses');
-    } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message ??
-        (e instanceof Error ? e.message : undefined);
-      setErr(msg ?? 'Failed to create expense');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveAndPost() {
-    setErr(null);
-    setBusy(true);
-    try {
-      const body = buildBody();
+      // QBO payee combo: an exact vendor-name match links the vendor, otherwise free text.
+      const vendor = vendors.find((v) => v.name.toLowerCase() === form.payee_text.trim().toLowerCase());
+      const body: CreateBody = {
+        transaction_date: form.transaction_date,
+        payee_text: vendor ? null : (form.payee_text || null),
+        vendor_id: vendor?.id ?? null,
+        expense_account_id: form.expense_account_id,
+        payment_account_id: form.payment_account_id,
+        amount: form.amount,
+        memo: form.memo || null,
+      };
       const r = await api.post<CreatedExpense>(`/businesses/${bizId}/expense-transactions`, body);
-      await api.post(`/businesses/${bizId}/expense-transactions/${r.data.id}/post`);
-      nav('/ap/expenses');
+      nav(`/ap/expenses/${r.data.id}`);
     } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message ??
-        (e instanceof Error ? e.message : undefined);
-      setErr(msg ?? 'Failed to create or post expense');
-    } finally {
-      setBusy(false);
-    }
+      const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
+      setErr(msg ?? 'Failed');
+    } finally { setBusy(false); }
   }
 
   if (!bizId) return <div>Pick a business.</div>;
-
   return (
-    <form className="space-y-6 max-w-2xl" onSubmit={saveDraft}>
-      <h1 className="text-2xl font-semibold">New Expense Transaction</h1>
-      <Card>
-        <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Date</Label>
-            <DateInput
-              value={form.transaction_date}
-              onChange={(e) => setForm((f) => ({ ...f, transaction_date: e.target.value }))}
-              required
-            />
-          </div>
-          <div>
-            <Label>Amount</Label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              placeholder="42.50"
-              className="text-right font-mono"
-              required
-            />
-          </div>
-          <div className="col-span-2">
-            <Label>Payee</Label>
-            <Input
-              value={form.payee_text}
-              onChange={(e) => setForm((f) => ({ ...f, payee_text: e.target.value }))}
-              placeholder="Vendor or payee name"
-              required
-            />
-          </div>
-          <div>
-            <Label>Expense account (debit)</Label>
-            <AccountSelect
-              accounts={expenseAccounts}
-              value={form.expense_account_id}
-              onChange={(id) => setForm((f) => ({ ...f, expense_account_id: id }))}
-              required
-              placeholder="Search expense account…"
-            />
-          </div>
-          <div>
-            <Label>Payment account (credit)</Label>
-            <AccountSelect
-              accounts={paymentAccounts}
-              value={form.payment_account_id}
-              onChange={(id) => setForm((f) => ({ ...f, payment_account_id: id }))}
-              required
-              placeholder="Search cash or credit account…"
-            />
-          </div>
-          <div className="col-span-2">
-            <Label>Memo</Label>
-            <Input
-              value={form.memo}
-              onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              placeholder="Optional note"
-            />
-          </div>
-        </CardContent>
-      </Card>
+    <form className="space-y-6" onSubmit={submit}>
+      <div className="flex items-start justify-between">
+        <h1 className="text-2xl font-semibold">Expense</h1>
+        <div className="text-right">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Amount</div>
+          <div className="text-3xl font-semibold font-mono">{fmtMoney(String(amountNum))}</div>
+        </div>
+      </div>
+
+      <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-3">
+        <div>
+          <Label className="text-xs text-muted-foreground">Payee</Label>
+          <Input
+            list="expense-payees"
+            value={form.payee_text}
+            onChange={(e) => setForm((f) => ({ ...f, payee_text: e.target.value }))}
+            placeholder="Who did you pay?"
+            required
+          />
+          <datalist id="expense-payees">
+            {vendors.map((v) => <option key={v.id} value={v.name} />)}
+          </datalist>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Payment account</Label>
+          <AccountSelect
+            accounts={paymentAccounts}
+            value={form.payment_account_id}
+            onChange={(id) => setForm((f) => ({ ...f, payment_account_id: id }))}
+            required
+            placeholder="Which account paid?"
+          />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Payment date</Label>
+          <DateInput
+            value={form.transaction_date}
+            onChange={(e) => setForm((f) => ({ ...f, transaction_date: e.target.value }))}
+            required
+          />
+        </div>
+      </CardContent></Card>
+
+      <Card><CardContent className="p-0">
+        <div className="border-b px-6 py-3 text-sm font-semibold">Category details</div>
+        <table className="w-full text-sm">
+          <thead className="border-b">
+            <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <th className="w-10 p-3 text-left">#</th>
+              <th className="p-3 text-left">Category</th>
+              <th className="p-3 text-left">Description</th>
+              <th className="w-40 p-3 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="p-3 text-muted-foreground">1</td>
+              <td className="p-3">
+                <AccountSelect
+                  accounts={expenseAccounts}
+                  value={form.expense_account_id}
+                  onChange={(id) => setForm((f) => ({ ...f, expense_account_id: id }))}
+                  required
+                  placeholder="Choose category…"
+                />
+              </td>
+              <td className="p-3">
+                <Input value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} placeholder="What did you pay for?" />
+              </td>
+              <td className="p-3">
+                <Input
+                  type="number" step="0.01" inputMode="decimal"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="0.00" required
+                  className="text-right font-mono"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="flex justify-end gap-12 border-t px-6 py-4 text-sm font-semibold">
+          <span>Total</span>
+          <span className="font-mono">{fmtMoney(String(amountNum))}</span>
+        </div>
+      </CardContent></Card>
+
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Saving…' : 'Save draft'}
-        </Button>
-        <Button type="button" onClick={saveAndPost} disabled={busy}>
-          {busy ? 'Saving…' : 'Save & Post'}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => nav('/ap/expenses')}>
-          Cancel
-        </Button>
+      <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
+        <Button type="button" variant="outline" onClick={() => nav('/ap/expenses')}>Cancel</Button>
+        <div className="flex-1" />
+        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </div>
     </form>
   );
