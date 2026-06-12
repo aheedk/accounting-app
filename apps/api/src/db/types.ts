@@ -797,6 +797,7 @@ export interface BankTransactionRulesTable {
   max_amount: ColumnType<string | null, string | number | null | undefined, string | number | null>;
   sign_filter: Generated<BankRuleSignFilter>;
   offset_account_id: string;
+  bank_account_id: string | null;
   priority: Generated<number>;
   is_active: Generated<boolean>;
   created_at: Generated<Timestamp>;
