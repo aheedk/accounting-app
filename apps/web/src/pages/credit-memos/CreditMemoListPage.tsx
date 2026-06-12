@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type CreditMemoSummary = {
   id: string;
@@ -147,7 +148,7 @@ export default function CreditMemoListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No matching credit memos found."
+          emptyMessage={<EmptyState title="No matching credit memos" hint="Adjust the filters above, or issue a credit to a customer." actionLabel="New credit memo" actionTo="/credit-memos/new" />}
         />
       </CardContent></Card>
     </div>

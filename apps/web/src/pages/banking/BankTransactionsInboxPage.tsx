@@ -288,39 +288,35 @@ export default function BankTransactionsInboxPage() {
         <Button asChild variant="outline"><Link to="/accounting/bank-transactions/import">Import CSV</Link></Button>
       </div>
 
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-          <div>
-            <Label>Bank account</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={bankAccountId}
-              onChange={e => setBankAccountId(e.target.value)}
-            >
-              {bankAccounts.map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.name}{b.account_last_four ? ` ••${b.account_last_four}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="outline" onClick={() => reload()} disabled={loading}>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Bank account</div>
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={bankAccountId}
+            onChange={e => setBankAccountId(e.target.value)}
+          >
+            {bankAccounts.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.name}{b.account_last_four ? ` ••${b.account_last_four}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Status</div>
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+          >
+            {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => reload()} disabled={loading}>
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </Button>
+      </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
 

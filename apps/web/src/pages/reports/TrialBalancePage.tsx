@@ -5,11 +5,11 @@ import autoTable from 'jspdf-autotable';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney, fmtSigned } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { fmtLongDate, todayLocal } from '@/lib/dates';
 
 function parseCSVLine(line: string): string[] {
   const cells: string[] = [];
@@ -57,6 +57,8 @@ type Row = { account_id: string; code: string; name: string; account_type: strin
 
 export default function TrialBalancePage() {
   const [bizId] = useActiveBusinessId();
+  const { businesses } = useAuth();
+  const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const [asOf, setAsOf] = useState(todayLocal());
   const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState({ total_debit: '0', total_credit: '0' });
@@ -96,7 +98,10 @@ export default function TrialBalancePage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold">Trial Balance</h1>
         <div className="flex flex-wrap items-end gap-2">
-          <div><Label>As of</Label><DateInput value={asOf} onChange={e => setAsOf(e.target.value)} /></div>
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">as of</div>
+            <DateInput value={asOf} onChange={e => setAsOf(e.target.value)} />
+          </div>
           <Button variant="outline" disabled={excelBusy} onClick={() => void handleDownload('excel')}>
             {excelBusy ? 'Downloading…' : 'Download Excel'}
           </Button>
@@ -106,31 +111,38 @@ export default function TrialBalancePage() {
         </div>
       </div>
       {dlErr && <p className="text-sm text-destructive">{dlErr}</p>}
-      <Card><CardContent className="p-0">
+      <ReportCard companyName={bizName} title="Trial Balance" subtitle={`As of ${fmtLongDate(asOf)}`}>
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40">
-            <tr><th className="text-left p-3">Code</th><th className="text-left p-3">Account</th><th className="text-left p-3">Type</th><th className="text-right p-3">Debit</th><th className="text-right p-3">Credit</th><th className="text-right p-3">Net</th></tr>
+          <thead className="border-b">
+            <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <th className="p-3 text-left">Code</th>
+              <th className="p-3 text-left">Account</th>
+              <th className="p-3 text-left">Type</th>
+              <th className="p-3 text-right">Debit</th>
+              <th className="p-3 text-right">Credit</th>
+              <th className="p-3 text-right">Net</th>
+            </tr>
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.account_id} className="border-b last:border-b-0">
+              <tr key={r.account_id} className="border-b hover:bg-muted/30">
                 <td className="p-3 font-mono">{r.code}</td>
                 <td className="p-3">{r.name}</td>
-                <td className="p-3">{r.account_type}</td>
-                <td className="p-3 text-right">{fmtMoney(r.total_debit)}</td>
-                <td className="p-3 text-right">{fmtMoney(r.total_credit)}</td>
-                <td className="p-3 text-right">{fmtSigned(r.net)}</td>
+                <td className="p-3 capitalize">{r.account_type}</td>
+                <td className="p-3 text-right font-mono">{fmtMoney(r.total_debit)}</td>
+                <td className="p-3 text-right font-mono">{fmtMoney(r.total_credit)}</td>
+                <td className="p-3 text-right font-mono">{fmtSigned(r.net)}</td>
               </tr>
             ))}
-            <tr className="font-semibold bg-muted/20">
-              <td colSpan={3} className="p-3 text-right">Totals</td>
-              <td className="p-3 text-right">{fmtMoney(totals.total_debit)}</td>
-              <td className="p-3 text-right">{fmtMoney(totals.total_credit)}</td>
+            <tr className="font-semibold">
+              <td colSpan={3} className="p-3">TOTAL</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(totals.total_debit)}</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(totals.total_credit)}</td>
               <td></td>
             </tr>
           </tbody>
         </table>
-      </CardContent></Card>
+      </ReportCard>
     </div>
   );
 }

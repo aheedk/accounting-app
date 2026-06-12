@@ -10,6 +10,7 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
 import { todayLocal } from '@/lib/dates';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -127,7 +128,7 @@ export default function VendorListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No vendors."
+          emptyMessage={<EmptyState title="No vendors yet" hint="Add a vendor to start tracking bills and expenses." actionLabel="New vendor" actionTo="/ap/vendors/new" />}
         />
       </CardContent></Card>
     </div>

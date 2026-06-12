@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 type StatusFilter = ExpenseStatus | 'all';
@@ -238,7 +239,7 @@ export default function ExpenseTransactionListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No results found."
+          emptyMessage={<EmptyState title="No expenses found" hint="Adjust the filters above, or record money you spent." actionLabel="New transaction" actionTo="/ap/expenses/new" />}
         />
       </CardContent></Card>
     </div>

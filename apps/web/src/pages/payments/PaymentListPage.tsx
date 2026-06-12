@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type PaymentSummary = {
   id: string;
@@ -160,7 +161,7 @@ export default function PaymentListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No matching payments found."
+          emptyMessage={<EmptyState title="No matching payments" hint="Adjust the filters above, or record a customer payment." actionLabel="Record payment" actionTo="/payments/new" />}
         />
       </CardContent></Card>
     </div>

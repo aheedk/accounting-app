@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type BillSummary = { id: string; bill_number: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
 type Vendor = { id: string; name: string };
@@ -162,7 +163,7 @@ export default function BillListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No results found."
+          emptyMessage={<EmptyState title="No bills found" hint="Adjust the filters above, or enter a bill to schedule a payment." actionLabel="Add bill" actionTo="/ap/bills/new" />}
         />
       </CardContent></Card>
     </div>

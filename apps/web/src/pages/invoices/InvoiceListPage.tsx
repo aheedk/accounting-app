@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type InvoiceStatus = 'draft' | 'posted' | 'paid' | 'voided';
 type InvoiceSummary = { id: string; customer_id: string; invoice_number: string; issue_date: string; due_date: string; status: InvoiceStatus; total: string };
@@ -95,7 +96,7 @@ export default function InvoiceListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No invoices."
+          emptyMessage={<EmptyState title="No invoices found" hint="Bill a customer for goods or services." actionLabel="New invoice" actionTo="/invoices/new" />}
         />
       </CardContent></Card>
     </div>

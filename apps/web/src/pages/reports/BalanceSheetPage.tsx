@@ -4,11 +4,11 @@ import { Decimal } from 'decimal.js';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { ReportCard } from '@/components/ui/ReportCard';
+import { useAuth } from '@/auth/useAuth';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
-import { todayLocal } from '@/lib/dates';
+import { fmtLongDate, todayLocal } from '@/lib/dates';
 
 type BsLine = {
   account_id: string;
@@ -50,6 +50,8 @@ const EMPTY_REPORT: BalanceSheetReport = {
 
 export default function BalanceSheetPage() {
   const [bizId] = useActiveBusinessId();
+  const { businesses } = useAuth();
+  const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const [asOf, setAsOf] = useState(todayLocal());
   const [report, setReport] = useState<BalanceSheetReport>(EMPTY_REPORT);
   const [err, setErr] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export default function BalanceSheetPage() {
         <h1 className="text-2xl font-semibold">Balance Sheet</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <Label>As of</Label>
+            <div className="mb-1 text-xs text-muted-foreground">as of</div>
             <DateInput value={asOf} onChange={e => setAsOf(e.target.value)} />
           </div>
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
@@ -126,101 +128,68 @@ export default function BalanceSheetPage() {
         {report.in_balance ? 'In balance ✓' : 'Out of balance'}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader><CardTitle>Assets</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3 w-24">Code</th>
-                  <th className="text-left p-3">Account</th>
-                  <th className="text-right p-3 w-32">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.asset_lines.length === 0 && (
-                  <tr className="border-b last:border-b-0">
-                    <td colSpan={3} className="p-3 text-muted-foreground italic">No asset balances.</td>
-                  </tr>
-                )}
-                {report.asset_lines.map(l => (
-                  <tr key={l.account_id} className="border-b last:border-b-0">
-                    <td className="p-3 font-mono">{l.account_code}</td>
-                    <td className="p-3">{l.account_name}</td>
-                    <td className="p-3 text-right">{fmtMoney(l.amount)}</td>
-                  </tr>
-                ))}
-                <tr className="font-semibold bg-muted/20">
-                  <td colSpan={2} className="p-3 text-right">Total Assets</td>
-                  <td className="p-3 text-right">{fmtMoney(report.assets_total)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+      <ReportCard companyName={bizName} title="Balance Sheet" subtitle={`As of ${fmtLongDate(asOf)}`}>
+        <table className="w-full text-sm">
+          <tbody>
+            <tr className="border-b">
+              <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Assets</td>
+            </tr>
+            {report.asset_lines.length === 0 && (
+              <tr className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">No asset balances.</td></tr>
+            )}
+            {report.asset_lines.map(l => (
+              <tr key={l.account_id} className="border-b hover:bg-muted/30">
+                <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
+                <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
+              </tr>
+            ))}
+            <tr className="border-b font-semibold">
+              <td className="p-3">Total Assets</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(report.assets_total)}</td>
+            </tr>
 
-        <Card>
-          <CardHeader><CardTitle>Liabilities &amp; Equity</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="text-left p-3 w-24">Code</th>
-                  <th className="text-left p-3">Account</th>
-                  <th className="text-right p-3 w-32">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="bg-muted/10 font-medium">
-                  <td colSpan={3} className="p-3 uppercase text-xs tracking-wide text-muted-foreground">Liabilities</td>
-                </tr>
-                {report.liability_lines.length === 0 && (
-                  <tr className="border-b last:border-b-0">
-                    <td colSpan={3} className="p-3 text-muted-foreground italic">No liability balances.</td>
-                  </tr>
-                )}
-                {report.liability_lines.map(l => (
-                  <tr key={l.account_id} className="border-b last:border-b-0">
-                    <td className="p-3 font-mono">{l.account_code}</td>
-                    <td className="p-3">{l.account_name}</td>
-                    <td className="p-3 text-right">{fmtMoney(l.amount)}</td>
-                  </tr>
-                ))}
-                <tr className="border-b font-semibold">
-                  <td colSpan={2} className="p-3 text-right">Total Liabilities</td>
-                  <td className="p-3 text-right">{fmtMoney(report.liabilities_total)}</td>
-                </tr>
+            <tr className="border-b">
+              <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Liabilities</td>
+            </tr>
+            {report.liability_lines.length === 0 && (
+              <tr className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">No liability balances.</td></tr>
+            )}
+            {report.liability_lines.map(l => (
+              <tr key={l.account_id} className="border-b hover:bg-muted/30">
+                <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
+                <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
+              </tr>
+            ))}
+            <tr className="border-b font-semibold">
+              <td className="p-3">Total Liabilities</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(report.liabilities_total)}</td>
+            </tr>
 
-                <tr className="bg-muted/10 font-medium">
-                  <td colSpan={3} className="p-3 uppercase text-xs tracking-wide text-muted-foreground">Equity</td>
-                </tr>
-                {report.equity_lines.map(l => (
-                  <tr key={l.account_id} className="border-b last:border-b-0">
-                    <td className="p-3 font-mono">{l.account_code}</td>
-                    <td className="p-3">{l.account_name}</td>
-                    <td className="p-3 text-right">{fmtMoney(l.amount)}</td>
-                  </tr>
-                ))}
-                <tr className="border-b last:border-b-0">
-                  <td className="p-3 font-mono text-muted-foreground">—</td>
-                  <td className="p-3 italic">Net Income YTD</td>
-                  <td className="p-3 text-right">{fmtMoney(report.net_income_ytd)}</td>
-                </tr>
-                <tr className="border-b font-semibold">
-                  <td colSpan={2} className="p-3 text-right">Total Equity + Net Income</td>
-                  <td className="p-3 text-right">{fmtMoney(equityPlusNi)}</td>
-                </tr>
+            <tr className="border-b">
+              <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Equity</td>
+            </tr>
+            {report.equity_lines.map(l => (
+              <tr key={l.account_id} className="border-b hover:bg-muted/30">
+                <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
+                <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
+              </tr>
+            ))}
+            <tr className="border-b hover:bg-muted/30">
+              <td className="p-3 pl-8 italic">Net Income YTD</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(report.net_income_ytd)}</td>
+            </tr>
+            <tr className="border-b font-semibold">
+              <td className="p-3">Total Equity + Net Income</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(equityPlusNi)}</td>
+            </tr>
 
-                <tr className="font-semibold bg-muted/20">
-                  <td colSpan={2} className="p-3 text-right">Total Liabilities + Equity</td>
-                  <td className="p-3 text-right">{fmtMoney(report.liabilities_equity_total)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      </div>
+            <tr className="font-semibold">
+              <td className="p-3">TOTAL LIABILITIES AND EQUITY</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(report.liabilities_equity_total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ReportCard>
     </div>
   );
 }

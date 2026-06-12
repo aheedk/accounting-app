@@ -21,7 +21,7 @@ export interface DataTableProps<T> {
   selectable?: boolean;
   actions?: (row: T) => ReactNode;
   actionsHeader?: ReactNode;
-  emptyMessage?: string;
+  emptyMessage?: ReactNode;
   downloadable?: { filename: string; title: string };
 }
 

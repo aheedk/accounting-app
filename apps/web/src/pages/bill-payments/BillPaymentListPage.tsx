@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type BillPaymentSummary = {
   id: string;
@@ -160,7 +161,7 @@ export default function BillPaymentListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No matching bill payments found."
+          emptyMessage={<EmptyState title="No matching bill payments" hint="Adjust the filters above, or pay an open bill." actionLabel="Record payment" actionTo="/ap/bill-payments/new" />}
         />
       </CardContent></Card>
     </div>

@@ -4,9 +4,11 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { ReportCard } from '@/components/ui/ReportCard';
+import { useAuth } from '@/auth/useAuth';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { fmtLongDate } from '@/lib/dates';
 
 type CashFlowLine = {
   entry_date: string;
@@ -59,6 +61,8 @@ function netClass(net: string): string {
 
 export default function CashFlowPage() {
   const [bizId] = useActiveBusinessId();
+  const { businesses } = useAuth();
+  const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const [periodStart, setPeriodStart] = useState<string>(defaultPeriodStart());
   const [periodEnd, setPeriodEnd] = useState<string>(defaultPeriodEnd());
   const [cashAccountId, setCashAccountId] = useState<string>('');
@@ -101,44 +105,36 @@ export default function CashFlowPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold">Cash Flow Statement</h1>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <div>
-              <Label>Period start</Label>
-              <DateInput value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
-            </div>
-            <div>
-              <Label>Period end</Label>
-              <DateInput value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
-            </div>
-            <div>
-              <Label>Cash account</Label>
-              <select
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                value={cashAccountId}
-                onChange={e => setCashAccountId(e.target.value)}
-              >
-                <option value="">Default</option>
-                {bankAccounts.map(b => (
-                  <option key={b.id} value={b.cash_account_id}>
-                    {b.cash_account_code} — {b.cash_account_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button onClick={() => load()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
-            </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Period start</div>
+            <DateInput value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
           </div>
-          {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
-        </CardContent>
-      </Card>
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Period end</div>
+            <DateInput value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Cash account</div>
+            <select
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+              value={cashAccountId}
+              onChange={e => setCashAccountId(e.target.value)}
+            >
+              <option value="">Default</option>
+              {bankAccounts.map(b => (
+                <option key={b.id} value={b.cash_account_id}>
+                  {b.cash_account_code} — {b.cash_account_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button variant="outline" onClick={() => load()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
+        </div>
+      </div>
+      {err && <p className="text-sm text-destructive">{err}</p>}
 
       {report && (
         <>
@@ -151,57 +147,59 @@ export default function CashFlowPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Beginning Balance</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-semibold">{fmtMoney(report.beginning_balance)}</div></CardContent>
+              <CardContent><div className="text-2xl font-semibold font-mono">{fmtMoney(report.beginning_balance)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Net Change</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-semibold ${netClass(report.net_change)}`}>{fmtMoney(report.net_change)}</div></CardContent>
+              <CardContent><div className={`text-2xl font-semibold font-mono ${netClass(report.net_change)}`}>{fmtMoney(report.net_change)}</div></CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Ending Balance</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-semibold">{fmtMoney(report.ending_balance)}</div></CardContent>
+              <CardContent><div className="text-2xl font-semibold font-mono">{fmtMoney(report.ending_balance)}</div></CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Activity — {report.cash_account_code} — {report.cash_account_name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {report.lines.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">No cash activity in this period</div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-muted/40">
-                    <tr>
-                      <th className="text-left p-3">Date</th>
-                      <th className="text-left p-3">Source</th>
-                      <th className="text-left p-3">Memo</th>
-                      <th className="text-right p-3">Debit</th>
-                      <th className="text-right p-3">Credit</th>
-                      <th className="text-right p-3">Net</th>
-                      <th className="text-right p-3">Running Balance</th>
+          <ReportCard
+            companyName={bizName}
+            title={`Statement of Cash Flows — ${report.cash_account_code} ${report.cash_account_name}`}
+            subtitle={`${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`}
+          >
+            {report.lines.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">No cash activity in this period.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="border-b">
+                  <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Source</th>
+                    <th className="p-3 text-left">Memo</th>
+                    <th className="p-3 text-right">Debit</th>
+                    <th className="p-3 text-right">Credit</th>
+                    <th className="p-3 text-right">Net</th>
+                    <th className="p-3 text-right">Running balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.lines.map(l => (
+                    <tr key={l.journal_entry_id} className="border-b hover:bg-muted/30">
+                      <td className="p-3 whitespace-nowrap">{l.entry_date}</td>
+                      <td className="p-3"><span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize">{l.source_type}</span></td>
+                      <td className="p-3">{l.memo ?? ''}</td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(l.debit)}</td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(l.credit)}</td>
+                      <td className={`p-3 text-right font-mono ${netClass(l.net_amount)}`}>{fmtMoney(l.net_amount)}</td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(l.running_balance)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {report.lines.map(l => (
-                      <tr key={l.journal_entry_id} className="border-b last:border-b-0">
-                        <td className="p-3">{l.entry_date}</td>
-                        <td className="p-3"><span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize">{l.source_type}</span></td>
-                        <td className="p-3">{l.memo ?? ''}</td>
-                        <td className="p-3 text-right">{fmtMoney(l.debit)}</td>
-                        <td className="p-3 text-right">{fmtMoney(l.credit)}</td>
-                        <td className={`p-3 text-right ${netClass(l.net_amount)}`}>{fmtMoney(l.net_amount)}</td>
-                        <td className="p-3 text-right">{fmtMoney(l.running_balance)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+                  ))}
+                  <tr className="font-semibold">
+                    <td colSpan={5} className="p-3">NET CHANGE IN CASH</td>
+                    <td className={`p-3 text-right font-mono ${netClass(report.net_change)}`}>{fmtMoney(report.net_change)}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(report.ending_balance)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </ReportCard>
         </>
       )}
     </div>

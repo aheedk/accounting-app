@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -85,7 +86,7 @@ export default function CustomerListPage() {
               </span>
             );
           }}
-          emptyMessage="No customers."
+          emptyMessage={<EmptyState title="No customers yet" hint="Add your first customer to start invoicing." actionLabel="New customer" actionTo="/customers/new" />}
         />
       </CardContent></Card>
     </div>

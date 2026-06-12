@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/auth/useAuth';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 
@@ -11,6 +11,8 @@ type Row = { vendor_id: string; vendor_name: string; tax_id: string | null; tota
 
 export default function TenNinetyNineReportPage() {
   const [bizId] = useActiveBusinessId();
+  const { businesses } = useAuth();
+  const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [rows, setRows] = useState<Row[]>([]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/reports/1099`, { params: { year } }).then(r => setRows(r.data.rows)); }, [bizId, year]);
@@ -24,29 +26,40 @@ export default function TenNinetyNineReportPage() {
         <h1 className="text-2xl font-semibold">1099 Report</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <Label>Year</Label>
-            <Input type="number" value={year} onChange={e => setYear(parseInt(e.target.value, 10) || new Date().getFullYear())} />
+            <div className="mb-1 text-xs text-muted-foreground">Year</div>
+            <Input className="w-28 font-mono" type="number" value={year} onChange={e => setYear(parseInt(e.target.value, 10) || new Date().getFullYear())} />
           </div>
           <DownloadButtons headers={dlHeaders} getRows={dlRows} filename={`1099-${year}`} title={`1099 Report — ${year}`} />
         </div>
       </div>
-      <Card><CardContent className="p-0">
+
+      <ReportCard companyName={bizName} title="1099 Contractor Payments" subtitle={`Calendar year ${year}`}>
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40"><tr><th className="text-left p-3">Vendor</th><th className="text-left p-3">Tax ID</th><th className="text-right p-3">Total Paid</th></tr></thead>
-          <tbody>{rows.map(r => (
-            <tr key={r.vendor_id} className="border-b last:border-b-0">
-              <td className="p-3">{r.vendor_name}</td>
-              <td className="p-3">{r.tax_id ?? '—'}</td>
-              <td className="p-3 text-right">{fmtMoney(r.total_paid)}</td>
+          <thead className="border-b">
+            <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <th className="p-3 text-left">Vendor</th>
+              <th className="p-3 text-left">Tax ID</th>
+              <th className="p-3 text-right">Total paid</th>
             </tr>
-          ))}
-          <tr className="font-semibold bg-muted/20">
-            <td className="p-3 text-right" colSpan={2}>Total</td>
-            <td className="p-3 text-right">{fmtMoney(total)}</td>
-          </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr className="border-b"><td colSpan={3} className="p-6 text-center text-muted-foreground">No 1099 payments recorded for {year}.</td></tr>
+            )}
+            {rows.map(r => (
+              <tr key={r.vendor_id} className="border-b hover:bg-muted/30">
+                <td className="p-3">{r.vendor_name}</td>
+                <td className="p-3 font-mono">{r.tax_id ?? '—'}</td>
+                <td className="p-3 text-right font-mono">{fmtMoney(r.total_paid)}</td>
+              </tr>
+            ))}
+            <tr className="font-semibold">
+              <td className="p-3" colSpan={2}>TOTAL</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(total)}</td>
+            </tr>
           </tbody>
         </table>
-      </CardContent></Card>
+      </ReportCard>
     </div>
   );
 }

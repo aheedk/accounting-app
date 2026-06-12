@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type VendorCreditSummary = {
   id: string;
@@ -147,7 +148,7 @@ export default function VendorCreditListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage="No matching vendor credits found."
+          emptyMessage={<EmptyState title="No matching vendor credits" hint="Adjust the filters above, or record a credit from a vendor." actionLabel="New vendor credit" actionTo="/ap/vendor-credits/new" />}
         />
       </CardContent></Card>
     </div>

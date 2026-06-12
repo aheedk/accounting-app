@@ -6,15 +6,9 @@ import { useAuth } from '@/auth/useAuth';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 import { ReportCard } from '@/components/ui/ReportCard';
-import { todayLocal } from '@/lib/dates';
+import { fmtLongDate, todayLocal } from '@/lib/dates';
 
 type Row = { customer_id: string; customer_name: string; current: string; over_30: string; over_60: string; over_90: string; total: string };
-
-function fmtLongDate(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-}
 
 // QBO leaves zero cells blank in aging reports.
 function cell(v: string) {
