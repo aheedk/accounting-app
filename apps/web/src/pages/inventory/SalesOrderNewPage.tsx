@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Customer = { id: string; name: string };
 
@@ -41,7 +42,7 @@ const blankLine = (): Line => ({
 export default function SalesOrderNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [hdr, setHdr] = useState({

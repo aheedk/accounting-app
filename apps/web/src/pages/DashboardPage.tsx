@@ -107,12 +107,13 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Where we are</CardTitle>
+            <CardTitle className="text-lg">What you can do</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Slice 1 is live: Ledger, Chart of Accounts, Journal Entries, and AR
-            (Customers, Invoices, Payments, Credit Memos) with Trial Balance and AR
-            Aging reports. The rest of the sidebar is stubbed for upcoming slices.
+            Full books in one place: AR (customers, invoices, payments, credits),
+            AP (vendors, bills, expenses), banking and reconciliation, journal
+            entries, payroll, inventory, and financial reports — all scoped to the
+            business selected above.
           </CardContent>
         </Card>
       </section>

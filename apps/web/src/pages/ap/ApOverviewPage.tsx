@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { fmtMoney } from '@/lib/money';
 
 type TopVendor = {
   vendor_id: string;
@@ -45,7 +46,7 @@ export default function ApOverviewPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Outstanding bills</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${data.outstanding_bills_total}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold font-mono">{fmtMoney(data.outstanding_bills_total)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Overdue bills</CardTitle></CardHeader>
@@ -53,11 +54,11 @@ export default function ApOverviewPage() {
         </Card>
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Due next 7 days</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${data.upcoming_payments_7d}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold font-mono">{fmtMoney(data.upcoming_payments_7d)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Due next 30 days</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${data.upcoming_payments_30d}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold font-mono">{fmtMoney(data.upcoming_payments_30d)}</div></CardContent>
         </Card>
       </div>
 
@@ -78,7 +79,7 @@ export default function ApOverviewPage() {
                 {data.top_vendors.map(v => (
                   <tr key={v.vendor_id} className="border-b last:border-b-0">
                     <td className="p-3">{v.vendor_name}</td>
-                    <td className="p-3 text-right font-mono">${v.outstanding}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(v.outstanding)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Vendor = { id: string; name: string; billing_address: Address | null };
@@ -25,7 +26,7 @@ export default function VendorCreditNewPage() {
   const nav = useNavigate();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [offsetAccounts, setOffsetAccounts] = useState<Account[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [form, setForm] = useState({ vendor_id: '', credit_date: today, amount: '', offset_account_id: '', memo: '' });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

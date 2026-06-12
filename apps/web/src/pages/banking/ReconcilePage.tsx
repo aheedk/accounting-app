@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type BankAccount = {
   id: string;
@@ -58,7 +59,7 @@ function inRange(date: string, start: string, end: string): boolean {
 
 export default function ReconcilePage() {
   const [bizId] = useActiveBusinessId();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');

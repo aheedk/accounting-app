@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type BillSummary = { id: string; bill_number: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
 type Vendor = { id: string; name: string };
@@ -41,7 +42,7 @@ function daysBetween(fromIso: string, toIso: string) {
 }
 
 function dateRangeBounds(value: string): { from: string; to: string } | null {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   if (value === 'year') return { from: `${today.slice(0, 4)}-01-01`, to: `${today.slice(0, 4)}-12-31` };
   if (value === '3m') return { from: isoDaysAgo(92), to: today };
   if (value === '12m') return { from: isoDaysAgo(365), to: today };
@@ -66,7 +67,7 @@ export default function BillListPage() {
   }, [bizId]);
 
   const vendorMap = useMemo(() => new Map(vendors.map(v => [v.id, v.name])), [vendors]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
 
   type Row = BillSummary & { vendor_name: string; overdue_days: number };
   const rows: Row[] = useMemo(() => {

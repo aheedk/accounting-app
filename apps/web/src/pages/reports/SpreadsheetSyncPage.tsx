@@ -8,6 +8,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { todayLocal } from '@/lib/dates';
 
 function pickErr(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
@@ -67,7 +68,7 @@ async function downloadPdf(url: string, params: Record<string, string>, title: s
 
 export default function SpreadsheetSyncPage() {
   const [bizId] = useActiveBusinessId();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
 
   const [jeFrom, setJeFrom] = useState('');
   const [jeTo, setJeTo] = useState(today);

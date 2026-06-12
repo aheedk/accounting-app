@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { fmtMoney } from '@/lib/money';
 
 type FirmRow = {
   business_id: string;
@@ -105,8 +106,8 @@ export default function ClientOverviewPage() {
                         {r.business_name}
                       </button>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono">${r.ar_balance}</td>
-                    <td className="px-3 py-2 text-right font-mono">${r.ap_balance}</td>
+                    <td className="px-3 py-2 text-right font-mono">{fmtMoney(r.ar_balance)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{fmtMoney(r.ap_balance)}</td>
                     <td className="px-3 py-2 text-right">{r.unreviewed_bank_txn_count}</td>
                     <td className="px-3 py-2 text-right">{r.open_period_count}</td>
                     <td className="px-3 py-2 text-right">

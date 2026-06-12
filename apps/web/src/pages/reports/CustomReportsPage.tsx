@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type GroupBy = 'account' | 'month' | 'cost_center' | 'customer' | 'vendor';
 type Column = 'debit' | 'credit' | 'net';
@@ -58,7 +59,7 @@ const COLUMN_OPTIONS: Array<{ value: Column; label: string }> = [
 ];
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 function startOfYearIso(): string {

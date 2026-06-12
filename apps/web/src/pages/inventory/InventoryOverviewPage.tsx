@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
+import { fmtMoney } from '@/lib/money';
 
 type Overview = {
   total_items_count: number;
@@ -42,7 +43,7 @@ export default function InventoryOverviewPage() {
           <CardHeader>
             <CardTitle>Stock Value</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold font-mono">${data.total_stock_value}</CardContent>
+          <CardContent className="text-2xl font-bold font-mono">{fmtMoney(data.total_stock_value)}</CardContent>
         </Card>
       </div>
       <Card>

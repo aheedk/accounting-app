@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Vendor = { id: string; name: string };
 type InventoryItem = { id: string; sku: string; name: string; purchase_cost: string | null };
@@ -24,7 +25,7 @@ export default function PurchaseOrderNewPage() {
   const nav = useNavigate();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [hdr, setHdr] = useState({ vendor_id: '', order_date: today, expected_delivery_date: '', memo: '' });
   const [lines, setLines] = useState<Line[]>([blank()]);
   const [err, setErr] = useState<string | null>(null);

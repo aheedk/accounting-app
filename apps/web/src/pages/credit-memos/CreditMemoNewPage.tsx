@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Customer = { id: string; name: string; billing_address: Address | null };
@@ -25,7 +26,7 @@ export default function CreditMemoNewPage() {
   const nav = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [revenueAccounts, setRevenueAccounts] = useState<Account[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [form, setForm] = useState({ customer_id: '', memo_date: today, amount: '', revenue_account_id: '', memo: '' });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

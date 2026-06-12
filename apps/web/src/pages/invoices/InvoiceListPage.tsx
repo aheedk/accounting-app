@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type InvoiceStatus = 'draft' | 'posted' | 'paid' | 'voided';
 type InvoiceSummary = { id: string; customer_id: string; invoice_number: string; issue_date: string; due_date: string; status: InvoiceStatus; total: string };
@@ -39,7 +40,7 @@ export default function InvoiceListPage() {
   }, [bizId]);
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
 
   type Row = InvoiceSummary & { customer_name: string; overdue_days: number };
   const rows: Row[] = useMemo(

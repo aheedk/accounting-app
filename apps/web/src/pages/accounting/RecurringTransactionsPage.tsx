@@ -8,6 +8,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { todayLocal } from '@/lib/dates';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 
@@ -41,7 +42,7 @@ const blankForm = () => ({
   name: '',
   template_type: 'journal_entry' as TemplateType,
   recurrence: 'monthly' as Recurrence,
-  next_run_date: new Date().toISOString().slice(0, 10),
+  next_run_date: todayLocal(),
   end_date: '',
   memo: '',
   reference: '',
@@ -85,7 +86,7 @@ export default function RecurringTransactionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bizId]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const due = useMemo(
     () => templates.filter((t) => t.is_active && t.next_run_date <= today),
     [templates, today],

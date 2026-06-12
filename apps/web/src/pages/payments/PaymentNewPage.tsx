@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Customer = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -27,7 +28,7 @@ export default function PaymentNewPage() {
   const [params] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [form, setForm] = useState({
     customer_id: params.get('customer_id') ?? '',
     payment_date: today,

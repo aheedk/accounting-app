@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { todayLocal } from '@/lib/dates';
 
 type BsLine = {
   account_id: string;
@@ -49,7 +50,7 @@ const EMPTY_REPORT: BalanceSheetReport = {
 
 export default function BalanceSheetPage() {
   const [bizId] = useActiveBusinessId();
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
+  const [asOf, setAsOf] = useState(todayLocal());
   const [report, setReport] = useState<BalanceSheetReport>(EMPTY_REPORT);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

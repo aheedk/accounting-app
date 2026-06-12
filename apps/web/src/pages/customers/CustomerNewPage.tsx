@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Address = {
   line1: string;
@@ -37,7 +38,7 @@ const LANGUAGES = ['English', 'Spanish', 'French'];
 export default function CustomerNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
 
   const [form, setForm] = useState({
     title: '',

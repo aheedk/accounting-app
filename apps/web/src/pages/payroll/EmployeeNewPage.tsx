@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { todayLocal } from '@/lib/dates';
 
 type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
@@ -33,7 +34,7 @@ const W4_STATUSES: Array<{ value: W4FilingStatus; label: string }> = [
 ];
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 export default function EmployeeNewPage() {

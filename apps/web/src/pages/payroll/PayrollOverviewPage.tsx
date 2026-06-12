@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
+import { fmtMoney } from '@/lib/money';
 
 type Overview = {
   next_pay_date: string | null;
@@ -45,7 +46,7 @@ export default function PayrollOverviewPage() {
             <CardTitle>Total Liabilities Outstanding</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold font-mono">
-            ${data.total_liabilities_outstanding}
+            {fmtMoney(data.total_liabilities_outstanding)}
           </CardContent>
         </Card>
         <Card>
@@ -53,7 +54,7 @@ export default function PayrollOverviewPage() {
             <CardTitle>Last Pay Run Total</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold font-mono">
-            ${data.last_pay_run_total}
+            {fmtMoney(data.last_pay_run_total)}
           </CardContent>
         </Card>
         <Card>

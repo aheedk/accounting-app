@@ -19,6 +19,34 @@ export type LoginResult = {
   businesses: Array<{ id: string; name: string; role_override: UserRole | null }>;
 };
 
+// firm_admins can open any business in the firm (matches resolveBusiness),
+// so list them all; other roles only see explicit grants.
+async function businessesForUser(
+  trx: Kysely<DB>,
+  user: { id: string; firm_id: string; role: UserRole },
+): Promise<LoginResult['businesses']> {
+  if (user.role === 'firm_admin') {
+    return trx
+      .selectFrom('businesses as b')
+      .leftJoin('user_business_access as uba', (join) =>
+        join.onRef('uba.business_id', '=', 'b.id').on('uba.user_id', '=', user.id),
+      )
+      .select(['b.id', 'b.name', 'uba.role_override'])
+      .where('b.firm_id', '=', user.firm_id)
+      .where('b.deleted_at', 'is', null)
+      .orderBy('b.name')
+      .execute();
+  }
+  return trx
+    .selectFrom('user_business_access as uba')
+    .innerJoin('businesses as b', 'b.id', 'uba.business_id')
+    .select(['b.id', 'b.name', 'uba.role_override'])
+    .where('uba.user_id', '=', user.id)
+    .where('b.deleted_at', 'is', null)
+    .orderBy('b.name')
+    .execute();
+}
+
 function ctxFromLogin(user: { id: string; firm_id: string; role: UserRole }, meta: ReqMeta): ServiceCtx {
   return {
     user_id: user.id,
@@ -69,13 +97,7 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
 
     await trx.updateTable('users').set({ last_login_at: sql`now()` }).where('id', '=', user.id).execute();
 
-    const businesses = await trx
-      .selectFrom('user_business_access as uba')
-      .innerJoin('businesses as b', 'b.id', 'uba.business_id')
-      .select(['b.id', 'b.name', 'uba.role_override'])
-      .where('uba.user_id', '=', user.id)
-      .where('b.deleted_at', 'is', null)
-      .execute();
+    const businesses = await businessesForUser(trx, user);
 
     await auditRecord(trx, ctxFromLogin(user, meta), {
       action: AUDIT.AUTH_LOGIN,
@@ -117,13 +139,7 @@ export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: Req
       user_id: user.id, token_hash: newHash, expires_at: expires_at.toISOString() as unknown as string,
     }).execute();
 
-    const businesses = await trx
-      .selectFrom('user_business_access as uba')
-      .innerJoin('businesses as b', 'b.id', 'uba.business_id')
-      .select(['b.id', 'b.name', 'uba.role_override'])
-      .where('uba.user_id', '=', user.id)
-      .where('b.deleted_at', 'is', null)
-      .execute();
+    const businesses = await businessesForUser(trx, user);
 
     await auditRecord(trx, ctxFromLogin(user, meta), {
       action: AUDIT.AUTH_REFRESH,

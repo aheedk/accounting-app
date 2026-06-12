@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { fmtMoney, fmtSigned } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 function parseCSVLine(line: string): string[] {
   const cells: string[] = [];
@@ -56,7 +57,7 @@ type Row = { account_id: string; code: string; name: string; account_type: strin
 
 export default function TrialBalancePage() {
   const [bizId] = useActiveBusinessId();
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
+  const [asOf, setAsOf] = useState(todayLocal());
   const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState({ total_debit: '0', total_credit: '0' });
   const [excelBusy, setExcelBusy] = useState(false);

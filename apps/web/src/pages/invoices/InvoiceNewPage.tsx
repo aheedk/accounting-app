@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/ProductServiceSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
@@ -23,7 +24,7 @@ export default function InvoiceNewPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [items, setItems] = useState<ProductServiceItem[]>([]);
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [hdr, setHdr] = useState({ customer_id: '', invoice_number: '', issue_date: today, due_date: today, memo: '', terms: 'Net 30' });
   const [taxCodeId, setTaxCodeId] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([blank(), blank()]);

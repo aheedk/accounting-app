@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -38,7 +39,7 @@ type CreateBody = {
 const AMOUNT_RE = /^\d+(\.\d+)?$/;
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 export default function ExpenseTransactionNewPage() {

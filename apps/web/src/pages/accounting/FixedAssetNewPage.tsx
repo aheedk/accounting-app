@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -40,7 +41,7 @@ type CreateBody = {
 export default function FixedAssetNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [form, setForm] = useState({
     name: '',

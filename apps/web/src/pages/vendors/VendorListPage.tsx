@@ -9,6 +9,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
+import { todayLocal } from '@/lib/dates';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -33,7 +34,7 @@ export default function VendorListPage() {
   useEffect(() => { reload(); }, [bizId]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setBills(r.data.bills)); }, [bizId]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const yearAgo = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
 
   // QBO vendors page: "Unpaid Last 365 Days" bar — overdue / open bills / paid.

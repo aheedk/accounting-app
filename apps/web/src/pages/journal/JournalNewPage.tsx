@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 type Line = { account_id: string; debit: string; credit: string; memo: string };
@@ -24,7 +25,7 @@ function pickErr(e: unknown): string {
 export default function JournalNewPage() {
   const [bizId] = useActiveBusinessId();
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocal());
   const [memo, setMemo] = useState('');
   const [reference, setReference] = useState('');
   const [lines, setLines] = useState<Line[]>([blank(), blank(), blank(), blank()]);

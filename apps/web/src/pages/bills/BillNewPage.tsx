@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { todayLocal } from '@/lib/dates';
 
 type Line = { description: string; quantity: string; unit_price: string; expense_account_id: string };
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
@@ -43,7 +44,7 @@ export default function BillNewPage() {
   const [params] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [hdr, setHdr] = useState({
     vendor_id: params.get('vendor_id') ?? '',
     bill_number: '',

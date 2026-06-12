@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { todayLocal } from '@/lib/dates';
 
 type Period = 'monthly' | 'quarterly' | 'annual';
 type Status = 'accrued' | 'paid';
@@ -46,7 +47,7 @@ function statusBadge(status: Status) {
 
 export default function PayrollTaxesPage() {
   const [bizId] = useActiveBusinessId();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [liabilities, setLiabilities] = useState<PayrollTaxLiability[]>([]);

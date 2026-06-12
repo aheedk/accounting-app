@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 import { ReportCard } from '@/components/ui/ReportCard';
+import { todayLocal } from '@/lib/dates';
 
 type Row = { customer_id: string; customer_name: string; current: string; over_30: string; over_60: string; over_90: string; total: string };
 
@@ -24,7 +25,7 @@ export default function AgingReportPage() {
   const [bizId] = useActiveBusinessId();
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
+  const [asOf, setAsOf] = useState(todayLocal());
   const [rows, setRows] = useState<Row[]>([]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/reports/aging`, { params: { as_of: asOf } }).then(r => setRows(r.data.rows)); }, [bizId, asOf]);
   if (!bizId) return <div>Pick a business.</div>;
