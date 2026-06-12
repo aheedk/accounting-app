@@ -41,6 +41,7 @@ router.post('/businesses/:businessId/bank-rules', requireMinRole('staff'), async
       sign_filter: body.sign_filter ?? 'any',
       offset_account_id: body.offset_account_id,
       priority: body.priority ?? 100,
+      bank_account_id: body.bank_account_id ?? null,
     };
     const created = await db.transaction().execute(trx =>
       bankRules.createRule(trx, ctxFromReq(req), input),
@@ -61,6 +62,7 @@ router.patch('/businesses/:businessId/bank-rules/:id', requireMinRole('staff'), 
     if (parsed.offset_account_id !== undefined) patch.offset_account_id = parsed.offset_account_id;
     if (parsed.priority !== undefined) patch.priority = parsed.priority;
     if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;
+    if (parsed.bank_account_id !== undefined) patch.bank_account_id = parsed.bank_account_id ?? null;
     const updated = await db.transaction().execute(trx =>
       bankRules.updateRule(trx, ctxFromReq(req), { rule_id: req.params['id']!, patch }),
     );

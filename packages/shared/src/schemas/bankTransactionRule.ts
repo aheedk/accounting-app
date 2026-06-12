@@ -9,6 +9,7 @@ export const bankRuleCreateSchema = z.object({
   max_amount: moneyStr.nullable().optional(),
   sign_filter: z.enum(['any', 'inflow_only', 'outflow_only']).optional(),
   offset_account_id: z.string().uuid(),
+  bank_account_id: z.string().uuid().nullable().optional(),
   priority: z.number().int().min(0).max(10000).optional(),
 });
 export type BankRuleCreate = z.infer<typeof bankRuleCreateSchema>;
