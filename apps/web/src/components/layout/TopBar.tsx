@@ -6,7 +6,7 @@ export function TopBar() {
   const { user, businesses, logout } = useAuth();
   const [active, setActive] = useActiveBusinessId();
   return (
-    <header className="h-14 shrink-0 border-b border-border bg-card flex items-center justify-between px-4">
+    <header className="h-14 shrink-0 border-b border-border bg-card/80 backdrop-blur flex items-center justify-between px-4">
       <div className="flex items-center gap-3">
         {businesses.length > 0 ? (
           <select

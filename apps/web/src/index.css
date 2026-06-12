@@ -4,24 +4,59 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 15%;
+    /* "Ink & ledger" palette: warm paper workspace, ink text, deep ledger blue. */
+    --background: 40 23% 97%;
+    --foreground: 225 30% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 15%;
-    --primary: 217 91% 50%;
+    --card-foreground: 225 30% 16%;
+    --primary: 221 65% 44%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 214 100% 97%;
-    --secondary-foreground: 217 91% 30%;
-    --muted: 214 32% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 214 100% 95%;
-    --accent-foreground: 217 91% 35%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 218 60% 95%;
+    --secondary-foreground: 221 60% 32%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 222 14% 46%;
+    --accent: 220 25% 93%;
+    --accent-foreground: 222 30% 22%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 50%;
+    --border: 220 16% 88%;
+    --input: 220 16% 85%;
+    --ring: 221 65% 44%;
+    /* Ink sidebar */
+    --sidebar: 224 42% 14%;
+    --sidebar-foreground: 220 30% 92%;
+    --sidebar-muted: 221 18% 66%;
+    --sidebar-hover: 222 30% 22%;
+    --sidebar-active: 223 32% 20%;
+    --gold: 42 62% 58%;
   }
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'tnum' on, 'lnum' on;
+  }
+  /* Page titles get the editorial serif across the whole app. */
+  h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.15);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.4);
+    background-clip: content-box;
+    border: 2px solid transparent;
+  }
 }

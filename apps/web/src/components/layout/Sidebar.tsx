@@ -155,12 +155,12 @@ export function Sidebar() {
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
 
   return (
-    <aside className="w-64 shrink-0 border-r bg-card flex flex-col h-full overflow-hidden">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+    <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-full overflow-hidden">
+      <div className="flex h-14 items-center gap-2.5 border-b border-white/10 px-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
           <BookOpen className="h-4 w-4" />
         </div>
-        <span className="font-semibold tracking-tight">Accounting</span>
+        <span className="font-display text-lg tracking-tight text-white">Accounting</span>
       </div>
 
       <nav
@@ -184,10 +184,10 @@ export function Sidebar() {
                 className={({ isActive }) =>
                   cn(
                     'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    'hover:bg-accent hover:text-accent-foreground',
+                    'hover:bg-sidebar-hover hover:text-white',
                     isActive
-                      ? 'border-l-2 border-primary bg-secondary text-secondary-foreground'
-                      : 'text-foreground/80',
+                      ? 'border-l-2 border-gold bg-sidebar-active text-white'
+                      : 'text-sidebar-muted',
                   )
                 }
               >
@@ -213,17 +213,17 @@ export function Sidebar() {
                 aria-expanded={isOpen}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  'hover:bg-accent hover:text-accent-foreground',
+                  'hover:bg-sidebar-hover hover:text-white',
                   isActiveGroup
-                    ? 'bg-secondary text-secondary-foreground'
-                    : 'text-foreground/80',
+                    ? 'bg-sidebar-active text-white'
+                    : 'text-sidebar-muted',
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="flex-1 text-left">{group.label}</span>
                 <ChevronRight
                   className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out',
+                    'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
                     isOpen && 'rotate-90',
                   )}
                 />
@@ -255,8 +255,8 @@ export function Sidebar() {
                             'flex items-center rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
                             isOpen ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
                             childActive
-                              ? 'border-primary bg-secondary font-medium text-secondary-foreground'
-                              : 'border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                              ? 'border-gold bg-sidebar-active font-medium text-white'
+                              : 'border-white/10 text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
                           )}
                         >
                           {child.label}
