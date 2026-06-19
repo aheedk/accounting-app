@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type ItemReceipt = {
   id: string;
@@ -112,7 +113,7 @@ export default function ItemReceiptListPage() {
               defaultSortKey="receipt_date"
               defaultSortDir="desc"
               downloadable={{ filename: 'item-receipts', title: 'Item Receipts' }}
-              emptyMessage="No item receipts yet. Receive against a sent purchase order to record one."
+              emptyMessage={<EmptyState title="No item receipts yet" hint="Receive against a sent purchase order to record stock arriving." actionLabel="Receive items" actionTo="/inventory/item-receipts/new" />}
             />
           )}
         </CardContent>

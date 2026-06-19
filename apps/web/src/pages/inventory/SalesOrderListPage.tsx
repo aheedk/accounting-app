@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -150,7 +151,7 @@ export default function SalesOrderListPage() {
       header: 'Status',
       sortable: true,
       sortValue: r => r.status,
-      render: r => <span className={statusBadgeClass(r.status)}>{r.status}</span>,
+      render: r => <span className={`${statusBadgeClass(r.status)} capitalize`}>{r.status}</span>,
     },
     {
       key: 'invoice',
@@ -167,7 +168,14 @@ export default function SalesOrderListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Sales Orders</h1>
-        <div className="flex items-center gap-3">
+        <Button asChild>
+          <Link to="/inventory/sales-orders/new">New sales order</Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Status</div>
           <select
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={statusFilter}
@@ -175,14 +183,11 @@ export default function SalesOrderListPage() {
           >
             <option value="">All statuses</option>
             {STATUSES.map((s) => (
-              <option key={s} value={s}>
+              <option key={s} value={s} className="capitalize">
                 {s}
               </option>
             ))}
           </select>
-          <Button asChild>
-            <Link to="/inventory/sales-orders/new">New sales order</Link>
-          </Button>
         </div>
       </div>
       {err && <p className="text-sm text-destructive">{err}</p>}
@@ -226,7 +231,7 @@ export default function SalesOrderListPage() {
                   </span>
                 );
               }}
-              emptyMessage="No sales orders yet."
+              emptyMessage={<EmptyState title="No sales orders yet" hint="Create a sales order to reserve stock for a customer before invoicing." actionLabel="New sales order" actionTo="/inventory/sales-orders/new" />}
             />
           )}
         </CardContent>
