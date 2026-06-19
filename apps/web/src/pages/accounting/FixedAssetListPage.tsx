@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown, Settings } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { MoneyBar } from '@/components/ui/MoneyBar';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 
 type FixedAssetStatus = 'active' | 'disposed';
@@ -27,6 +30,13 @@ function fmtShortDate(iso: string) {
   const [y, m, d] = iso.split('-');
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
+function statusBadge(status: FixedAssetStatus) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return status === 'active'
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Disposed</span>;
 }
 
 export default function FixedAssetListPage() {
@@ -52,15 +62,25 @@ export default function FixedAssetListPage() {
 
   const filtered = statusFilter ? items.filter(a => a.status === statusFilter) : items;
 
+  // Totals span all assets, unfiltered (QBO behavior).
+  const totals = useMemo(() => items.reduce(
+    (acc, a) => ({
+      cost: acc.cost + Number(a.cost),
+      accumulated: acc.accumulated + Number(a.accumulated_depreciation),
+      book: acc.book + Number(a.book_value),
+    }),
+    { cost: 0, accumulated: 0, book: 0 },
+  ), [items]);
+
   const columns: Column<FixedAssetRow>[] = [
-    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => r.name },
+    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <span className="font-medium">{r.name}</span> },
+    { key: 'purchase_date', header: 'Purchase Date', sortable: true, sortValue: r => Date.parse(r.purchase_date), render: r => <span className="whitespace-nowrap">{fmtShortDate(r.purchase_date)}</span> },
     { key: 'cost', header: 'Cost', sortable: true, align: 'right', sortValue: r => Number(r.cost), render: r => <span className="font-mono">{fmtMoney(r.cost)}</span> },
     { key: 'salvage_value', header: 'Salvage', sortable: true, align: 'right', sortValue: r => Number(r.salvage_value), render: r => <span className="font-mono">{fmtMoney(r.salvage_value)}</span> },
     { key: 'useful_life_years', header: 'Life (yrs)', sortable: true, align: 'right', sortValue: r => r.useful_life_years, render: r => r.useful_life_years },
-    { key: 'purchase_date', header: 'Purchase Date', sortable: true, sortValue: r => Date.parse(r.purchase_date), render: r => <span className="whitespace-nowrap">{fmtShortDate(r.purchase_date)}</span> },
-    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.status, render: r => <span className="capitalize">{r.status}</span> },
-    { key: 'accumulated_depreciation', header: 'Accumulated Dep', sortable: true, align: 'right', sortValue: r => Number(r.accumulated_depreciation), render: r => <span className="font-mono">{fmtMoney(r.accumulated_depreciation)}</span> },
+    { key: 'accumulated_depreciation', header: 'Accum. Dep.', sortable: true, align: 'right', sortValue: r => Number(r.accumulated_depreciation), render: r => <span className="font-mono">{fmtMoney(r.accumulated_depreciation)}</span> },
     { key: 'book_value', header: 'Book Value', sortable: true, align: 'right', sortValue: r => Number(r.book_value), render: r => <span className="font-mono">{fmtMoney(r.book_value)}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.status, render: r => statusBadge(r.status) },
   ];
 
   if (!bizId) return <div>Pick a business.</div>;
@@ -69,16 +89,32 @@ export default function FixedAssetListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Fixed Assets</h1>
-        <div className="flex items-center gap-3">
+        <Button asChild>
+          <Link to="/accounting/fixed-assets/new">Add fixed asset</Link>
+        </Button>
+      </div>
+
+      {items.length > 0 && (
+        <MoneyBar
+          segments={[
+            { amount: totals.cost, caption: 'Total cost', colorClass: 'bg-sky-500' },
+            { amount: totals.accumulated, caption: 'Accumulated depreciation', colorClass: 'bg-amber-500' },
+            { amount: totals.book, caption: 'Net book value', colorClass: 'bg-emerald-500' },
+          ]}
+        />
+      )}
+
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Status</div>
           <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>
-            {['active', 'disposed'].map(s => <option key={s} value={s}>{s}</option>)}
+            <option value="active">Active</option>
+            <option value="disposed">Disposed</option>
           </select>
-          <Button asChild>
-            <Link to="/accounting/fixed-assets/new">Add fixed asset</Link>
-          </Button>
         </div>
       </div>
+
       {err && <p className="text-sm text-destructive">{err}</p>}
       <Card>
         <CardContent className="p-0">
@@ -92,12 +128,14 @@ export default function FixedAssetListPage() {
               defaultSortKey="purchase_date"
               defaultSortDir="desc"
               downloadable={{ filename: 'fixed-assets', title: 'Fixed Assets' }}
+              actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
               actions={r => (
-                <Link className="text-primary hover:underline" to={`/accounting/fixed-assets/${r.id}`}>
-                  View/Edit
-                </Link>
+                <span className="inline-flex items-center gap-2">
+                  <Link className="text-primary hover:underline" to={`/accounting/fixed-assets/${r.id}`}>View/Edit</Link>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </span>
               )}
-              emptyMessage="No fixed assets. Add one to track cost and depreciation."
+              emptyMessage={<EmptyState title="No fixed assets found" hint="Add an asset to track its cost, depreciation, and book value." actionLabel="Add fixed asset" actionTo="/accounting/fixed-assets/new" />}
             />
           )}
         </CardContent>
