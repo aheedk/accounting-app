@@ -84,6 +84,12 @@ function pickErr(e: unknown): string {
     ?.response?.data?.error?.message ?? 'Failed';
 }
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 export default function CustomReportsPage() {
   const [bizId] = useActiveBusinessId();
   const [reports, setReports] = useState<SavedReport[]>([]);
@@ -269,8 +275,8 @@ export default function CustomReportsPage() {
                         className={`w-full px-4 py-3 text-left text-sm transition-colors hover:bg-accent ${active ? 'bg-accent font-medium' : ''}`}
                       >
                         <div className="truncate">{r.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {r.definition.group_by} · {r.definition.date_range.from} → {r.definition.date_range.to}
+                        <div className="text-xs capitalize text-muted-foreground">
+                          {r.definition.group_by.replace(/_/g, ' ')} · {fmtShortDate(r.definition.date_range.from)} → {fmtShortDate(r.definition.date_range.to)}
                         </div>
                       </button>
                     </li>
@@ -435,7 +441,7 @@ export default function CustomReportsPage() {
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b bg-muted/40">
-                      <tr>
+                      <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         <th className="text-left p-3">{groupColumnLabel(form.definition.group_by)}</th>
                         {form.definition.columns.includes('debit') && <th className="text-right p-3">Debit</th>}
                         {form.definition.columns.includes('credit') && <th className="text-right p-3">Credit</th>}
@@ -444,7 +450,7 @@ export default function CustomReportsPage() {
                     </thead>
                     <tbody>
                       {rows.map(r => (
-                        <tr key={r.group_key} className="border-b last:border-b-0">
+                        <tr key={r.group_key} className="border-b last:border-b-0 hover:bg-muted/30">
                           <td className="p-3">{r.group_key}</td>
                           {form.definition.columns.includes('debit') && (
                             <td className="p-3 text-right font-mono">{fmtMoney(r.debit)}</td>
