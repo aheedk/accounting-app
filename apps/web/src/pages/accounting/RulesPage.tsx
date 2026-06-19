@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -75,10 +76,16 @@ const EMPTY_FORM: RuleFormState = {
 };
 
 const SIGN_FILTER_OPTIONS: Array<{ value: SignFilter; label: string }> = [
-  { value: 'any', label: 'any' },
-  { value: 'inflow_only', label: 'inflow only' },
-  { value: 'outflow_only', label: 'outflow only' },
+  { value: 'any', label: 'Any' },
+  { value: 'inflow_only', label: 'Inflow only' },
+  { value: 'outflow_only', label: 'Outflow only' },
 ];
+
+const SIGN_FILTER_LABELS: Record<SignFilter, string> = {
+  any: 'Any',
+  inflow_only: 'Inflow only',
+  outflow_only: 'Outflow only',
+};
 
 function pickErr(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
@@ -405,7 +412,7 @@ export default function RulesPage() {
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">Name</th>
                 <th className="text-left p-3">Description contains</th>
                 <th className="text-left p-3">Amount range</th>
@@ -413,14 +420,14 @@ export default function RulesPage() {
                 <th className="text-left p-3">Offset account</th>
                 <th className="text-right p-3">Priority</th>
                 <th className="text-left p-3">Active</th>
-                <th className="text-left p-3">Actions</th>
+                <th className="text-left p-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-muted-foreground">
-                    No rules yet. Create one above to auto-categorize bank transactions.
+                  <td colSpan={8} className="p-0">
+                    <EmptyState title="No rules yet" hint="Create a rule above to auto-categorize incoming bank transactions by description, amount, and direction." />
                   </td>
                 </tr>
               )}
@@ -429,11 +436,11 @@ export default function RulesPage() {
                 const isRowBusy = rowBusyId === r.id;
                 return (
                   <Fragment key={r.id}>
-                    <tr className="border-b last:border-b-0">
+                    <tr className="border-b last:border-b-0 hover:bg-muted/30">
                       <td className="p-3 font-medium">{r.name}</td>
                       <td className="p-3">{r.description_contains}</td>
                       <td className="p-3 font-mono">{amountRangeLabel(r.min_amount, r.max_amount)}</td>
-                      <td className="p-3">{r.sign_filter}</td>
+                      <td className="p-3">{SIGN_FILTER_LABELS[r.sign_filter]}</td>
                       <td className="p-3 font-mono">{r.offset_account_code} — {r.offset_account_name}</td>
                       <td className="p-3 text-right font-mono">{r.priority}</td>
                       <td className="p-3">
