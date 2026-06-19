@@ -55,6 +55,20 @@ function pickErr(e: unknown): string {
   );
 }
 
+function fmtShortDate(iso: string | null) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
+function activeBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Paused</span>;
+}
+
 export default function RecurringTransactionsPage() {
   const [bizId] = useActiveBusinessId();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -221,8 +235,8 @@ export default function RecurringTransactionsPage() {
               {due.map((t) => (
                 <li key={t.id} className="py-2 flex justify-between">
                   <span>{t.name}</span>
-                  <span className="font-mono text-muted-foreground">
-                    {t.recurrence} — next {t.next_run_date}
+                  <span className="text-muted-foreground">
+                    <span className="capitalize">{t.recurrence}</span> — next <span className="font-mono">{fmtShortDate(t.next_run_date)}</span>
                   </span>
                 </li>
               ))}
@@ -454,16 +468,16 @@ export default function RecurringTransactionsPage() {
                 </tr>
               ) : (
                 templates.map((t) => (
-                  <tr key={t.id} className="border-b last:border-b-0">
-                    <td className="p-3">{t.name}</td>
-                    <td className="p-3">{t.template_type}</td>
-                    <td className="p-3">{t.recurrence}</td>
-                    <td className="p-3 font-mono">{t.next_run_date}</td>
-                    <td className="p-3 font-mono">
-                      {t.last_run_at ? t.last_run_at.slice(0, 10) : '—'}
+                  <tr key={t.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 font-medium">{t.name}</td>
+                    <td className="p-3 capitalize">{t.template_type.replace(/_/g, ' ')}</td>
+                    <td className="p-3 capitalize">{t.recurrence}</td>
+                    <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(t.next_run_date)}</td>
+                    <td className="p-3 font-mono whitespace-nowrap">
+                      {fmtShortDate(t.last_run_at)}
                     </td>
                     <td className="p-3">
-                      <input type="checkbox" checked={t.is_active} disabled readOnly />
+                      {activeBadge(t.is_active)}
                     </td>
                     <td className="p-3 text-right">
                       <Button
