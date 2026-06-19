@@ -72,11 +72,11 @@ export default function ManagementReportsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Total revenue (12m)</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${fmtMoney(data.total_revenue_last_12)}</div></CardContent>
+          <CardContent><div className="font-mono text-2xl font-bold">{fmtMoney(data.total_revenue_last_12)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Total expense (12m)</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${fmtMoney(data.total_expense_last_12)}</div></CardContent>
+          <CardContent><div className="font-mono text-2xl font-bold">{fmtMoney(data.total_expense_last_12)}</div></CardContent>
         </Card>
       </div>
 
@@ -99,7 +99,7 @@ export default function ManagementReportsPage() {
                   const v = Number(row.amount);
                   const pct = maxRevenue > 0 && Number.isFinite(v) ? Math.max(0, (v / maxRevenue) * 100) : 0;
                   return (
-                    <tr key={row.month} className="border-b last:border-b-0">
+                    <tr key={row.month} className="border-b last:border-b-0 hover:bg-muted/30">
                       <td className="p-3 font-mono">{row.month}</td>
                       <td className="p-3">
                         <div className="h-2 w-full rounded bg-muted">
@@ -109,7 +109,7 @@ export default function ManagementReportsPage() {
                           />
                         </div>
                       </td>
-                      <td className="p-3 text-right font-mono">${fmtMoney(row.amount)}</td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(row.amount)}</td>
                     </tr>
                   );
                 })}
@@ -135,10 +135,10 @@ export default function ManagementReportsPage() {
               </thead>
               <tbody>
                 {data.expense_breakdown.map(row => (
-                  <tr key={row.account_code} className="border-b last:border-b-0">
+                  <tr key={row.account_code} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="p-3 font-mono">{row.account_code}</td>
                     <td className="p-3">{row.account_name}</td>
-                    <td className="p-3 text-right font-mono">${fmtMoney(row.amount)}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(row.amount)}</td>
                   </tr>
                 ))}
               </tbody>
