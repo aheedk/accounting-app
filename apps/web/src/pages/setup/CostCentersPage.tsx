@@ -25,6 +25,13 @@ function errorMessage(e: unknown): string {
     ?.response?.data?.error?.message ?? 'Request failed';
 }
 
+function statusBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
+}
+
 export default function CostCentersPage() {
   const [bizId] = useActiveBusinessId();
   const { user } = useAuth();
@@ -193,16 +200,16 @@ export default function CostCentersPage() {
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">Name</th>
                 <th className="text-left p-3">Code</th>
-                <th className="text-left p-3">Active</th>
-                <th className="text-right p-3"></th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-right p-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {items.map(c => (
-                <tr key={c.id} className="border-b last:border-b-0 align-top">
+                <tr key={c.id} className="border-b last:border-b-0 align-top hover:bg-muted/30">
                   {editing === c.id ? (
                     <>
                       <td className="p-3" colSpan={4}>
@@ -231,9 +238,9 @@ export default function CostCentersPage() {
                     </>
                   ) : (
                     <>
-                      <td className="p-3">{c.name}</td>
-                      <td className="p-3 font-mono">{c.code ?? ''}</td>
-                      <td className="p-3">{c.is_active ? 'yes' : 'no'}</td>
+                      <td className="p-3 font-medium">{c.name}</td>
+                      <td className="p-3 font-mono">{c.code ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td className="p-3">{statusBadge(c.is_active)}</td>
                       <td className="p-3 text-right space-x-2">
                         {canEdit && (
                           <>
