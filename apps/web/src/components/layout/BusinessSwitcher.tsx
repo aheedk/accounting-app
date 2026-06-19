@@ -6,11 +6,9 @@ import { useActiveBusinessId } from '@/lib/business';
 import { cn } from '@/lib/utils';
 
 // QBO-style company switcher: shows the current company and lets you jump to
-// another company, return to the firm practice view, or add a client.
-// Decision: there is no dedicated create-client flow yet, so "Add client" and
-// "Back to practice" both land on the firm practice surface (Client Overview),
-// which lists every client in the firm.
+// another company, add a client, or return to the firm practice view.
 const PRACTICE_PATH = '/accounting/client-overview';
+const ADD_CLIENT_PATH = '/clients/new';
 
 export function BusinessSwitcher() {
   const { user, businesses } = useAuth();
@@ -123,7 +121,7 @@ export function BusinessSwitcher() {
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => go(PRACTICE_PATH)}
+                onClick={() => go(ADD_CLIENT_PATH)}
                 className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60"
               >
                 <Plus className="h-4 w-4 text-primary" />
