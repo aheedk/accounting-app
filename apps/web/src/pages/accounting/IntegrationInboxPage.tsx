@@ -82,6 +82,12 @@ const IMPORT_SOURCE_OPTIONS: Array<{ value: IntegrationSource; label: string }> 
   { value: 'generic', label: 'Generic CSV' },
 ];
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 function statusBadge(status: IntegrationInboxStatus) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
   switch (status) {
@@ -352,37 +358,40 @@ export default function IntegrationInboxPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Integration Inbox</h1>
+      <h1 className="text-2xl font-semibold">Integration Transactions</h1>
 
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-          <div>
-            <Label>Source</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={sourceFilter}
-              onChange={e => setSourceFilter(e.target.value as SourceFilter)}
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Source</div>
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={sourceFilter}
+            onChange={e => setSourceFilter(e.target.value as SourceFilter)}
+          >
+            {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 border-b">
+        {STATUS_OPTIONS.map(o => {
+          const active = statusFilter === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setStatusFilter(o.value)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
             >
-              {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="outline" onClick={() => reload()} disabled={loading}>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
 
       <Card>
         <CardContent className="space-y-3 p-4">
@@ -427,18 +436,18 @@ export default function IntegrationInboxPage() {
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40">
-            <tr>
+            <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="text-left p-3">Date</th>
               <th className="text-left p-3">Source</th>
               <th className="text-left p-3">Description</th>
               <th className="text-right p-3">Amount</th>
               <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">Actions</th>
+              <th className="text-left p-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No rows match the current filter.</td></tr>
+              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{loading ? 'Loading…' : 'No transactions match the current filter.'}</td></tr>
             )}
             {rows.map(t => {
               const n = parseFloat(t.amount);
@@ -446,8 +455,8 @@ export default function IntegrationInboxPage() {
               const isOpen = action?.rowId === t.id;
               return (
                 <Fragment key={t.id}>
-                  <tr className="border-b last:border-b-0">
-                    <td className="p-3">{t.occurred_at}</td>
+                  <tr className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 whitespace-nowrap">{fmtShortDate(t.occurred_at)}</td>
                     <td className="p-3 text-xs text-muted-foreground">{sourceLabel(t.source)}</td>
                     <td className="p-3">
                       {t.description}
