@@ -70,11 +70,51 @@ Tax Codes / Cost Centers / Fiscal Periods (status badges, local dates, styled
 headers, hover) and Users (styled header + hover). Chart of Accounts reuses the
 converted Accounting page; Entity is already a clean settings form.
 
+## Company switcher (top bar)
+
+Replaced the plain native business `<select>` with a QBO-style popover
+(`components/layout/BusinessSwitcher.tsx`):
+
+- **Current company** with a gold building mark + checkmark.
+- **Other companies** — switch-to list (each with its `role_override` badge).
+- Firm-admin actions: **Add client** (→ `/clients/new`) and **Back to
+  practice** (→ `/accounting/client-overview`).
+- Opens on click; closes on outside-click / Escape / selection.
+
+## Add a client (create business) — new feature
+
+A real create-business flow, not just a link:
+
+- **API** — `POST /firm/businesses` (`routes/businesses.ts`), firm-level
+  (outside the `/businesses/:businessId` tenancy mount), guarded
+  `requireMinRole('firm_admin')`.
+- **Service** — `createBusiness` (`services/core/businessService.ts`) inserts
+  the business under the caller's firm, seeds the default chart of accounts +
+  current-year fiscal periods via the existing SQL helpers `seed_default_coa()`
+  / `seed_calendar_year_periods()` (migration 0009), grants the creator a
+  `user_business_access` row, and audits `business.create` +
+  `user_business_access.grant`.
+- **Schema** — `businessCreateSchema` in `packages/shared/src/schemas/business.ts`.
+- **Web** — `AddClientPage` at `/clients/new` (name, legal name, tax ID, fiscal
+  year start, optional address). On success it calls the new
+  `AuthContext.refresh()` (re-fetches `/me`), switches into the new client, and
+  lands on its dashboard.
+- **Test** — `tests/integration/businessService.test.ts` asserts COA + periods
+  seeded, creator-only access, and audit row.
+
+> ⚠️ Deploy note: `POST /firm/businesses` only works once the API is deployed
+> (or the dev proxy is pointed at the local API). Against the prod proxy the
+> route 404s until deploy.
+
 ## Verification
 
-- `npm -w @accounting/web run typecheck` clean after every commit.
+- `npm -w @accounting/web run typecheck` and `npm -w @accounting/api run
+  typecheck` clean; `npm -w @accounting/shared run build` clean.
 - `npm -w @accounting/web run lint` — 0 errors, 14 pre-existing
   `react-hooks/exhaustive-deps` warnings (unchanged from `main`).
 - Spot-checked in the browser against the running dev server (Chart of
   Accounts, Bank Transactions tabs, Client Overview MoneyBar, Standard
-  Reports grouped list, Management Reports).
+  Reports grouped list, Management Reports, Inventory, Cost Centers, Payroll
+  Overview, the company switcher popover, and the Add-client page).
+- `businessService.test.ts` is written but **not run in the sandbox** (the
+  suite needs Docker testcontainers); run it where Docker is available.
