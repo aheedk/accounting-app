@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CreateMenu } from './CreateMenu';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -162,6 +163,8 @@ export function Sidebar() {
         </div>
         <span className="font-display text-lg tracking-tight text-white">Accounting</span>
       </div>
+
+      <CreateMenu />
 
       <nav
         className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto"
