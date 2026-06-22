@@ -61,6 +61,18 @@ function varianceClass(variance: string): string {
   return 'text-muted-foreground';
 }
 
+function statusBadge(status: 'draft' | 'active' | 'archived') {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  switch (status) {
+    case 'active':
+      return <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>;
+    case 'archived':
+      return <span className={`${base} bg-muted text-muted-foreground`}>Archived</span>;
+    default:
+      return <span className={`${base} bg-amber-100 text-amber-800`}>Draft</span>;
+  }
+}
+
 export default function FinancialPlanningPage() {
   const [bizId] = useActiveBusinessId();
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -224,10 +236,11 @@ export default function FinancialPlanningPage() {
                         onClick={() => setSelectedId(b.id)}
                         className={`w-full px-4 py-3 text-left hover:bg-muted/40 ${selectedId === b.id ? 'bg-muted/60' : ''}`}
                       >
-                        <div className="font-medium">{b.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          FY {b.fiscal_year} — <span className="capitalize">{b.status}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{b.name}</span>
+                          {statusBadge(b.status)}
                         </div>
+                        <div className="text-xs text-muted-foreground">FY {b.fiscal_year}</div>
                       </button>
                     </li>
                   ))}

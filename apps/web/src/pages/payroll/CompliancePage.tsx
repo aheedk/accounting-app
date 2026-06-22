@@ -50,6 +50,20 @@ const STATUS_LABELS: Record<ItemStatus, string> = {
   na: 'N/A',
 };
 
+function statusBadge(status: ItemStatus) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  switch (status) {
+    case 'done':
+      return <span className={`${base} bg-emerald-100 text-emerald-800`}>Done</span>;
+    case 'in_progress':
+      return <span className={`${base} bg-amber-100 text-amber-800`}>In progress</span>;
+    case 'na':
+      return <span className={`${base} bg-muted text-muted-foreground`}>N/A</span>;
+    default:
+      return <span className={`${base} bg-sky-100 text-sky-800`}>Open</span>;
+  }
+}
+
 function pickErr(e: unknown): string {
   const resp = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
     ?.response?.data?.error?.message;
@@ -256,7 +270,10 @@ export default function CompliancePage() {
               <Card key={item.id}>
                 <CardHeader className="pb-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <CardTitle className="text-base">{ITEM_LABELS[item.item_key]}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base">{ITEM_LABELS[item.item_key]}</CardTitle>
+                      {statusBadge(item.status)}
+                    </div>
                     <div className="flex items-center gap-2">
                       <Label className="text-xs text-muted-foreground">Status</Label>
                       <select

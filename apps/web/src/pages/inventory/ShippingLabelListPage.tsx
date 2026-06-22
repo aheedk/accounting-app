@@ -7,6 +7,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 
 type ShippingLabel = {
@@ -181,7 +182,7 @@ export default function ShippingLabelListPage() {
                   Delete
                 </Button>
               )}
-              emptyMessage="No shipping labels yet."
+              emptyMessage={<EmptyState title="No shipping labels yet" hint="Create a label to record a shipment's carrier, tracking number, and cost." actionLabel="New label" actionTo="/inventory/shipping-labels/new" />}
             />
           )}
         </CardContent>

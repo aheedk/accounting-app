@@ -11,6 +11,13 @@ type Overview = {
   employee_count: number;
 };
 
+function fmtShortDate(iso: string | null) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 export default function PayrollOverviewPage() {
   const [bizId] = useActiveBusinessId();
   const [data, setData] = useState<Overview | null>(null);
@@ -38,7 +45,7 @@ export default function PayrollOverviewPage() {
             <CardTitle>Next Pay Date</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold">
-            {data.next_pay_date ?? '—'}
+            {fmtShortDate(data.next_pay_date)}
           </CardContent>
         </Card>
         <Card>

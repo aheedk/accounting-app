@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileDown, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { MoneyBar } from '@/components/ui/MoneyBar';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
@@ -19,12 +22,20 @@ type FirmRow = {
   last_reconciliation_date: string | null;
 };
 
+function fmtShortDate(iso: string | null) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 export default function ClientOverviewPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [, setActiveBusiness] = useActiveBusinessId();
   const [rows, setRows] = useState<FirmRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [excelBusy, setExcelBusy] = useState(false);
 
   const isFirmAdmin = user?.role === 'firm_admin';
 
@@ -41,6 +52,32 @@ export default function ClientOverviewPage() {
       });
   }, [isFirmAdmin]);
 
+  const totals = useMemo(() => (rows ?? []).reduce(
+    (acc, r) => ({ ar: acc.ar + Number(r.ar_balance), ap: acc.ap + Number(r.ap_balance) }),
+    { ar: 0, ap: 0 },
+  ), [rows]);
+
+  function pickBusiness(id: string) {
+    setActiveBusiness(id);
+    navigate('/');
+  }
+
+  const columns: Column<FirmRow>[] = [
+    {
+      key: 'business_name', header: 'Business', sortable: true, sortValue: r => r.business_name,
+      render: r => (
+        <button type="button" onClick={() => pickBusiness(r.business_id)} className="font-medium text-primary hover:underline">
+          {r.business_name}
+        </button>
+      ),
+    },
+    { key: 'ar_balance', header: 'AR Balance', align: 'right', sortable: true, sortValue: r => Number(r.ar_balance), render: r => <span className="font-mono">{fmtMoney(r.ar_balance)}</span> },
+    { key: 'ap_balance', header: 'AP Balance', align: 'right', sortable: true, sortValue: r => Number(r.ap_balance), render: r => <span className="font-mono">{fmtMoney(r.ap_balance)}</span> },
+    { key: 'unreviewed_bank_txn_count', header: 'Unreviewed Txns', align: 'right', sortable: true, sortValue: r => r.unreviewed_bank_txn_count, render: r => r.unreviewed_bank_txn_count > 0 ? <span className="font-medium text-amber-700">{r.unreviewed_bank_txn_count}</span> : <span className="text-muted-foreground">0</span> },
+    { key: 'open_period_count', header: 'Open Periods', align: 'right', sortable: true, sortValue: r => r.open_period_count, render: r => r.open_period_count },
+    { key: 'last_reconciliation_date', header: 'Last Reconciliation', align: 'right', sortable: true, sortValue: r => r.last_reconciliation_date ?? '', render: r => <span className="whitespace-nowrap">{fmtShortDate(r.last_reconciliation_date)}</span> },
+  ];
+
   if (!isFirmAdmin) {
     return (
       <div className="space-y-4">
@@ -54,11 +91,6 @@ export default function ClientOverviewPage() {
   if (error) return <div className="text-sm text-destructive">{error}</div>;
   if (!rows) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
-  function pickBusiness(id: string) {
-    setActiveBusiness(id);
-    navigate('/');
-  }
-
   const dlHeaders = ['Business', 'AR Balance', 'AP Balance', 'Unreviewed Bank Txns', 'Open Periods', 'Last Reconciliation'];
   const dlRows = () => rows.map(r => [
     r.business_name,
@@ -68,8 +100,6 @@ export default function ClientOverviewPage() {
     String(r.open_period_count),
     r.last_reconciliation_date ?? '—',
   ]);
-
-  const [excelBusy, setExcelBusy] = useState(false);
 
   function handleExport() {
     setExcelBusy(true);
@@ -104,51 +134,28 @@ export default function ClientOverviewPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All clients</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {rows.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">No businesses in this firm yet.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40">
-                <tr>
-                  <th className="px-3 py-2 text-left">Business</th>
-                  <th className="px-3 py-2 text-right">AR Balance</th>
-                  <th className="px-3 py-2 text-right">AP Balance</th>
-                  <th className="px-3 py-2 text-right">Unreviewed Bank Txns</th>
-                  <th className="px-3 py-2 text-right">Open Periods</th>
-                  <th className="px-3 py-2 text-right">Last Reconciliation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.business_id} className="border-b last:border-0">
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => pickBusiness(r.business_id)}
-                        className="text-primary underline hover:no-underline"
-                      >
-                        {r.business_name}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">{fmtMoney(r.ar_balance)}</td>
-                    <td className="px-3 py-2 text-right font-mono">{fmtMoney(r.ap_balance)}</td>
-                    <td className="px-3 py-2 text-right">{r.unreviewed_bank_txn_count}</td>
-                    <td className="px-3 py-2 text-right">{r.open_period_count}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.last_reconciliation_date && r.last_reconciliation_date !== '' ? r.last_reconciliation_date : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {rows.length > 0 && (
+        <MoneyBar
+          segments={[
+            { amount: totals.ar, caption: 'Total receivable', colorClass: 'bg-emerald-500' },
+            { amount: totals.ap, caption: 'Total payable', colorClass: 'bg-rose-500' },
+            { amount: totals.ar - totals.ap, caption: 'Net position', colorClass: 'bg-sky-500' },
+          ]}
+        />
+      )}
+
+      <Card><CardContent className="p-0">
+        <DataTable
+          rows={rows}
+          getRowId={r => r.business_id}
+          columns={columns}
+          defaultSortKey="business_name"
+          defaultSortDir="asc"
+          selectable={false}
+          downloadable={{ filename: 'client-overview', title: 'Client Overview' }}
+          emptyMessage={<EmptyState title="No businesses in this firm yet" hint="Clients you add to the firm will appear here with their balances and review status." />}
+        />
+      </CardContent></Card>
     </div>
   );
 }

@@ -116,10 +116,18 @@ const TXN_TYPE_OPTIONS: { value: TemplateType; label: string }[] = [
   { value: 'purchase_order', label: 'Purchase Order' },
 ];
 
-function fmtDate(iso: string | null): string {
+function fmtShortDate(iso: string | null) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
+function activeBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Paused</span>;
 }
 
 export default function RecurringTransactionsPage() {
@@ -191,8 +199,8 @@ export default function RecurringTransactionsPage() {
         'Scheduled',
         TXN_TYPE_LABELS[t.template_type] ?? t.template_type,
         INTERVAL_LABELS[t.recurrence] ?? t.recurrence,
-        fmtDate(t.last_run_at),
-        fmtDate(t.next_run_date),
+        fmtShortDate(t.last_run_at),
+        fmtShortDate(t.next_run_date),
         '0.00',
       ]);
       downloadAsExcel(headers, rows, 'recurring-transactions');
@@ -208,8 +216,8 @@ export default function RecurringTransactionsPage() {
         <td>Scheduled</td>
         <td>${TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
         <td>${INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
-        <td>${fmtDate(t.last_run_at)}</td>
-        <td>${fmtDate(t.next_run_date)}</td>
+        <td>${fmtShortDate(t.last_run_at)}</td>
+        <td>${fmtShortDate(t.next_run_date)}</td>
         <td>—</td>
         <td style="text-align:right">0.00</td>
       </tr>`).join('');
@@ -511,13 +519,13 @@ export default function RecurringTransactionsPage() {
                 </tr>
               ) : (
                 filteredTemplates.map((t) => (
-                  <tr key={t.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                    <td className="p-3">{t.name}</td>
+                  <tr key={t.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 font-medium">{t.name}</td>
                     <td className="p-3 text-muted-foreground">Scheduled</td>
                     <td className="p-3">{TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
                     <td className="p-3">{INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
-                    <td className="p-3 font-mono">{fmtDate(t.last_run_at)}</td>
-                    <td className="p-3 font-mono">{fmtDate(t.next_run_date)}</td>
+                    <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(t.last_run_at)}</td>
+                    <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(t.next_run_date)}</td>
                     <td className="p-3 text-muted-foreground">—</td>
                     <td className="p-3 text-right font-mono">0.00</td>
                     <td className="p-3 text-right">

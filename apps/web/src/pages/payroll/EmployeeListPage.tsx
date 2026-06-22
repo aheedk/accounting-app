@@ -8,6 +8,7 @@ import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
 
 const IMPORT_COLS = [
@@ -167,7 +168,7 @@ export default function EmployeeListPage() {
               : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
           }
         >
-          {r.is_active ? 'active' : 'inactive'}
+          {r.is_active ? 'Active' : 'Inactive'}
         </span>
       ),
     },
@@ -260,7 +261,9 @@ export default function EmployeeListPage() {
                   </span>
                 );
               }}
-              emptyMessage={isFirmAdmin ? 'No employees yet. Add one to get started.' : 'No employees yet.'}
+              emptyMessage={isFirmAdmin
+                ? <EmptyState title="No employees yet" hint="Add an employee or import a roster to start running payroll." actionLabel="Add employee" actionTo="/payroll/employees/new" />
+                : <EmptyState title="No employees yet" hint="Employees added by your firm admin will appear here." />}
             />
           )}
         </CardContent>

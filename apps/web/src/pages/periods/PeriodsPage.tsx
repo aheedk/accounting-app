@@ -13,6 +13,19 @@ function pickErr(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message ?? 'Failed';
 }
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
+function statusBadge(status: 'open' | 'closed') {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return status === 'open'
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Open</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Closed</span>;
+}
+
 export default function PeriodsPage() {
   const [bizId] = useActiveBusinessId();
   const { user } = useAuth();
@@ -102,21 +115,24 @@ export default function PeriodsPage() {
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40">
-            <tr>
+            <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="text-left p-3">Starts</th>
               <th className="text-left p-3">Ends</th>
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Closed</th>
-              <th className="text-left p-3">Actions</th>
+              <th className="text-left p-3">Action</th>
             </tr>
           </thead>
           <tbody>
+            {periods.length === 0 && (
+              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No fiscal periods yet. Use “Seed a year” to create them.</td></tr>
+            )}
             {periods.map(p => (
-              <tr key={p.id} className="border-b last:border-b-0">
-                <td className="p-3">{p.starts_on}</td>
-                <td className="p-3">{p.ends_on}</td>
-                <td className="p-3">{p.status}</td>
-                <td className="p-3">{p.closed_at ? new Date(p.closed_at).toLocaleString() : ''}</td>
+              <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                <td className="p-3 whitespace-nowrap">{fmtShortDate(p.starts_on)}</td>
+                <td className="p-3 whitespace-nowrap">{fmtShortDate(p.ends_on)}</td>
+                <td className="p-3">{statusBadge(p.status)}</td>
+                <td className="p-3 whitespace-nowrap">{p.closed_at ? new Date(p.closed_at).toLocaleDateString() : <span className="text-muted-foreground">—</span>}</td>
                 <td className="p-3">
                   {p.status === 'open' && (
                     <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => close(p)}>Close</Button>

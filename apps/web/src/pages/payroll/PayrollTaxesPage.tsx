@@ -42,8 +42,14 @@ function pickErr(e: unknown): string {
 
 function statusBadge(status: Status) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
-  if (status === 'accrued') return <span className={`${base} bg-amber-100 text-amber-800`}>accrued</span>;
-  return <span className={`${base} bg-emerald-100 text-emerald-800`}>paid</span>;
+  if (status === 'accrued') return <span className={`${base} bg-amber-100 text-amber-800`}>Accrued</span>;
+  return <span className={`${base} bg-emerald-100 text-emerald-800`}>Paid</span>;
+}
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
 export default function PayrollTaxesPage() {
@@ -313,13 +319,13 @@ export default function PayrollTaxesPage() {
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">Period</th>
                 <th className="text-left p-3">Date Range</th>
                 <th className="text-left p-3">Liability Account</th>
                 <th className="text-right p-3">Amount</th>
                 <th className="text-left p-3">Status</th>
-                <th className="text-right p-3"></th>
+                <th className="text-right p-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -331,9 +337,9 @@ export default function PayrollTaxesPage() {
                 </tr>
               )}
               {liabilities.map(l => (
-                <tr key={l.id} className="border-b last:border-b-0">
-                  <td className="p-3">{l.period}</td>
-                  <td className="p-3 font-mono text-xs">{l.period_start} → {l.period_end}</td>
+                <tr key={l.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                  <td className="p-3 capitalize">{l.period}</td>
+                  <td className="p-3 font-mono text-xs whitespace-nowrap">{fmtShortDate(l.period_start)} → {fmtShortDate(l.period_end)}</td>
                   <td className="p-3">{accountLabel(l.liability_account_id)}</td>
                   <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
                   <td className="p-3">{statusBadge(l.status)}</td>
@@ -360,7 +366,7 @@ export default function PayrollTaxesPage() {
             <CardContent>
               <form className="space-y-3" onSubmit={submitPay}>
                 <p className="text-sm text-muted-foreground">
-                  {payTarget.period} · {payTarget.period_start} → {payTarget.period_end} ·{' '}
+                  <span className="capitalize">{payTarget.period}</span> · {fmtShortDate(payTarget.period_start)} → {fmtShortDate(payTarget.period_end)} ·{' '}
                   <span className="font-mono">{fmtMoney(payTarget.amount)}</span>
                 </p>
                 <div>

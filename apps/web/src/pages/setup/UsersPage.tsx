@@ -269,19 +269,19 @@ export default function UsersPage() {
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">Email</th>
                 <th className="text-left p-3">Name</th>
                 <th className="text-left p-3">Firm role</th>
                 <th className="text-left p-3">Business access</th>
-                <th className="text-right p-3"></th>
+                <th className="text-right p-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {users.map(u => {
                 const isSelf = u.id === user?.id;
                 return (
-                  <tr key={u.id} className="border-b last:border-b-0 align-top">
+                  <tr key={u.id} className="border-b last:border-b-0 align-top hover:bg-muted/30">
                     <td className="p-3">{u.email}</td>
                     <td className="p-3">{u.full_name}</td>
                     <td className="p-3">

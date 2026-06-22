@@ -55,6 +55,7 @@ import FixedAssetListPage from '@/pages/accounting/FixedAssetListPage';
 import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
 import FixedAssetDetailPage from '@/pages/accounting/FixedAssetDetailPage';
 import EntityPage from '@/pages/setup/EntityPage';
+import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
 import CostCentersPage from '@/pages/setup/CostCentersPage';
 import InventoryListPage from '@/pages/inventory/InventoryListPage';
@@ -172,6 +173,7 @@ export default function App() {
             <Route path="/accounting/fixed-assets/:id" element={<FixedAssetDetailPage />} />
 
             {/* Setup */}
+            <Route path="/clients/new" element={<AddClientPage />} />
             <Route path="/setup/entity" element={<EntityPage />} />
             <Route path="/setup/coa" element={<CoaListPage />} />
             <Route path="/setup/cost-centers" element={<CostCentersPage />} />

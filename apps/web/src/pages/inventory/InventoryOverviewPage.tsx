@@ -11,6 +11,12 @@ type Overview = {
   recent_sales: Array<{ id: string; order_date: string; so_number: string }>;
 };
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 export default function InventoryOverviewPage() {
   const [bizId] = useActiveBusinessId();
   const [data, setData] = useState<Overview | null>(null);
@@ -63,8 +69,8 @@ export default function InventoryOverviewPage() {
               </thead>
               <tbody>
                 {data.recent_receipts.map((r) => (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="px-3 py-2">{r.receipt_date}</td>
+                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-3 py-2 whitespace-nowrap">{fmtShortDate(r.receipt_date)}</td>
                     <td className="px-3 py-2 font-mono">{r.po_number}</td>
                   </tr>
                 ))}
@@ -90,8 +96,8 @@ export default function InventoryOverviewPage() {
               </thead>
               <tbody>
                 {data.recent_sales.map((r) => (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="px-3 py-2">{r.order_date}</td>
+                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-3 py-2 whitespace-nowrap">{fmtShortDate(r.order_date)}</td>
                     <td className="px-3 py-2 font-mono">{r.so_number}</td>
                   </tr>
                 ))}

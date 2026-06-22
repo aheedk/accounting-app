@@ -59,6 +59,12 @@ function inRange(date: string, start: string, end: string): boolean {
   return date >= start && date <= end;
 }
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 export default function ReconcilePage() {
   const [bizId] = useActiveBusinessId();
   const today = todayLocal();
@@ -234,11 +240,11 @@ export default function ReconcilePage() {
                 <tr><td className="p-3 text-muted-foreground" colSpan={4}>No prior reconciliations for this account.</td></tr>
               )}
               {priorTop10.map(r => (
-                <tr key={r.id} className="border-b last:border-b-0">
-                  <td className="p-3">{r.period_start} — {r.period_end}</td>
-                  <td className="p-3 text-right">{fmtMoney(r.statement_ending_balance)}</td>
-                  <td className="p-3">{new Date(r.reconciled_at).toLocaleString()}</td>
-                  <td className="p-3">{r.memo ?? ''}</td>
+                <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                  <td className="p-3 whitespace-nowrap">{fmtShortDate(r.period_start)} — {fmtShortDate(r.period_end)}</td>
+                  <td className="p-3 text-right font-mono">{fmtMoney(r.statement_ending_balance)}</td>
+                  <td className="p-3 whitespace-nowrap">{new Date(r.reconciled_at).toLocaleDateString()}</td>
+                  <td className="p-3">{r.memo ?? <span className="text-muted-foreground">—</span>}</td>
                 </tr>
               ))}
             </tbody>

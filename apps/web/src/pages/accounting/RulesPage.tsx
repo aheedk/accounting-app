@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -86,6 +87,12 @@ const DIRECTION_OPTIONS: Array<{ value: SignFilter; label: string }> = [
   { value: 'inflow_only', label: 'Money in' },
   { value: 'any', label: 'Money out or in' },
 ];
+
+const SIGN_FILTER_LABELS: Record<SignFilter, string> = {
+  any: 'Any',
+  inflow_only: 'Inflow only',
+  outflow_only: 'Outflow only',
+};
 
 function directionLabel(s: SignFilter): string {
   return DIRECTION_OPTIONS.find(o => o.value === s)?.label ?? s;
@@ -562,8 +569,8 @@ export default function RulesPage() {
             <tbody>
               {filteredRules.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                    {rules.length === 0 ? 'No rules yet. Create one to auto-categorize bank transactions.' : 'No rules match your search.'}
+                  <td colSpan={9} className="p-0">
+                    <EmptyState title="No rules yet" hint="Create a rule above to auto-categorize incoming bank transactions by description, amount, and direction." />
                   </td>
                 </tr>
               ) : (

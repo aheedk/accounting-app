@@ -84,6 +84,12 @@ const IMPORT_SOURCE_OPTIONS: Array<{ value: IntegrationSource; label: string }> 
   { value: 'generic', label: 'Generic CSV' },
 ];
 
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
+
 function statusBadge(status: IntegrationInboxStatus) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
   switch (status) {
@@ -356,7 +362,7 @@ export default function IntegrationInboxPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Integration Inbox</h1>
+        <h1 className="text-2xl font-semibold">Integration Transactions</h1>
         <div className="flex items-center gap-2">
           <div className="relative group">
             <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['Date', 'Description', 'Amount', 'Source', 'Status'], rows.map(r => [r.occurred_at, r.description, r.amount, r.source, r.status]), 'integration-inbox'); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
@@ -365,7 +371,7 @@ export default function IntegrationInboxPage() {
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
           </div>
           <div className="relative group">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { const hdrs = ['Date', 'Description', 'Amount', 'Source', 'Status']; const rowsHtml = rows.map(r => `<tr><td>${r.occurred_at}</td><td>${r.description}</td><td>${r.amount}</td><td>${r.source}</td><td>${r.status}</td></tr>`).join(''); const win = window.open('', '_blank'); if (!win) return; win.document.write(`<!DOCTYPE html><html><head><title>Integration Inbox</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Integration Inbox</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`); win.document.close(); }} aria-label="Print">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { const hdrs = ['Date', 'Description', 'Amount', 'Source', 'Status']; const rowsHtml = rows.map(r => `<tr><td>${r.occurred_at}</td><td>${r.description}</td><td>${r.amount}</td><td>${r.source}</td><td>${r.status}</td></tr>`).join(''); const win = window.open('', '_blank'); if (!win) return; win.document.write(`<!DOCTYPE html><html><head><title>Integration Transactions</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Integration Transactions</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`); win.document.close(); }} aria-label="Print">
               <Printer className="h-4 w-4" />
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
@@ -373,35 +379,38 @@ export default function IntegrationInboxPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-          <div>
-            <Label>Source</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={sourceFilter}
-              onChange={e => setSourceFilter(e.target.value as SourceFilter)}
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Source</div>
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={sourceFilter}
+            onChange={e => setSourceFilter(e.target.value as SourceFilter)}
+          >
+            {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 border-b">
+        {STATUS_OPTIONS.map(o => {
+          const active = statusFilter === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setStatusFilter(o.value)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
             >
-              {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="outline" onClick={() => reload()} disabled={loading}>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
 
       <Card>
         <CardContent className="space-y-3 p-4">
@@ -446,18 +455,18 @@ export default function IntegrationInboxPage() {
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40">
-            <tr>
+            <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="text-left p-3">Date</th>
               <th className="text-left p-3">Source</th>
               <th className="text-left p-3">Description</th>
               <th className="text-right p-3">Amount</th>
               <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">Actions</th>
+              <th className="text-left p-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No rows match the current filter.</td></tr>
+              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{loading ? 'Loading…' : 'No transactions match the current filter.'}</td></tr>
             )}
             {rows.map(t => {
               const n = parseFloat(t.amount);
@@ -465,8 +474,8 @@ export default function IntegrationInboxPage() {
               const isOpen = action?.rowId === t.id;
               return (
                 <Fragment key={t.id}>
-                  <tr className="border-b last:border-b-0">
-                    <td className="p-3">{t.occurred_at}</td>
+                  <tr className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 whitespace-nowrap">{fmtShortDate(t.occurred_at)}</td>
                     <td className="p-3 text-xs text-muted-foreground">{sourceLabel(t.source)}</td>
                     <td className="p-3">
                       {t.description}

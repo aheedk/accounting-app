@@ -87,12 +87,18 @@ function roleAtLeast(role: Role | undefined, floor: Role): boolean {
 }
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'unreviewed', label: 'Unreviewed' },
+  { value: 'unreviewed', label: 'For review' },
   { value: 'matched', label: 'Matched' },
   { value: 'categorized', label: 'Categorized' },
   { value: 'excluded', label: 'Excluded' },
   { value: 'all', label: 'All' },
 ];
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
 
 function statusBadge(status: BankTransactionStatus) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
@@ -320,19 +326,26 @@ export default function BankTransactionsInboxPage() {
             ))}
           </select>
         </div>
-        <div>
-          <div className="mb-1 text-xs text-muted-foreground">Status</div>
-          <select
-            className="h-9 rounded-md border bg-background px-3 text-sm"
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-          >
-            {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-        <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => reload()} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-1 border-b">
+        {STATUS_OPTIONS.map(o => {
+          const active = statusFilter === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setStatusFilter(o.value)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
@@ -350,7 +363,7 @@ export default function BankTransactionsInboxPage() {
           </thead>
           <tbody>
             {txns.length === 0 && (
-              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No transactions match the current filter.</td></tr>
+              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{loading ? 'Loading…' : 'No transactions match the current filter.'}</td></tr>
             )}
             {txns.map(t => {
               const n = parseFloat(t.amount);
@@ -358,8 +371,8 @@ export default function BankTransactionsInboxPage() {
               const isOpen = action?.txnId === t.id;
               return (
                 <Fragment key={t.id}>
-                  <tr className="border-b last:border-b-0">
-                    <td className="p-3">{t.transaction_date}</td>
+                  <tr className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 whitespace-nowrap">{fmtShortDate(t.transaction_date)}</td>
                     <td className="p-3">{t.description}</td>
                     <td className={`p-3 text-right font-mono ${positive ? 'text-emerald-700' : 'text-destructive'}`}>
                       {fmtMoney(t.amount)}

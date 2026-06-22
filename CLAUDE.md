@@ -17,6 +17,7 @@ The only acceptable reason to interrupt the user is: a destructive irreversible 
 Production-grade accounting system for an accounting firm.
 
 - **Slices 1–13 shipped.** All 23 originally-stubbed ComingSoon tabs replaced. 47 migrations, 157 integration tests, full sidebar coverage. See per-slice plans under `docs/superpowers/plans/`.
+- **QBO-style revamp.** Every sidebar tab restyled to match QuickBooks Online (shared `MoneyBar` / `ReportCard` / `EmptyState` / `DataTable`, status pills, local dates, `fmtMoney` with no `$`). First wave is on `main`; the second wave (Accounting/Reports/Payroll/Inventory/Setup + QBO company switcher + Add-client flow) is on branch `accounting-qbo-revamp`. Living status in `docs/qbo-revamp-handoff.md`; changelogs in `docs/qbo-style-revamp-changes.md` and `docs/accounting-qbo-revamp-changes.md`.
 - Design specs live in `docs/superpowers/specs/`. Implementation plans live in `docs/superpowers/plans/`.
 - New features beyond the 23 tabs: write a fresh spec → plan → impl following the same pattern documented here.
 
