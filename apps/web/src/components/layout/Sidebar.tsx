@@ -14,6 +14,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateMenu } from './CreateMenu';
+import { BookmarkMenu } from './BookmarkMenu';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -165,6 +166,7 @@ export function Sidebar() {
       </div>
 
       <CreateMenu />
+      <BookmarkMenu />
 
       <nav
         className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto"
