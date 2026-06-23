@@ -7,6 +7,19 @@ export function fmtLongDate(iso: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
 
+export function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function todayLocal(): string {
   const d = new Date();
   return dateToLocalIso(d);

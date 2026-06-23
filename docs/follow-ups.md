@@ -78,29 +78,6 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 **Priority:** high.
 
-#### QBO-style detail pages
-
-**Why:** Several detail pages still feel like legacy admin pages compared with the newer QBO-style list/form screens.
-
-**Pages to review:**
-- Customer detail.
-- Invoice detail.
-- Bill detail.
-- Payment detail.
-- Expense transaction detail.
-- Journal entry detail.
-- Inventory item detail.
-
-**To do:**
-- Add stronger detail headers with status badges, totals, primary actions, and secondary action menus.
-- Add related activity/transaction sections where useful.
-- Add audit/history panels for posted/voided/edited records.
-- Replace raw date rendering with the shared local date helpers.
-- Prefer names and human-readable references over raw IDs where possible.
-- Add print/share/copy/edit/void actions where they match the transaction lifecycle.
-
-**Priority:** high.
-
 #### Custom Reports regression coverage
 
 **Why:** The saved custom report flow and account picker UX work, but the create/run/delete lifecycle and account filter behavior should be covered by regression tests.

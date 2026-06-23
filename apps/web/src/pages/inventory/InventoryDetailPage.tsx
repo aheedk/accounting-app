@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
 import { useParams, useNavigate } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
+import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
 
 type StockMovementReason = 'adjustment' | 'opening_balance' | 'manual_in' | 'manual_out' | 'write_off';
 
@@ -37,8 +39,12 @@ type InventoryItemDetail = {
   inventory_asset_account_id: string | null;
   is_active: boolean;
   quantity_on_hand: string;
+  created_at?: string;
+  updated_at?: string;
   stock_movements: StockMovement[];
 };
+
+type Account = { id: string; code: string; name: string };
 
 const REASONS: Array<{ value: StockMovementReason; label: string }> = [
   { value: 'adjustment', label: 'Adjustment' },
@@ -52,11 +58,29 @@ function today(): string {
   return todayLocal();
 }
 
+function reasonLabel(reason: StockMovementReason): string {
+  return REASONS.find(r => r.value === reason)?.label ?? reason.replace(/_/g, ' ');
+}
+
+function fmtQuantity(value: string | number): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtSignedQuantity(value: string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${fmtQuantity(n)}`;
+}
+
 export default function InventoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [data, setData] = useState<InventoryItemDetail | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [adjForm, setAdjForm] = useState({
     movement_date: today(),
@@ -81,8 +105,13 @@ export default function InventoryDetailPage() {
   }, [bizId, id]);
 
   useEffect(() => {
-    reload();
+    void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}/coa`, { params: { include_inactive: true } }).then(r => setAccounts(r.data.accounts)).catch(() => setAccounts([]));
+  }, [bizId]);
 
   async function submitAdjust(e: React.FormEvent) {
     e.preventDefault();
@@ -100,7 +129,7 @@ export default function InventoryDetailPage() {
         memo: adjForm.memo.trim() === '' ? null : adjForm.memo,
       };
       await api.post(`/businesses/${bizId}/inventory-items/${id}/adjust-stock`, body);
-      setAdjMsg(`Stock adjusted by ${adjForm.quantity_delta} on ${adjForm.movement_date}.`);
+      setAdjMsg(`Stock adjusted by ${adjForm.quantity_delta} on ${fmtLongDate(adjForm.movement_date)}.`);
       setAdjForm({ movement_date: today(), quantity_delta: '', reason: 'adjustment', memo: '' });
       await reload();
     } catch (e: unknown) {
@@ -113,59 +142,64 @@ export default function InventoryDetailPage() {
     }
   }
 
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, `${a.code} - ${a.name}`])), [accounts]);
+
   if (!bizId) return <div>Pick a business.</div>;
   if (loadErr) return <div className="text-sm text-destructive">{loadErr}</div>;
-  if (!data) return <div>Loading…</div>;
+  if (!data) return <div>Loading...</div>;
+
+  const lastMovement = data.stock_movements[0];
+  const scrollToAdjust = () => document.getElementById('stock-adjust')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{data.name}</h1>
-          <p className="text-sm text-muted-foreground font-mono">SKU: {data.sku}</p>
-        </div>
-        <span
-          className={
-            data.is_active
-              ? 'inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800'
-              : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
-          }
-        >
-          {data.is_active ? 'active' : 'inactive'}
-        </span>
+      <DetailPageHeader
+        eyebrow="Inventory item"
+        title={data.name}
+        subtitle={<span className="font-mono">SKU {data.sku}</span>}
+        status={data.is_active ? 'active' : 'inactive'}
+        totalLabel="Qty on hand"
+        total={fmtQuantity(data.quantity_on_hand)}
+        actions={[{ label: 'Adjust stock', icon: <SlidersHorizontal className="h-4 w-4" />, onClick: scrollToAdjust, disabled: !data.is_active }]}
+        menuActions={baseDetailMenuActions()}
+      />
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailMetric label="Quantity on hand" value={fmtQuantity(data.quantity_on_hand)} hint={data.unit_of_measure} />
+        <DetailMetric label="Purchase cost" value={data.purchase_cost ? fmtMoney(data.purchase_cost) : '-'} />
+        <DetailMetric label="Sale price" value={data.sale_price ? fmtMoney(data.sale_price) : '-'} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Item details</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <DetailField label="SKU" value={data.sku} />
+            <DetailField label="Unit" value={data.unit_of_measure} />
+            <DetailField label="Income account" value={data.income_account_id ? accountMap.get(data.income_account_id) ?? data.income_account_id.slice(0, 8) : null} />
+            <DetailField label="Expense account" value={data.expense_account_id ? accountMap.get(data.expense_account_id) ?? data.expense_account_id.slice(0, 8) : null} />
+            <DetailField label="Inventory asset account" value={data.inventory_asset_account_id ? accountMap.get(data.inventory_asset_account_id) ?? data.inventory_asset_account_id.slice(0, 8) : null} />
+            <DetailField label="Description" className="sm:col-span-2" value={data.description} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Activity</CardTitle></CardHeader>
+          <CardContent>
+            <DetailActivity
+              items={[
+                { label: 'Created', value: data.created_at ? fmtDateTime(data.created_at) : null },
+                { label: 'Last updated', value: data.updated_at ? fmtDateTime(data.updated_at) : null },
+                { label: 'Stock movements', value: data.stock_movements.length ? `${data.stock_movements.length} total` : null },
+                { label: 'Last movement', value: lastMovement ? `${fmtSignedQuantity(lastMovement.quantity_delta)} on ${fmtLongDate(lastMovement.movement_date)}` : null },
+              ]}
+            />
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>SKU: {data.sku}</div>
-          <div>Unit: {data.unit_of_measure}</div>
-          <div>Purchase cost: {data.purchase_cost ? fmtMoney(data.purchase_cost) : '—'}</div>
-          <div>Sale price: {data.sale_price ? fmtMoney(data.sale_price) : '—'}</div>
-          <div className="col-span-2">
-            Description: {data.description ?? '—'}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Income acct: {data.income_account_id ?? '—'}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Expense acct: {data.expense_account_id ?? '—'}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Inventory asset acct: {data.inventory_asset_account_id ?? '—'}
-          </div>
-          <div className="col-span-2 font-semibold">
-            Quantity on hand: {fmtMoney(data.quantity_on_hand)}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Stock movements</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Stock movements</CardTitle></CardHeader>
         <CardContent className="p-0">
           {data.stock_movements.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">
@@ -175,29 +209,31 @@ export default function InventoryDetailPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>
-                  <th className="text-left p-3">Date</th>
-                  <th className="text-right p-3">Delta</th>
-                  <th className="text-left p-3">Reason</th>
-                  <th className="text-left p-3">Memo</th>
-                  <th className="text-left p-3">Posted by</th>
+                  <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-right">Delta</th>
+                  <th className="p-3 text-left">Reason</th>
+                  <th className="p-3 text-left">Memo</th>
+                  <th className="p-3 text-left">Posted by</th>
+                  <th className="p-3 text-left">Created</th>
                 </tr>
               </thead>
               <tbody>
                 {data.stock_movements.map((m) => (
                   <tr key={m.id} className="border-b last:border-b-0">
-                    <td className="p-3">{m.movement_date}</td>
+                    <td className="p-3">{fmtLongDate(m.movement_date)}</td>
                     <td
                       className={
                         parseFloat(m.quantity_delta) < 0
-                          ? 'p-3 text-right text-destructive'
-                          : 'p-3 text-right'
+                          ? 'p-3 text-right font-mono text-destructive'
+                          : 'p-3 text-right font-mono'
                       }
                     >
-                      {fmtMoney(m.quantity_delta)}
+                      {fmtSignedQuantity(m.quantity_delta)}
                     </td>
-                    <td className="p-3">{m.reason}</td>
-                    <td className="p-3">{m.memo ?? '—'}</td>
-                    <td className="p-3">{m.posted_by_name ?? '—'}</td>
+                    <td className="p-3">{reasonLabel(m.reason)}</td>
+                    <td className="p-3">{m.memo ?? '-'}</td>
+                    <td className="p-3">{m.posted_by_name ?? '-'}</td>
+                    <td className="p-3">{fmtDateTime(m.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -206,12 +242,10 @@ export default function InventoryDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Adjust stock</CardTitle>
-        </CardHeader>
+      <Card id="stock-adjust">
+        <CardHeader><CardTitle>Adjust stock</CardTitle></CardHeader>
         <CardContent>
-          <form className="grid grid-cols-2 gap-3" onSubmit={submitAdjust}>
+          <form className="grid gap-3 md:grid-cols-2" onSubmit={submitAdjust}>
             <div>
               <Label>Movement date</Label>
               <DateInput
@@ -227,7 +261,7 @@ export default function InventoryDetailPage() {
                 step="0.0001"
                 value={adjForm.quantity_delta}
                 onChange={(e) => setAdjForm((f) => ({ ...f, quantity_delta: e.target.value }))}
-                placeholder="e.g. 10 or -3"
+                placeholder="e.g. 10.00 or -3.00"
                 required
               />
             </div>
@@ -254,9 +288,9 @@ export default function InventoryDetailPage() {
                 onChange={(e) => setAdjForm((f) => ({ ...f, memo: e.target.value }))}
               />
             </div>
-            <div className="col-span-2 flex gap-2">
+            <div className="md:col-span-2 flex gap-2">
               <Button type="submit" disabled={busy || !data.is_active}>
-                {busy ? 'Saving…' : 'Adjust stock'}
+                {busy ? 'Saving...' : 'Adjust stock'}
               </Button>
             </div>
           </form>
@@ -266,7 +300,7 @@ export default function InventoryDetailPage() {
       </Card>
 
       <Button variant="outline" onClick={() => nav('/inventory/items')}>
-        Back to list
+        Back to inventory
       </Button>
     </div>
   );
