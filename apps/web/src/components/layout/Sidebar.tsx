@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MyMenu } from './MyMenu';
 import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
 
@@ -165,6 +166,7 @@ export function Sidebar() {
         <span className="font-display text-lg tracking-tight text-white">Accounting</span>
       </div>
 
+      <MyMenu />
       <CreateMenu />
       <BookmarkMenu />
 
