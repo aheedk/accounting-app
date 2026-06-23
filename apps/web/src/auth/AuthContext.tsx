@@ -18,6 +18,7 @@ type AuthState = {
   businesses: AuthBusiness[];
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -55,6 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value = useMemo<AuthState>(() => ({ status, user, businesses, login, logout }), [status, user, businesses, login, logout]);
+  // Re-fetch the current user + business access (e.g. after adding a client).
+  const refresh = useCallback(async () => {
+    const me = await api.get('/me');
+    setUser(me.data.user);
+    setBusinesses(me.data.businesses ?? []);
+  }, []);
+
+  const value = useMemo<AuthState>(() => ({ status, user, businesses, login, logout, refresh }), [status, user, businesses, login, logout, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

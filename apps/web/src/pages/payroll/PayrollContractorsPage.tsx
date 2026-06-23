@@ -103,13 +103,13 @@ export default function PayrollContractorsPage() {
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">Name</th>
                 <th className="text-left p-3">Email</th>
                 <th className="text-left p-3">Tax ID Type</th>
                 <th className="text-left p-3">Tax ID</th>
                 <th className="text-left p-3">Status</th>
-                <th className="text-right p-3">Actions</th>
+                <th className="text-right p-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -132,7 +132,7 @@ export default function PayrollContractorsPage() {
                 </tr>
               )}
               {items.map(c => (
-                <tr key={c.id} className="border-b last:border-b-0 align-top">
+                <tr key={c.id} className="border-b last:border-b-0 align-top hover:bg-muted/30">
                   <td className="p-3">{c.name}</td>
                   <td className="p-3">{c.email ?? ''}</td>
                   <td className="p-3">

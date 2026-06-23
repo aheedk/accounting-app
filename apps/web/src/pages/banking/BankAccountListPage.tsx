@@ -6,6 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
+
+function statusBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
+}
 
 type Account = {
   id: string;
@@ -83,7 +91,7 @@ export default function BankAccountListPage() {
     { key: 'institution', header: 'Institution', sortable: true, sortValue: r => r.institution ?? '', render: r => r.institution || <span className="text-muted-foreground">—</span> },
     { key: 'account_last_four', header: 'Last 4', sortable: true, sortValue: r => r.account_last_four ?? '', render: r => <span className="font-mono">{r.account_last_four || <span className="text-muted-foreground">—</span>}</span> },
     { key: 'cash_account', header: 'Linked CoA', sortable: true, sortValue: r => `${r.cash_account_code} ${r.cash_account_name}`, render: r => <span className="font-mono">{r.cash_account_code} — {r.cash_account_name}</span> },
-    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => <span className="capitalize">{r.is_active ? 'active' : 'inactive'}</span> },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => statusBadge(r.is_active) },
   ];
 
   if (!bizId) return <div>Pick a business.</div>;
@@ -92,14 +100,7 @@ export default function BankAccountListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bank Accounts</h1>
-        <div className="flex items-center gap-3">
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="active">active</option>
-            <option value="inactive">inactive</option>
-          </select>
-          <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add bank account'}</Button>
-        </div>
+        <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add bank account'}</Button>
       </div>
 
       {showCreate && (
@@ -140,6 +141,17 @@ export default function BankAccountListPage() {
         </Card>
       )}
 
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Status</div>
+          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <DataTable
@@ -149,7 +161,7 @@ export default function BankAccountListPage() {
             defaultSortKey="name"
             defaultSortDir="asc"
             downloadable={{ filename: 'bank-accounts', title: 'Bank Accounts' }}
-            emptyMessage="No bank accounts."
+            emptyMessage={<EmptyState title="No bank accounts yet" hint="Add a bank account and link it to a cash account in your chart of accounts." />}
           />
         </CardContent>
       </Card>

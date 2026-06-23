@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 
 type LinkedEntityType =
@@ -238,17 +239,7 @@ export default function ReceiptsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Receipts</h1>
-        <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
-          value={filter}
-          onChange={e => setFilter(e.target.value as LinkedEntityType | 'all')}
-        >
-          <option value="all">All</option>
-          {LINK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
-      </div>
+      <h1 className="text-2xl font-semibold">Receipts</h1>
 
       <Card>
         <CardHeader><CardTitle>Upload receipt</CardTitle></CardHeader>
@@ -271,30 +262,44 @@ export default function ReceiptsPage() {
         </CardContent>
       </Card>
 
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Linked to</div>
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={filter}
+            onChange={e => setFilter(e.target.value as LinkedEntityType | 'all')}
+          >
+            <option value="all">All receipts</option>
+            {LINK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">Uploaded</th>
                 <th className="text-left p-3">Type</th>
                 <th className="text-left p-3">File</th>
                 <th className="text-left p-3">Linked to</th>
                 <th className="text-left p-3">Entity ID</th>
-                <th className="text-right p-3"></th>
+                <th className="text-right p-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {receipts.length === 0 && (
-                <tr><td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">No receipts yet.</td></tr>
+                <tr><td colSpan={6} className="p-0"><EmptyState title="No receipts yet" hint="Upload a receipt above, then link it to a bill, expense, or bank transaction." /></td></tr>
               )}
               {receipts.map(r => {
                 const f = files[r.file_id];
                 const name = f?.original_name ?? r.file_id.slice(0, 8);
                 const mime = f?.mime_type ?? '';
                 return (
-                  <tr key={r.id} className="border-b last:border-b-0">
-                    <td className="p-3 font-mono text-xs">{new Date(r.created_at).toLocaleString()}</td>
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 whitespace-nowrap">{new Date(r.created_at).toLocaleDateString()}</td>
                     <td className="p-3 font-mono text-xs">{mime ? mimeIcon(mime) : '—'}</td>
                     <td className="p-3">
                       <button

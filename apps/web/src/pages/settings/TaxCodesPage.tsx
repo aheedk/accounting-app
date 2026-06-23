@@ -11,6 +11,13 @@ import { DownloadButtons } from '@/components/ui/DownloadButtons';
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null; is_active: boolean };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
 
+function statusBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
+}
+
 export default function TaxCodesPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<TaxCode[]>([]);
@@ -68,12 +75,12 @@ export default function TaxCodesPage() {
       )}
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40"><tr><th className="text-left p-3">Code</th><th className="text-left p-3">Name</th><th className="text-right p-3">Current rate</th><th className="text-left p-3">Active</th></tr></thead>
-          <tbody>{items.map(c => (<tr key={c.id} className="border-b last:border-b-0">
+          <thead className="border-b bg-muted/40"><tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground"><th className="text-left p-3">Code</th><th className="text-left p-3">Name</th><th className="text-right p-3">Current rate</th><th className="text-left p-3">Status</th></tr></thead>
+          <tbody>{items.length === 0 && (<tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No tax codes yet.</td></tr>)}{items.map(c => (<tr key={c.id} className="border-b last:border-b-0 hover:bg-muted/30">
             <td className="p-3 font-mono">{c.code}</td>
             <td className="p-3">{c.name}</td>
-            <td className="p-3 text-right">{c.current_rate ? `${parseFloat((parseFloat(c.current_rate) * 100).toFixed(4))}%` : '—'}</td>
-            <td className="p-3">{c.is_active ? 'yes' : 'no'}</td>
+            <td className="p-3 text-right font-mono">{c.current_rate ? `${parseFloat((parseFloat(c.current_rate) * 100).toFixed(4))}%` : '—'}</td>
+            <td className="p-3">{statusBadge(c.is_active)}</td>
           </tr>))}</tbody>
         </table>
       </CardContent></Card>

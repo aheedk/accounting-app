@@ -18,3 +18,12 @@ export const businessUpdateSchema = z.object({
   address: businessAddressSchema.nullable().optional(),
 });
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
+
+export const businessCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  legal_name: z.string().min(1).max(200).nullable().optional(),
+  tax_id: z.string().min(1).max(50).nullable().optional(),
+  fiscal_year_start_month: z.number().int().min(1).max(12).optional(),
+  address: businessAddressSchema.nullable().optional(),
+});
+export type BusinessCreate = z.infer<typeof businessCreateSchema>;

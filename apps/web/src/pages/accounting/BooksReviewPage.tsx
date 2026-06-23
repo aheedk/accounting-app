@@ -35,6 +35,18 @@ const TASK_LABELS: Record<TaskKey, string> = {
   close_period: 'Close period',
 };
 
+function taskStatusBadge(status: TaskStatus) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  switch (status) {
+    case 'done':
+      return <span className={`${base} bg-emerald-100 text-emerald-800`}>Done</span>;
+    case 'in_progress':
+      return <span className={`${base} bg-amber-100 text-amber-800`}>In progress</span>;
+    default:
+      return <span className={`${base} bg-muted text-muted-foreground`}>To do</span>;
+  }
+}
+
 function pickErr(e: unknown): string {
   const resp = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
   if (resp) return resp;
@@ -135,7 +147,16 @@ export default function BooksReviewPage() {
 
       {periodId && (
         <Card>
-          <CardHeader><CardTitle>Review checklist</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>Review checklist</CardTitle>
+              {tasks.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  {tasks.filter(t => t.status === 'done').length} of {tasks.length} signed off
+                </span>
+              )}
+            </div>
+          </CardHeader>
           <CardContent>
             {loadingTasks && tasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -146,7 +167,10 @@ export default function BooksReviewPage() {
                 {tasks.map(t => (
                   <div key={t.id} className="rounded-md border p-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="font-medium">{TASK_LABELS[t.task_key]}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{TASK_LABELS[t.task_key]}</span>
+                        {taskStatusBadge(t.status)}
+                      </div>
                       <div className="flex items-center gap-2">
                         <Label className="text-xs text-muted-foreground">Status</Label>
                         <select

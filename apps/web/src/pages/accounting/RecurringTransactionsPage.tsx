@@ -14,24 +14,7 @@ import { downloadAsExcel } from '@/lib/download';
 type Account = { id: string; code: string; name: string; account_type: string };
 
 type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-type TemplateType =
-  | 'bill'
-  | 'non_posting_charge'
-  | 'check'
-  | 'non_posting_credit'
-  | 'credit_card_credit'
-  | 'credit_memo'
-  | 'deposit'
-  | 'estimate'
-  | 'expense'
-  | 'invoice'
-  | 'journal_entry'
-  | 'payment'
-  | 'refund'
-  | 'sales_receipt'
-  | 'transfer'
-  | 'vendor_credit'
-  | 'purchase_order';
+type TemplateType = 'journal_entry' | 'invoice' | 'bill';
 
 type Template = {
   id: string;
@@ -46,6 +29,10 @@ type Template = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+type RunDueResult = {
+  results: Array<{ template_id: string; runs_created: number }>;
 };
 
 type Line = { account_id: string; debit: string; credit: string; memo: string };
@@ -78,42 +65,14 @@ const INTERVAL_LABELS: Record<Recurrence, string> = {
 
 const TXN_TYPE_LABELS: Record<TemplateType, string> = {
   bill: 'Bill',
-  non_posting_charge: 'Non-Posting Charge',
-  check: 'Check',
-  non_posting_credit: 'Non-Posting Credit',
-  credit_card_credit: 'Credit Card Credit',
-  credit_memo: 'Credit Memo',
-  deposit: 'Deposit',
-  estimate: 'Estimate',
-  expense: 'Expense',
   invoice: 'Invoice',
   journal_entry: 'Journal Entry',
-  payment: 'Payment',
-  refund: 'Refund',
-  sales_receipt: 'Sales Receipt',
-  transfer: 'Transfer',
-  vendor_credit: 'Vendor Credit',
-  purchase_order: 'Purchase Order',
 };
 
-const TXN_TYPE_OPTIONS: { value: TemplateType; label: string }[] = [
-  { value: 'bill', label: 'Bill' },
-  { value: 'non_posting_charge', label: 'Non-Posting Charge' },
-  { value: 'check', label: 'Check' },
-  { value: 'non_posting_credit', label: 'Non-Posting Credit' },
-  { value: 'credit_card_credit', label: 'Credit Card Credit' },
-  { value: 'credit_memo', label: 'Credit Memo' },
-  { value: 'deposit', label: 'Deposit' },
-  { value: 'estimate', label: 'Estimate' },
-  { value: 'expense', label: 'Expense' },
-  { value: 'invoice', label: 'Invoice' },
+const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; disabled?: boolean; title?: string }> = [
   { value: 'journal_entry', label: 'Journal Entry' },
-  { value: 'payment', label: 'Payment' },
-  { value: 'refund', label: 'Refund' },
-  { value: 'sales_receipt', label: 'Sales Receipt' },
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'vendor_credit', label: 'Vendor Credit' },
-  { value: 'purchase_order', label: 'Purchase Order' },
+  { value: 'invoice', label: 'Invoice (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
+  { value: 'bill', label: 'Bill (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
 ];
 
 function fmtDate(iso: string | null): string {
@@ -127,6 +86,9 @@ export default function RecurringTransactionsPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [runResult, setRunResult] = useState<string | null>(null);
+  const [runErr, setRunErr] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
   const [form, setForm] = useState(blankForm());
   const [lines, setLines] = useState<Line[]>([blankLine(), blankLine()]);
@@ -167,6 +129,12 @@ export default function RecurringTransactionsPage() {
     if (appliedTxnType && t.template_type !== appliedTxnType) return false;
     return true;
   }), [templates, nameFilter, appliedTemplateType, appliedTxnType]);
+
+  const today = todayLocal();
+  const due = useMemo(
+    () => templates.filter((t) => t.is_active && t.next_run_date <= today),
+    [templates, today],
+  );
 
   const totalD = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
   const totalC = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
@@ -251,6 +219,26 @@ export default function RecurringTransactionsPage() {
   }
 
   const activeFilterCount = (appliedTemplateType ? 1 : 0) + (appliedTxnType ? 1 : 0);
+
+  async function runDue() {
+    if (!bizId) return;
+    setRunning(true);
+    setRunErr(null);
+    setRunResult(null);
+    try {
+      const r = await api.post<RunDueResult>(
+        `/businesses/${bizId}/recurring-templates/run-due`,
+        {},
+      );
+      const total = r.data.results.reduce((s, x) => s + x.runs_created, 0);
+      setRunResult(`Created ${total} entries across ${r.data.results.length} templates.`);
+      reload();
+    } catch (e: unknown) {
+      setRunErr(pickErr(e));
+    } finally {
+      setRunning(false);
+    }
+  }
 
   async function deleteTemplate(id: string) {
     if (!bizId) return;
@@ -368,6 +356,35 @@ export default function RecurringTransactionsPage() {
         </div>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Due now ({due.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {due.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing due today.</p>
+          ) : (
+            <ul className="divide-y text-sm">
+              {due.map((t) => (
+                <li key={t.id} className="flex justify-between py-2">
+                  <span>{t.name}</span>
+                  <span className="text-muted-foreground">
+                    <span className="capitalize">{t.recurrence}</span> — next <span className="font-mono">{fmtDate(t.next_run_date)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex items-center gap-3 pt-2">
+            <Button onClick={runDue} disabled={running || due.length === 0}>
+              {running ? 'Running…' : 'Run all due'}
+            </Button>
+            {runResult && <span className="text-sm text-green-600">{runResult}</span>}
+            {runErr && <span className="text-sm text-destructive">{runErr}</span>}
+          </div>
+        </CardContent>
+      </Card>
+
       {deleteErr && <p className="text-sm text-destructive">{deleteErr}</p>}
 
       <Card>
@@ -401,7 +418,7 @@ export default function RecurringTransactionsPage() {
                     required
                   >
                     {TXN_TYPE_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>{o.label}</option>
                     ))}
                   </select>
                 </div>

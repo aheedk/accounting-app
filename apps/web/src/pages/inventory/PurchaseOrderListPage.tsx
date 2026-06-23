@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -135,7 +136,7 @@ export default function PurchaseOrderListPage() {
       header: 'Status',
       sortable: true,
       sortValue: r => r.status,
-      render: r => <span className={statusBadgeClass(r.status)}>{r.status}</span>,
+      render: r => <span className={`${statusBadgeClass(r.status)} capitalize`}>{r.status}</span>,
     },
   ];
 
@@ -145,7 +146,14 @@ export default function PurchaseOrderListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Purchase Orders</h1>
-        <div className="flex items-center gap-3">
+        <Button asChild>
+          <Link to="/inventory/purchase-orders/new">New PO</Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Status</div>
           <select
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={statusFilter}
@@ -153,14 +161,11 @@ export default function PurchaseOrderListPage() {
           >
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
+              <option key={s} value={s} className="capitalize">
                 {s}
               </option>
             ))}
           </select>
-          <Button asChild>
-            <Link to="/inventory/purchase-orders/new">New PO</Link>
-          </Button>
         </div>
       </div>
       {err && <p className="text-sm text-destructive">{err}</p>}
@@ -190,7 +195,7 @@ export default function PurchaseOrderListPage() {
                 )}
               </span>
             )}
-            emptyMessage="No purchase orders yet."
+            emptyMessage={<EmptyState title="No purchase orders yet" hint="Create a purchase order to record stock you've ordered from a vendor." actionLabel="New PO" actionTo="/inventory/purchase-orders/new" />}
           />
         </CardContent>
       </Card>

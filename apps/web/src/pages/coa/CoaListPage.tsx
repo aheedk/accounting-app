@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, FileDown, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from '@/lib/apiClient';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -24,6 +25,15 @@ interface ImportRow {
 
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
 
+const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
+
+function statusBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
+}
+
 export default function CoaListPage() {
   const [bizId] = useActiveBusinessId();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -31,6 +41,8 @@ export default function CoaListPage() {
   const [form, setForm] = useState({ code: '', name: '', account_type: 'asset' });
   const [err, setErr] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
+  const [search, setSearch] = useState('');
   const [excelBusy, setExcelBusy] = useState(false);
 
   const [showDropdown, setShowDropdown] = useState(false);
@@ -75,7 +87,16 @@ export default function CoaListPage() {
     }
   }
 
-  const filtered = typeFilter ? accounts.filter(a => a.account_type === typeFilter) : accounts;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return accounts.filter(a => {
+      if (typeFilter && a.account_type !== typeFilter) return false;
+      if (statusFilter === 'active' && !a.is_active) return false;
+      if (statusFilter === 'inactive' && a.is_active) return false;
+      if (q && !a.name.toLowerCase().includes(q) && !a.code.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [accounts, typeFilter, statusFilter, search]);
 
   function handleExport() {
     setExcelBusy(true);
@@ -191,11 +212,11 @@ export default function CoaListPage() {
   }
 
   const columns: Column<Account>[] = [
-    { key: 'code', header: 'Code', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono">{r.code}</span> },
-    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => r.name },
+    { key: 'code', header: 'Code', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono text-muted-foreground">{r.code}</span> },
+    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <span className="font-medium">{r.name}</span> },
     { key: 'account_type', header: 'Type', sortable: true, sortValue: r => r.account_type, render: r => <span className="capitalize">{r.account_type}</span> },
-    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => <span className="capitalize">{r.is_active ? 'active' : 'inactive'}</span> },
-    { key: 'system', header: 'System', sortable: true, sortValue: r => r.is_system ? 'yes' : 'no', render: r => r.is_system ? 'yes' : 'no' },
+    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => statusBadge(r.is_active) },
+    { key: 'system', header: 'Source', sortable: true, sortValue: r => r.is_system ? 'system' : 'user', render: r => <span className="text-muted-foreground">{r.is_system ? 'System' : 'User'}</span> },
   ];
 
   const validImportCount = importRows.filter(r => !r.error).length;
@@ -243,10 +264,25 @@ export default function CoaListPage() {
           onChange={e => setTypeFilter(e.target.value)}
         >
           <option value="">All types</option>
-          {['asset', 'liability', 'equity', 'revenue', 'expense'].map(t => (
+          {ACCOUNT_TYPES.map(t => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="all">All statuses</option>
+        </select>
+        <Input
+          className="h-9 w-64"
+          placeholder="Search by name or code"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
         <div className="relative group">
           <button
             className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
@@ -282,7 +318,7 @@ export default function CoaListPage() {
           columns={columns}
           defaultSortKey="code"
           defaultSortDir="asc"
-          emptyMessage="No accounts."
+          emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, import accounts, or add a new account to your chart." />}
         />
       </CardContent></Card>
 
@@ -321,7 +357,7 @@ export default function CoaListPage() {
                     value={form.account_type}
                     onChange={e => setForm(f => ({ ...f, account_type: e.target.value }))}
                   >
-                    {['asset', 'liability', 'equity', 'revenue', 'expense'].map(t => (
+                    {ACCOUNT_TYPES.map(t => (
                       <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                     ))}
                   </select>
