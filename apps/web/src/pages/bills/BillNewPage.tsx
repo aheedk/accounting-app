@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { addDaysLocal, todayLocal } from '@/lib/dates';
 
 type Line = { description: string; quantity: string; unit_price: string; expense_account_id: string };
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
@@ -28,9 +28,7 @@ const TERMS_OPTIONS: { label: string; days: number }[] = [
 ];
 
 function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return addDaysLocal(iso, days);
 }
 function fmtAddress(a: Address | null | undefined): string {
   if (!a) return '';

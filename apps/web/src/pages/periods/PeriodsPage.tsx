@@ -5,6 +5,7 @@ import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { currentYearLocal } from '@/lib/dates';
 
 type Period = { id: string; starts_on: string; ends_on: string; status: 'open' | 'closed'; closed_at: string | null };
 
@@ -63,7 +64,7 @@ export default function PeriodsPage() {
   }
 
   async function seedYear() {
-    const yearStr = window.prompt('Year to seed?', String(new Date().getFullYear() + 1));
+    const yearStr = window.prompt('Year to seed?', String(currentYearLocal() + 1));
     if (!yearStr) return;
     setErr(null);
     try { await api.post(`/businesses/${bizId}/periods/seed-year`, { year: parseInt(yearStr, 10) }); await reload(); }

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { currentYearLocal } from '@/lib/dates';
 
 type Row = { vendor_id: string; vendor_name: string; tax_id: string | null; total_paid: string };
 
@@ -13,7 +14,7 @@ export default function TenNinetyNineReportPage() {
   const [bizId] = useActiveBusinessId();
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [year, setYear] = useState<number>(currentYearLocal());
   const [rows, setRows] = useState<Row[]>([]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/reports/1099`, { params: { year } }).then(r => setRows(r.data.rows)); }, [bizId, year]);
   if (!bizId) return <div>Pick a business.</div>;
@@ -27,7 +28,7 @@ export default function TenNinetyNineReportPage() {
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">Year</div>
-            <Input className="w-28 font-mono" type="number" value={year} onChange={e => setYear(parseInt(e.target.value, 10) || new Date().getFullYear())} />
+            <Input className="w-28 font-mono" type="number" value={year} onChange={e => setYear(parseInt(e.target.value, 10) || currentYearLocal())} />
           </div>
           <DownloadButtons headers={dlHeaders} getRows={dlRows} filename={`1099-${year}`} title={`1099 Report — ${year}`} />
         </div>
