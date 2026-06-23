@@ -101,19 +101,15 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 **Priority:** high.
 
-#### Custom Reports account picker and run flow
+#### Custom Reports regression coverage
 
-**Why:** The saved custom report flow works, but the account picker is a long checkbox wall and the main actions can fall below the fold.
+**Why:** The saved custom report flow and account picker UX work, but the create/run/delete lifecycle and account filter behavior should be covered by regression tests.
 
 **To do:**
-- Add account search.
-- Group accounts by type with collapsible sections.
-- Add "select all in group" controls.
-- Consider filtering by account code/name.
-- Add a sticky footer/action bar for `Save`, `Run`, `Save & Run`, and `Cancel`.
-- Keep saved report create/run/delete behavior covered by tests.
+- Add tests for saved report create, run, and delete.
+- Add tests for account filtering with all accounts, one account, and account-type group selection.
 
-**Priority:** high.
+**Priority:** medium.
 
 #### Performance Center charts
 
@@ -136,10 +132,9 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 **Why:** Banking pages work, but the workflow can become much more useful before production use.
 
 **To do:**
-- Add CSV import preview and mapping.
 - Add import history.
 - Add rule dry-run with match counts before save.
-- Add stronger match suggestions and reviewed/unreviewed states.
+- Add stronger match suggestions.
 - Add undo behavior for recent imports or rule applications where feasible.
 - Improve empty states for accounts with no transactions or no imported items.
 
@@ -172,18 +167,6 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 - Add company file storage settings once the S3/R2 adapter exists.
 
 **Priority:** medium.
-
-#### Data formatting and export correctness
-
-**Why:** A few concrete implementation issues showed up during the audit.
-
-**To do:**
-- Replace remaining local date defaults based on `toISOString().slice(0, 10)` with `todayLocal()` or equivalent local-date helpers.
-- Review pages still using `new Date().getFullYear()` for default fiscal/report years and decide whether local-date helpers are needed.
-- Fix inventory quantity display so quantities use count/quantity formatting instead of money formatting.
-- Fix `DataTable` CSV export so columns without `sortValue` do not export blank cells.
-
-**Priority:** high.
 
 #### Form validation and save feedback
 
@@ -218,14 +201,6 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 - Pages affected: `ReceiptsPage`, `IntegrationInboxPage`, `ContractorsPage`, `EmployeeDetailPage`, `PayrollTaxesPage`.
 
 **Effort:** ~1 hour across all pages.
-
-### Sidebar audit
-
-**Why:** The sidebar component (`apps/web/src/components/layout/Sidebar.tsx`) was last touched during slice 6/7 and never explicitly re-verified post-slice-13. All routes are wired in `App.tsx` and the original sidebar entries point to the right paths, but worth a manual walk-through to confirm every nav item lands on a real page (not 404).
-
-**To do:** open the deployed app, click every sidebar item, verify no broken links.
-
-**Effort:** ~10 min manual.
 
 ---
 
