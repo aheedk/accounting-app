@@ -60,16 +60,154 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 ## UI polish
 
-### Real charting library on Performance Center
+### Localhost UX audit backlog - 2026-06-22
 
-**Why:** Slice 12 ships inline-SVG sparklines as a "no new deps" choice. Workable but ugly — no axis labels, no tooltips, no comparison overlays.
+**Context:** Manual audit on the signed-in local web app at `http://127.0.0.1:5175/`. Routes and nested tabs were clicked across Dashboard, AR, AP, Accounting, Reports, Payroll, Inventory, Setup, integrations, banking, and representative detail pages. Disposable create/edit/delete checks were also run for cost centers, bank rules, budgets, and custom reports; the test records were cleaned up afterward.
+
+**Overall result:** No route-level crashes were found. The app is stable enough for continued feature work, but several screens still need QBO-style depth, stronger workflow controls, better mobile behavior, and a few data/formatting fixes.
+
+#### Mobile app shell
+
+**Why:** The app shell is effectively desktop-only on phone widths. On a 390px viewport, the fixed sidebar consumes about 256px and leaves only about 134px for main content.
+
+**To do:**
+- Add a mobile drawer or collapsible sidebar for `AppShell` / `Sidebar`.
+- Add a compact mobile top bar with menu access and current company context.
+- Ensure tables and dense report screens have horizontal overflow handling.
+- Verify core routes at phone, tablet, and desktop widths.
+
+**Priority:** high.
+
+#### QBO-style detail pages
+
+**Why:** Several detail pages still feel like legacy admin pages compared with the newer QBO-style list/form screens.
+
+**Pages to review:**
+- Customer detail.
+- Invoice detail.
+- Bill detail.
+- Payment detail.
+- Expense transaction detail.
+- Journal entry detail.
+- Inventory item detail.
+
+**To do:**
+- Add stronger detail headers with status badges, totals, primary actions, and secondary action menus.
+- Add related activity/transaction sections where useful.
+- Add audit/history panels for posted/voided/edited records.
+- Replace raw date rendering with the shared local date helpers.
+- Prefer names and human-readable references over raw IDs where possible.
+- Add print/share/copy/edit/void actions where they match the transaction lifecycle.
+
+**Priority:** high.
+
+#### Custom Reports account picker and run flow
+
+**Why:** The saved custom report flow works, but the account picker is a long checkbox wall and the main actions can fall below the fold.
+
+**To do:**
+- Add account search.
+- Group accounts by type with collapsible sections.
+- Add "select all in group" controls.
+- Consider filtering by account code/name.
+- Add a sticky footer/action bar for `Save`, `Run`, `Save & Run`, and `Cancel`.
+- Keep saved report create/run/delete behavior covered by tests.
+
+**Priority:** high.
+
+#### Performance Center charts
+
+**Why:** Performance Center still uses hand-rolled inline SVG sparklines. They are functional but too limited for a reporting surface.
 
 **To do:**
 - `npm install -w apps/web recharts` (or victory, or chart.js).
-- Replace the `<Sparkline />` component in `apps/web/src/pages/reports/PerformanceCenterPage.tsx` with a proper `<LineChart>`.
+- Replace the local sparkline with a real charting library such as Recharts.
+- Add axes, tooltips, date range controls, and comparison periods.
+- Add drilldowns from KPIs into the underlying report where practical.
+- Include short KPI explanations in tooltips or compact help affordances.
 - Optional: add YoY comparison overlay (current 12mo vs prior 12mo).
 
-**Effort:** ~30 min for a basic recharts swap.
+**Priority:** medium-high.
+
+**Effort:** ~30 min for a basic Recharts swap.
+
+#### Banking, imports, and rules workflow
+
+**Why:** Banking pages work, but the workflow can become much more useful before production use.
+
+**To do:**
+- Add CSV import preview and mapping.
+- Add import history.
+- Add rule dry-run with match counts before save.
+- Add stronger match suggestions and reviewed/unreviewed states.
+- Add undo behavior for recent imports or rule applications where feasible.
+- Improve empty states for accounts with no transactions or no imported items.
+
+**Priority:** medium-high.
+
+#### Recurring transactions
+
+**Why:** The recurring template UI still exposes invoice and bill template types as "coming soon"; only journal entry materialization is complete.
+
+**To do:**
+- Finish invoice recurring templates.
+- Finish bill recurring templates.
+- Add pause/resume controls.
+- Add next-run preview and last-run history.
+- Add scheduled materialization instead of requiring the user to manually click "Run all due".
+
+**Priority:** high.
+
+#### Setup and admin settings
+
+**Why:** Setup has the foundation, but a real accounting workspace needs more company-level controls.
+
+**To do:**
+- Add numbering prefixes/counters for invoices, bills, POs, SOs, and other documents.
+- Add defaults for terms, payment methods, invoice settings, and bill settings.
+- Add tax defaults and sales tax settings.
+- Add fiscal close locks / period locks.
+- Add an audit log viewer.
+- Add permission templates or role presets.
+- Add company file storage settings once the S3/R2 adapter exists.
+
+**Priority:** medium.
+
+#### Data formatting and export correctness
+
+**Why:** A few concrete implementation issues showed up during the audit.
+
+**To do:**
+- Replace remaining local date defaults based on `toISOString().slice(0, 10)` with `todayLocal()` or equivalent local-date helpers.
+- Review pages still using `new Date().getFullYear()` for default fiscal/report years and decide whether local-date helpers are needed.
+- Fix inventory quantity display so quantities use count/quantity formatting instead of money formatting.
+- Fix `DataTable` CSV export so columns without `sortValue` do not export blank cells.
+
+**Priority:** high.
+
+#### Form validation and save feedback
+
+**Why:** Invalid submits can surface generic `Input validation failed` feedback instead of field-level guidance. Some settings-style changes save without a clear saving/saved state.
+
+**To do:**
+- Add field-level validation messages to dense create/edit forms.
+- Add sticky save bars where forms are long.
+- Add explicit `Saving`, `Saved`, and failure states for settings/status updates.
+- Review compliance status changes for clear autosave feedback.
+
+**Priority:** medium-high.
+
+#### Accessibility pass for form controls
+
+**Why:** Chrome reported multiple form controls without associated labels, IDs, or names while create/edit panels were open.
+
+**To do:**
+- Add explicit labels and stable IDs to inputs, selects, checkboxes, and custom controls.
+- Ensure dialog/panel flows have focus management and escape-to-close behavior.
+- Prefer the shared dialog component for modal flows.
+- Add accessibility checks to the manual smoke checklist.
+
+**Priority:** medium.
 
 ### shadcn `Dialog` for modal flows
 
