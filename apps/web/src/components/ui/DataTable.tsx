@@ -135,7 +135,7 @@ export function DataTable<T>({
         {sortedRows.map(row => {
           const id = getRowId(row);
           return (
-            <tr key={id} className="border-b last:border-b-0 hover:bg-muted/30">
+            <tr key={id} className="border-b last:border-b-0 hover:bg-muted/80 transition-colors">
               {selectable && (
                 <td className="p-3">
                   <input

@@ -15,6 +15,7 @@ export type CreateRuleInput = {
   sign_filter: BankRuleSignFilter;
   offset_account_id: string;
   priority: number;
+  bank_account_id: string | null;
 };
 
 export type UpdateRuleInput = {
@@ -28,6 +29,7 @@ export type UpdateRuleInput = {
     offset_account_id: string;
     priority: number;
     is_active: boolean;
+    bank_account_id: string | null;
   }>;
 };
 
@@ -48,6 +50,7 @@ export async function createRule(trx: Transaction<DB>, ctx: ServiceCtx, input: C
     sign_filter: input.sign_filter,
     offset_account_id: input.offset_account_id,
     priority: input.priority,
+    bank_account_id: input.bank_account_id,
   }).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
@@ -83,6 +86,7 @@ export async function updateRule(trx: Transaction<DB>, ctx: ServiceCtx, input: U
     ...(input.patch.offset_account_id !== undefined ? { offset_account_id: input.patch.offset_account_id } : {}),
     ...(input.patch.priority !== undefined ? { priority: input.patch.priority } : {}),
     ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
+    ...(input.patch.bank_account_id !== undefined ? { bank_account_id: input.patch.bank_account_id } : {}),
   }).where('id', '=', input.rule_id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
@@ -115,12 +119,15 @@ export async function deleteRule(trx: Transaction<DB>, ctx: ServiceCtx, input: {
 export async function listRules(db: Kysely<DB>, business_id: string) {
   return db.selectFrom('bank_transaction_rules as btr')
     .innerJoin('chart_of_accounts as a', 'a.id', 'btr.offset_account_id')
+    .leftJoin('bank_accounts as ba', 'ba.id', 'btr.bank_account_id')
     .select([
       'btr.id', 'btr.business_id', 'btr.name', 'btr.description_contains',
       'btr.min_amount', 'btr.max_amount', 'btr.sign_filter',
       'btr.offset_account_id', 'btr.priority', 'btr.is_active',
+      'btr.bank_account_id',
       'btr.created_at', 'btr.updated_at',
       'a.code as offset_account_code', 'a.name as offset_account_name',
+      'ba.name as bank_account_name',
     ])
     .where('btr.business_id', '=', business_id)
     .where('btr.deleted_at', 'is', null)
@@ -131,12 +138,15 @@ export async function listRules(db: Kysely<DB>, business_id: string) {
 export async function getRule(db: Kysely<DB>, business_id: string, rule_id: string) {
   const row = await db.selectFrom('bank_transaction_rules as btr')
     .innerJoin('chart_of_accounts as a', 'a.id', 'btr.offset_account_id')
+    .leftJoin('bank_accounts as ba', 'ba.id', 'btr.bank_account_id')
     .select([
       'btr.id', 'btr.business_id', 'btr.name', 'btr.description_contains',
       'btr.min_amount', 'btr.max_amount', 'btr.sign_filter',
       'btr.offset_account_id', 'btr.priority', 'btr.is_active',
+      'btr.bank_account_id',
       'btr.created_at', 'btr.updated_at',
       'a.code as offset_account_code', 'a.name as offset_account_name',
+      'ba.name as bank_account_name',
     ])
     .where('btr.id', '=', rule_id)
     .where('btr.business_id', '=', business_id)
