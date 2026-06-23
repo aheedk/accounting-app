@@ -9,6 +9,7 @@ export type Column<T> = {
   align?: 'left' | 'right';
   sortable?: boolean;
   sortValue?: (row: T) => string | number;
+  exportValue?: (row: T) => string | number | boolean | null | undefined;
   render: (row: T) => ReactNode;
 };
 
@@ -75,11 +76,26 @@ export function DataTable<T>({
 
   const colSpan = (selectable ? 1 : 0) + columns.length + (actions ? 1 : 0);
 
+  function exportCell(row: T, col: Column<T>): string {
+    const explicit = col.exportValue?.(row);
+    if (explicit !== undefined && explicit !== null) return String(explicit);
+
+    const raw = (row as Record<string, unknown>)[col.key];
+    if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+      return String(raw);
+    }
+
+    if (col.sortValue) return String(col.sortValue(row));
+
+    const rendered = col.render(row);
+    return typeof rendered === 'string' || typeof rendered === 'number' ? String(rendered) : '';
+  }
+
   function handleDownload(format: 'excel' | 'pdf') {
     if (!downloadable) return;
     const headers = columns.map(c => c.header);
     const exportRows = sortedRows.map(row =>
-      columns.map(col => (col.sortValue ? String(col.sortValue(row)) : '')),
+      columns.map(col => exportCell(row, col)),
     );
     if (format === 'excel') {
       setExcelBusy(true);
