@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
@@ -139,7 +139,28 @@ function pathMatchesChild(pathname: string, child: NavChild): boolean {
   return pathname.startsWith(child.to + '/');
 }
 
-export function Sidebar() {
+// Brand header shared by the desktop sidebar and the mobile drawer.
+export function SidebarBrand() {
+  return (
+    <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
+      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
+        <BookOpen className="h-4 w-4" />
+      </div>
+      <span className="font-display text-lg tracking-tight text-white">Accounting</span>
+    </div>
+  );
+}
+
+type SidebarNavProps = {
+  // Desktop expands a group on hover; touch/drawer expands on tap (accordion).
+  expandOnHover?: boolean;
+  // Fired after navigating to a destination — lets the mobile drawer close itself.
+  onNavigate?: () => void;
+};
+
+// The navigation list itself, rendered both inside the static desktop sidebar and
+// the mobile drawer. Interaction mode switches between hover (mouse) and tap.
+export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
@@ -153,123 +174,148 @@ export function Sidebar() {
   }, [pathname]);
 
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
+  // Tap-to-expand accordion state for touch/drawer mode; defaults to the active group.
+  const [openGroupId, setOpenGroupId] = useState<string | null>(activeGroupId);
+
+  // Keep the tap accordion aligned with the active route in drawer mode.
+  useEffect(() => {
+    if (!expandOnHover) setOpenGroupId(activeGroupId);
+  }, [activeGroupId, expandOnHover]);
+
+  function go(to: string) {
+    navigate(to);
+    onNavigate?.();
+  }
 
   return (
-    <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-full overflow-hidden">
-      <div className="flex h-14 items-center gap-2.5 border-b border-white/10 px-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
-          <BookOpen className="h-4 w-4" />
-        </div>
-        <span className="font-display text-lg tracking-tight text-white">Accounting</span>
-      </div>
+    <nav
+      className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3"
+      onMouseLeave={() => {
+        if (expandOnHover) setHoveredGroupId(null);
+      }}
+    >
+      {groups.map(group => {
+        const Icon = group.icon;
+        const isActiveGroup = activeGroupId === group.id;
+        const isOpen = expandOnHover
+          ? hoveredGroupId === group.id || (hoveredGroupId === null && isActiveGroup)
+          : openGroupId === group.id;
 
-      <nav
-        className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto"
-        onMouseLeave={() => setHoveredGroupId(null)}
-      >
-        {groups.map(group => {
-          const Icon = group.icon;
-          const isActiveGroup = activeGroupId === group.id;
-          const isOpen =
-            hoveredGroupId === group.id ||
-            (hoveredGroupId === null && isActiveGroup);
-
-          if (!group.children || group.children.length === 0) {
-            const to = group.to ?? '/';
-            return (
-              <NavLink
-                key={group.id}
-                to={to}
-                end
-                className={({ isActive }) =>
-                  cn(
-                    'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    'hover:bg-sidebar-hover hover:text-white',
-                    isActive
-                      ? 'border-l-2 border-gold bg-sidebar-active text-white'
-                      : 'text-sidebar-muted',
-                  )
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{group.label}</span>
-              </NavLink>
-            );
-          }
-
+        if (!group.children || group.children.length === 0) {
+          const to = group.to ?? '/';
           return (
-            <div
+            <NavLink
               key={group.id}
-              className="flex flex-col"
-              onMouseEnter={() => setHoveredGroupId(group.id)}
-              onFocus={() => setHoveredGroupId(group.id)}
+              to={to}
+              end
+              onClick={() => onNavigate?.()}
+              className={({ isActive }) =>
+                cn(
+                  'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'hover:bg-sidebar-hover hover:text-white',
+                  isActive
+                    ? 'border-l-2 border-gold bg-sidebar-active text-white'
+                    : 'text-sidebar-muted',
+                )
+              }
             >
-              <button
-                type="button"
-                onClick={() => {
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{group.label}</span>
+            </NavLink>
+          );
+        }
+
+        return (
+          <div
+            key={group.id}
+            className="flex flex-col"
+            onMouseEnter={() => {
+              if (expandOnHover) setHoveredGroupId(group.id);
+            }}
+            onFocus={() => {
+              if (expandOnHover) setHoveredGroupId(group.id);
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                if (expandOnHover) {
                   const first = group.children?.[0];
                   if (first) navigate(first.to);
-                }}
-                aria-expanded={isOpen}
+                } else {
+                  setOpenGroupId(id => (id === group.id ? null : group.id));
+                }
+              }}
+              aria-expanded={isOpen}
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                'hover:bg-sidebar-hover hover:text-white',
+                isActiveGroup
+                  ? 'bg-sidebar-active text-white'
+                  : 'text-sidebar-muted',
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">{group.label}</span>
+              <ChevronRight
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  'hover:bg-sidebar-hover hover:text-white',
-                  isActiveGroup
-                    ? 'bg-sidebar-active text-white'
-                    : 'text-sidebar-muted',
+                  'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
+                  isOpen && 'rotate-90',
                 )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="flex-1 text-left">{group.label}</span>
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
-                    isOpen && 'rotate-90',
-                  )}
-                />
-              </button>
+              />
+            </button>
 
-              <div
-                className={cn(
-                  'grid transition-all duration-200 ease-out',
-                  isOpen
-                    ? 'grid-rows-[1fr] opacity-100 mt-0.5'
-                    : 'grid-rows-[0fr] opacity-0 mt-0',
-                )}
-                aria-hidden={!isOpen}
-              >
-                <div className="overflow-hidden">
-                  <div className="flex flex-col gap-0.5 pl-6">
-                    {group.children.map((child, idx) => {
-                      const childActive = pathMatchesChild(pathname, child);
-                      return (
-                        <button
-                          key={`${group.id}-${child.to}`}
-                          type="button"
-                          tabIndex={isOpen ? 0 : -1}
-                          onClick={() => navigate(child.to)}
-                          style={{
-                            transitionDelay: isOpen ? `${idx * 20}ms` : '0ms',
-                          }}
-                          className={cn(
-                            'flex items-center rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
-                            isOpen ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
-                            childActive
-                              ? 'border-gold bg-sidebar-active font-medium text-white'
-                              : 'border-white/10 text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
-                          )}
-                        >
-                          {child.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+            <div
+              className={cn(
+                'grid transition-all duration-200 ease-out',
+                isOpen
+                  ? 'grid-rows-[1fr] opacity-100 mt-0.5'
+                  : 'grid-rows-[0fr] opacity-0 mt-0',
+              )}
+              aria-hidden={!isOpen}
+            >
+              <div className="overflow-hidden">
+                <div className="flex flex-col gap-0.5 pl-6">
+                  {group.children.map((child, idx) => {
+                    const childActive = pathMatchesChild(pathname, child);
+                    return (
+                      <button
+                        key={`${group.id}-${child.to}`}
+                        type="button"
+                        tabIndex={isOpen ? 0 : -1}
+                        onClick={() => go(child.to)}
+                        style={{
+                          transitionDelay: isOpen ? `${idx * 20}ms` : '0ms',
+                        }}
+                        className={cn(
+                          'flex items-center rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
+                          isOpen ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
+                          childActive
+                            ? 'border-gold bg-sidebar-active font-medium text-white'
+                            : 'border-white/10 text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
+                        )}
+                      >
+                        {child.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
-          );
-        })}
-      </nav>
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+// Static sidebar for desktop (`lg` and up). On smaller viewports it is hidden and
+// the same nav is presented through the `MobileNav` drawer.
+export function Sidebar() {
+  return (
+    <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex">
+      <SidebarBrand />
+      <SidebarNav />
     </aside>
   );
 }
