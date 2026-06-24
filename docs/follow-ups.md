@@ -66,17 +66,6 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 **Overall result:** No route-level crashes were found. The app is stable enough for continued feature work, but several screens still need QBO-style depth, stronger workflow controls, better mobile behavior, and a few data/formatting fixes.
 
-#### Mobile app shell
-
-**Why:** The app shell was effectively desktop-only on phone widths. On a 390px viewport, the fixed sidebar consumed about 256px and left only about 134px for main content.
-
-**Status:** implemented (on `main`).
-- Static sidebar now hides below the `lg` breakpoint; the same nav is presented through an off-canvas drawer (`MobileNav` + a new `Sheet` primitive on the existing Radix Dialog) opened by a hamburger button in the top bar. The drawer uses tap-to-expand accordion groups and closes on navigation; desktop keeps its hover-to-expand behavior.
-- Top bar keeps the company switcher (company context) with mobile-friendly truncation; `main` padding tightened on small screens.
-- `DataTable` and the report tables now have horizontal overflow handling — scroll containers, with a mobile `min-width` on dense/wide tables so columns scroll instead of crushing.
-
-**Remaining:** manual visual QA across phone / tablet / desktop widths against a signed-in session. The web dev server proxies `/api` to the production API, so this needs real credentials.
-
 #### Custom Reports regression coverage
 
 **Why:** The saved custom report flow and account picker UX work, but the create/run/delete lifecycle and account filter behavior should be covered by regression tests.
