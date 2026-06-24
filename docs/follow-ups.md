@@ -68,15 +68,14 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 #### Mobile app shell
 
-**Why:** The app shell is effectively desktop-only on phone widths. On a 390px viewport, the fixed sidebar consumes about 256px and leaves only about 134px for main content.
+**Why:** The app shell was effectively desktop-only on phone widths. On a 390px viewport, the fixed sidebar consumed about 256px and left only about 134px for main content.
 
-**To do:**
-- Add a mobile drawer or collapsible sidebar for `AppShell` / `Sidebar`.
-- Add a compact mobile top bar with menu access and current company context.
-- Ensure tables and dense report screens have horizontal overflow handling.
-- Verify core routes at phone, tablet, and desktop widths.
+**Status:** implemented (on `main`).
+- Static sidebar now hides below the `lg` breakpoint; the same nav is presented through an off-canvas drawer (`MobileNav` + a new `Sheet` primitive on the existing Radix Dialog) opened by a hamburger button in the top bar. The drawer uses tap-to-expand accordion groups and closes on navigation; desktop keeps its hover-to-expand behavior.
+- Top bar keeps the company switcher (company context) with mobile-friendly truncation; `main` padding tightened on small screens.
+- `DataTable` and the report tables now have horizontal overflow handling — scroll containers, with a mobile `min-width` on dense/wide tables so columns scroll instead of crushing.
 
-**Priority:** high.
+**Remaining:** manual visual QA across phone / tablet / desktop widths against a signed-in session. The web dev server proxies `/api` to the production API, so this needs real credentials.
 
 #### Custom Reports regression coverage
 
