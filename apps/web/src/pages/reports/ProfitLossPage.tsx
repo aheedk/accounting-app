@@ -153,6 +153,7 @@ export default function ProfitLossPage() {
             title="Profit and Loss"
             subtitle={`${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`}
           >
+            <div className="w-full overflow-x-auto">
             <table className="w-full text-sm">
               <tbody>
                 <tr className="border-b">
@@ -203,6 +204,7 @@ export default function ProfitLossPage() {
                 </tr>
               </tbody>
             </table>
+            </div>
           </ReportCard>
         </>
       )}

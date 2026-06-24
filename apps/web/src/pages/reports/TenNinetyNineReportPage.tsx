@@ -35,6 +35,7 @@ export default function TenNinetyNineReportPage() {
       </div>
 
       <ReportCard companyName={bizName} title="1099 Contractor Payments" subtitle={`Calendar year ${year}`}>
+        <div className="w-full overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b">
             <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -60,6 +61,7 @@ export default function TenNinetyNineReportPage() {
             </tr>
           </tbody>
         </table>
+        </div>
       </ReportCard>
     </div>
   );

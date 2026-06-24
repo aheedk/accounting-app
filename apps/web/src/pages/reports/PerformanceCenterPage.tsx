@@ -43,6 +43,7 @@ function TrendCard({ title, color, data }: { title: string; color: string; data:
       </CardHeader>
       <CardContent className="space-y-3">
         <Sparkline data={data} color={color} />
+        <div className="w-full overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="border-b text-muted-foreground">
             <tr>
@@ -65,6 +66,7 @@ function TrendCard({ title, color, data }: { title: string; color: string; data:
             )}
           </tbody>
         </table>
+        </div>
       </CardContent>
     </Card>
   );

@@ -86,6 +86,7 @@ export default function ManagementReportsPage() {
           {data.revenue_by_month.length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground">No revenue recorded.</div>
           ) : (
+            <div className="w-full overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>
@@ -115,6 +116,7 @@ export default function ManagementReportsPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -125,6 +127,7 @@ export default function ManagementReportsPage() {
           {data.expense_breakdown.length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground">No expenses recorded.</div>
           ) : (
+            <div className="w-full overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>
@@ -143,6 +146,7 @@ export default function ManagementReportsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

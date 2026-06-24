@@ -501,7 +501,8 @@ export default function CustomReportsPage() {
                 {rows.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground">No matching journal activity for the selected filters.</p>
                 ) : (
-                  <table className="w-full text-sm">
+                  <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm sm:min-w-0">
                     <thead className="border-b bg-muted/40">
                       <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         <th className="text-left p-3">{groupColumnLabel(form.definition.group_by)}</th>
@@ -527,6 +528,7 @@ export default function CustomReportsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </CardContent>
             </Card>

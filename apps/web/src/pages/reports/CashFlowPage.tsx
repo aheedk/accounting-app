@@ -167,7 +167,8 @@ export default function CashFlowPage() {
             {report.lines.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">No cash activity in this period.</div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm sm:min-w-0">
                 <thead className="border-b">
                   <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <th className="p-3 text-left">Date</th>
@@ -198,6 +199,7 @@ export default function CashFlowPage() {
                   </tr>
                 </tbody>
               </table>
+              </div>
             )}
           </ReportCard>
         </>

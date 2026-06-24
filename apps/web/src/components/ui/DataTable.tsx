@@ -118,7 +118,10 @@ export function DataTable<T>({
           </Button>
         </div>
       )}
-    <table className="w-full text-sm">
+    {/* Wrap in a horizontal scroll container so dense tables stay usable on
+        narrow viewports instead of crushing columns or pushing the page wide. */}
+    <div className="w-full overflow-x-auto">
+    <table className="w-full min-w-[640px] text-sm sm:min-w-0">
       <thead className="border-b">
         <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {selectable && (
@@ -178,6 +181,7 @@ export function DataTable<T>({
         )}
       </tbody>
     </table>
+    </div>
     </>
   );
 }
