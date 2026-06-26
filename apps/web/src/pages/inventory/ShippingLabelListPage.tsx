@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileDown, Printer } from 'lucide-react';
+import { FileDown, Printer, Package, CheckCircle2 } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -22,12 +22,11 @@ type ShippingLabel = {
   notes: string | null;
 };
 
-// Server returns `{ labels: [...] }` (see apps/api/src/routes/shippingLabels.ts).
 type ListResponse = { labels: ShippingLabel[] };
 
 function pickErr(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
+    ?.response?.data?.error?.message ?? 'Failed to load shipping labels';
 }
 
 function fmtShortDate(iso: string) {
@@ -35,6 +34,12 @@ function fmtShortDate(iso: string) {
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
+
+const CARRIERS = [
+  { name: 'USPS', transit: '1–5 business days', best: true },
+  { name: 'FedEx', transit: '1–3 business days', best: false },
+  { name: 'UPS',   transit: '1–5 business days', best: false },
+];
 
 export default function ShippingLabelListPage() {
   const [bizId] = useActiveBusinessId();
@@ -99,7 +104,7 @@ export default function ShippingLabelListPage() {
     },
     {
       key: 'linked',
-      header: 'Linked entity',
+      header: 'Linked Entity',
       render: r => (
         <span className="font-mono text-xs">
           {r.invoice_id
@@ -140,6 +145,69 @@ export default function ShippingLabelListPage() {
 
   return (
     <div className="space-y-6">
+      {/* Hero banner — mirrors QBO "Simplify your shipping" layout */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-8 p-8">
+          {/* Left: copy + CTA */}
+          <div className="flex-1 space-y-4">
+            <div className="flex items-center gap-2 text-primary">
+              <Package className="h-6 w-6" />
+              <span className="text-sm font-semibold uppercase tracking-wide">Shipping</span>
+            </div>
+            <h2 className="text-3xl font-bold text-foreground leading-tight">
+              Track your shipments
+            </h2>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              {[
+                'Record carrier, tracking number, and cost in one place',
+                'Link labels directly to invoices or sales orders',
+                'See shipping history and costs across all carriers',
+                'Download and print your label log any time',
+              ].map(item => (
+                <li key={item} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Button asChild className="mt-2">
+              <Link to="/inventory/shipping-labels/new">New label</Link>
+            </Button>
+          </div>
+
+          {/* Right: carrier reference table */}
+          <div className="md:w-72 shrink-0">
+            <div className="rounded-lg border bg-background overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Carrier</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Transit time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CARRIERS.map((c, i) => (
+                    <tr key={c.name} className={i < CARRIERS.length - 1 ? 'border-b' : ''}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {c.best && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                          <span className={c.best ? 'font-medium text-foreground' : 'text-muted-foreground'}>{c.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{c.transit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-4 py-2 text-xs text-muted-foreground border-t">
+                * Transit times are estimates only
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* List section */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Shipping Labels</h1>
         <div className="flex items-center gap-2">
@@ -160,7 +228,9 @@ export default function ShippingLabelListPage() {
           </Button>
         </div>
       </div>
+
       {err && <p className="text-sm text-destructive">{err}</p>}
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -173,16 +243,18 @@ export default function ShippingLabelListPage() {
               defaultSortKey="shipped_at"
               defaultSortDir="desc"
               actions={r => (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => deleteLabel(r.id)}
-                >
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => deleteLabel(r.id)}>
                   Delete
                 </Button>
               )}
-              emptyMessage={<EmptyState title="No shipping labels yet" hint="Create a label to record a shipment's carrier, tracking number, and cost." actionLabel="New label" actionTo="/inventory/shipping-labels/new" />}
+              emptyMessage={
+                <EmptyState
+                  title="No shipping labels yet"
+                  hint="Create a label to record a shipment's carrier, tracking number, and cost."
+                  actionLabel="New label"
+                  actionTo="/inventory/shipping-labels/new"
+                />
+              }
             />
           )}
         </CardContent>

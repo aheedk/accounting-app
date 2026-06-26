@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileDown, Printer } from 'lucide-react';
+import { FileDown, Printer, CheckCircle2 } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
-import { EmptyState } from '@/components/ui/EmptyState';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -76,14 +75,11 @@ export default function SalesOrderListPage() {
     }
   }, [bizId, statusFilter]);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  useEffect(() => { reload(); }, [reload]);
 
   useEffect(() => {
     if (!bizId) return;
-    api
-      .get<CustomersResponse>(`/businesses/${bizId}/customers`)
+    api.get<CustomersResponse>(`/businesses/${bizId}/customers`)
       .then((r) => setCustomers(r.data.customers))
       .catch(() => setCustomers([]));
   }, [bizId]);
@@ -183,6 +179,8 @@ export default function SalesOrderListPage() {
     win.document.close();
   }
 
+  const showHero = !loading && rows.length === 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -206,68 +204,94 @@ export default function SalesOrderListPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <div className="mb-1 text-xs text-muted-foreground">Status</div>
-          <select
-            className="h-9 rounded-md border bg-background px-3 text-sm"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All statuses</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s} className="capitalize">
-                {s}
-              </option>
-            ))}
-          </select>
+      {/* QBO-style hero — shown only when the list is empty */}
+      {showHero && (
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="flex flex-col md:flex-row gap-8 p-10">
+            <div className="flex-1 space-y-5">
+              <h2 className="text-3xl font-bold leading-tight text-foreground">
+                Simplify sales order management
+              </h2>
+              <p className="text-muted-foreground">
+                Reserve inventory, avoid overselling, and sync your inventory with accounting for total peace of mind.
+              </p>
+              <ul className="space-y-2.5 text-sm text-muted-foreground">
+                {[
+                  'Track what you\'ve committed and stay on top of inventory',
+                  'Keep tabs on inventory assets and costs to get the full picture',
+                  'See what\'s selling and track popular products with sales reports',
+                ].map(item => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button asChild size="lg" className="mt-2">
+                <Link to="/inventory/sales-orders/new">Create sales order</Link>
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
-      {err && <p className="text-sm text-destructive">{err}</p>}
-      {actionErr && <p className="text-sm text-destructive">{actionErr}</p>}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6 text-sm text-muted-foreground">Loading…</div>
-          ) : (
-            <DataTable
-              rows={rows}
-              getRowId={r => r.id}
-              columns={columns}
-              defaultSortKey="order_date"
-              defaultSortDir="desc"
-              actions={r => {
-                const canFulfill = r.status === 'draft' || r.status === 'confirmed';
-                const canVoid = r.status !== 'fulfilled' && r.status !== 'void';
-                const busy = busyId === r.id;
-                return (
-                  <span className="inline-flex items-center gap-2">
-                    <Link className="text-primary underline" to={`/inventory/sales-orders/${r.id}`}>
-                      view
-                    </Link>
-                    {canFulfill && (
-                      <Button size="sm" disabled={busy} onClick={() => fulfill(r.id)}>
-                        {busy ? 'Working…' : 'Fulfill'}
-                      </Button>
-                    )}
-                    {canVoid && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={busy}
-                        onClick={() => voidIt(r.id)}
-                      >
-                        Void
-                      </Button>
-                    )}
-                  </span>
-                );
-              }}
-              emptyMessage={<EmptyState title="No sales orders yet" hint="Create a sales order to reserve stock for a customer before invoicing." actionLabel="New sales order" actionTo="/inventory/sales-orders/new" />}
-            />
-          )}
-        </CardContent>
-      </Card>
+      )}
+
+      {/* Filters + table — hidden when hero is showing */}
+      {!showHero && (
+        <>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Status</div>
+              <select
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All statuses</option>
+                {STATUSES.map((s) => (
+                  <option key={s} value={s} className="capitalize">{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {err && <p className="text-sm text-destructive">{err}</p>}
+          {actionErr && <p className="text-sm text-destructive">{actionErr}</p>}
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+              ) : (
+                <DataTable
+                  rows={rows}
+                  getRowId={r => r.id}
+                  columns={columns}
+                  defaultSortKey="order_date"
+                  defaultSortDir="desc"
+                  actions={r => {
+                    const canFulfill = r.status === 'draft' || r.status === 'confirmed';
+                    const canVoid = r.status !== 'fulfilled' && r.status !== 'void';
+                    const busy = busyId === r.id;
+                    return (
+                      <span className="inline-flex items-center gap-2">
+                        <Link className="text-primary underline" to={`/inventory/sales-orders/${r.id}`}>view</Link>
+                        {canFulfill && (
+                          <Button size="sm" disabled={busy} onClick={() => fulfill(r.id)}>
+                            {busy ? 'Working…' : 'Fulfill'}
+                          </Button>
+                        )}
+                        {canVoid && (
+                          <Button size="sm" variant="destructive" disabled={busy} onClick={() => voidIt(r.id)}>
+                            Void
+                          </Button>
+                        )}
+                      </span>
+                    );
+                  }}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
