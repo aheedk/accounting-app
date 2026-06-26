@@ -4,6 +4,9 @@ import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry } from '../core/ledgerService.js';
+import { nextCounter } from '../core/numberingService.js';
+import { createDraft as createInvoiceDraft } from '../ar/invoiceService.js';
+import { createDraft as createBillDraft } from '../ap/billService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateTemplateInput = {
@@ -55,6 +58,12 @@ export async function listTemplates(db: Kysely<DB>, business_id: string) {
     .orderBy('next_run_date').execute();
 }
 
+function addDays(date: string, days: number): string {
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 function advanceDate(date: string, recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly'): string {
   const d = new Date(date + 'T00:00:00Z');
   switch (recurrence) {
@@ -100,9 +109,68 @@ export async function runDue(
             memo: l.memo ?? null,
           })),
         });
+      } else if (t.template_type === 'invoice') {
+        const payload = t.payload as {
+          customer_id: string;
+          due_days?: number | null;
+          memo?: string | null;
+          terms?: string | null;
+          lines: Array<{
+            description: string;
+            quantity: string;
+            unit_price: string;
+            revenue_account_id: string;
+            tax_code_id?: string | null;
+          }>;
+        };
+        const n = await nextCounter(trx, t.business_id, 'invoice');
+        await createInvoiceDraft(trx, ctx, {
+          business_id: t.business_id,
+          customer_id: payload.customer_id,
+          invoice_number: `INV-${String(n).padStart(4, '0')}`,
+          issue_date: nextDate,
+          due_date: addDays(nextDate, payload.due_days ?? 30),
+          memo: payload.memo ?? `Recurring: ${t.name}`,
+          terms: payload.terms ?? null,
+          lines: payload.lines.map(l => ({
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            revenue_account_id: l.revenue_account_id,
+            tax_code_id: l.tax_code_id ?? null,
+          })),
+        });
+      } else if (t.template_type === 'bill') {
+        const payload = t.payload as {
+          vendor_id: string;
+          due_days?: number | null;
+          memo?: string | null;
+          terms?: string | null;
+          lines: Array<{
+            description: string;
+            quantity: string;
+            unit_price: string;
+            expense_account_id: string;
+          }>;
+        };
+        const n = await nextCounter(trx, t.business_id, 'bill');
+        await createBillDraft(trx, ctx, {
+          business_id: t.business_id,
+          vendor_id: payload.vendor_id,
+          bill_number: `BILL-${String(n).padStart(4, '0')}`,
+          bill_date: nextDate,
+          due_date: addDays(nextDate, payload.due_days ?? 30),
+          memo: payload.memo ?? `Recurring: ${t.name}`,
+          terms: payload.terms ?? null,
+          lines: payload.lines.map(l => ({
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            expense_account_id: l.expense_account_id,
+          })),
+        });
       } else {
-        // Slice 9 ships JE only. Invoice + Bill recurrence ships in a future polish slice.
-        throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `recurring ${t.template_type} not yet implemented`);
+        throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `unknown template_type: ${String((t as { template_type: unknown }).template_type)}`);
       }
       runs++;
       nextDate = advanceDate(nextDate, t.recurrence);

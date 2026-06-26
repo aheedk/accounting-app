@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, seedCoa, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeCustomer, makeVendor, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
 import * as rt from '../../src/services/accounting/recurringTemplateService.js';
 
@@ -99,5 +99,77 @@ describe('recurringTemplateService', () => {
     const jes = await t.db.selectFrom('journal_entries').selectAll()
       .where('business_id', '=', biz.id).execute();
     expect(jes.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('runDue with invoice template creates a draft invoice with correct due_date', async () => {
+    const { biz, ctx } = await bootstrap();
+    const customer = await makeCustomer(t.db, biz.id);
+    // AR account 1100 is seeded by seedCoa; revenue account 4000 is also seeded.
+    const revenue = await t.db.selectFrom('chart_of_accounts').select(['id'])
+      .where('business_id', '=', biz.id).where('code', '=', '4010').executeTakeFirstOrThrow();
+
+    const today = new Date().toISOString().slice(0, 10);
+    await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Monthly retainer',
+        template_type: 'invoice',
+        payload: {
+          customer_id: customer.id,
+          due_days: 15,
+          lines: [{ description: 'Retainer', quantity: '1', unit_price: '200', revenue_account_id: revenue.id, tax_code_id: null }],
+        },
+        recurrence: 'monthly',
+        next_run_date: today,
+      }),
+    );
+
+    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    expect(results[0]?.runs_created).toBe(1);
+
+    const invoices = await t.db.selectFrom('invoices').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0]?.status).toBe('draft');
+    expect(invoices[0]?.customer_id).toBe(customer.id);
+    // due_date should be today + 15 days
+    const expectedDue = new Date(today + 'T00:00:00Z');
+    expectedDue.setUTCDate(expectedDue.getUTCDate() + 15);
+    expect(invoices[0]?.due_date).toBe(expectedDue.toISOString().slice(0, 10));
+  });
+
+  it('runDue with bill template creates a draft bill with correct due_date', async () => {
+    const { biz, ctx } = await bootstrap();
+    const vendor = await makeVendor(t.db, biz.id);
+    const expense = await t.db.selectFrom('chart_of_accounts').select(['id'])
+      .where('business_id', '=', biz.id).where('code', '=', '5010').executeTakeFirstOrThrow();
+
+    const today = new Date().toISOString().slice(0, 10);
+    await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Monthly rent',
+        template_type: 'bill',
+        payload: {
+          vendor_id: vendor.id,
+          due_days: 30,
+          lines: [{ description: 'Rent', quantity: '1', unit_price: '1500', expense_account_id: expense.id }],
+        },
+        recurrence: 'monthly',
+        next_run_date: today,
+      }),
+    );
+
+    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    expect(results[0]?.runs_created).toBe(1);
+
+    const bills = await t.db.selectFrom('bills').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(bills).toHaveLength(1);
+    expect(bills[0]?.status).toBe('draft');
+    expect(bills[0]?.vendor_id).toBe(vendor.id);
+    const expectedDue = new Date(today + 'T00:00:00Z');
+    expectedDue.setUTCDate(expectedDue.getUTCDate() + 30);
+    expect(bills[0]?.due_date).toBe(expectedDue.toISOString().slice(0, 10));
   });
 });

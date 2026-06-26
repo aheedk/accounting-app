@@ -400,6 +400,12 @@ export interface RecurringTemplatesTable {
   created_by_user_id: string | null;
 }
 
+export interface NumberingCountersTable {
+  business_id: string;
+  entity_type: string;
+  last_value: ColumnType<number, number, number>;
+}
+
 export interface FilesTable {
   id: Generated<string>;
   business_id: string;
@@ -935,4 +941,5 @@ export interface DB {
   pay_run_lines: PayRunLinesTable;
   payroll_tax_liabilities: PayrollTaxLiabilitiesTable;
   compliance_items: ComplianceItemsTable;
+  numbering_counters: NumberingCountersTable;
 }

@@ -114,5 +114,8 @@ describe('payRunService', () => {
       pr.voidPayRun(trx, ctx, { pay_run_id: finalized.id }),
     );
     expect(voided.status).toBe('void');
+    // Migration 0051 loosened the constraint so the JE back-link is preserved on void.
+    expect(voided.journal_entry_id).toBe(finalized.journal_entry_id);
+    expect(voided.finalized_at).toBe(finalized.finalized_at);
   });
 });

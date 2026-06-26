@@ -5,6 +5,7 @@ import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import * as invSvc from '../ar/invoiceService.js';
 import { adjustStock } from '../inventory/stockMovementService.js';
+import { nextCounter } from '../core/numberingService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateSOLineInput = {
@@ -23,22 +24,13 @@ export type CreateSOInput = {
 };
 
 async function nextSONumber(trx: Transaction<DB>, business_id: string): Promise<string> {
-  // Simple per-business numbering: SO-{count+1}, zero-padded to 4 digits.
-  const r = await trx.selectFrom('sales_orders')
-    .select(eb => eb.fn.count<string>('id').as('cnt'))
-    .where('business_id', '=', business_id)
-    .executeTakeFirstOrThrow();
-  return `SO-${String(Number(r.cnt) + 1).padStart(4, '0')}`;
+  const n = await nextCounter(trx, business_id, 'sales_order');
+  return `SO-${String(n).padStart(4, '0')}`;
 }
 
 async function nextInvoiceNumber(trx: Transaction<DB>, business_id: string): Promise<string> {
-  // Per-business invoice sequence: INV-{count+1}. Best-effort uniqueness; if a
-  // collision occurs, createDraft will throw DUPLICATE_RESOURCE — caller should retry.
-  const r = await trx.selectFrom('invoices')
-    .select(eb => eb.fn.count<string>('id').as('cnt'))
-    .where('business_id', '=', business_id)
-    .executeTakeFirstOrThrow();
-  return `INV-${String(Number(r.cnt) + 1).padStart(4, '0')}`;
+  const n = await nextCounter(trx, business_id, 'invoice');
+  return `INV-${String(n).padStart(4, '0')}`;
 }
 
 export async function createSO(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateSOInput) {
