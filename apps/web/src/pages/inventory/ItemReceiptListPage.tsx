@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileDown, Printer } from 'lucide-react';
+import { CheckCircle2, FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -41,7 +41,7 @@ function fmtShortDate(iso: string) {
 function pickErr(e: unknown): string {
   return (
     (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data
-      ?.error?.message ?? 'Failed'
+      ?.error?.message ?? 'Failed to load item receipts'
   );
 }
 
@@ -113,6 +113,37 @@ export default function ItemReceiptListPage() {
 
   return (
     <div className="space-y-6">
+
+      {/* QBO-style hero banner — always visible */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-8 p-10">
+          <div className="flex-1 space-y-5">
+            <h2 className="text-3xl font-bold leading-tight text-foreground">
+              Restock inventory as<br />shipments arrive
+            </h2>
+            <p className="text-muted-foreground">
+              Track real-time inventory moving into your warehouse to keep inventory levels accurate.
+            </p>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
+              {[
+                'Update stock levels when you receive inventory',
+                'Match received inventory with purchase orders and bills',
+                'Track discrepancies for faster resolutions',
+              ].map(item => (
+                <li key={item} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Button asChild className="mt-2">
+              <Link to="/inventory/item-receipts/new">Receive items</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* List section */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Item Receipts</h1>
         <div className="flex items-center gap-2">
@@ -133,7 +164,9 @@ export default function ItemReceiptListPage() {
           </Button>
         </div>
       </div>
+
       {err && <p className="text-sm text-destructive">{err}</p>}
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -146,7 +179,14 @@ export default function ItemReceiptListPage() {
               defaultSortKey="receipt_date"
               defaultSortDir="desc"
               downloadable={{ filename: 'item-receipts', title: 'Item Receipts' }}
-              emptyMessage={<EmptyState title="No item receipts yet" hint="Receive against a sent purchase order to record stock arriving." actionLabel="Receive items" actionTo="/inventory/item-receipts/new" />}
+              emptyMessage={
+                <EmptyState
+                  title="No item receipts yet"
+                  hint="Receive against a sent purchase order to record stock arriving."
+                  actionLabel="Receive items"
+                  actionTo="/inventory/item-receipts/new"
+                />
+              }
             />
           )}
         </CardContent>
