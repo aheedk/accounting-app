@@ -193,6 +193,9 @@ export const AUDIT = {
   PAYROLL_TAX_RECORD: 'payroll_tax.record',
   PAYROLL_TAX_PAY: 'payroll_tax.pay',
   COMPLIANCE_ITEM_UPDATE: 'compliance_item.update',
+
+  // Banking import batches
+  BANK_IMPORT_UNDO: 'bank_import.undo',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

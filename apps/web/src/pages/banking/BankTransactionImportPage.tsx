@@ -30,6 +30,19 @@ type ParseResult = {
 
 type ImportResult = { imported: number; deduped: number };
 
+type ImportBatch = {
+  id: string;
+  bank_account_id: string;
+  bank_account_name: string | null;
+  filename: string | null;
+  rows_submitted: number;
+  imported: number;
+  deduped: number;
+  created_at: string;
+  undone_at: string | null;
+  remaining_rows: string | number;
+};
+
 type ImportRow = {
   transaction_date: string;
   description: string;
@@ -161,7 +174,17 @@ export default function BankTransactionImportPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [undoBusy, setUndoBusy] = useState<string | null>(null);
+  const [undoMsg, setUndoMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  function loadBatches() {
+    if (!bizId) return;
+    api.get<{ batches: ImportBatch[] }>(`/businesses/${bizId}/bank-imports`)
+      .then(r => setBatches(r.data.batches))
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     if (!bizId) return;
@@ -178,8 +201,24 @@ export default function BankTransactionImportPage() {
         setErr(pickErr(e));
       }
     })();
+    loadBatches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bizId]);
+
+  async function undoBatch(b: ImportBatch) {
+    if (!bizId) return;
+    if (!confirm(`Undo this import? Still-unreviewed rows from ${b.filename ?? 'this batch'} will be removed; anything already matched, categorized, or excluded is kept.`)) return;
+    setUndoBusy(b.id); setUndoMsg(null); setErr(null);
+    try {
+      const r = await api.post<{ deleted: number; kept: number }>(`/businesses/${bizId}/bank-imports/${b.id}/undo`, {});
+      setUndoMsg(`Removed ${r.data.deleted} transaction${r.data.deleted === 1 ? '' : 's'}${r.data.kept > 0 ? `; kept ${r.data.kept} already-reviewed` : ''}.`);
+      loadBatches();
+    } catch (e: unknown) {
+      setErr(pickErr(e));
+    } finally {
+      setUndoBusy(null);
+    }
+  }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setErr(null); setResult(null);
@@ -260,9 +299,11 @@ export default function BankTransactionImportPage() {
     try {
       const r = await api.post(`/businesses/${bizId}/bank-transactions/import`, {
         bank_account_id: bankAccountId,
+        filename: fileName || null,
         rows,
       });
       setResult({ imported: r.data.imported, deduped: r.data.deduped });
+      loadBatches();
     } catch (e: unknown) {
       setErr(pickErr(e));
     } finally {
@@ -408,6 +449,63 @@ export default function BankTransactionImportPage() {
           </Button>
         </div>
       )}
+
+      <Card>
+        <CardHeader><CardTitle>Import history</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {undoMsg && <p className="text-sm text-green-600">{undoMsg}</p>}
+          {batches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No imports yet for this company.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/40">
+                  <tr>
+                    <th className="p-2 text-left text-xs font-medium uppercase tracking-wide">Imported</th>
+                    <th className="p-2 text-left text-xs font-medium uppercase tracking-wide">File</th>
+                    <th className="p-2 text-left text-xs font-medium uppercase tracking-wide">Account</th>
+                    <th className="p-2 text-right text-xs font-medium uppercase tracking-wide">New</th>
+                    <th className="p-2 text-right text-xs font-medium uppercase tracking-wide">Deduped</th>
+                    <th className="p-2 text-right text-xs font-medium uppercase tracking-wide">Remaining</th>
+                    <th className="p-2 text-left text-xs font-medium uppercase tracking-wide">Status</th>
+                    <th className="p-2 text-right text-xs font-medium uppercase tracking-wide">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map(b => (
+                    <tr key={b.id} className="border-b last:border-b-0">
+                      <td className="p-2 font-mono text-xs">{new Date(b.created_at).toLocaleString()}</td>
+                      <td className="p-2">{b.filename ?? '—'}</td>
+                      <td className="p-2">{b.bank_account_name ?? '—'}</td>
+                      <td className="p-2 text-right font-mono">{b.imported}</td>
+                      <td className="p-2 text-right font-mono">{b.deduped}</td>
+                      <td className="p-2 text-right font-mono">{Number(b.remaining_rows)}</td>
+                      <td className="p-2">
+                        {b.undone_at
+                          ? <span className="text-muted-foreground">Undone</span>
+                          : <span className="text-emerald-600">Active</span>}
+                      </td>
+                      <td className="p-2 text-right">
+                        {!b.undone_at && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-auto p-0 font-normal text-primary hover:text-primary"
+                            disabled={undoBusy === b.id}
+                            onClick={() => undoBatch(b)}
+                          >
+                            {undoBusy === b.id ? 'Undoing…' : 'Undo'}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

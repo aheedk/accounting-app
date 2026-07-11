@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
@@ -346,7 +347,20 @@ export default function BankTransactionsInboxPage() {
           </thead>
           <tbody>
             {txns.length === 0 && (
-              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{loading ? 'Loading…' : 'No transactions match the current filter.'}</td></tr>
+              <tr>
+                <td colSpan={5}>
+                  {loading ? (
+                    <div className="p-6 text-center text-muted-foreground">Loading…</div>
+                  ) : (
+                    <EmptyState
+                      title="No transactions here"
+                      hint="Import a bank CSV to fill this inbox, or adjust the status filter above."
+                      actionLabel="Import transactions"
+                      actionTo="/accounting/bank-transactions/import"
+                    />
+                  )}
+                </td>
+              </tr>
             )}
             {txns.map(t => {
               const n = parseFloat(t.amount);

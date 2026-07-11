@@ -770,6 +770,20 @@ export interface BankTransactionsTable {
   imported_at: Generated<Timestamp>;
   reviewed_at: Timestamp | null;
   reviewed_by_user_id: string | null;
+  import_batch_id: string | null;
+}
+
+export interface BankImportBatchesTable {
+  id: Generated<string>;
+  business_id: string;
+  bank_account_id: string;
+  filename: string | null;
+  rows_submitted: number;
+  imported: number;
+  deduped: number;
+  created_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  undone_at: Timestamp | null;
 }
 
 export interface BankReconciliationsTable {
@@ -942,4 +956,5 @@ export interface DB {
   payroll_tax_liabilities: PayrollTaxLiabilitiesTable;
   compliance_items: ComplianceItemsTable;
   numbering_counters: NumberingCountersTable;
+  bank_import_batches: BankImportBatchesTable;
 }

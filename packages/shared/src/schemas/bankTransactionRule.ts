@@ -23,3 +23,13 @@ export const bankRuleApplySchema = z.object({
   bank_account_id: z.string().uuid(),
 });
 export type BankRuleApply = z.infer<typeof bankRuleApplySchema>;
+
+// Candidate-rule preview: match conditions only, no name/offset required.
+export const bankRuleDryRunSchema = z.object({
+  description_contains: z.string().min(1).max(500),
+  min_amount: moneyStr.nullable().optional(),
+  max_amount: moneyStr.nullable().optional(),
+  sign_filter: z.enum(['any', 'inflow_only', 'outflow_only']).optional(),
+  bank_account_id: z.string().uuid().nullable().optional(),
+});
+export type BankRuleDryRun = z.infer<typeof bankRuleDryRunSchema>;

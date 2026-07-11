@@ -4,6 +4,7 @@ const moneyStr = z.string().regex(/^-?\d+(\.\d+)?$/);
 
 export const bankTransactionImportSchema = z.object({
   bank_account_id: z.string().uuid(),
+  filename: z.string().max(300).nullable().optional(),
   rows: z.array(z.object({
     transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     description: z.string().min(1).max(500),

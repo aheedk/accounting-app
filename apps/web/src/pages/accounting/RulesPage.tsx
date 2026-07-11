@@ -168,6 +168,9 @@ export default function RulesPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
 
   const [applyBankAccountId, setApplyBankAccountId] = useState<string>('');
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [applyResult, setApplyResult] = useState<string | null>(null);
+  const [dryRun, setDryRun] = useState<{ matches: number; total_unreviewed: number } | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -418,6 +421,41 @@ export default function RulesPage() {
 
   const formValid = form.name.trim() !== '' && form.description_contains.trim() !== '' && form.offset_account_id !== '';
 
+  // Live match preview while the drawer is open (read-only dry run, debounced).
+  useEffect(() => {
+    if (!bizId || !drawerOpen || form.description_contains.trim() === '') {
+      setDryRun(null);
+      return;
+    }
+    const handle = setTimeout(() => {
+      api.post<{ matches: number; total_unreviewed: number }>(`/businesses/${bizId}/bank-rules/dry-run`, {
+        description_contains: form.description_contains.trim(),
+        min_amount: form.min_amount.trim() === '' ? null : form.min_amount.trim(),
+        max_amount: form.max_amount.trim() === '' ? null : form.max_amount.trim(),
+        sign_filter: form.sign_filter,
+        bank_account_id: form.bank_account_id === '' ? null : form.bank_account_id,
+      })
+        .then(r => setDryRun({ matches: r.data.matches, total_unreviewed: r.data.total_unreviewed }))
+        .catch(() => setDryRun(null));
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [bizId, drawerOpen, form.description_contains, form.min_amount, form.max_amount, form.sign_filter, form.bank_account_id]);
+
+  async function applyRulesNow() {
+    if (!bizId || !applyBankAccountId) return;
+    setApplyBusy(true); setErr(null); setApplyResult(null);
+    try {
+      const r = await api.post<{ applied: number; rules_tried: number }>(`/businesses/${bizId}/bank-rules/apply`, {
+        bank_account_id: applyBankAccountId,
+      });
+      setApplyResult(`Categorized ${r.data.applied} transaction${r.data.applied === 1 ? '' : 's'} using ${r.data.rules_tried} active rule${r.data.rules_tried === 1 ? '' : 's'}.`);
+    } catch (e: unknown) {
+      setErr(pickErr(e));
+    } finally {
+      setApplyBusy(false);
+    }
+  }
+
   if (!bizId) return <div>Pick a business.</div>;
 
   return (
@@ -429,6 +467,28 @@ export default function RulesPage() {
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
+
+      {/* Apply rules to unreviewed transactions */}
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+          <span className="text-sm font-medium">Apply rules now</span>
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={applyBankAccountId}
+            onChange={e => setApplyBankAccountId(e.target.value)}
+            aria-label="Bank account to apply rules to"
+          >
+            {bankAccounts.filter(ba => ba.is_active).map(ba => (
+              <option key={ba.id} value={ba.id}>{ba.name}</option>
+            ))}
+          </select>
+          <Button size="sm" onClick={applyRulesNow} disabled={applyBusy || !applyBankAccountId}>
+            {applyBusy ? 'Applying…' : 'Apply rules'}
+          </Button>
+          {applyResult && <span className="text-sm text-green-600">{applyResult}</span>}
+          <span className="ml-auto text-xs text-muted-foreground">Runs active rules against unreviewed transactions, first match wins.</span>
+        </CardContent>
+      </Card>
 
       {/* Rules table */}
       <Card>
@@ -775,6 +835,13 @@ export default function RulesPage() {
                       <span className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
+                )}
+
+                {dryRun && (
+                  <p className="text-sm rounded-md border bg-muted/40 px-3 py-2">
+                    Preview: matches <span className="font-semibold">{dryRun.matches}</span> of{' '}
+                    {dryRun.total_unreviewed} unreviewed transaction{dryRun.total_unreviewed === 1 ? '' : 's'}.
+                  </p>
                 )}
 
                 {err && <p className="text-sm text-destructive">{err}</p>}

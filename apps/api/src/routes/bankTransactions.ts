@@ -57,6 +57,7 @@ router.post('/businesses/:businessId/bank-transactions/import', requireMinRole('
       btSvc.importTransactions(trx, ctxFromReq(req), {
         business_id: req.tenancy!.business_id,
         bank_account_id: body.bank_account_id,
+        filename: body.filename ?? null,
         rows: body.rows.map(r => ({
           transaction_date: r.transaction_date,
           description: r.description,
@@ -66,6 +67,25 @@ router.post('/businesses/:businessId/bank-transactions/import', requireMinRole('
       }),
     );
     res.status(201).json(result);
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/bank-imports', async (req, res, next) => {
+  try {
+    const acct = req.query['bank_account_id'];
+    const batches = await btSvc.listImportBatches(
+      db, req.tenancy!.business_id, typeof acct === 'string' && acct ? acct : undefined,
+    );
+    res.json({ batches });
+  } catch (e) { next(e); }
+});
+
+router.post('/businesses/:businessId/bank-imports/:id/undo', requireMinRole('staff'), async (req, res, next) => {
+  try {
+    const result = await db.transaction().execute(trx =>
+      btSvc.undoImport(trx, ctxFromReq(req), { batch_id: req.params['id']! }),
+    );
+    res.json(result);
   } catch (e) { next(e); }
 });
 

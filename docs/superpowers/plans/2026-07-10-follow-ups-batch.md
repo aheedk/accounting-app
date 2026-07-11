@@ -194,7 +194,7 @@ ALTER TABLE pay_runs ADD CONSTRAINT pr_finalized_has_je CHECK (
 - Modify: `apps/web/package.json` (+`recharts` — dependency explicitly prescribed by follow-ups.md)
 - Modify: `apps/web/src/pages/reports/PerformanceCenterPage.tsx`
 
-- [ ] Replace hand-rolled SVG sparklines with Recharts (`ResponsiveContainer` + `AreaChart`/`LineChart`): X/Y axes, themed tooltip using `fmtMoney`, KPI explanation line in tooltip, date-range compare consistent with existing data shape. Keep theme tokens (ink/gold, IBM Plex Mono numerals). Typecheck + lint + browser verify. Commit `feat(web): Recharts charts on Performance Center`.
+- [x] Replace hand-rolled SVG sparklines with Recharts (`ResponsiveContainer` + `AreaChart`/`LineChart`): X/Y axes, themed tooltip using `fmtMoney`, KPI explanation line in tooltip, date-range compare consistent with existing data shape. Keep theme tokens (ink/gold, IBM Plex Mono numerals). Typecheck + lint + browser verify. Commit `feat(web): Recharts charts on Performance Center`.
 
 ---
 

@@ -191,4 +191,103 @@ describe('bankTransactionService', () => {
     expect(cleared.reviewed_at).toBeNull();
     expect(cleared.reviewed_by_user_id).toBeNull();
   });
+
+  it('importTransactions records an import batch and stamps rows with it', async () => {
+    const { biz, ctx, bankAccount } = await setup(t);
+    const result = await t.db.transaction().execute(trx =>
+      btSvc.importTransactions(trx, ctx, {
+        business_id: biz.id,
+        bank_account_id: bankAccount.id,
+        filename: 'april-statement.csv',
+        rows: [
+          { transaction_date: '2026-04-10', description: 'Deposit A', amount: '100.0000', external_id: 'b-1' },
+          { transaction_date: '2026-04-11', description: 'Coffee', amount: '-4.2500', external_id: 'b-2' },
+        ],
+      }),
+    );
+    expect(result.batch_id).toBeTruthy();
+
+    const batch = await t.db.selectFrom('bank_import_batches').selectAll()
+      .where('id', '=', result.batch_id).executeTakeFirstOrThrow();
+    expect(batch.filename).toBe('april-statement.csv');
+    expect(Number(batch.imported)).toBe(2);
+    expect(Number(batch.deduped)).toBe(0);
+    expect(batch.undone_at).toBeNull();
+
+    const rows = await t.db.selectFrom('bank_transactions').selectAll()
+      .where('bank_account_id', '=', bankAccount.id).execute();
+    expect(rows).toHaveLength(2);
+    for (const r of rows) expect(r.import_batch_id).toBe(result.batch_id);
+  });
+
+  it('undoImport deletes only still-unreviewed rows and marks the batch undone', async () => {
+    const { biz, ctx, bankAccount, revenue } = await setup(t);
+    const result = await t.db.transaction().execute(trx =>
+      btSvc.importTransactions(trx, ctx, {
+        business_id: biz.id,
+        bank_account_id: bankAccount.id,
+        rows: [
+          { transaction_date: '2026-04-10', description: 'Keep me (categorized)', amount: '250.0000', external_id: 'u-1' },
+          { transaction_date: '2026-04-11', description: 'Delete me 1', amount: '-10.0000', external_id: 'u-2' },
+          { transaction_date: '2026-04-12', description: 'Delete me 2', amount: '-20.0000', external_id: 'u-3' },
+        ],
+      }),
+    );
+    const kept = await t.db.selectFrom('bank_transactions').selectAll()
+      .where('external_id', '=', 'u-1').executeTakeFirstOrThrow();
+    await t.db.transaction().execute(trx =>
+      btSvc.categorize(trx, ctx, { bank_transaction_id: kept.id, offset_account_id: revenue.id, memo: null }),
+    );
+
+    const undo = await t.db.transaction().execute(trx =>
+      btSvc.undoImport(trx, ctx, { batch_id: result.batch_id }),
+    );
+    expect(undo.deleted).toBe(2);
+    expect(undo.kept).toBe(1);
+
+    const remaining = await t.db.selectFrom('bank_transactions').selectAll()
+      .where('bank_account_id', '=', bankAccount.id).execute();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.external_id).toBe('u-1');
+
+    const batch = await t.db.selectFrom('bank_import_batches').selectAll()
+      .where('id', '=', result.batch_id).executeTakeFirstOrThrow();
+    expect(batch.undone_at).not.toBeNull();
+
+    // A second undo is rejected.
+    await expect(t.db.transaction().execute(trx =>
+      btSvc.undoImport(trx, ctx, { batch_id: result.batch_id }),
+    )).rejects.toThrow(/already undone/);
+  });
+
+  it('listImportBatches returns batches newest-first with remaining-row counts', async () => {
+    const { biz, ctx, bankAccount } = await setup(t);
+    const first = await t.db.transaction().execute(trx =>
+      btSvc.importTransactions(trx, ctx, {
+        business_id: biz.id,
+        bank_account_id: bankAccount.id,
+        filename: 'one.csv',
+        rows: [{ transaction_date: '2026-04-10', description: 'A', amount: '1.0000', external_id: 'l-1' }],
+      }),
+    );
+    const second = await t.db.transaction().execute(trx =>
+      btSvc.importTransactions(trx, ctx, {
+        business_id: biz.id,
+        bank_account_id: bankAccount.id,
+        filename: 'two.csv',
+        rows: [
+          { transaction_date: '2026-04-11', description: 'B', amount: '2.0000', external_id: 'l-2' },
+          { transaction_date: '2026-04-12', description: 'C', amount: '3.0000', external_id: 'l-3' },
+        ],
+      }),
+    );
+
+    const batches = await btSvc.listImportBatches(t.db, biz.id);
+    expect(batches).toHaveLength(2);
+    expect(batches[0]?.id).toBe(second.batch_id);
+    expect(batches[0]?.filename).toBe('two.csv');
+    expect(Number(batches[0]?.remaining_rows)).toBe(2);
+    expect(batches[1]?.id).toBe(first.batch_id);
+    expect(Number(batches[1]?.remaining_rows)).toBe(1);
+  });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
 import { makeFirm, makeBusiness, makeUser, seedCoa, seedYearPeriods, makeBankAccount, makeBankRule } from '../helpers/factories.js';
 import * as btSvc from '../../src/services/banking/bankTransactionService.js';
-import { applyRules } from '../../src/services/banking/ruleApplyService.js';
+import { applyRules, dryRunRule } from '../../src/services/banking/ruleApplyService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
 const meta = { request_id: '00000000-0000-0000-0000-0000000bbb50', ip_address: '127.0.0.1', user_agent: 'vitest' };
@@ -122,5 +122,37 @@ describe('ruleApplyService', () => {
     const accountIds = lines.map(l => l.account_id);
     expect(accountIds).toContain(revenue.id);
     expect(accountIds).not.toContain(expense.id);
+  });
+
+  it('dryRunRule reports match count and sample without mutating anything', async () => {
+    const { biz, ctx, bankAccount } = await setup(t);
+    await t.db.transaction().execute(trx =>
+      btSvc.importTransactions(trx, ctx, {
+        business_id: biz.id,
+        bank_account_id: bankAccount.id,
+        rows: [
+          { transaction_date: '2026-04-10', description: 'STRIPE payout 1', amount: '90.0000', external_id: 'd-1' },
+          { transaction_date: '2026-04-11', description: 'Stripe payout 2', amount: '450.0000', external_id: 'd-2' },
+          { transaction_date: '2026-04-12', description: 'Office coffee', amount: '-6.0000', external_id: 'd-3' },
+        ],
+      }),
+    );
+
+    const result = await dryRunRule(t.db, biz.id, {
+      description_contains: 'stripe',
+      min_amount: '100',
+      max_amount: null,
+      sign_filter: 'inflow_only',
+      bank_account_id: null,
+    });
+    expect(result.total_unreviewed).toBe(3);
+    expect(result.matches).toBe(1);
+    expect(result.sample).toHaveLength(1);
+    expect(result.sample[0]?.description).toBe('Stripe payout 2');
+
+    // Nothing mutated: all rows still unreviewed.
+    const rows = await t.db.selectFrom('bank_transactions').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(rows.every(r => r.status === 'unreviewed')).toBe(true);
   });
 });

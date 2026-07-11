@@ -17,12 +17,13 @@ export type ImportRowInput = {
 export type ImportTransactionsInput = {
   business_id: string;
   bank_account_id: string;
+  filename?: string | null;
   rows: ImportRowInput[];
 };
 
 export async function importTransactions(
   trx: Transaction<DB>, ctx: ServiceCtx, input: ImportTransactionsInput,
-): Promise<{ imported: number; deduped: number }> {
+): Promise<{ imported: number; deduped: number; batch_id: string }> {
   const bankAcct = await trx.selectFrom('bank_accounts').selectAll()
     .where('id', '=', input.bank_account_id).executeTakeFirst();
   if (!bankAcct || bankAcct.deleted_at) throw new NotFoundError('bank_account', input.bank_account_id);
@@ -42,6 +43,16 @@ export async function importTransactions(
     }
   }
 
+  const batch = await trx.insertInto('bank_import_batches').values({
+    business_id: input.business_id,
+    bank_account_id: input.bank_account_id,
+    filename: input.filename ?? null,
+    rows_submitted: input.rows.length,
+    imported: 0,
+    deduped: 0,
+    created_by_user_id: ctx.user_id,
+  }).returningAll().executeTakeFirstOrThrow();
+
   let imported = 0;
   let deduped = 0;
   for (const row of input.rows) {
@@ -56,9 +67,14 @@ export async function importTransactions(
       description: row.description,
       amount: row.amount,
       external_id: row.external_id,
+      import_batch_id: batch.id,
     }).execute();
     imported += 1;
   }
+
+  await trx.updateTable('bank_import_batches')
+    .set({ imported, deduped })
+    .where('id', '=', batch.id).execute();
 
   await auditRecord(trx, ctx, {
     action: AUDIT.BANK_TRANSACTION_IMPORT,
@@ -67,12 +83,70 @@ export async function importTransactions(
     before: null,
     after: {
       bank_account_id: input.bank_account_id,
+      import_batch_id: batch.id,
       rows_submitted: input.rows.length,
       imported,
       deduped,
     },
   });
-  return { imported, deduped };
+  return { imported, deduped, batch_id: batch.id };
+}
+
+/**
+ * Undo an import: delete rows from the batch that are still unreviewed and
+ * unreconciled (mutable-until-reconciled invariant); anything the user already
+ * matched/categorized/excluded is kept and reported.
+ */
+export async function undoImport(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { batch_id: string },
+): Promise<{ deleted: number; kept: number }> {
+  const batch = await trx.selectFrom('bank_import_batches').selectAll()
+    .where('id', '=', input.batch_id).executeTakeFirst();
+  if (!batch) throw new NotFoundError('bank_import_batch', input.batch_id);
+  if (batch.undone_at) throw new PreconditionError('import batch already undone');
+
+  const deletedRows = await trx.deleteFrom('bank_transactions')
+    .where('import_batch_id', '=', input.batch_id)
+    .where('status', '=', 'unreviewed')
+    .where('is_reconciled', '=', false)
+    .returning('id')
+    .execute();
+  const keptRows = await trx.selectFrom('bank_transactions')
+    .select(eb => eb.fn.count<string>('id').as('cnt'))
+    .where('import_batch_id', '=', input.batch_id)
+    .executeTakeFirstOrThrow();
+
+  const updated = await trx.updateTable('bank_import_batches')
+    .set({ undone_at: sql`now()` })
+    .where('id', '=', input.batch_id)
+    .returningAll().executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.BANK_IMPORT_UNDO,
+    entity_type: 'bank_import_batch',
+    entity_id: input.batch_id,
+    before: batch,
+    after: { ...updated, deleted: deletedRows.length, kept: Number(keptRows.cnt) },
+  });
+  return { deleted: deletedRows.length, kept: Number(keptRows.cnt) };
+}
+
+export async function listImportBatches(
+  db: Kysely<DB>, business_id: string, bank_account_id?: string,
+) {
+  let q = db.selectFrom('bank_import_batches as b')
+    .leftJoin('bank_accounts as ba', 'ba.id', 'b.bank_account_id')
+    .selectAll('b')
+    .select('ba.name as bank_account_name')
+    .select(eb => eb.selectFrom('bank_transactions as bt')
+      .select(eb2 => eb2.fn.count<string>('bt.id').as('cnt'))
+      .whereRef('bt.import_batch_id', '=', 'b.id')
+      .as('remaining_rows'))
+    .where('b.business_id', '=', business_id)
+    .orderBy('b.created_at', 'desc')
+    .limit(100);
+  if (bank_account_id) q = q.where('b.bank_account_id', '=', bank_account_id);
+  return q.execute();
 }
 
 async function fetchUnreviewed(trx: Transaction<DB>, bank_transaction_id: string) {

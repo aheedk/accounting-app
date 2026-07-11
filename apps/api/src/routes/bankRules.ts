@@ -79,6 +79,20 @@ router.delete('/businesses/:businessId/bank-rules/:id', requireMinRole('accounta
   } catch (e) { next(e); }
 });
 
+router.post('/businesses/:businessId/bank-rules/dry-run', requireMinRole('staff'), async (req, res, next) => {
+  try {
+    const body = schemas.bankRuleDryRunSchema.parse(req.body);
+    const result = await ruleApply.dryRunRule(db, req.tenancy!.business_id, {
+      description_contains: body.description_contains,
+      min_amount: body.min_amount ?? null,
+      max_amount: body.max_amount ?? null,
+      sign_filter: body.sign_filter ?? 'any',
+      bank_account_id: body.bank_account_id ?? null,
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
 router.post('/businesses/:businessId/bank-rules/apply', requireMinRole('staff'), async (req, res, next) => {
   try {
     const body = schemas.bankRuleApplySchema.parse(req.body);
