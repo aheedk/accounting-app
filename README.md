@@ -2,6 +2,8 @@
 
 Production-grade accounting system for an accounting firm. See `docs/superpowers/specs/` for the design spec.
 
+> **Continuing an in-flight work session?** See [`HANDOFF.md`](./HANDOFF.md) — current batch state, environment notes, and the next task to pick up.
+
 ## Deployed environments
 
 - **API:** `<paste Railway URL here>`

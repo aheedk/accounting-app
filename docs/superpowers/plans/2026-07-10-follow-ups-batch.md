@@ -194,7 +194,7 @@ ALTER TABLE pay_runs ADD CONSTRAINT pr_finalized_has_je CHECK (
 - Modify: `apps/web/package.json` (+`recharts` — dependency explicitly prescribed by follow-ups.md)
 - Modify: `apps/web/src/pages/reports/PerformanceCenterPage.tsx`
 
-- [x] Replace hand-rolled SVG sparklines with Recharts (`ResponsiveContainer` + `AreaChart`/`LineChart`): X/Y axes, themed tooltip using `fmtMoney`, KPI explanation line in tooltip, date-range compare consistent with existing data shape. Keep theme tokens (ink/gold, IBM Plex Mono numerals). Typecheck + lint + browser verify. Commit `feat(web): Recharts charts on Performance Center`.
+- [ ] Replace hand-rolled SVG sparklines with Recharts (`ResponsiveContainer` + `AreaChart`/`LineChart`): X/Y axes, themed tooltip using `fmtMoney`, KPI explanation line in tooltip, date-range compare consistent with existing data shape. Keep theme tokens (ink/gold, IBM Plex Mono numerals). Typecheck + lint + browser verify. Commit `feat(web): Recharts charts on Performance Center`.
 
 ---
 
@@ -208,7 +208,7 @@ ALTER TABLE pay_runs ADD CONSTRAINT pr_finalized_has_je CHECK (
 
 Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, return match count + sample, **no writes**; undo import = delete transactions from a batch only where status is still imported/unreviewed (mutable-until-reconciled invariant — no `protect_posted`-style trigger, per CLAUDE.md don'ts); history = batches with counts/dates/filename.
 
-- [x] TDD service-first, then routes, then web. Audit actions appended for `bank_import.undo` (+ create if batches are new). Commit per sub-feature if sizeable, else one commit.
+- [ ] TDD service-first, then routes, then web. Audit actions appended for `bank_import.undo` (+ create if batches are new). Commit per sub-feature if sizeable, else one commit.
 
 ---
 
@@ -218,7 +218,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 - Create: `apps/web/src/components/ui/dialog.tsx` (shadcn wrapper over `@radix-ui/react-dialog` — already in `apps/web/package.json` per handoff)
 - Modify: `apps/web/src/pages/receipts/ReceiptsPage.tsx`, `.../IntegrationInboxPage.tsx`, `.../payroll/ContractorsPage.tsx`, `.../payroll/EmployeeDetailPage.tsx`, `.../payroll/PayrollTaxesPage.tsx` (exact paths recon'd at execution)
 
-- [x] Swap fixed-overlay `<Card>` modals for `<Dialog>` (focus trap, Escape, aria). Visual parity otherwise. Browser-verify each page. Commit `polish(web): shadcn Dialog for modal flows`.
+- [ ] Swap fixed-overlay `<Card>` modals for `<Dialog>` (focus trap, Escape, aria). Visual parity otherwise. Browser-verify each page. Commit `polish(web): shadcn Dialog for modal flows`.
 
 ---
 
@@ -227,7 +227,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 **Files:**
 - Modify: `apps/api/tests/integration/customReportService.test.ts`
 
-- [x] Add lifecycle tests (create/run/delete of a saved definition) and account-filter tests (all accounts / single account / account-type group) against seeded JEs with known balances. No production code expected to change; if a bug surfaces, fix in the same commit. Commit `test(api): custom report lifecycle + account filter coverage`.
+- [ ] Add lifecycle tests (create/run/delete of a saved definition) and account-filter tests (all accounts / single account / account-type group) against seeded JEs with known balances. No production code expected to change; if a bug surfaces, fix in the same commit. Commit `test(api): custom report lifecycle + account filter coverage`.
 
 ---
 
@@ -237,7 +237,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 - Modify: API error middleware (`apps/api/src/middleware/` or `app.ts`) — ensure zod 400s include per-field `issues` (path + message), not just `Input validation failed`
 - Modify: web api client + dense forms (Invoice/Bill/JE/Receive Payment) to render field-level messages; settings-style pages get explicit Saving/Saved/error states
 
-- [x] Verify current 400 shape first; extend without breaking existing consumers/tests. Sweep top dense forms only (YAGNI). Commit `feat: field-level validation feedback + save states`.
+- [ ] Verify current 400 shape first; extend without breaking existing consumers/tests. Sweep top dense forms only (YAGNI). Commit `feat: field-level validation feedback + save states`.
 
 ---
 
@@ -245,7 +245,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 
 **Files:** create/edit panels across `apps/web/src/pages/` flagged by Chrome (recon with a devtools audit on localhost).
 
-- [x] `htmlFor`/`id` pairs (stable ids), `aria-label` on icon-only buttons, focus initial field in dialogs (Task H's Dialog gives focus trap). Commit `polish(web): form control labels and ids`.
+- [ ] `htmlFor`/`id` pairs (stable ids), `aria-label` on icon-only buttons, focus initial field in dialogs (Task H's Dialog gives focus trap). Commit `polish(web): form control labels and ids`.
 
 ---
 
@@ -255,14 +255,14 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 - Modify: `apps/api/src/lib/fileStorage.ts` (add `S3Storage` implementing the existing `FileStorage` interface: `store`, `read`, `exists`)
 - Modify: `apps/api/package.json` (+`@aws-sdk/client-s3`)
 
-- [x] Export swap: `process.env.S3_BUCKET ? new S3Storage(...) : new LocalVolumeStorage(...)`. Env vars (`S3_BUCKET`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) documented in follow-ups.md; adapter stays dormant until set (no new env required to run). Unit-testable via interface; integration against real R2 is out of scope. Commit `feat(api): env-gated S3/R2 file storage adapter`.
+- [ ] Export swap: `process.env.S3_BUCKET ? new S3Storage(...) : new LocalVolumeStorage(...)`. Env vars (`S3_BUCKET`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) documented in follow-ups.md; adapter stays dormant until set (no new env required to run). Unit-testable via interface; integration against real R2 is out of scope. Commit `feat(api): env-gated S3/R2 file storage adapter`.
 
 ---
 
 ### Wrap-up
 
 - [ ] Full integration suite with the forks flags; web+api typecheck; web lint.
-- [x] Patch `docs/follow-ups.md` (remove/annotate completed sections — matches prior "docs: remove completed follow-ups" pattern) and refresh `docs/qbo-revamp-handoff.md` staleness (second wave is merged).
+- [ ] Refresh `docs/qbo-revamp-handoff.md` staleness (second wave is merged). (`follow-ups.md` A–E sections already trimmed.)
 - [ ] Report deliberately-skipped items to the user: Railway volume mount (dashboard access), prod test-vendor deletion (prod destructive — needs explicit go-ahead), tax engine / Plaid / OCR (out of scope per doc).
 
 ## Self-review notes

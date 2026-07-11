@@ -34,27 +34,7 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 ## Data model hardening
 
-### Loosen biconditional CHECK on `pay_runs.pr_finalized_has_je`
-
-**Why:** Same shape of issue slice 8 fixed on `expense_transactions.et_posted_has_je` (commit `8b747dd`). The current biconditional CHECK forces `journal_entry_id` and `finalized_at` to NULL when status flips to `void`, dropping the audit back-link to the (now-voided) JE. Reversal JE is still findable via `journal_entries.reversed_entry_id`, but the pay-run row no longer points at the original.
-
-**To do:**
-- New migration that drops the biconditional and replaces with two one-way implications: `(status = 'draft') → (journal_entry_id IS NULL)` AND `(status = 'finalized') → (journal_entry_id IS NOT NULL AND finalized_at IS NOT NULL)`. Void allows either.
-- Update `payRunService.voidPayRun` to stop nulling `journal_entry_id` / `finalized_at` / `finalized_by_user_id`.
-- Add a test asserting the JE link survives void (mirrors the slice 8 fix).
-
-**Effort:** ~20 min including migration + service edit + test.
-
-### Per-business sequences for invoice / bill / PO / SO numbering
-
-**Why:** All numbering services use `count(*) + 1` to assign the next number. Races between concurrent fulfillments / receipts (or between manual creation and automated fulfillment) can produce collision attempts that throw `DUPLICATE_RESOURCE`. Documented in `salesOrderService` agent report.
-
-**To do:**
-- Postgres sequence per business per entity, OR a `business_id, entity_type` row in a new `numbering_counters` table with `SELECT ... FOR UPDATE`.
-- Refactor `nextInvoiceNumber`, `nextBillNumber`, `nextPONumber`, `nextSONumber` (all in different service files) to use the new helper.
-- Existing tests should pass unchanged.
-
-**Effort:** ~1 hour. Touches multiple service files; worth coordinating into one focused commit.
+_Done 2026-07-10 (see `docs/superpowers/plans/2026-07-10-follow-ups-batch.md`): pay_runs void keeps its JE link (migration `0052`), and `numbering_counters` (migration `0051`) replaced the `count(*)+1` helpers._
 
 ---
 
@@ -104,19 +84,6 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 - Improve empty states for accounts with no transactions or no imported items.
 
 **Priority:** medium-high.
-
-#### Recurring transactions
-
-**Why:** The recurring template UI still exposes invoice and bill template types as "coming soon"; only journal entry materialization is complete.
-
-**To do:**
-- Finish invoice recurring templates.
-- Finish bill recurring templates.
-- Add pause/resume controls.
-- Add next-run preview and last-run history.
-- Add scheduled materialization instead of requiring the user to manually click "Run all due".
-
-**Priority:** high.
 
 #### Setup and admin settings
 
@@ -171,30 +138,7 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 ## Recurring transactions
 
-### Invoice + bill template_types
-
-**Why:** Slice 9's `recurringTemplateService.runDue` ships **journal_entry materialization only**. Invoice + bill template_types pass the create schema but throw `PRECONDITION_FAILED` at materialization time. Documented inline.
-
-**To do:**
-- Extend `runDue` to handle `template_type === 'invoice'` (call `invoiceService.createDraft` + `postInvoice`) and `'bill'` (call `billService.createDraft` + `postBill`).
-- Each template's `payload` jsonb must validate against the appropriate zod schema before invoking the service.
-- Add 2 tests: monthly invoice template + monthly bill template materialize correctly.
-
-**Effort:** ~1.5 hours including tests.
-
----
-
-## Cron / scheduling
-
-### True scheduler for recurring transactions
-
-**Why:** Current implementation is lazy-materialization only — the user must visit `/accounting/recurring` and click "Run all due" for any due templates to materialize. Works, but the user has to remember.
-
-**To do:** Either
-- Railway cron service running `POST /businesses/:bizId/recurring-templates/run-due` daily for each active business.
-- A self-pinging endpoint + Railway-cron one-shot.
-
-**Effort:** ~1 hour including testing.
+_Done 2026-07-10/11: invoice + bill materialization (typed payload schemas), pause/resume, next-run preview, run history, and an in-process hourly scheduler in the API (no Railway cron needed). See `docs/superpowers/plans/2026-07-10-follow-ups-batch.md` Tasks B–D._
 
 ---
 
