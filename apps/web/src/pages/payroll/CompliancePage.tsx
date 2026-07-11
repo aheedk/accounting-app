@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { pickErr } from '@/lib/apiErrors';
 
 type ItemKey =
   | 'state_registration'
@@ -63,13 +64,6 @@ function statusBadge(status: ItemStatus) {
   }
 }
 
-function pickErr(e: unknown): string {
-  const resp = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message;
-  if (resp) return resp;
-  if (e instanceof Error) return e.message;
-  return 'Request failed';
-}
 
 export default function CompliancePage() {
   const [bizId] = useActiveBusinessId();
@@ -79,6 +73,8 @@ export default function CompliancePage() {
   // Per-item busy flag so we can disable controls during inflight requests without
   // freezing the entire list.
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Transient per-item "Saved ✓" confirmation for autosave-style changes.
+  const [savedId, setSavedId] = useState<string | null>(null);
   // Cache uploaded file metadata so the "View document" link can render the original
   // filename instead of just a UUID.
   const [files, setFiles] = useState<Record<string, FileRow>>({});
@@ -153,6 +149,8 @@ export default function CompliancePage() {
     try {
       await api.patch(`/businesses/${bizId}/compliance-items/${id}`, patch);
       await reload();
+      setSavedId(id);
+      setTimeout(() => setSavedId(s => (s === id ? null : s)), 2500);
     } catch (e: unknown) {
       setErr(pickErr(e));
     } finally {
@@ -256,6 +254,8 @@ export default function CompliancePage() {
                       {statusBadge(item.status)}
                     </div>
                     <div className="flex items-center gap-2">
+                      {isBusy && <span className="text-xs text-muted-foreground">Saving…</span>}
+                      {!isBusy && savedId === item.id && <span className="text-xs text-emerald-600">Saved ✓</span>}
                       <Label className="text-xs text-muted-foreground">Status</Label>
                       <select
                         className="h-9 rounded-md border bg-background px-2 text-sm"

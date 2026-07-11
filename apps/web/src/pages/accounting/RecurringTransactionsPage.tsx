@@ -11,6 +11,7 @@ import { api } from '@/lib/apiClient';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal, fmtLongDate } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
+import { pickErr } from '@/lib/apiErrors';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 type Customer = { id: string; name: string };
@@ -59,12 +60,6 @@ const blankForm = () => ({
   due_days: '30',
 });
 
-function pickErr(e: unknown): string {
-  return (
-    (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data
-      ?.error?.message ?? 'Failed'
-  );
-}
 
 const INTERVAL_LABELS: Record<Recurrence, string> = {
   weekly: 'Every Week',

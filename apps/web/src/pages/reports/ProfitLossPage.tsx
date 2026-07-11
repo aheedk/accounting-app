@@ -9,6 +9,7 @@ import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { fmtLongDate } from '@/lib/dates';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
+import { pickErr } from '@/lib/apiErrors';
 
 type PnlLine = {
   account_id: string;
@@ -31,10 +32,6 @@ type PnlReport = {
   net_income: string;
 };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed to load report';
-}
 
 function monthRange(now: Date): { start: string; end: string } {
   const y = now.getFullYear();

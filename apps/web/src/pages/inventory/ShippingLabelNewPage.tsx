@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type LinkTarget = 'invoice' | 'sales_order';
 
@@ -38,14 +39,6 @@ type CreateBody = {
   notes?: string;
 };
 
-function pickErr(e: unknown): string {
-  return (
-    (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-      ?.response?.data?.error?.message ??
-    (e instanceof Error ? e.message : undefined) ??
-    'Failed'
-  );
-}
 
 function today(): string {
   return todayLocal();

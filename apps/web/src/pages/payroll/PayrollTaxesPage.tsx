@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 import { todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type Period = 'monthly' | 'quarterly' | 'annual';
 type Status = 'accrued' | 'paid';
@@ -35,10 +36,6 @@ type Account = {
   is_active: boolean;
 };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function statusBadge(status: Status) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';

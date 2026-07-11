@@ -9,6 +9,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 type Line = { account_id: string; debit: string; credit: string; description: string; name: string; class_name: string };
@@ -16,10 +17,6 @@ type Line = { account_id: string; debit: string; credit: string; description: st
 const blank = (): Line => ({ account_id: '', debit: '', credit: '', description: '', name: '', class_name: '' });
 const DEFAULT_ROWS = 8;
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 export default function JournalNewPage() {
   const [bizId] = useActiveBusinessId();

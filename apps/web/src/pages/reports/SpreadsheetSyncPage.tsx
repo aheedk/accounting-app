@@ -9,11 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function parseCSVLine(line: string): string[] {
   const cells: string[] = [];

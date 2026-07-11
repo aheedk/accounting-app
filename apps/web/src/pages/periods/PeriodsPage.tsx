@@ -6,12 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 import { currentYearLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type Period = { id: string; starts_on: string; ends_on: string; status: 'open' | 'closed'; closed_at: string | null };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message ?? 'Failed';
-}
 
 function fmtShortDate(iso: string) {
   const [y, m, d] = iso.split('-');

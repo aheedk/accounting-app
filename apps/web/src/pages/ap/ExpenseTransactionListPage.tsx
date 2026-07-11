@@ -11,6 +11,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { daysAgoLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 type StatusFilter = ExpenseStatus | 'all';
@@ -47,10 +48,6 @@ function roleAtLeast(role: Role | undefined, floor: Role): boolean {
   return r >= f;
 }
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All transactions' },

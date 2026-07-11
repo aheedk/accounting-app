@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { pickErr } from '@/lib/apiErrors';
 
 type BankAccount = {
   id: string;
@@ -50,10 +51,6 @@ type ImportRow = {
   external_id?: string;
 };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 // 30-line inline CSV parser. Handles:
 // - Quoted fields with embedded commas: `"a, b",c`

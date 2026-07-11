@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { pickErr } from '@/lib/apiErrors';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -38,12 +39,6 @@ type POListResponse = { purchase_orders: PurchaseOrder[] };
 type ItemsResponse = { items: InventoryItem[] };
 type VendorsResponse = { vendors: Vendor[] };
 
-function pickErr(e: unknown): string {
-  return (
-    (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data
-      ?.error?.message ?? 'Failed to receive purchase order'
-  );
-}
 
 function todayIso(): string {
   const d = new Date();

@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/useAuth';
 import { fmtMoney } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type BsLine = {
   account_id: string;
@@ -30,10 +31,6 @@ type BalanceSheetReport = {
   in_balance: boolean;
 };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed to load Balance Sheet.';
-}
 
 const EMPTY_REPORT: BalanceSheetReport = {
   as_of: '',

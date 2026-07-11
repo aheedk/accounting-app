@@ -4,6 +4,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { pickErr } from '@/lib/apiErrors';
 
 type Period = {
   id: string;
@@ -47,12 +48,6 @@ function taskStatusBadge(status: TaskStatus) {
   }
 }
 
-function pickErr(e: unknown): string {
-  const resp = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
-  if (resp) return resp;
-  if (e instanceof Error) return e.message;
-  return 'Request failed';
-}
 
 export default function BooksReviewPage() {
   const [bizId] = useActiveBusinessId();

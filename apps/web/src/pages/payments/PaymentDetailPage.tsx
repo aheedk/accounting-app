@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { pickErr } from '@/lib/apiErrors';
 
 type Payment = {
   id: string;
@@ -45,10 +46,6 @@ type OpenInvoice = { id: string; invoice_number: string; total: string };
 type Customer = { id: string; name: string; email?: string | null };
 type Account = { id: string; code: string; name: string };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 export default function PaymentDetailPage() {
   const { id } = useParams<{ id: string }>();

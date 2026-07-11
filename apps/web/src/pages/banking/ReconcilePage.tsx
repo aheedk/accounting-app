@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type BankAccount = {
   id: string;
@@ -45,12 +46,6 @@ type BankTransaction = {
   is_reconciled: boolean;
 };
 
-function pickErr(e: unknown): string {
-  const resp = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
-  if (resp) return resp;
-  if (e instanceof Error) return e.message;
-  return 'Request failed';
-}
 
 function inRange(date: string, start: string, end: string): boolean {
   if (!start || !end) return false;

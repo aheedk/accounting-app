@@ -237,7 +237,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 - Modify: API error middleware (`apps/api/src/middleware/` or `app.ts`) — ensure zod 400s include per-field `issues` (path + message), not just `Input validation failed`
 - Modify: web api client + dense forms (Invoice/Bill/JE/Receive Payment) to render field-level messages; settings-style pages get explicit Saving/Saved/error states
 
-- [ ] Verify current 400 shape first; extend without breaking existing consumers/tests. Sweep top dense forms only (YAGNI). Commit `feat: field-level validation feedback + save states`.
+- [x] Verify current 400 shape first; extend without breaking existing consumers/tests. Sweep top dense forms only (YAGNI). Commit `feat: field-level validation feedback + save states`.
 
 ---
 

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
+import { pickErr } from '@/lib/apiErrors';
 
 type LinkedEntityType =
   | 'bank_transaction'
@@ -51,10 +52,6 @@ const LINK_TYPES: Array<{ value: LinkedEntityType; label: string }> = [
   { value: 'journal_entry', label: 'Journal Entry' },
 ];
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function entityBadge(type: LinkedEntityType) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';

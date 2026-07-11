@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { currentYearLocal, todayLocal } from '@/lib/dates';
+import { pickErr } from '@/lib/apiErrors';
 
 type GroupBy = 'account' | 'month' | 'cost_center' | 'customer' | 'vendor';
 type Column = 'debit' | 'credit' | 'net';
@@ -79,10 +80,6 @@ function emptyForm(): { name: string; definition: Definition } {
   };
 }
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function fmtShortDate(iso: string) {
   const [y, m, d] = iso.split('-');

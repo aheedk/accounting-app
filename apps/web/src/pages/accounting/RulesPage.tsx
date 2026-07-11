@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
+import { pickErr } from '@/lib/apiErrors';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -81,10 +82,6 @@ function directionLabel(s: SignFilter): string {
   return DIRECTION_OPTIONS.find(o => o.value === s)?.label ?? s;
 }
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function amountRangeLabel(min: string | null, max: string | null): string {
   if (min == null && max == null) return '';

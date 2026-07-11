@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { pickErr } from '@/lib/apiErrors';
 
 type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
 type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
@@ -54,10 +55,6 @@ type ActionFormState = {
   excluded_reason: string;
 };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'pending', label: 'Pending' },

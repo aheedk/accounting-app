@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { pickErr } from '@/lib/apiErrors';
 
 type ItemReceipt = {
   id: string;
@@ -36,12 +37,6 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-function pickErr(e: unknown): string {
-  return (
-    (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data
-      ?.error?.message ?? 'Failed'
-  );
-}
 
 export default function ItemReceiptListPage() {
   const [bizId] = useActiveBusinessId();

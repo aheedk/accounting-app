@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { parseMoneyInput } from '@/lib/money';
+import { pickErr } from '@/lib/apiErrors';
 
 type JE = { id: string; entry_date: string; memo: string | null; status: string; source_type: string };
 type ImportRow = { entry_date: string; account_code: string; debit: string; credit: string; description: string; _status?: string; _err?: string };
@@ -21,10 +22,6 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function statusBadge(status: string) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';

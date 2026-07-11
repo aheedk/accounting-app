@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
+import { pickErr } from '@/lib/apiErrors';
 
 type ShippingLabel = {
   id: string;
@@ -23,10 +24,6 @@ type ShippingLabel = {
 // Server returns `{ labels: [...] }` (see apps/api/src/routes/shippingLabels.ts).
 type ListResponse = { labels: ShippingLabel[] };
 
-function pickErr(e: unknown): string {
-  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-    ?.response?.data?.error?.message ?? 'Failed';
-}
 
 function fmtShortDate(iso: string) {
   const [y, m, d] = iso.split('-');
