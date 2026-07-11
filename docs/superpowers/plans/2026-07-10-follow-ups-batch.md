@@ -227,7 +227,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 **Files:**
 - Modify: `apps/api/tests/integration/customReportService.test.ts`
 
-- [ ] Add lifecycle tests (create/run/delete of a saved definition) and account-filter tests (all accounts / single account / account-type group) against seeded JEs with known balances. No production code expected to change; if a bug surfaces, fix in the same commit. Commit `test(api): custom report lifecycle + account filter coverage`.
+- [x] Add lifecycle tests (create/run/delete of a saved definition) and account-filter tests (all accounts / single account / account-type group) against seeded JEs with known balances. No production code expected to change; if a bug surfaces, fix in the same commit. Commit `test(api): custom report lifecycle + account filter coverage`.
 
 ---
 
