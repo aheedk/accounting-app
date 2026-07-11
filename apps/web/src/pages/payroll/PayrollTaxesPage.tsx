@@ -342,8 +342,9 @@ export default function PayrollTaxesPage() {
                   <span className="font-mono">{fmtMoney(payTarget.amount)}</span>
                 </p>
                 <div>
-                  <Label>Cash account</Label>
+                  <Label htmlFor="pay-cash-account">Cash account</Label>
                   <select
+                    id="pay-cash-account"
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={payCashAccountId}
                     onChange={e => setPayCashAccountId(e.target.value)}
@@ -356,8 +357,9 @@ export default function PayrollTaxesPage() {
                   </select>
                 </div>
                 <div>
-                  <Label>Payment date</Label>
+                  <Label htmlFor="pay-date">Payment date</Label>
                   <DateInput
+                    id="pay-date"
                     value={payDate}
                     onChange={e => setPayDate(e.target.value)}
                     required

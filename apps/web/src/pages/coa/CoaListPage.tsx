@@ -64,6 +64,14 @@ export default function CoaListPage() {
   }
   useEffect(() => { void reload(); }, [bizId]);
 
+  // Escape closes the create drawer (parity with the Dialog-based modals).
+  useEffect(() => {
+    if (!showCreate) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowCreate(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showCreate]);
+
   useEffect(() => {
     function handle(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -327,7 +335,7 @@ export default function CoaListPage() {
       {showCreate && (
         <div className="fixed inset-0 z-50 flex">
           <div className="flex-1 bg-black/20" onClick={() => setShowCreate(false)} />
-          <div className="w-96 bg-background shadow-xl flex flex-col border-l">
+          <div className="w-96 bg-background shadow-xl flex flex-col border-l" role="dialog" aria-modal="true" aria-label="New account">
             <div className="flex items-center justify-between border-b px-6 py-4">
               <h2 className="text-lg font-semibold">New account</h2>
               <button

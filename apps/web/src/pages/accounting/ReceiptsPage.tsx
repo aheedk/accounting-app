@@ -328,8 +328,9 @@ export default function ReceiptsPage() {
             <div className="p-6">
               <form className="space-y-3" onSubmit={submitLink}>
                 <div>
-                  <Label>Entity type</Label>
+                  <Label htmlFor="link-entity-type">Entity type</Label>
                   <select
+                    id="link-entity-type"
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={linkType}
                     onChange={e => {
@@ -349,8 +350,9 @@ export default function ReceiptsPage() {
 
                 {linkType === 'bank_transaction' && (
                   <div>
-                    <Label>Bank transaction</Label>
+                    <Label htmlFor="link-bank-txn">Bank transaction</Label>
                     <select
+                      id="link-bank-txn"
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={linkId}
                       onChange={e => setLinkId(e.target.value)}
@@ -368,8 +370,9 @@ export default function ReceiptsPage() {
 
                 {linkType === 'bill' && (
                   <div>
-                    <Label>Bill</Label>
+                    <Label htmlFor="link-bill">Bill</Label>
                     <select
+                      id="link-bill"
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={linkId}
                       onChange={e => setLinkId(e.target.value)}
@@ -387,8 +390,9 @@ export default function ReceiptsPage() {
 
                 {linkType === 'expense_transaction' && (
                   <div>
-                    <Label>Expense transaction</Label>
+                    <Label htmlFor="link-expense-txn">Expense transaction</Label>
                     <select
+                      id="link-expense-txn"
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={linkId}
                       onChange={e => setLinkId(e.target.value)}
@@ -406,8 +410,9 @@ export default function ReceiptsPage() {
 
                 {(linkType === 'invoice' || linkType === 'journal_entry') && (
                   <div>
-                    <Label>{linkType === 'invoice' ? 'Invoice' : 'Journal entry'} ID</Label>
+                    <Label htmlFor="link-entity-id">{linkType === 'invoice' ? 'Invoice' : 'Journal entry'} ID</Label>
                     <Input
+                      id="link-entity-id"
                       value={linkId}
                       onChange={e => setLinkId(e.target.value)}
                       placeholder="UUID"

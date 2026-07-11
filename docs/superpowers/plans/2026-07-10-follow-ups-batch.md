@@ -245,7 +245,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 
 **Files:** create/edit panels across `apps/web/src/pages/` flagged by Chrome (recon with a devtools audit on localhost).
 
-- [ ] `htmlFor`/`id` pairs (stable ids), `aria-label` on icon-only buttons, focus initial field in dialogs (Task H's Dialog gives focus trap). Commit `polish(web): form control labels and ids`.
+- [x] `htmlFor`/`id` pairs (stable ids), `aria-label` on icon-only buttons, focus initial field in dialogs (Task H's Dialog gives focus trap). Commit `polish(web): form control labels and ids`.
 
 ---
 

@@ -418,6 +418,15 @@ export default function RulesPage() {
 
   const formValid = form.name.trim() !== '' && form.description_contains.trim() !== '' && form.offset_account_id !== '';
 
+  // Escape closes the rule drawer (parity with the Dialog-based modals).
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDrawer(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen]);
+
   // Live match preview while the drawer is open (read-only dry run, debounced).
   useEffect(() => {
     if (!bizId || !drawerOpen || form.description_contains.trim() === '') {
@@ -681,7 +690,12 @@ export default function RulesPage() {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="flex-1 bg-black/20" onClick={closeDrawer} />
-          <div className="w-[420px] bg-background shadow-xl flex flex-col border-l overflow-hidden">
+          <div
+            className="w-[420px] bg-background shadow-xl flex flex-col border-l overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label={drawerMode === 'create' ? 'New rule' : 'Edit rule'}
+          >
             <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0">
               <h2 className="text-lg font-semibold">{drawerMode === 'create' ? 'New rule' : 'Edit rule'}</h2>
               <button type="button" className="text-muted-foreground hover:text-foreground text-lg" onClick={closeDrawer}>✕</button>
@@ -693,8 +707,9 @@ export default function RulesPage() {
 
                 {/* Rule name */}
                 <div>
-                  <Label className="text-sm font-medium">What do you want to call this rule? <span className="text-destructive">*</span></Label>
+                  <Label className="text-sm font-medium" htmlFor="rule-name">What do you want to call this rule? <span className="text-destructive">*</span></Label>
                   <Input
+                    id="rule-name"
                     className="mt-1"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}

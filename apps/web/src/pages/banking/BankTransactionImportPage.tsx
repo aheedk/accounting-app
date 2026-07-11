@@ -343,8 +343,9 @@ export default function BankTransactionImportPage() {
         <CardHeader><CardTitle>1. Select bank account and file</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
-            <Label>Bank account</Label>
+            <Label htmlFor="import-bank-account">Bank account</Label>
             <select
+              id="import-bank-account"
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={bankAccountId}
               onChange={e => setBankAccountId(e.target.value)}
