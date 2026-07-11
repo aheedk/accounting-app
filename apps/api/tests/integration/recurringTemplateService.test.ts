@@ -176,6 +176,83 @@ describe('recurringTemplateService', () => {
     expect(jes).toHaveLength(1);
   });
 
+  it('update can pause a template so runDue skips it, and audits the change', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const today = new Date().toISOString().slice(0, 10);
+    const row = await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Pausable',
+        template_type: 'journal_entry',
+        payload: { lines: [
+          { account_id: expense.id, debit: '100', credit: '0' },
+          { account_id: cash.id, debit: '0', credit: '100' },
+        ] },
+        recurrence: 'monthly',
+        next_run_date: today,
+      }),
+    );
+
+    const updated = await t.db.transaction().execute(trx =>
+      rt.update(trx, ctx, { template_id: row.id, patch: { is_active: false } }),
+    );
+    expect(updated.is_active).toBe(false);
+
+    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    expect(results).toHaveLength(0);
+
+    const audit = await t.db.selectFrom('audit_logs').selectAll()
+      .where('entity_id', '=', row.id)
+      .where('action', '=', 'recurring_template.update')
+      .execute();
+    expect(audit).toHaveLength(1);
+  });
+
+  it('update validates a replacement payload against the template type', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const row = await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Strict',
+        template_type: 'journal_entry',
+        payload: { lines: [
+          { account_id: expense.id, debit: '100', credit: '0' },
+          { account_id: cash.id, debit: '0', credit: '100' },
+        ] },
+        recurrence: 'monthly',
+        next_run_date: '2026-01-01',
+      }),
+    );
+    await expect(t.db.transaction().execute(trx =>
+      rt.update(trx, ctx, { template_id: row.id, patch: { payload: { lines: [] } } }),
+    )).rejects.toThrow(/invalid recurring journal entry payload/);
+  });
+
+  it('listRuns returns run history recorded by runDue', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const today = new Date().toISOString().slice(0, 10);
+    const row = await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Tracked',
+        template_type: 'journal_entry',
+        payload: { lines: [
+          { account_id: expense.id, debit: '42', credit: '0' },
+          { account_id: cash.id, debit: '0', credit: '42' },
+        ] },
+        recurrence: 'monthly',
+        next_run_date: today,
+      }),
+    );
+    await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+
+    const runs = await rt.listRuns(t.db, biz.id, row.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.runs_created).toBe(1);
+    expect(runs[0]?.advanced_to > today).toBe(true);
+    expect(runs[0]?.at).toBeTruthy();
+  });
+
   it('create rejects an invoice template whose payload is missing customer_id', async () => {
     const { biz, ctx } = await bootstrap();
     const revenue = await makeAccount(t.db, biz.id, { code: '4002', name: 'Rev', account_type: 'revenue' });

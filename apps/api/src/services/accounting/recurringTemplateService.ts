@@ -78,6 +78,77 @@ export async function listTemplates(db: Kysely<DB>, business_id: string) {
     .orderBy('next_run_date').execute();
 }
 
+export type UpdateTemplateInput = {
+  template_id: string;
+  patch: {
+    name?: string;
+    payload?: unknown;
+    recurrence?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+    next_run_date?: string;
+    end_date?: string | null;
+    is_active?: boolean;
+  };
+};
+
+export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateTemplateInput) {
+  const before = await trx.selectFrom('recurring_templates').selectAll()
+    .where('id', '=', input.template_id).executeTakeFirst();
+  if (!before) throw new NotFoundError('recurring_template', input.template_id);
+
+  const patch: {
+    name?: string;
+    payload?: object;
+    recurrence?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+    next_run_date?: string;
+    end_date?: string | null;
+    is_active?: boolean;
+  } = {};
+  if (input.patch.name !== undefined) patch.name = input.patch.name;
+  if (input.patch.payload !== undefined) patch.payload = parsePayload(before.template_type, input.patch.payload);
+  if (input.patch.recurrence !== undefined) patch.recurrence = input.patch.recurrence;
+  if (input.patch.next_run_date !== undefined) patch.next_run_date = input.patch.next_run_date;
+  if (input.patch.end_date !== undefined) patch.end_date = input.patch.end_date;
+  if (input.patch.is_active !== undefined) patch.is_active = input.patch.is_active;
+  if (Object.keys(patch).length === 0) return before;
+
+  const row = await trx.updateTable('recurring_templates').set(patch)
+    .where('id', '=', input.template_id).returningAll().executeTakeFirstOrThrow();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.RECURRING_TEMPLATE_UPDATE,
+    entity_type: 'recurring_template',
+    entity_id: row.id,
+    before,
+    after: row,
+  });
+  return row;
+}
+
+export type TemplateRunEntry = {
+  at: RecurringTemplateRow['created_at'];
+  runs_created: number;
+  advanced_to: string;
+};
+
+/** Run history straight from the audit trail — no extra table needed. */
+export async function listRuns(
+  db: Kysely<DB>, business_id: string, template_id: string,
+): Promise<TemplateRunEntry[]> {
+  const rows = await db.selectFrom('audit_logs')
+    .select(['created_at', 'after_state'])
+    .where('business_id', '=', business_id)
+    .where('entity_type', '=', 'recurring_template')
+    .where('entity_id', '=', template_id)
+    .where('action', '=', AUDIT.RECURRING_TEMPLATE_RUN)
+    .orderBy('created_at', 'desc')
+    .limit(50)
+    .execute();
+  return rows.map(r => {
+    const raw: unknown = typeof r.after_state === 'string' ? JSON.parse(r.after_state) : r.after_state;
+    const obj = (raw ?? {}) as { runs_created?: number; advanced_to?: string };
+    return { at: r.created_at, runs_created: obj.runs_created ?? 0, advanced_to: obj.advanced_to ?? '' };
+  });
+}
+
 function advanceDate(date: string, recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly'): string {
   const d = new Date(date + 'T00:00:00Z');
   switch (recurrence) {

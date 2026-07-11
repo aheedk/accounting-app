@@ -42,6 +42,29 @@ router.post('/businesses/:businessId/recurring-templates', requireMinRole('accou
   } catch (e) { next(e); }
 });
 
+router.patch('/businesses/:businessId/recurring-templates/:id', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const body = schemas.recurringTemplateUpdateSchema.parse(req.body);
+    const patch: Parameters<typeof rt.update>[2]['patch'] = {};
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.payload !== undefined) patch.payload = body.payload;
+    if (body.recurrence !== undefined) patch.recurrence = body.recurrence;
+    if (body.next_run_date !== undefined) patch.next_run_date = body.next_run_date;
+    if (body.end_date !== undefined) patch.end_date = body.end_date ?? null;
+    if (body.is_active !== undefined) patch.is_active = body.is_active;
+    const updated = await db.transaction().execute(trx =>
+      rt.update(trx, ctxFromReq(req), { template_id: req.params['id']!, patch }),
+    );
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/recurring-templates/:id/runs', async (req, res, next) => {
+  try {
+    res.json({ runs: await rt.listRuns(db, req.tenancy!.business_id, req.params['id']!) });
+  } catch (e) { next(e); }
+});
+
 router.delete('/businesses/:businessId/recurring-templates/:id', requireMinRole('accountant'), async (req, res, next) => {
   try {
     await db.transaction().execute(trx =>

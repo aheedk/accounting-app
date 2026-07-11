@@ -8,10 +8,12 @@ import { Label } from '@/components/ui/label';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { todayLocal, fmtLongDate } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
 
 type Account = { id: string; code: string; name: string; account_type: string };
+type Customer = { id: string; name: string };
+type Vendor = { id: string; name: string };
 
 type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 type TemplateType = 'journal_entry' | 'invoice' | 'bill';
@@ -31,13 +33,17 @@ type Template = {
   updated_at: string;
 };
 
+type TemplateRun = { at: string; runs_created: number; advanced_to: string };
+
 type RunDueResult = {
   results: Array<{ template_id: string; runs_created: number }>;
 };
 
-type Line = { account_id: string; debit: string; credit: string; memo: string };
+type JeLine = { account_id: string; debit: string; credit: string; memo: string };
+type DocLine = { description: string; quantity: string; unit_price: string; account_id: string };
 
-const blankLine = (): Line => ({ account_id: '', debit: '0.00', credit: '0.00', memo: '' });
+const blankJeLine = (): JeLine => ({ account_id: '', debit: '0.00', credit: '0.00', memo: '' });
+const blankDocLine = (): DocLine => ({ description: '', quantity: '1', unit_price: '0.00', account_id: '' });
 
 const blankForm = () => ({
   name: '',
@@ -47,6 +53,9 @@ const blankForm = () => ({
   end_date: '',
   memo: '',
   reference: '',
+  customer_id: '',
+  vendor_id: '',
+  due_days: '30',
 });
 
 function pickErr(e: unknown): string {
@@ -69,10 +78,10 @@ const TXN_TYPE_LABELS: Record<TemplateType, string> = {
   journal_entry: 'Journal Entry',
 };
 
-const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; disabled?: boolean; title?: string }> = [
+const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
   { value: 'journal_entry', label: 'Journal Entry' },
-  { value: 'invoice', label: 'Invoice (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
-  { value: 'bill', label: 'Bill (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
+  { value: 'invoice', label: 'Invoice' },
+  { value: 'bill', label: 'Bill' },
 ];
 
 function fmtDate(iso: string | null): string {
@@ -81,20 +90,76 @@ function fmtDate(iso: string | null): string {
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+// Mirrors the server's advanceDate so previews match what runDue will do.
+function advance(date: string, recurrence: Recurrence): string {
+  const d = new Date(date + 'T00:00:00Z');
+  switch (recurrence) {
+    case 'weekly': d.setUTCDate(d.getUTCDate() + 7); break;
+    case 'monthly': d.setUTCMonth(d.getUTCMonth() + 1); break;
+    case 'quarterly': d.setUTCMonth(d.getUTCMonth() + 3); break;
+    case 'yearly': d.setUTCFullYear(d.getUTCFullYear() + 1); break;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function nextDates(
+  t: { next_run_date: string; recurrence: Recurrence; end_date: string | null }, n = 3,
+): string[] {
+  const out: string[] = [];
+  let cur = t.next_run_date;
+  for (let i = 0; i < n; i++) {
+    if (t.end_date && cur > t.end_date) break;
+    out.push(cur);
+    cur = advance(cur, t.recurrence);
+  }
+  return out;
+}
+
+function templateAmount(t: Template): number {
+  const p = t.payload as {
+    lines?: Array<{ debit?: string; quantity?: string; unit_price?: string }>;
+  } | null;
+  if (!p?.lines) return 0;
+  if (t.template_type === 'journal_entry') {
+    return p.lines.reduce((s, l) => s + (parseFloat(l.debit ?? '0') || 0), 0);
+  }
+  return p.lines.reduce(
+    (s, l) => s + (parseFloat(l.quantity ?? '0') || 0) * (parseFloat(l.unit_price ?? '0') || 0), 0,
+  );
+}
+
+function templateParty(t: Template, customers: Customer[], vendors: Vendor[]): string {
+  const p = t.payload as { customer_id?: string; vendor_id?: string } | null;
+  if (t.template_type === 'invoice' && p?.customer_id) {
+    return customers.find(c => c.id === p.customer_id)?.name ?? '—';
+  }
+  if (t.template_type === 'bill' && p?.vendor_id) {
+    return vendors.find(v => v.id === p.vendor_id)?.name ?? '—';
+  }
+  return '—';
+}
+
 export default function RecurringTransactionsPage() {
   const [bizId] = useActiveBusinessId();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
   const [runErr, setRunErr] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
   const [form, setForm] = useState(blankForm());
-  const [lines, setLines] = useState<Line[]>([blankLine(), blankLine()]);
+  const [jeLines, setJeLines] = useState<JeLine[]>([blankJeLine(), blankJeLine()]);
+  const [docLines, setDocLines] = useState<DocLine[]>([blankDocLine()]);
   const [formErr, setFormErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const [rowErr, setRowErr] = useState<string | null>(null);
+
+  // Run-history expansion
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [runsCache, setRunsCache] = useState<Record<string, TemplateRun[] | 'loading'>>({});
 
   // Filter state
   const [nameFilter, setNameFilter] = useState('');
@@ -116,6 +181,14 @@ export default function RecurringTransactionsPage() {
       .get<{ accounts: Account[] }>(`/businesses/${bizId}/coa`)
       .then((r) => setAccounts(r.data.accounts))
       .catch(() => undefined);
+    api
+      .get<{ customers: Customer[] }>(`/businesses/${bizId}/customers`)
+      .then((r) => setCustomers(r.data.customers))
+      .catch(() => undefined);
+    api
+      .get<{ vendors: Vendor[] }>(`/businesses/${bizId}/vendors`)
+      .then((r) => setVendors(r.data.vendors))
+      .catch(() => undefined);
   }
 
   useEffect(() => {
@@ -136,32 +209,47 @@ export default function RecurringTransactionsPage() {
     [templates, today],
   );
 
-  const totalD = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
-  const totalC = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  const revenueAccounts = useMemo(() => accounts.filter(a => a.account_type === 'revenue'), [accounts]);
+  const expenseAccounts = useMemo(() => accounts.filter(a => a.account_type === 'expense'), [accounts]);
+
+  const totalD = jeLines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const totalC = jeLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
   const balanced = Math.abs(totalD - totalC) < 0.005 && totalD > 0;
+  const docTotal = docLines.reduce((s, l) => s + (parseFloat(l.quantity) || 0) * (parseFloat(l.unit_price) || 0), 0);
+
+  const isJe = form.template_type === 'journal_entry';
+  const formPreview = nextDates(
+    { next_run_date: form.next_run_date, recurrence: form.recurrence, end_date: form.end_date || null },
+  );
 
   function resetForm() {
     setForm(blankForm());
-    setLines([blankLine(), blankLine()]);
+    setJeLines([blankJeLine(), blankJeLine()]);
+    setDocLines([blankDocLine()]);
     setFormErr(null);
   }
 
-  function updateLine(i: number, patch: Partial<Line>) {
-    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  function updateJeLine(i: number, patch: Partial<JeLine>) {
+    setJeLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  }
+
+  function updateDocLine(i: number, patch: Partial<DocLine>) {
+    setDocLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
 
   function handleExport() {
     setExcelBusy(true);
     try {
-      const headers = ['Template Name', 'Type', 'TXN Type', 'Interval', 'Previous Date', 'Next Date', 'Amount'];
+      const headers = ['Template Name', 'Status', 'TXN Type', 'Interval', 'Previous Date', 'Next Date', 'Customer/Vendor', 'Amount'];
       const rows = filteredTemplates.map(t => [
         t.name,
-        'Scheduled',
+        t.is_active ? 'Scheduled' : 'Paused',
         TXN_TYPE_LABELS[t.template_type] ?? t.template_type,
         INTERVAL_LABELS[t.recurrence] ?? t.recurrence,
         fmtDate(t.last_run_at),
         fmtDate(t.next_run_date),
-        '0.00',
+        templateParty(t, customers, vendors),
+        fmtMoney(templateAmount(t)),
       ]);
       downloadAsExcel(headers, rows, 'recurring-transactions');
     } finally {
@@ -173,13 +261,13 @@ export default function RecurringTransactionsPage() {
     const rows = filteredTemplates.map(t => `
       <tr>
         <td>${t.name}</td>
-        <td>Scheduled</td>
+        <td>${t.is_active ? 'Scheduled' : 'Paused'}</td>
         <td>${TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
         <td>${INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
         <td>${fmtDate(t.last_run_at)}</td>
         <td>${fmtDate(t.next_run_date)}</td>
-        <td>—</td>
-        <td style="text-align:right">0.00</td>
+        <td>${templateParty(t, customers, vendors)}</td>
+        <td style="text-align:right">${fmtMoney(templateAmount(t))}</td>
       </tr>`).join('');
     const win = window.open('', '_blank');
     if (!win) return;
@@ -196,10 +284,10 @@ export default function RecurringTransactionsPage() {
       <h2>Recurring Transactions</h2>
       <p>Generated ${new Date().toLocaleDateString()}</p>
       <table>
-        <thead><tr><th>Template Name</th><th>Type</th><th>TXN Type</th><th>Interval</th><th>Previous Date</th><th>Next Date</th><th>Customer/Vendor</th><th>Amount</th></tr></thead>
+        <thead><tr><th>Template Name</th><th>Status</th><th>TXN Type</th><th>Interval</th><th>Previous Date</th><th>Next Date</th><th>Customer/Vendor</th><th>Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <script>window.onload = function(){ window.print(); }<\/script>
+      <script>window.onload = function(){ window.print(); }${'</'}script>
     </body></html>`);
     win.document.close();
   }
@@ -232,6 +320,7 @@ export default function RecurringTransactionsPage() {
       );
       const total = r.data.results.reduce((s, x) => s + x.runs_created, 0);
       setRunResult(`Created ${total} entries across ${r.data.results.length} templates.`);
+      setRunsCache({});
       reload();
     } catch (e: unknown) {
       setRunErr(pickErr(e));
@@ -243,13 +332,100 @@ export default function RecurringTransactionsPage() {
   async function deleteTemplate(id: string) {
     if (!bizId) return;
     if (!confirm('Delete this template?')) return;
-    setDeleteErr(null);
+    setRowErr(null);
     try {
       await api.delete(`/businesses/${bizId}/recurring-templates/${id}`);
       reload();
     } catch (e: unknown) {
-      setDeleteErr(pickErr(e));
+      setRowErr(pickErr(e));
     }
+  }
+
+  async function togglePaused(t: Template) {
+    if (!bizId) return;
+    setRowErr(null);
+    try {
+      await api.patch(`/businesses/${bizId}/recurring-templates/${t.id}`, { is_active: !t.is_active });
+      reload();
+    } catch (e: unknown) {
+      setRowErr(pickErr(e));
+    }
+  }
+
+  async function toggleHistory(t: Template) {
+    if (expandedId === t.id) { setExpandedId(null); return; }
+    setExpandedId(t.id);
+    if (!bizId || runsCache[t.id]) return;
+    setRunsCache((c) => ({ ...c, [t.id]: 'loading' }));
+    try {
+      const r = await api.get<{ runs: TemplateRun[] }>(`/businesses/${bizId}/recurring-templates/${t.id}/runs`);
+      setRunsCache((c) => ({ ...c, [t.id]: r.data.runs }));
+    } catch {
+      setRunsCache((c) => ({ ...c, [t.id]: [] }));
+    }
+  }
+
+  function buildPayload(): { payload: object } | { error: string } {
+    if (isJe) {
+      for (let i = 0; i < jeLines.length; i++) {
+        const l = jeLines[i]!;
+        const d = parseFloat(l.debit) || 0;
+        const c = parseFloat(l.credit) || 0;
+        if (!l.account_id) return { error: `Line ${i + 1}: select an account.` };
+        if (d > 0 && c > 0) return { error: `Line ${i + 1}: only one of debit or credit may be > 0.` };
+        if (d === 0 && c === 0) return { error: `Line ${i + 1}: enter a debit or credit amount.` };
+      }
+      if (!balanced) return { error: 'Total debit must equal total credit.' };
+      return {
+        payload: {
+          memo: form.memo || null,
+          reference: form.reference || null,
+          lines: jeLines.map((l) => ({
+            account_id: l.account_id,
+            debit: parseMoneyInput(l.debit || '0'),
+            credit: parseMoneyInput(l.credit || '0'),
+            memo: l.memo || null,
+          })),
+        },
+      };
+    }
+
+    const isInvoice = form.template_type === 'invoice';
+    if (isInvoice && !form.customer_id) return { error: 'Select a customer.' };
+    if (!isInvoice && !form.vendor_id) return { error: 'Select a vendor.' };
+    const dueDays = Number(form.due_days);
+    if (!Number.isInteger(dueDays) || dueDays < 0 || dueDays > 365) {
+      return { error: 'Due days must be a whole number between 0 and 365.' };
+    }
+    for (let i = 0; i < docLines.length; i++) {
+      const l = docLines[i]!;
+      if (!l.description.trim()) return { error: `Line ${i + 1}: enter a description.` };
+      if (!((parseFloat(l.quantity) || 0) > 0)) return { error: `Line ${i + 1}: quantity must be > 0.` };
+      if ((parseFloat(l.unit_price) || 0) < 0) return { error: `Line ${i + 1}: rate cannot be negative.` };
+      if (!l.account_id) return { error: `Line ${i + 1}: select an account.` };
+    }
+    const lines = docLines.map((l) => (isInvoice
+      ? {
+        description: l.description.trim(),
+        quantity: parseMoneyInput(l.quantity),
+        unit_price: parseMoneyInput(l.unit_price || '0'),
+        revenue_account_id: l.account_id,
+        tax_code_id: null,
+      }
+      : {
+        description: l.description.trim(),
+        quantity: parseMoneyInput(l.quantity),
+        unit_price: parseMoneyInput(l.unit_price || '0'),
+        expense_account_id: l.account_id,
+      }));
+    return {
+      payload: {
+        ...(isInvoice ? { customer_id: form.customer_id } : { vendor_id: form.vendor_id }),
+        due_days: dueDays,
+        memo: form.memo || null,
+        lines,
+      },
+    };
   }
 
   async function submitForm(e: React.FormEvent) {
@@ -257,32 +433,15 @@ export default function RecurringTransactionsPage() {
     if (!bizId) return;
     setFormErr(null);
 
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i]!;
-      const d = parseFloat(l.debit) || 0;
-      const c = parseFloat(l.credit) || 0;
-      if (!l.account_id) { setFormErr(`Line ${i + 1}: select an account.`); return; }
-      if (d > 0 && c > 0) { setFormErr(`Line ${i + 1}: only one of debit or credit may be > 0.`); return; }
-      if (d === 0 && c === 0) { setFormErr(`Line ${i + 1}: enter a debit or credit amount.`); return; }
-    }
-    if (!balanced) { setFormErr('Total debit must equal total credit.'); return; }
+    const built = buildPayload();
+    if ('error' in built) { setFormErr(built.error); return; }
 
     setBusy(true);
     try {
-      const payload = {
-        memo: form.memo || null,
-        reference: form.reference || null,
-        lines: lines.map((l) => ({
-          account_id: l.account_id,
-          debit: parseMoneyInput(l.debit || '0'),
-          credit: parseMoneyInput(l.credit || '0'),
-          memo: l.memo || null,
-        })),
-      };
       await api.post(`/businesses/${bizId}/recurring-templates`, {
         name: form.name,
         template_type: form.template_type,
-        payload,
+        payload: built.payload,
         recurrence: form.recurrence,
         next_run_date: form.next_run_date,
         end_date: form.end_date || null,
@@ -362,7 +521,9 @@ export default function RecurringTransactionsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {due.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing due today.</p>
+            <p className="text-sm text-muted-foreground">
+              Nothing due today. Due templates also materialize automatically once a day.
+            </p>
           ) : (
             <ul className="divide-y text-sm">
               {due.map((t) => (
@@ -385,7 +546,7 @@ export default function RecurringTransactionsPage() {
         </CardContent>
       </Card>
 
-      {deleteErr && <p className="text-sm text-destructive">{deleteErr}</p>}
+      {rowErr && <p className="text-sm text-destructive">{rowErr}</p>}
 
       <Card>
         <CardHeader>
@@ -406,25 +567,27 @@ export default function RecurringTransactionsPage() {
             <form className="space-y-4 border rounded-md p-4" onSubmit={submitForm}>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Name</Label>
-                  <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+                  <Label htmlFor="rt-name">Name</Label>
+                  <Input id="rt-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
                 </div>
                 <div>
-                  <Label>Transaction type</Label>
+                  <Label htmlFor="rt-type">Transaction type</Label>
                   <select
+                    id="rt-type"
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={form.template_type}
                     onChange={(e) => setForm((f) => ({ ...f, template_type: e.target.value as TemplateType }))}
                     required
                   >
                     {TXN_TYPE_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>{o.label}</option>
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <Label>Recurrence</Label>
+                  <Label htmlFor="rt-recurrence">Recurrence</Label>
                   <select
+                    id="rt-recurrence"
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={form.recurrence}
                     onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value as Recurrence }))}
@@ -437,69 +600,167 @@ export default function RecurringTransactionsPage() {
                   </select>
                 </div>
                 <div>
-                  <Label>Next run date</Label>
-                  <DateInput value={form.next_run_date} onChange={(e) => setForm((f) => ({ ...f, next_run_date: e.target.value }))} required />
+                  <Label htmlFor="rt-next-run">Next run date</Label>
+                  <DateInput id="rt-next-run" value={form.next_run_date} onChange={(e) => setForm((f) => ({ ...f, next_run_date: e.target.value }))} required />
                 </div>
                 <div>
-                  <Label>End date (optional)</Label>
-                  <DateInput value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))} />
+                  <Label htmlFor="rt-end">End date (optional)</Label>
+                  <DateInput id="rt-end" value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))} />
                 </div>
-                <div>
-                  <Label>Reference</Label>
-                  <Input value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} />
-                </div>
+                {isJe ? (
+                  <div>
+                    <Label htmlFor="rt-reference">Reference</Label>
+                    <Input id="rt-reference" value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} />
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="rt-due-days">Due days ({form.template_type === 'invoice' ? 'invoice' : 'bill'} due N days after each run)</Label>
+                    <Input
+                      id="rt-due-days"
+                      type="number"
+                      min="0"
+                      max="365"
+                      step="1"
+                      value={form.due_days}
+                      onChange={(e) => setForm((f) => ({ ...f, due_days: e.target.value }))}
+                    />
+                  </div>
+                )}
+                {form.template_type === 'invoice' && (
+                  <div>
+                    <Label htmlFor="rt-customer">Customer</Label>
+                    <select
+                      id="rt-customer"
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      value={form.customer_id}
+                      onChange={(e) => setForm((f) => ({ ...f, customer_id: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select customer…</option>
+                      {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                )}
+                {form.template_type === 'bill' && (
+                  <div>
+                    <Label htmlFor="rt-vendor">Vendor</Label>
+                    <select
+                      id="rt-vendor"
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      value={form.vendor_id}
+                      onChange={(e) => setForm((f) => ({ ...f, vendor_id: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select vendor…</option>
+                      {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="col-span-2">
-                  <Label>Memo</Label>
-                  <Input value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} />
+                  <Label htmlFor="rt-memo">Memo</Label>
+                  <Input id="rt-memo" value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Lines</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setLines((ls) => [...ls, blankLine()])}>+ Add line</Button>
-                </div>
-                {lines.map((l, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-4">
-                      <Label className="sr-only">Account</Label>
-                      <select
-                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                        value={l.account_id}
-                        onChange={(e) => updateLine(i, { account_id: e.target.value })}
-                        required
-                      >
-                        <option value="">Select account…</option>
-                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="sr-only">Debit</Label>
-                      <Input type="number" step="0.0001" min="0" value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: '0.00' })} />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="sr-only">Credit</Label>
-                      <Input type="number" step="0.0001" min="0" value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: '0.00' })} />
-                    </div>
-                    <div className="col-span-3">
-                      <Label className="sr-only">Memo</Label>
-                      <Input value={l.memo} onChange={(e) => updateLine(i, { memo: e.target.value })} placeholder="Line memo" />
-                    </div>
-                    <div className="col-span-1">
-                      <Button type="button" variant="ghost" onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 2}>×</Button>
-                    </div>
+              {formPreview.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Next runs: {formPreview.map(d => fmtLongDate(d)).join(' · ')}
+                </p>
+              )}
+
+              {isJe ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Lines</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setJeLines((ls) => [...ls, blankJeLine()])}>+ Add line</Button>
                   </div>
-                ))}
-                <div className="flex justify-end gap-8 pt-3 border-t font-mono text-sm">
-                  <div>Total Debit: {fmtMoney(totalD)}</div>
-                  <div>Total Credit: {fmtMoney(totalC)}</div>
-                  <div className={balanced ? 'text-green-600' : 'text-destructive'}>{balanced ? 'BALANCED' : 'UNBALANCED'}</div>
+                  {jeLines.map((l, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-4">
+                        <Label className="sr-only" htmlFor={`rt-je-account-${i}`}>Account</Label>
+                        <select
+                          id={`rt-je-account-${i}`}
+                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                          value={l.account_id}
+                          onChange={(e) => updateJeLine(i, { account_id: e.target.value })}
+                          required
+                        >
+                          <option value="">Select account…</option>
+                          {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="sr-only" htmlFor={`rt-je-debit-${i}`}>Debit</Label>
+                        <Input id={`rt-je-debit-${i}`} type="number" step="0.0001" min="0" value={l.debit} onChange={(e) => updateJeLine(i, { debit: e.target.value, credit: '0.00' })} />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="sr-only" htmlFor={`rt-je-credit-${i}`}>Credit</Label>
+                        <Input id={`rt-je-credit-${i}`} type="number" step="0.0001" min="0" value={l.credit} onChange={(e) => updateJeLine(i, { credit: e.target.value, debit: '0.00' })} />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="sr-only" htmlFor={`rt-je-memo-${i}`}>Memo</Label>
+                        <Input id={`rt-je-memo-${i}`} value={l.memo} onChange={(e) => updateJeLine(i, { memo: e.target.value })} placeholder="Line memo" />
+                      </div>
+                      <div className="col-span-1">
+                        <Button type="button" variant="ghost" onClick={() => setJeLines((ls) => ls.filter((_, idx) => idx !== i))} disabled={jeLines.length <= 2}>×</Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end gap-8 pt-3 border-t font-mono text-sm">
+                    <div>Total Debit: {fmtMoney(totalD)}</div>
+                    <div>Total Credit: {fmtMoney(totalC)}</div>
+                    <div className={balanced ? 'text-green-600' : 'text-destructive'}>{balanced ? 'BALANCED' : 'UNBALANCED'}</div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Lines</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setDocLines((ls) => [...ls, blankDocLine()])}>+ Add line</Button>
+                  </div>
+                  {docLines.map((l, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-4">
+                        <Label className="sr-only" htmlFor={`rt-doc-desc-${i}`}>Description</Label>
+                        <Input id={`rt-doc-desc-${i}`} value={l.description} onChange={(e) => updateDocLine(i, { description: e.target.value })} placeholder="Description" />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="sr-only" htmlFor={`rt-doc-qty-${i}`}>Qty</Label>
+                        <Input id={`rt-doc-qty-${i}`} type="number" step="0.0001" min="0" value={l.quantity} onChange={(e) => updateDocLine(i, { quantity: e.target.value })} placeholder="Qty" />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="sr-only" htmlFor={`rt-doc-rate-${i}`}>Rate</Label>
+                        <Input id={`rt-doc-rate-${i}`} type="number" step="0.0001" min="0" value={l.unit_price} onChange={(e) => updateDocLine(i, { unit_price: e.target.value })} placeholder="Rate" />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="sr-only" htmlFor={`rt-doc-account-${i}`}>{form.template_type === 'invoice' ? 'Income account' : 'Expense account'}</Label>
+                        <select
+                          id={`rt-doc-account-${i}`}
+                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                          value={l.account_id}
+                          onChange={(e) => updateDocLine(i, { account_id: e.target.value })}
+                          required
+                        >
+                          <option value="">{form.template_type === 'invoice' ? 'Income account…' : 'Expense account…'}</option>
+                          {(form.template_type === 'invoice' ? revenueAccounts : expenseAccounts).map((a) => (
+                            <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-1">
+                        <Button type="button" variant="ghost" onClick={() => setDocLines((ls) => ls.filter((_, idx) => idx !== i))} disabled={docLines.length <= 1}>×</Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end pt-3 border-t font-mono text-sm">
+                    <div>Total: {fmtMoney(docTotal)}</div>
+                  </div>
+                </div>
+              )}
 
               {formErr && <p className="text-sm text-destructive">{formErr}</p>}
               <div className="flex gap-2">
-                <Button type="submit" disabled={busy || !balanced}>{busy ? 'Saving…' : 'Create template'}</Button>
+                <Button type="submit" disabled={busy || (isJe && !balanced)}>{busy ? 'Saving…' : 'Create template'}</Button>
                 <Button type="button" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
               </div>
             </form>
@@ -509,7 +770,7 @@ export default function RecurringTransactionsPage() {
             <thead className="border-b bg-muted/40">
               <tr>
                 <th className="text-left p-3 font-medium text-xs uppercase tracking-wide">Template Name</th>
-                <th className="text-left p-3 font-medium text-xs uppercase tracking-wide">Type</th>
+                <th className="text-left p-3 font-medium text-xs uppercase tracking-wide">Status</th>
                 <th className="text-left p-3 font-medium text-xs uppercase tracking-wide">TXN Type</th>
                 <th className="text-left p-3 font-medium text-xs uppercase tracking-wide">Interval</th>
                 <th className="text-left p-3 font-medium text-xs uppercase tracking-wide">Previous Date</th>
@@ -527,23 +788,23 @@ export default function RecurringTransactionsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredTemplates.map((t) => (
-                  <tr key={t.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                    <td className="p-3">{t.name}</td>
-                    <td className="p-3 text-muted-foreground">Scheduled</td>
-                    <td className="p-3">{TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
-                    <td className="p-3">{INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
-                    <td className="p-3 font-mono">{fmtDate(t.last_run_at)}</td>
-                    <td className="p-3 font-mono">{fmtDate(t.next_run_date)}</td>
-                    <td className="p-3 text-muted-foreground">—</td>
-                    <td className="p-3 text-right font-mono">0.00</td>
-                    <td className="p-3 text-right">
-                      <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={() => deleteTemplate(t.id)}>
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                filteredTemplates.map((t) => {
+                  const upcoming = nextDates(t);
+                  const runs = runsCache[t.id];
+                  return (
+                    <FragmentRow
+                      key={t.id}
+                      t={t}
+                      upcoming={upcoming}
+                      expanded={expandedId === t.id}
+                      runs={runs}
+                      party={templateParty(t, customers, vendors)}
+                      onTogglePaused={() => togglePaused(t)}
+                      onToggleHistory={() => toggleHistory(t)}
+                      onDelete={() => deleteTemplate(t.id)}
+                    />
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -560,8 +821,9 @@ export default function RecurringTransactionsPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <Label>Template Type</Label>
+                <Label htmlFor="rt-filter-interval">Template Type</Label>
                 <select
+                  id="rt-filter-interval"
                   className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={pendingTemplateType}
                   onChange={e => setPendingTemplateType(e.target.value)}
@@ -574,8 +836,9 @@ export default function RecurringTransactionsPage() {
                 </select>
               </div>
               <div>
-                <Label>Transaction Type</Label>
+                <Label htmlFor="rt-filter-txn">Transaction Type</Label>
                 <select
+                  id="rt-filter-txn"
                   className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={pendingTxnType}
                   onChange={e => setPendingTxnType(e.target.value)}
@@ -595,5 +858,75 @@ export default function RecurringTransactionsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function FragmentRow(props: {
+  t: Template;
+  upcoming: string[];
+  expanded: boolean;
+  runs: TemplateRun[] | 'loading' | undefined;
+  party: string;
+  onTogglePaused: () => void;
+  onToggleHistory: () => void;
+  onDelete: () => void;
+}) {
+  const { t, upcoming, expanded, runs, party } = props;
+  return (
+    <>
+      <tr className="border-b last:border-b-0 hover:bg-muted/20">
+        <td className="p-3">{t.name}</td>
+        <td className="p-3">
+          <span className={t.is_active ? 'text-emerald-600' : 'text-muted-foreground'}>
+            {t.is_active ? 'Scheduled' : 'Paused'}
+          </span>
+        </td>
+        <td className="p-3">{TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
+        <td className="p-3">{INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
+        <td className="p-3 font-mono">{fmtDate(t.last_run_at)}</td>
+        <td className="p-3 font-mono" title={upcoming.length > 0 ? `Upcoming: ${upcoming.join(', ')}` : undefined}>
+          {fmtDate(t.next_run_date)}
+        </td>
+        <td className="p-3 text-muted-foreground">{party}</td>
+        <td className="p-3 text-right font-mono">{fmtMoney(templateAmount(t))}</td>
+        <td className="p-3 text-right whitespace-nowrap">
+          <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={props.onTogglePaused}>
+            {t.is_active ? 'Pause' : 'Resume'}
+          </Button>
+          <span className="text-muted-foreground/40 px-1.5">|</span>
+          <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={props.onToggleHistory}>
+            History
+          </Button>
+          <span className="text-muted-foreground/40 px-1.5">|</span>
+          <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={props.onDelete}>
+            Delete
+          </Button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="border-b bg-muted/10">
+          <td colSpan={9} className="px-6 py-3">
+            {runs === 'loading' || runs === undefined ? (
+              <p className="text-sm text-muted-foreground">Loading run history…</p>
+            ) : runs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No runs yet. Upcoming: {upcoming.map(d => fmtDate(d)).join(', ') || '—'}</p>
+            ) : (
+              <div className="space-y-1 text-sm">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Run history</p>
+                <ul className="divide-y">
+                  {runs.map((r, i) => (
+                    <li key={i} className="flex items-center justify-between py-1.5">
+                      <span className="font-mono">{fmtDate(r.at)}</span>
+                      <span>{r.runs_created} {r.runs_created === 1 ? 'entry' : 'entries'} created</span>
+                      <span className="text-muted-foreground">advanced to <span className="font-mono">{fmtDate(r.advanced_to)}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
