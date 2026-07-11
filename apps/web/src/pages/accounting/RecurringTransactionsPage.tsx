@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FileDown, Printer } from 'lucide-react';
 import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -821,14 +822,10 @@ export default function RecurringTransactionsPage() {
       </Card>
 
       {/* Filter modal */}
-      {showFilterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-sm mx-4">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">Recurring Transactions</h2>
-              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setShowFilterModal(false)}>✕</button>
-            </div>
-            <div className="p-6 space-y-4">
+      <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Recurring Transactions</DialogTitle></DialogHeader>
+          <div className="p-6 space-y-4">
               <div>
                 <Label htmlFor="rt-filter-interval">Template Type</Label>
                 <select
@@ -859,13 +856,12 @@ export default function RecurringTransactionsPage() {
                 </select>
               </div>
             </div>
-            <div className="border-t px-6 py-4 flex items-center justify-between gap-2">
-              <Button variant="outline" onClick={() => { setPendingTemplateType(''); setPendingTxnType(''); }}>Reset</Button>
-              <Button onClick={applyFilter}>Apply</Button>
-            </div>
-          </div>
-        </div>
-      )}
+          <DialogFooter className="justify-between">
+            <Button variant="outline" onClick={() => { setPendingTemplateType(''); setPendingTxnType(''); }}>Reset</Button>
+            <Button onClick={applyFilter}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

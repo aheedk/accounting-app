@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 
@@ -323,11 +324,11 @@ export default function ReceiptsPage() {
         </CardContent>
       </Card>
 
-      {linkTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="w-full max-w-lg">
-            <CardHeader><CardTitle>Link receipt</CardTitle></CardHeader>
-            <CardContent>
+      <Dialog open={!!linkTarget} onOpenChange={(open) => { if (!open) closeLink(); }}>
+        {linkTarget && (
+          <DialogContent>
+            <DialogHeader><DialogTitle>Link receipt</DialogTitle></DialogHeader>
+            <div className="p-6">
               <form className="space-y-3" onSubmit={submitLink}>
                 <div>
                   <Label>Entity type</Label>
@@ -426,10 +427,10 @@ export default function ReceiptsPage() {
                   <Button type="submit" disabled={linkBusy}>{linkBusy ? 'Saving…' : 'Save link'}</Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

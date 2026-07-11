@@ -7,6 +7,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { parseMoneyInput } from '@/lib/money';
@@ -204,16 +205,11 @@ export default function JournalListPage() {
       </CardContent></Card>
 
       {/* Import modal */}
-      {importOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => !importing && setImportOpen(false)} />
-          <div className="relative bg-background rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">Import Journal Entries from Excel</h2>
-              <button onClick={() => !importing && setImportOpen(false)} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
-            </div>
+      <Dialog open={importOpen} onOpenChange={(open) => { if (!importing) setImportOpen(open); }}>
+        <DialogContent className="max-w-[700px] max-h-[80vh] flex flex-col">
+          <DialogHeader><DialogTitle>Import Journal Entries from Excel</DialogTitle></DialogHeader>
 
-            <div className="flex-1 overflow-auto p-6 space-y-4">
+          <div className="flex-1 overflow-auto p-6 space-y-4">
               {importRows.length === 0 ? (
                 <div
                   className={`border-2 border-dashed rounded-lg p-10 flex flex-col items-center gap-3 text-muted-foreground cursor-pointer transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`}
@@ -259,28 +255,27 @@ export default function JournalListPage() {
               )}
             </div>
 
-            <div className="border-t px-6 py-4 flex items-center justify-between">
-              <button
-                className="text-sm text-muted-foreground hover:underline"
-                onClick={() => setImportRows([])}
-                disabled={importing}
-              >
-                Clear
-              </button>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => !importing && setImportOpen(false)} disabled={importing}>
-                  {importDone ? 'Close' : 'Cancel'}
+          <DialogFooter className="justify-between">
+            <button
+              className="text-sm text-muted-foreground hover:underline"
+              onClick={() => setImportRows([])}
+              disabled={importing}
+            >
+              Clear
+            </button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => !importing && setImportOpen(false)} disabled={importing}>
+                {importDone ? 'Close' : 'Cancel'}
+              </Button>
+              {importRows.length > 0 && !importDone && (
+                <Button onClick={runImport} disabled={importing}>
+                  {importing ? 'Importing…' : `Import ${importRows.length} rows`}
                 </Button>
-                {importRows.length > 0 && !importDone && (
-                  <Button onClick={runImport} disabled={importing}>
-                    {importing ? 'Importing…' : `Import ${importRows.length} rows`}
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

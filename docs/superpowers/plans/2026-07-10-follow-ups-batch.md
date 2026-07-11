@@ -208,7 +208,7 @@ ALTER TABLE pay_runs ADD CONSTRAINT pr_finalized_has_je CHECK (
 
 Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, return match count + sample, **no writes**; undo import = delete transactions from a batch only where status is still imported/unreviewed (mutable-until-reconciled invariant — no `protect_posted`-style trigger, per CLAUDE.md don'ts); history = batches with counts/dates/filename.
 
-- [ ] TDD service-first, then routes, then web. Audit actions appended for `bank_import.undo` (+ create if batches are new). Commit per sub-feature if sizeable, else one commit.
+- [x] TDD service-first, then routes, then web. Audit actions appended for `bank_import.undo` (+ create if batches are new). Commit per sub-feature if sizeable, else one commit.
 
 ---
 
@@ -218,7 +218,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 - Create: `apps/web/src/components/ui/dialog.tsx` (shadcn wrapper over `@radix-ui/react-dialog` — already in `apps/web/package.json` per handoff)
 - Modify: `apps/web/src/pages/receipts/ReceiptsPage.tsx`, `.../IntegrationInboxPage.tsx`, `.../payroll/ContractorsPage.tsx`, `.../payroll/EmployeeDetailPage.tsx`, `.../payroll/PayrollTaxesPage.tsx` (exact paths recon'd at execution)
 
-- [ ] Swap fixed-overlay `<Card>` modals for `<Dialog>` (focus trap, Escape, aria). Visual parity otherwise. Browser-verify each page. Commit `polish(web): shadcn Dialog for modal flows`.
+- [x] Swap fixed-overlay `<Card>` modals for `<Dialog>` (focus trap, Escape, aria). Visual parity otherwise. Browser-verify each page. Commit `polish(web): shadcn Dialog for modal flows`.
 
 ---
 

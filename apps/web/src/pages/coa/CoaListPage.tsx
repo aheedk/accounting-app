@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -383,27 +384,19 @@ export default function CoaListPage() {
       )}
 
       {/* Import chart of accounts modal */}
-      {showImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">
-                {importRows.length === 0
-                  ? 'Import a chart of accounts'
-                  : importDone
-                    ? `Done — ${successImportCount} imported, ${errorImportCount} failed`
-                    : `${validImportCount} of ${importRows.length} rows ready to import`}
-              </h2>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground text-xl"
-                onClick={() => { setShowImport(false); setImportRows([]); setImportDone(false); }}
-              >
-                ✕
-              </button>
-            </div>
+      <Dialog open={showImport} onOpenChange={(open) => { if (!open) { setShowImport(false); setImportRows([]); setImportDone(false); } }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {importRows.length === 0
+                ? 'Import a chart of accounts'
+                : importDone
+                  ? `Done — ${successImportCount} imported, ${errorImportCount} failed`
+                  : `${validImportCount} of ${importRows.length} rows ready to import`}
+            </DialogTitle>
+          </DialogHeader>
 
-            <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto p-6">
               <input
                 ref={importFileRef}
                 type="file"
@@ -464,36 +457,35 @@ export default function CoaListPage() {
               )}
             </div>
 
-            <div className="border-t px-6 py-4 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                className="text-sm text-primary underline hover:no-underline"
-                onClick={downloadSampleTemplate}
+          <DialogFooter className="justify-between gap-3">
+            <button
+              type="button"
+              className="text-sm text-primary underline hover:no-underline"
+              onClick={downloadSampleTemplate}
+            >
+              Download sample template
+            </button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setShowImport(false); setImportRows([]); setImportDone(false); }}
               >
-                Download sample template
-              </button>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => { setShowImport(false); setImportRows([]); setImportDone(false); }}
-                >
-                  Cancel
+                Cancel
+              </Button>
+              {importRows.length === 0 && (
+                <Button onClick={() => importFileRef.current?.click()}>
+                  Next
                 </Button>
-                {importRows.length === 0 && (
-                  <Button onClick={() => importFileRef.current?.click()}>
-                    Next
-                  </Button>
-                )}
-                {importRows.length > 0 && !importDone && (
-                  <Button onClick={() => void runImport()} disabled={importBusy || validImportCount === 0}>
-                    {importBusy ? 'Importing…' : `Import ${validImportCount} record${validImportCount === 1 ? '' : 's'}`}
-                  </Button>
-                )}
-              </div>
+              )}
+              {importRows.length > 0 && !importDone && (
+                <Button onClick={() => void runImport()} disabled={importBusy || validImportCount === 0}>
+                  {importBusy ? 'Importing…' : `Import ${validImportCount} record${validImportCount === 1 ? '' : 's'}`}
+                </Button>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

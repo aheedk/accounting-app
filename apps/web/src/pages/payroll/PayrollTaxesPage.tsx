@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { DownloadButtons } from '@/components/ui/DownloadButtons';
 import { todayLocal } from '@/lib/dates';
@@ -333,11 +334,11 @@ export default function PayrollTaxesPage() {
         </CardContent>
       </Card>
 
-      {payTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="w-full max-w-lg">
-            <CardHeader><CardTitle>Pay liability</CardTitle></CardHeader>
-            <CardContent>
+      <Dialog open={!!payTarget} onOpenChange={(open) => { if (!open) closePay(); }}>
+        {payTarget && (
+          <DialogContent>
+            <DialogHeader><DialogTitle>Pay liability</DialogTitle></DialogHeader>
+            <div className="p-6">
               <form className="space-y-3" onSubmit={submitPay}>
                 <p className="text-sm text-muted-foreground">
                   <span className="capitalize">{payTarget.period}</span> · {fmtShortDate(payTarget.period_start)} → {fmtShortDate(payTarget.period_end)} ·{' '}
@@ -371,10 +372,10 @@ export default function PayrollTaxesPage() {
                   <Button type="submit" disabled={payBusy}>{payBusy ? 'Paying…' : 'Pay'}</Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }
