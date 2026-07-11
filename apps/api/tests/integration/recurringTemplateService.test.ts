@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, seedCoa, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeCustomer, makeVendor, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
 import * as rt from '../../src/services/accounting/recurringTemplateService.js';
 
@@ -99,5 +99,99 @@ describe('recurringTemplateService', () => {
     const jes = await t.db.selectFrom('journal_entries').selectAll()
       .where('business_id', '=', biz.id).execute();
     expect(jes.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('runDue materializes a due invoice template as a posted invoice with a JE', async () => {
+    const { biz, ctx } = await bootstrap();
+    const customer = await makeCustomer(t.db, biz.id);
+    const revenue = await makeAccount(t.db, biz.id, { code: '4001', name: 'Consulting revenue', account_type: 'revenue' });
+    const today = new Date().toISOString().slice(0, 10);
+
+    await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Monthly retainer',
+        template_type: 'invoice',
+        payload: {
+          customer_id: customer.id,
+          due_days: 15,
+          lines: [
+            { description: 'Retainer', quantity: '1', unit_price: '1200', revenue_account_id: revenue.id, tax_code_id: null },
+          ],
+        },
+        recurrence: 'monthly',
+        next_run_date: today,
+      }),
+    );
+    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    expect(results[0]?.runs_created).toBe(1);
+
+    const invoices = await t.db.selectFrom('invoices').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0]?.status).toBe('posted');
+    expect(invoices[0]?.invoice_number).toBe('INV-0001');
+    expect(invoices[0]?.issue_date).toBe(today);
+    const expectedDue = new Date(today + 'T00:00:00Z');
+    expectedDue.setUTCDate(expectedDue.getUTCDate() + 15);
+    expect(invoices[0]?.due_date).toBe(expectedDue.toISOString().slice(0, 10));
+
+    const jes = await t.db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', biz.id).where('source_type', '=', 'invoice').execute();
+    expect(jes).toHaveLength(1);
+  });
+
+  it('runDue materializes a due bill template as a posted bill with a JE', async () => {
+    const { biz, ctx, expense } = await bootstrap();
+    const vendor = await makeVendor(t.db, biz.id);
+    const today = new Date().toISOString().slice(0, 10);
+
+    await t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Monthly hosting',
+        template_type: 'bill',
+        payload: {
+          vendor_id: vendor.id,
+          lines: [
+            { description: 'Hosting', quantity: '1', unit_price: '250', expense_account_id: expense.id },
+          ],
+        },
+        recurrence: 'monthly',
+        next_run_date: today,
+      }),
+    );
+    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    expect(results[0]?.runs_created).toBe(1);
+
+    const bills = await t.db.selectFrom('bills').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(bills).toHaveLength(1);
+    expect(bills[0]?.status).toBe('posted');
+    expect(bills[0]?.bill_number).toBe('BILL-0001');
+    expect(bills[0]?.bill_date).toBe(today);
+
+    const jes = await t.db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', biz.id).where('source_type', '=', 'bill').execute();
+    expect(jes).toHaveLength(1);
+  });
+
+  it('create rejects an invoice template whose payload is missing customer_id', async () => {
+    const { biz, ctx } = await bootstrap();
+    const revenue = await makeAccount(t.db, biz.id, { code: '4002', name: 'Rev', account_type: 'revenue' });
+    await expect(t.db.transaction().execute(trx =>
+      rt.create(trx, ctx, {
+        business_id: biz.id,
+        name: 'Broken',
+        template_type: 'invoice',
+        payload: {
+          lines: [
+            { description: 'X', quantity: '1', unit_price: '10', revenue_account_id: revenue.id, tax_code_id: null },
+          ],
+        },
+        recurrence: 'monthly',
+        next_run_date: '2026-01-01',
+      }),
+    )).rejects.toThrow(/invalid recurring invoice payload/);
   });
 });

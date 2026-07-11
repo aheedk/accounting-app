@@ -91,8 +91,8 @@ Note: user-typed numbers can still collide with generated ones (pre-existing); s
 - Test: `apps/api/tests/integration/recurringTemplateService.test.ts` (extend)
 
 **Interfaces:**
-- Consumes: Task A `nextNumber`; `invoiceService.createDraft/postInvoice`; `billService.createDraft/postBill` (signatures recorded below).
-- Produces: `recurringInvoicePayloadSchema`, `recurringBillPayloadSchema`, `recurringJePayloadSchema` (exported via `schemas/index.ts` — already re-exports the module); `materializeTemplate(trx, ctx, t, runDate)` internal helper reused by Task D.
+- Consumes: Task A `nextNumber`; `invoiceService.createDraft/postInvoice`; `billService.createDraft/postBill`. Drift note: `createDraft` returns `{ invoice, lines }` / `{ bill, lines }`, not the bare row.
+- Produces: `recurringInvoicePayloadSchema`, `recurringBillPayloadSchema`, `recurringJePayloadSchema` (exported via `schemas/index.ts` — already re-exports the module); exported `materializeDueTemplate(trx, ctx, template, today)` (whole catch-up loop + advance + audit for ONE template) reused by Task D with a per-template ctx built from `created_by_user_id`.
 
 Payload schemas (dates and numbers are per-run, so payloads carry neither):
 
