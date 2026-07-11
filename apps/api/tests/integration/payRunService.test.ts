@@ -114,5 +114,14 @@ describe('payRunService', () => {
       pr.voidPayRun(trx, ctx, { pay_run_id: finalized.id }),
     );
     expect(voided.status).toBe('void');
+    // Void keeps the back-link to the (now reversed) JE — mirrors the slice-8
+    // fix on expense_transactions (commit 8b747dd).
+    expect(voided.journal_entry_id).toBe(finalized.journal_entry_id);
+    expect(voided.finalized_at).not.toBeNull();
+    expect(voided.finalized_by_user_id).toBe(finalized.finalized_by_user_id);
+    const reversals = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', finalized.journal_entry_id!)
+      .execute();
+    expect(reversals).toHaveLength(1);
   });
 });

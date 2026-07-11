@@ -235,16 +235,10 @@ export async function voidPayRun(
     });
   }
 
-  // The pr_finalized_has_je CHECK is biconditional:
-  //   (status = 'finalized') = (journal_entry_id IS NOT NULL AND finalized_at IS NOT NULL)
-  // So when transitioning to 'void' we MUST null both journal_entry_id and finalized_at
-  // (and finalized_by_user_id for symmetry). The reversal JE preserves the audit trail
-  // through journal_entries.reversed_entry_id and the audit log "before" snapshot below.
+  // Since migration 0052 the CHECK allows void to keep journal_entry_id /
+  // finalized_at, so the voided run keeps its back-link to the reversed JE.
   const updated = await trx.updateTable('pay_runs').set({
     status: 'void',
-    journal_entry_id: null,
-    finalized_at: null,
-    finalized_by_user_id: null,
   }).where('id', '=', input.pay_run_id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
