@@ -136,7 +136,7 @@ export default function CoaListPage() {
         <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th>System</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <script>window.onload = function(){ window.print(); }<\/script>
+      <script>window.onload = function(){ window.print(); }${'</'}script>
     </body></html>`);
     win.document.close();
   }
