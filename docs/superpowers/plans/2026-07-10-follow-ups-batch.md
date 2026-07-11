@@ -255,7 +255,7 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 - Modify: `apps/api/src/lib/fileStorage.ts` (add `S3Storage` implementing the existing `FileStorage` interface: `store`, `read`, `exists`)
 - Modify: `apps/api/package.json` (+`@aws-sdk/client-s3`)
 
-- [ ] Export swap: `process.env.S3_BUCKET ? new S3Storage(...) : new LocalVolumeStorage(...)`. Env vars (`S3_BUCKET`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) documented in follow-ups.md; adapter stays dormant until set (no new env required to run). Unit-testable via interface; integration against real R2 is out of scope. Commit `feat(api): env-gated S3/R2 file storage adapter`.
+- [x] Export swap: `process.env.S3_BUCKET ? new S3Storage(...) : new LocalVolumeStorage(...)`. Env vars (`S3_BUCKET`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) documented in follow-ups.md; adapter stays dormant until set (no new env required to run). Unit-testable via interface; integration against real R2 is out of scope. Commit `feat(api): env-gated S3/R2 file storage adapter`.
 
 ---
 
