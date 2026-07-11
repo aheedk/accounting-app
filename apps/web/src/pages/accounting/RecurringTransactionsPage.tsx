@@ -86,6 +86,10 @@ const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
+  // Date-only strings must not go through new Date() — that parses as UTC
+  // midnight and local getters roll it back a day in negative-offset zones.
+  const dateOnly = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) return `${dateOnly[2]}/${dateOnly[3]}/${dateOnly[1]}`;
   const d = new Date(iso);
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 }

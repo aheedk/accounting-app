@@ -97,20 +97,21 @@ BEGIN
         (r.id, 'annual_filing',      'open',        '2026-12-31', 'Annual report due to Secretary of State.');
     END IF;
 
-    -- Recurring templates (future-dated so they are not auto-run) ---------
+    -- Recurring templates (payloads match the recurring*PayloadSchema shapes:
+    -- account_id uuids and money strings, so runDue can materialize them) ---
     IF NOT EXISTS (SELECT 1 FROM recurring_templates WHERE business_id = r.id AND name = 'Monthly Office Rent') THEN
       INSERT INTO recurring_templates (business_id, name, template_type, payload, recurrence, next_run_date, is_active, created_by_user_id) VALUES
         (r.id, 'Monthly Office Rent', 'journal_entry',
          jsonb_build_object('memo', 'Office rent', 'lines',
            jsonb_build_array(
-             jsonb_build_object('account_code','5200','debit',2500,'credit',0),
-             jsonb_build_object('account_code','1020','debit',0,'credit',2500))),
+             jsonb_build_object('account_id',(SELECT id FROM chart_of_accounts WHERE business_id = r.id AND code = '5200'),'debit','2500','credit','0'),
+             jsonb_build_object('account_id',(SELECT id FROM chart_of_accounts WHERE business_id = r.id AND code = '1020'),'debit','0','credit','2500'))),
          'monthly', '2026-07-01', true, v_user),
         (r.id, 'Quarterly Insurance', 'journal_entry',
          jsonb_build_object('memo', 'Insurance premium', 'lines',
            jsonb_build_array(
-             jsonb_build_object('account_code','5900','debit',1200,'credit',0),
-             jsonb_build_object('account_code','1020','debit',0,'credit',1200))),
+             jsonb_build_object('account_id',(SELECT id FROM chart_of_accounts WHERE business_id = r.id AND code = '5900'),'debit','1200','credit','0'),
+             jsonb_build_object('account_id',(SELECT id FROM chart_of_accounts WHERE business_id = r.id AND code = '1020'),'debit','0','credit','1200'))),
          'quarterly', '2026-09-01', true, v_user);
     END IF;
 
