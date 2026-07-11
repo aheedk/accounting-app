@@ -36,7 +36,7 @@ type Template = {
 type TemplateRun = { at: string; runs_created: number; advanced_to: string };
 
 type RunDueResult = {
-  results: Array<{ template_id: string; runs_created: number }>;
+  results: Array<{ template_id: string; runs_created: number; error?: string }>;
 };
 
 type JeLine = { account_id: string; debit: string; credit: string; memo: string };
@@ -322,8 +322,13 @@ export default function RecurringTransactionsPage() {
         `/businesses/${bizId}/recurring-templates/run-due`,
         {},
       );
-      const total = r.data.results.reduce((s, x) => s + x.runs_created, 0);
-      setRunResult(`Created ${total} entries across ${r.data.results.length} templates.`);
+      const ok = r.data.results.filter((x) => !x.error);
+      const failedRuns = r.data.results.filter((x) => x.error);
+      const total = ok.reduce((s, x) => s + x.runs_created, 0);
+      setRunResult(`Created ${total} entries across ${ok.length} templates.`);
+      if (failedRuns.length > 0) {
+        setRunErr(`${failedRuns.length} template(s) failed: ${failedRuns.map((x) => x.error).join(' — ')}`);
+      }
       setRunsCache({});
       reload();
     } catch (e: unknown) {

@@ -63,7 +63,7 @@ describe('recurringTemplateService', () => {
         next_run_date: today,
       }),
     );
-    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
     expect(results).toHaveLength(1);
     expect(results[0]?.runs_created).toBe(1);
 
@@ -93,7 +93,7 @@ describe('recurringTemplateService', () => {
       }),
     );
 
-    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
     expect(results[0]?.runs_created).toBeGreaterThanOrEqual(3);
 
     const jes = await t.db.selectFrom('journal_entries').selectAll()
@@ -123,7 +123,7 @@ describe('recurringTemplateService', () => {
         next_run_date: today,
       }),
     );
-    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
     expect(results[0]?.runs_created).toBe(1);
 
     const invoices = await t.db.selectFrom('invoices').selectAll()
@@ -161,7 +161,7 @@ describe('recurringTemplateService', () => {
         next_run_date: today,
       }),
     );
-    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
     expect(results[0]?.runs_created).toBe(1);
 
     const bills = await t.db.selectFrom('bills').selectAll()
@@ -198,7 +198,7 @@ describe('recurringTemplateService', () => {
     );
     expect(updated.is_active).toBe(false);
 
-    const results = await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
     expect(results).toHaveLength(0);
 
     const audit = await t.db.selectFrom('audit_logs').selectAll()
@@ -244,7 +244,7 @@ describe('recurringTemplateService', () => {
         next_run_date: today,
       }),
     );
-    await t.db.transaction().execute(trx => rt.runDue(trx, ctx, biz.id));
+    await rt.runDueForBusiness(t.db, ctx, biz.id);
 
     const runs = await rt.listRuns(t.db, biz.id, row.id);
     expect(runs).toHaveLength(1);

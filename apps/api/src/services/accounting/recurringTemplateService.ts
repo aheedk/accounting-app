@@ -254,19 +254,34 @@ export async function materializeDueTemplate(
   return { template_id: t.id, runs_created: runs };
 }
 
-export async function runDue(
-  trx: Transaction<DB>, ctx: ServiceCtx, business_id: string,
-): Promise<{ template_id: string; runs_created: number }[]> {
+export type RunDueResult = { template_id: string; runs_created: number; error?: string };
+
+/**
+ * Run every due template for a business, each in its own transaction, so one
+ * broken template cannot roll back its siblings. Errors are reported
+ * per-template instead of thrown.
+ */
+export async function runDueForBusiness(
+  db: Kysely<DB>, ctx: ServiceCtx, business_id: string,
+): Promise<RunDueResult[]> {
   const today = new Date().toISOString().slice(0, 10);
-  const due = await trx.selectFrom('recurring_templates').selectAll()
+  const due = await db.selectFrom('recurring_templates').selectAll()
     .where('business_id', '=', business_id)
     .where('is_active', '=', true)
     .where('next_run_date', '<=', today)
     .execute();
 
-  const results: { template_id: string; runs_created: number }[] = [];
+  const results: RunDueResult[] = [];
   for (const t of due) {
-    results.push(await materializeDueTemplate(trx, ctx, t, today));
+    try {
+      results.push(await db.transaction().execute(trx => materializeDueTemplate(trx, ctx, t, today)));
+    } catch (e: unknown) {
+      results.push({
+        template_id: t.id,
+        runs_created: 0,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
   return results;
 }

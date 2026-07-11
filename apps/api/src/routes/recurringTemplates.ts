@@ -75,8 +75,10 @@ router.delete('/businesses/:businessId/recurring-templates/:id', requireMinRole(
 });
 
 router.post('/businesses/:businessId/recurring-templates/run-due', requireMinRole('accountant'), async (req, res, next) => {
+  // Per-template transactions: one broken template reports its error without
+  // rolling back the runs of its siblings.
   try {
-    const results = await db.transaction().execute(trx => rt.runDue(trx, ctxFromReq(req), req.tenancy!.business_id));
+    const results = await rt.runDueForBusiness(db, ctxFromReq(req), req.tenancy!.business_id);
     res.json({ results });
   } catch (e) { next(e); }
 });
