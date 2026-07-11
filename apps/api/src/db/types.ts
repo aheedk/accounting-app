@@ -881,6 +881,12 @@ export interface DepreciationEntriesTable {
   posted_by_user_id: string | null;
 }
 
+export interface NumberingCountersTable {
+  business_id: string;
+  entity_type: string;
+  last_value: ColumnType<string, string | number | undefined, string | number>;
+}
+
 export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
@@ -935,4 +941,5 @@ export interface DB {
   pay_run_lines: PayRunLinesTable;
   payroll_tax_liabilities: PayrollTaxLiabilitiesTable;
   compliance_items: ComplianceItemsTable;
+  numbering_counters: NumberingCountersTable;
 }

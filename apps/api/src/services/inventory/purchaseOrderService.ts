@@ -3,6 +3,7 @@ import { AUDIT, ERR } from '@accounting/shared';
 import type { DB, PurchaseOrderStatus } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
+import { nextNumber } from '../core/numberingService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreatePOLineInput = {
@@ -22,13 +23,7 @@ export type CreatePOInput = {
 };
 
 async function nextPONumber(trx: Transaction<DB>, business_id: string): Promise<string> {
-  // Simple per-business numbering: PO-{count+1}, zero-padded to 4 digits.
-  const r = await trx.selectFrom('purchase_orders')
-    .select(eb => eb.fn.count<string>('id').as('cnt'))
-    .where('business_id', '=', business_id)
-    .executeTakeFirstOrThrow();
-  const next = Number(r.cnt) + 1;
-  return `PO-${String(next).padStart(4, '0')}`;
+  return nextNumber(trx, business_id, 'purchase_order', 'PO');
 }
 
 export async function createPO(trx: Transaction<DB>, ctx: ServiceCtx, input: CreatePOInput) {

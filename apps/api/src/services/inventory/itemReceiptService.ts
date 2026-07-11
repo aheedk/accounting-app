@@ -6,6 +6,7 @@ import { record as auditRecord } from '../audit/auditService.js';
 import * as billSvc from '../ap/billService.js';
 import { adjustStock } from './stockMovementService.js';
 import { getPO } from './purchaseOrderService.js';
+import { nextNumber } from '../core/numberingService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateReceiptInput = {
@@ -16,11 +17,7 @@ export type CreateReceiptInput = {
 };
 
 async function nextBillNumber(trx: Transaction<DB>, business_id: string): Promise<string> {
-  const r = await trx.selectFrom('bills')
-    .select(eb => eb.fn.count<string>('id').as('cnt'))
-    .where('business_id', '=', business_id)
-    .executeTakeFirstOrThrow();
-  return `BILL-${String(Number(r.cnt) + 1).padStart(4, '0')}`;
+  return nextNumber(trx, business_id, 'bill', 'BILL');
 }
 
 export async function createReceipt(
