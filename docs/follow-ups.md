@@ -20,15 +20,7 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 ### Cloudflare R2 (or S3) adapter
 
-**Why:** Long-term replacement for the Railway volume. R2 has 10 GB free tier, no egress fees, S3-compatible API. Costs ~$0.015/GB/month after that vs. Railway's ~$0.25/GB/month. Removes the 500 MB cap entirely.
-
-**To do:**
-- New `S3Storage` class in `apps/api/src/lib/fileStorage.ts` implementing the existing `FileStorage` interface (`store`, `read`, `exists`).
-- Add `@aws-sdk/client-s3` dependency.
-- Env vars: `S3_BUCKET`, `S3_ENDPOINT` (R2 endpoint), `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
-- Swap the exported `fileStorage` instance based on env (`if (process.env.S3_BUCKET) ... else new LocalVolumeStorage()`).
-
-**Effort:** ~30 min. Interface was designed for this swap to be a single-file change.
+_Code done 2026-07-11: `S3Storage` in `apps/api/src/lib/fileStorage.ts`, env-gated on `S3_BUCKET` (+`S3_ENDPOINT` for R2; credentials via `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`). Remaining is ops-side only: create the R2 bucket + API token and set the four env vars in Railway._
 
 ---
 
@@ -46,44 +38,7 @@ _Done 2026-07-10 (see `docs/superpowers/plans/2026-07-10-follow-ups-batch.md`): 
 
 **Overall result:** No route-level crashes were found. The app is stable enough for continued feature work, but several screens still need QBO-style depth, stronger workflow controls, better mobile behavior, and a few data/formatting fixes.
 
-#### Custom Reports regression coverage
-
-**Why:** The saved custom report flow and account picker UX work, but the create/run/delete lifecycle and account filter behavior should be covered by regression tests.
-
-**To do:**
-- Add tests for saved report create, run, and delete.
-- Add tests for account filtering with all accounts, one account, and account-type group selection.
-
-**Priority:** medium.
-
-#### Performance Center charts
-
-**Why:** Performance Center still uses hand-rolled inline SVG sparklines. They are functional but too limited for a reporting surface.
-
-**To do:**
-- `npm install -w apps/web recharts` (or victory, or chart.js).
-- Replace the local sparkline with a real charting library such as Recharts.
-- Add axes, tooltips, date range controls, and comparison periods.
-- Add drilldowns from KPIs into the underlying report where practical.
-- Include short KPI explanations in tooltips or compact help affordances.
-- Optional: add YoY comparison overlay (current 12mo vs prior 12mo).
-
-**Priority:** medium-high.
-
-**Effort:** ~30 min for a basic Recharts swap.
-
-#### Banking, imports, and rules workflow
-
-**Why:** Banking pages work, but the workflow can become much more useful before production use.
-
-**To do:**
-- Add import history.
-- Add rule dry-run with match counts before save.
-- Add stronger match suggestions.
-- Add undo behavior for recent imports or rule applications where feasible.
-- Improve empty states for accounts with no transactions or no imported items.
-
-**Priority:** medium-high.
+_Done 2026-07-11 (see the batch plan): Custom Reports regression tests (lifecycle + account filters + month grouping); Performance Center on Recharts (axes, tooltips, 3M/6M/12M ranges, prior-period deltas, P&L drilldowns — YoY overlay still optional/future); banking import history + undo + rule dry-run with live match preview + inbox EmptyState ("stronger match suggestions" remains future work)._
 
 #### Setup and admin settings
 
@@ -102,37 +57,15 @@ _Done 2026-07-10 (see `docs/superpowers/plans/2026-07-10-follow-ups-batch.md`): 
 
 #### Form validation and save feedback
 
-**Why:** Invalid submits can surface generic `Input validation failed` feedback instead of field-level guidance. Some settings-style changes save without a clear saving/saved state.
-
-**To do:**
-- Add field-level validation messages to dense create/edit forms.
-- Add sticky save bars where forms are long.
-- Add explicit `Saving`, `Saved`, and failure states for settings/status updates.
-- Review compliance status changes for clear autosave feedback.
-
-**Priority:** medium-high.
+_Mostly done 2026-07-11: API zod 400s already carried `field_errors`; the web now surfaces them everywhere via the shared `lib/apiErrors.pickErr` (27 pages swept), `pickFieldErrors` is available for inline per-input rendering, and compliance autosaves show Saving…/Saved ✓. Remaining nice-to-haves: sticky save bars on long forms, inline (next-to-input) message placement on the densest forms._
 
 #### Accessibility pass for form controls
 
-**Why:** Chrome reported multiple form controls without associated labels, IDs, or names while create/edit panels were open.
-
-**To do:**
-- Add explicit labels and stable IDs to inputs, selects, checkboxes, and custom controls.
-- Ensure dialog/panel flows have focus management and escape-to-close behavior.
-- Prefer the shared dialog component for modal flows.
-- Add accessibility checks to the manual smoke checklist.
-
-**Priority:** medium.
+_First pass done 2026-07-11: label/id pairs on the recurring form, rule drawer, receipts + payroll-tax dialogs, and import page; Escape + `role="dialog"`/`aria-modal` on the Rules and CoA side drawers; center modals now use the shared Dialog (focus trap/aria built in). Remaining: a devtools-driven sweep of the rest of the create/edit panels + adding a11y checks to the manual smoke checklist._
 
 ### shadcn `Dialog` for modal flows
 
-**Why:** Slice 10's `ReceiptsPage` and slice 11's various dialogs use plain fixed-overlay `<Card>` instead of `@radix-ui/react-dialog` (already in `package.json`). No focus trap, no escape-to-close, no aria attributes.
-
-**To do:**
-- Replace ad-hoc modal overlays with `<Dialog>` from `@/components/ui/dialog` (create the wrapper if it doesn't exist following shadcn convention).
-- Pages affected: `ReceiptsPage`, `IntegrationInboxPage`, `ContractorsPage`, `EmployeeDetailPage`, `PayrollTaxesPage`.
-
-**Effort:** ~1 hour across all pages.
+_Done 2026-07-11: `@/components/ui/dialog` (Radix wrapper) created; converted the center modals on Receipts, Payroll Taxes, Recurring Transactions (filter), Journal import, and CoA import. (The originally-listed ContractorsPage/EmployeeDetailPage/IntegrationInboxPage modals no longer existed after the QBO restyle.) Side drawers (Rules, CoA create) keep the drawer pattern with Escape + dialog semantics added._
 
 ---
 

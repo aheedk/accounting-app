@@ -1,13 +1,16 @@
 # Session handoff — follow-ups batch (2026-07-10/11)
 
-Continuation notes for the next Claude session (user is switching accounts;
-same machine, same checkout). **Read this, then continue the plan.**
+**STATUS: the batch is COMPLETE — all Tasks A–L shipped** (see
+`docs/superpowers/plans/2026-07-10-follow-ups-batch.md` checkboxes and
+`docs/follow-ups.md` for what each item became). This file remains as the
+environment reference for future sessions.
 
-## Where to pick up
+## Still open (not code)
 
-1. Plan: `docs/superpowers/plans/2026-07-10-follow-ups-batch.md` — Tasks A–E are DONE, continue at **Task F** (checkboxes in the plan are current).
-2. Work inline on `main` (matches repo convention; user handles pushes). Use superpowers `executing-plans` + `test-driven-development` skills. Commit after every task (user preference).
-3. Deliberately out of scope: Railway volume mount (user must do in dashboard), prod "QBO Style Test Co" vendor deletion (needs explicit user go-ahead), tax engine / Plaid / OCR.
+1. **Push + deploy**: everything is committed to local `main`, unpushed. Prod needs migrations 0051–0053 applied (`npm run migrate:prod` runs on deploy) — user handles pushes/deploys.
+2. Railway volume mount OR R2 env vars (`S3_BUCKET`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) — the S3 adapter code is in and dormant until set.
+3. Prod "QBO Style Test Co" test-vendor deletion (needs explicit user go-ahead).
+4. Remaining polish is listed in `docs/follow-ups.md` (Setup/admin settings section, banking match suggestions, sticky save bars, broader a11y sweep, tax engine / Plaid / OCR).
 
 ## Completed this session (all committed to local `main`, not pushed)
 

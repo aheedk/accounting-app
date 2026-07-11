@@ -261,9 +261,9 @@ Behaviors: dry-run = evaluate rule predicate over unreconciled transactions, ret
 
 ### Wrap-up
 
-- [ ] Full integration suite with the forks flags; web+api typecheck; web lint.
-- [ ] Refresh `docs/qbo-revamp-handoff.md` staleness (second wave is merged). (`follow-ups.md` A–E sections already trimmed.)
-- [ ] Report deliberately-skipped items to the user: Railway volume mount (dashboard access), prod test-vendor deletion (prod destructive — needs explicit go-ahead), tax engine / Plaid / OCR (out of scope per doc).
+- [x] Full integration suite with the forks flags (63 files, 179 tests green); web+api typecheck; web lint.
+- [x] Refresh `docs/qbo-revamp-handoff.md` staleness; final `follow-ups.md` sweep (all batch items annotated done).
+- [x] Report deliberately-skipped items to the user: Railway volume mount (dashboard access), prod test-vendor deletion (prod destructive — needs explicit go-ahead), tax engine / Plaid / OCR (out of scope per doc).
 
 ## Self-review notes
 

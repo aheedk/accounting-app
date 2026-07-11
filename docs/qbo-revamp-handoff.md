@@ -4,7 +4,12 @@ Purpose: a self-contained snapshot so a fresh chat (after `/clear`) can pick up
 without the long history. For the formal "what shipped" changelog see
 [`qbo-style-revamp-changes.md`](./qbo-style-revamp-changes.md).
 
-_Last updated: 2026-06-22._
+_Last updated: 2026-07-11. NOTE: the second wave (`accounting-qbo-revamp`) has
+since been **merged to `main`** — the "Open follow-ups" merge item below is done.
+The 2026-07 follow-ups batch (recurring templates completion, scheduler,
+numbering counters, banking import history/dry-run/undo, Recharts, Dialogs,
+validation surfacing, S3 adapter) is documented in
+`docs/superpowers/plans/2026-07-10-follow-ups-batch.md` and `HANDOFF.md`._
 
 ---
 
