@@ -24,7 +24,10 @@ export async function getPerformanceReport(db: Kysely<DB>, ctx: ServiceCtx): Pro
   const revenueRes = await db.executeQuery<MonthAmtRow>(sql<MonthAmtRow>`
     SELECT
       to_char(m.month, 'YYYY-MM') AS month,
-      COALESCE(SUM(jel.credit - jel.debit), 0)::text AS amount
+      -- Restrict to revenue lines inside the SUM: a bare LEFT JOIN condition on
+      -- account_type never filters rows, and summing credit-debit across ALL
+      -- lines of balanced JEs is identically zero (double-entry).
+      COALESCE(SUM(CASE WHEN coa.account_type = 'revenue' THEN jel.credit - jel.debit ELSE 0 END), 0)::text AS amount
     FROM generate_series(
       date_trunc('month', now()) - interval '11 months',
       date_trunc('month', now()),
@@ -36,8 +39,7 @@ export async function getPerformanceReport(db: Kysely<DB>, ctx: ServiceCtx): Pro
      AND je.reversed_entry_id IS NULL
      AND date_trunc('month', je.entry_date) = m.month
     LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
-    LEFT JOIN chart_of_accounts coa
-      ON coa.id = jel.account_id AND coa.account_type = 'revenue'
+    LEFT JOIN chart_of_accounts coa ON coa.id = jel.account_id
     GROUP BY m.month
     ORDER BY m.month
   `.compile(db));
@@ -45,7 +47,7 @@ export async function getPerformanceReport(db: Kysely<DB>, ctx: ServiceCtx): Pro
   const expenseRes = await db.executeQuery<MonthAmtRow>(sql<MonthAmtRow>`
     SELECT
       to_char(m.month, 'YYYY-MM') AS month,
-      COALESCE(SUM(jel.debit - jel.credit), 0)::text AS amount
+      COALESCE(SUM(CASE WHEN coa.account_type = 'expense' THEN jel.debit - jel.credit ELSE 0 END), 0)::text AS amount
     FROM generate_series(
       date_trunc('month', now()) - interval '11 months',
       date_trunc('month', now()),
@@ -57,8 +59,7 @@ export async function getPerformanceReport(db: Kysely<DB>, ctx: ServiceCtx): Pro
      AND je.reversed_entry_id IS NULL
      AND date_trunc('month', je.entry_date) = m.month
     LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
-    LEFT JOIN chart_of_accounts coa
-      ON coa.id = jel.account_id AND coa.account_type = 'expense'
+    LEFT JOIN chart_of_accounts coa ON coa.id = jel.account_id
     GROUP BY m.month
     ORDER BY m.month
   `.compile(db));
