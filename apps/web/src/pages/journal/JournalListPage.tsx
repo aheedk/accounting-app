@@ -232,7 +232,7 @@ export default function JournalListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage={<EmptyState title="No journal entries found" hint="Adjust the filters above, or record a manual journal entry." actionLabel="New entry" actionTo="/journal/new" />}
+          emptyMessage={<EmptyState title="No journal entries found" hint="Adjust the filters above, import entries, or record a manual journal entry." actionLabel="New entry" actionTo="/journal/new" />}
         />
       </CardContent></Card>
 

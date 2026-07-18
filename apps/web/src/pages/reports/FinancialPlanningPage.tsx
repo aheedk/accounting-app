@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney, fmtSigned } from '@/lib/money';
+import { currentYearLocal } from '@/lib/dates';
 
 type Budget = {
   id: string;
@@ -85,7 +86,7 @@ export default function FinancialPlanningPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [newName, setNewName] = useState('');
-  const [newYear, setNewYear] = useState<string>(String(new Date().getFullYear()));
+  const [newYear, setNewYear] = useState<string>(String(currentYearLocal()));
 
   const loadBudgets = useCallback(async () => {
     if (!bizId) return;

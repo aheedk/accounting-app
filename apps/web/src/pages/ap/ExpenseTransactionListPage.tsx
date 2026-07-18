@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { daysAgoLocal } from '@/lib/dates';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 type StatusFilter = ExpenseStatus | 'all';
@@ -85,10 +86,6 @@ function fmtShortDate(iso: string) {
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
-function isoDaysAgo(days: number) {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-}
-
 export default function ExpenseTransactionListPage() {
   const [bizId] = useActiveBusinessId();
   const { user } = useAuth();
@@ -157,7 +154,7 @@ export default function ExpenseTransactionListPage() {
   type Row = ExpenseTransaction & { payee_name: string; category_name: string };
   const rows: Row[] = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = range && range.days > 0 ? isoDaysAgo(range.days) : '';
+    const cutoff = range && range.days > 0 ? daysAgoLocal(range.days) : '';
     return items
       .filter(t => !cutoff || t.transaction_date >= cutoff)
       .map(t => ({

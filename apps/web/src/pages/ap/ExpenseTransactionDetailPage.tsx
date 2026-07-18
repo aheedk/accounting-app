@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { FileText, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import type { Role } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
+import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
@@ -28,6 +31,9 @@ type ExpenseTransaction = {
   updated_at?: string;
 };
 
+type Vendor = { id: string; name: string };
+type Account = { id: string; code: string; name: string; account_type: string };
+
 const ROLE_RANK: Record<Role, number> = {
   client: 0,
   staff: 1,
@@ -47,20 +53,6 @@ function pickErr(e: unknown): string {
     ?.response?.data?.error?.message ?? 'Failed';
 }
 
-function statusBadge(status: ExpenseStatus) {
-  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
-  switch (status) {
-    case 'draft':
-      return <span className={`${base} bg-amber-100 text-amber-800`}>draft</span>;
-    case 'posted':
-      return <span className={`${base} bg-emerald-100 text-emerald-800`}>posted</span>;
-    case 'void':
-      return <span className={`${base} bg-muted text-muted-foreground`}>void</span>;
-    default:
-      return <span className={base}>{status}</span>;
-  }
-}
-
 export default function ExpenseTransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
@@ -69,6 +61,8 @@ export default function ExpenseTransactionDetailPage() {
   const canMutate = roleAtLeast(user?.role, 'accountant');
 
   const [data, setData] = useState<ExpenseTransaction | null>(null);
+  const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -78,12 +72,26 @@ export default function ExpenseTransactionDetailPage() {
     try {
       const r = await api.get<ExpenseTransaction>(`/businesses/${bizId}/expense-transactions/${id}`);
       setData(r.data);
+      if (r.data.vendor_id) {
+        try {
+          const v = await api.get<Vendor>(`/businesses/${bizId}/vendors/${r.data.vendor_id}`);
+          setVendor(v.data);
+        } catch {
+          setVendor(null);
+        }
+      } else {
+        setVendor(null);
+      }
     } catch (e: unknown) {
       setErr(pickErr(e));
     }
   }, [bizId, id]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}/coa`, { params: { include_inactive: true } }).then(r => setAccounts(r.data.accounts)).catch(() => setAccounts([]));
+  }, [bizId]);
 
   async function post() {
     if (!bizId || !id) return;
@@ -113,66 +121,74 @@ export default function ExpenseTransactionDetailPage() {
     }
   }
 
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, `${a.code} - ${a.name}`])), [accounts]);
+
   if (!bizId) return <div>Pick a business.</div>;
   if (err && !data) return <div className="text-sm text-destructive">{err}</div>;
-  if (!data) return <div>Loading…</div>;
+  if (!data) return <div>Loading...</div>;
+
+  const payeeName = vendor?.name ?? data.payee_text ?? 'No payee';
+  const canPost = canMutate && data.status === 'draft';
+  const canVoid = canMutate && (data.status === 'draft' || data.status === 'posted');
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Expense Transaction</h1>
-          <p className="text-xs text-muted-foreground font-mono">{data.id}</p>
-        </div>
-        {statusBadge(data.status)}
-      </div>
+      <DetailPageHeader
+        eyebrow="Expense transaction"
+        title={payeeName}
+        subtitle={fmtLongDate(data.transaction_date)}
+        status={data.status}
+        totalLabel="Amount"
+        total={fmtMoney(data.amount)}
+        actions={canPost ? [{ label: busy ? 'Posting...' : 'Post expense', icon: <FileText className="h-4 w-4" />, onClick: post, disabled: busy }] : []}
+        menuActions={[
+          ...baseDetailMenuActions(),
+          ...(canVoid ? [{ label: 'Void expense', icon: <Trash2 className="h-4 w-4" />, onSelect: voidExpense, destructive: true, disabled: busy }] : []),
+        ]}
+      />
 
       {err && <p className="text-sm text-destructive">{err}</p>}
 
-      <Card>
-        <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>Date: {data.transaction_date}</div>
-          <div>Amount: <span className="font-mono">{fmtMoney(data.amount)}</span></div>
-          <div className="col-span-2">Payee: {data.payee_text ?? '—'}</div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Vendor: {data.vendor_id ?? '—'}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Expense account: {data.expense_account_id}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Payment account: {data.payment_account_id}
-          </div>
-          <div className="col-span-2">Memo: {data.memo ?? '—'}</div>
-          <div className="col-span-2">
-            Journal entry:{' '}
-            {data.journal_entry_id ? (
-              <Link to={`/journal/${data.journal_entry_id}`} className="text-primary underline font-mono text-xs">
-                JE {data.journal_entry_id.slice(0, 8)}
-              </Link>
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
-          </div>
-          {data.posted_at && (
-            <div className="col-span-2 text-xs text-muted-foreground">Posted at: {data.posted_at}</div>
-          )}
-          {data.voided_at && (
-            <div className="col-span-2 text-xs text-muted-foreground">Voided at: {data.voided_at}</div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="flex gap-2">
-        {canMutate && data.status === 'draft' && (
-          <Button onClick={post} disabled={busy}>{busy ? 'Posting…' : 'Post'}</Button>
-        )}
-        {canMutate && (data.status === 'draft' || data.status === 'posted') && (
-          <Button variant="outline" onClick={voidExpense} disabled={busy}>{busy ? 'Voiding…' : 'Void'}</Button>
-        )}
-        <Button variant="outline" onClick={() => nav('/ap/expenses')}>Back to list</Button>
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailMetric label="Expense date" value={fmtLongDate(data.transaction_date)} />
+        <DetailMetric label="Expense account" value={accountMap.get(data.expense_account_id) ?? data.expense_account_id.slice(0, 8)} />
+        <DetailMetric label="Paid from" value={accountMap.get(data.payment_account_id) ?? data.payment_account_id.slice(0, 8)} />
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Details</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <DetailField label="Payee" value={vendor ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : data.payee_text} />
+            <DetailField label="Transaction date" value={fmtLongDate(data.transaction_date)} />
+            <DetailField label="Expense account" value={accountMap.get(data.expense_account_id) ?? data.expense_account_id.slice(0, 8)} />
+            <DetailField label="Payment account" value={accountMap.get(data.payment_account_id) ?? data.payment_account_id.slice(0, 8)} />
+            <DetailField label="Memo" className="sm:col-span-2" value={data.memo} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Activity</CardTitle></CardHeader>
+          <CardContent>
+            <DetailActivity
+              items={[
+                { label: 'Created', value: data.created_at ? fmtDateTime(data.created_at) : null },
+                { label: 'Last updated', value: data.updated_at ? fmtDateTime(data.updated_at) : null },
+                { label: 'Posted', value: data.posted_at ? fmtDateTime(data.posted_at) : null },
+                { label: 'Voided', value: data.voided_at ? fmtDateTime(data.voided_at) : null },
+                {
+                  label: 'Journal entry',
+                  value: data.journal_entry_id
+                    ? <Link to={`/journal/${data.journal_entry_id}`} className="font-mono text-primary hover:underline">JE {data.journal_entry_id.slice(0, 8)}</Link>
+                    : null,
+                },
+              ]}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Button variant="outline" onClick={() => nav('/ap/expenses')}>Back to expenses</Button>
     </div>
   );
 }

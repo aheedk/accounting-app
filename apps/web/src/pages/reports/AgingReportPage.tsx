@@ -76,7 +76,8 @@ export default function AgingReportPage() {
       </div>
 
       <ReportCard companyName={bizName} title="A/R Aging Summary Report" subtitle={`As of ${fmtLongDate(asOf)}`}>
-        <table className="w-full text-sm">
+        <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm sm:min-w-0">
           <thead className="border-b">
             <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="p-3 text-left"></th>
@@ -111,6 +112,7 @@ export default function AgingReportPage() {
             </tr>
           </tbody>
         </table>
+        </div>
       </ReportCard>
     </div>
   );

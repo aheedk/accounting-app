@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { daysAgoLocal, todayLocal } from '@/lib/dates';
 import { EmptyState } from '@/components/ui/EmptyState';
 
 type BillSummary = { id: string; bill_number: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
@@ -34,9 +34,6 @@ function fmtShortDate(iso: string) {
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
-function isoDaysAgo(days: number) {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-}
 function daysBetween(fromIso: string, toIso: string) {
   const a = new Date(`${fromIso}T00:00:00Z`).getTime();
   const b = new Date(`${toIso}T00:00:00Z`).getTime();
@@ -46,8 +43,8 @@ function daysBetween(fromIso: string, toIso: string) {
 function dateRangeBounds(value: string): { from: string; to: string } | null {
   const today = todayLocal();
   if (value === 'year') return { from: `${today.slice(0, 4)}-01-01`, to: `${today.slice(0, 4)}-12-31` };
-  if (value === '3m') return { from: isoDaysAgo(92), to: today };
-  if (value === '12m') return { from: isoDaysAgo(365), to: today };
+  if (value === '3m') return { from: daysAgoLocal(92), to: today };
+  if (value === '12m') return { from: daysAgoLocal(365), to: today };
   return null;
 }
 

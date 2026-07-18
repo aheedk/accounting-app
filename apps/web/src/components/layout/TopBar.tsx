@@ -1,13 +1,22 @@
+import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 
-export function TopBar() {
+export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   return (
-    <header className="h-14 shrink-0 border-b border-border bg-card/80 backdrop-blur flex items-center gap-4 px-4">
-      <div className="flex shrink-0 items-center">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Open navigation menu"
+          className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent lg:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <BusinessSwitcher />
       </div>
 

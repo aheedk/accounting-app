@@ -10,6 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
 
 type CreditMemoSummary = {
   id: string;
@@ -35,10 +36,6 @@ function fmtShortDate(iso: string) {
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
-function isoDaysAgo(days: number) {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-}
-
 export default function CreditMemoListPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<CreditMemoSummary[]>([]);
@@ -61,7 +58,7 @@ export default function CreditMemoListPage() {
 
   const rows = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = range && range.days > 0 ? isoDaysAgo(range.days) : '';
+    const cutoff = range && range.days > 0 ? daysAgoLocal(range.days) : '';
     const q = customerQuery.trim().toLowerCase();
     return allRows.filter(r =>
       (!statusFilter || r.status === statusFilter) &&
@@ -72,8 +69,8 @@ export default function CreditMemoListPage() {
 
   // Money bar totals are computed across all credit memos, unfiltered (QBO behavior).
   const stats = useMemo(() => {
-    const yearStart = `${new Date().getFullYear()}-01-01`;
-    const recentCutoff = isoDaysAgo(30);
+    const yearStart = `${currentYearLocal()}-01-01`;
+    const recentCutoff = daysAgoLocal(30);
     let issued = 0, remaining = 0, drafts = 0, draftCount = 0, recent = 0, recentCount = 0;
     for (const c of items) {
       const amt = Number(c.amount);

@@ -65,7 +65,7 @@ export function BusinessSwitcher() {
         )}
       >
         <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="max-w-[14rem] truncate font-medium">{activeBiz?.name}</span>
+        <span className="max-w-[40vw] truncate font-medium sm:max-w-[14rem]">{activeBiz?.name}</span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 

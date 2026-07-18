@@ -158,6 +158,7 @@ export default function BalanceSheetPage() {
       </div>
 
       <ReportCard companyName={bizName} title="Balance Sheet" subtitle={`As of ${fmtLongDate(asOf)}`}>
+        <div className="w-full overflow-x-auto">
         <table className="w-full text-sm">
           <tbody>
             <tr className="border-b">
@@ -218,6 +219,7 @@ export default function BalanceSheetPage() {
             </tr>
           </tbody>
         </table>
+        </div>
       </ReportCard>
     </div>
   );

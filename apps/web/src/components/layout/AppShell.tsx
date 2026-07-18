@@ -1,14 +1,32 @@
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { MobileNav } from './MobileNav';
 import { TopBar } from './TopBar';
 
 export function AppShell() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Close the drawer if the viewport grows to the `lg` breakpoint, where the
+  // static sidebar takes over — avoids the drawer lingering over it on resize.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => {
+      if (mq.matches) setMobileNavOpen(false);
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   return (
-    <div className="h-screen flex overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar />
-        <main className="flex-1 p-6 overflow-y-auto"><Outlet /></main>
+      <MobileNav open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopBar onMenuClick={() => setMobileNavOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   );

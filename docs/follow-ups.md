@@ -60,16 +60,102 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 
 ## UI polish
 
-### Real charting library on Performance Center
+### Localhost UX audit backlog - 2026-06-22
 
-**Why:** Slice 12 ships inline-SVG sparklines as a "no new deps" choice. Workable but ugly — no axis labels, no tooltips, no comparison overlays.
+**Context:** Manual audit on the signed-in local web app at `http://127.0.0.1:5175/`. Routes and nested tabs were clicked across Dashboard, AR, AP, Accounting, Reports, Payroll, Inventory, Setup, integrations, banking, and representative detail pages. Disposable create/edit/delete checks were also run for cost centers, bank rules, budgets, and custom reports; the test records were cleaned up afterward.
+
+**Overall result:** No route-level crashes were found. The app is stable enough for continued feature work, but several screens still need QBO-style depth, stronger workflow controls, better mobile behavior, and a few data/formatting fixes.
+
+#### Custom Reports regression coverage
+
+**Why:** The saved custom report flow and account picker UX work, but the create/run/delete lifecycle and account filter behavior should be covered by regression tests.
+
+**To do:**
+- Add tests for saved report create, run, and delete.
+- Add tests for account filtering with all accounts, one account, and account-type group selection.
+
+**Priority:** medium.
+
+#### Performance Center charts
+
+**Why:** Performance Center still uses hand-rolled inline SVG sparklines. They are functional but too limited for a reporting surface.
 
 **To do:**
 - `npm install -w apps/web recharts` (or victory, or chart.js).
-- Replace the `<Sparkline />` component in `apps/web/src/pages/reports/PerformanceCenterPage.tsx` with a proper `<LineChart>`.
+- Replace the local sparkline with a real charting library such as Recharts.
+- Add axes, tooltips, date range controls, and comparison periods.
+- Add drilldowns from KPIs into the underlying report where practical.
+- Include short KPI explanations in tooltips or compact help affordances.
 - Optional: add YoY comparison overlay (current 12mo vs prior 12mo).
 
-**Effort:** ~30 min for a basic recharts swap.
+**Priority:** medium-high.
+
+**Effort:** ~30 min for a basic Recharts swap.
+
+#### Banking, imports, and rules workflow
+
+**Why:** Banking pages work, but the workflow can become much more useful before production use.
+
+**To do:**
+- Add import history.
+- Add rule dry-run with match counts before save.
+- Add stronger match suggestions.
+- Add undo behavior for recent imports or rule applications where feasible.
+- Improve empty states for accounts with no transactions or no imported items.
+
+**Priority:** medium-high.
+
+#### Recurring transactions
+
+**Why:** The recurring template UI still exposes invoice and bill template types as "coming soon"; only journal entry materialization is complete.
+
+**To do:**
+- Finish invoice recurring templates.
+- Finish bill recurring templates.
+- Add pause/resume controls.
+- Add next-run preview and last-run history.
+- Add scheduled materialization instead of requiring the user to manually click "Run all due".
+
+**Priority:** high.
+
+#### Setup and admin settings
+
+**Why:** Setup has the foundation, but a real accounting workspace needs more company-level controls.
+
+**To do:**
+- Add numbering prefixes/counters for invoices, bills, POs, SOs, and other documents.
+- Add defaults for terms, payment methods, invoice settings, and bill settings.
+- Add tax defaults and sales tax settings.
+- Add fiscal close locks / period locks.
+- Add an audit log viewer.
+- Add permission templates or role presets.
+- Add company file storage settings once the S3/R2 adapter exists.
+
+**Priority:** medium.
+
+#### Form validation and save feedback
+
+**Why:** Invalid submits can surface generic `Input validation failed` feedback instead of field-level guidance. Some settings-style changes save without a clear saving/saved state.
+
+**To do:**
+- Add field-level validation messages to dense create/edit forms.
+- Add sticky save bars where forms are long.
+- Add explicit `Saving`, `Saved`, and failure states for settings/status updates.
+- Review compliance status changes for clear autosave feedback.
+
+**Priority:** medium-high.
+
+#### Accessibility pass for form controls
+
+**Why:** Chrome reported multiple form controls without associated labels, IDs, or names while create/edit panels were open.
+
+**To do:**
+- Add explicit labels and stable IDs to inputs, selects, checkboxes, and custom controls.
+- Ensure dialog/panel flows have focus management and escape-to-close behavior.
+- Prefer the shared dialog component for modal flows.
+- Add accessibility checks to the manual smoke checklist.
+
+**Priority:** medium.
 
 ### shadcn `Dialog` for modal flows
 
@@ -80,14 +166,6 @@ Non-blocking items deferred during the slices 8–13 initiative. None of these p
 - Pages affected: `ReceiptsPage`, `IntegrationInboxPage`, `ContractorsPage`, `EmployeeDetailPage`, `PayrollTaxesPage`.
 
 **Effort:** ~1 hour across all pages.
-
-### Sidebar audit
-
-**Why:** The sidebar component (`apps/web/src/components/layout/Sidebar.tsx`) was last touched during slice 6/7 and never explicitly re-verified post-slice-13. All routes are wired in `App.tsx` and the original sidebar entries point to the right paths, but worth a manual walk-through to confirm every nav item lands on a real page (not 404).
-
-**To do:** open the deployed app, click every sidebar item, verify no broken links.
-
-**Effort:** ~10 min manual.
 
 ---
 

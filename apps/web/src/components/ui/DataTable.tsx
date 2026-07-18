@@ -9,6 +9,7 @@ export type Column<T> = {
   align?: 'left' | 'right';
   sortable?: boolean;
   sortValue?: (row: T) => string | number;
+  exportValue?: (row: T) => string | number | boolean | null | undefined;
   render: (row: T) => ReactNode;
 };
 
@@ -75,11 +76,26 @@ export function DataTable<T>({
 
   const colSpan = (selectable ? 1 : 0) + columns.length + (actions ? 1 : 0);
 
+  function exportCell(row: T, col: Column<T>): string {
+    const explicit = col.exportValue?.(row);
+    if (explicit !== undefined && explicit !== null) return String(explicit);
+
+    const raw = (row as Record<string, unknown>)[col.key];
+    if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+      return String(raw);
+    }
+
+    if (col.sortValue) return String(col.sortValue(row));
+
+    const rendered = col.render(row);
+    return typeof rendered === 'string' || typeof rendered === 'number' ? String(rendered) : '';
+  }
+
   function handleDownload(format: 'excel' | 'pdf') {
     if (!downloadable) return;
     const headers = columns.map(c => c.header);
     const exportRows = sortedRows.map(row =>
-      columns.map(col => (col.sortValue ? String(col.sortValue(row)) : '')),
+      columns.map(col => exportCell(row, col)),
     );
     if (format === 'excel') {
       setExcelBusy(true);
@@ -102,7 +118,10 @@ export function DataTable<T>({
           </Button>
         </div>
       )}
-    <table className="w-full text-sm">
+    {/* Wrap in a horizontal scroll container so dense tables stay usable on
+        narrow viewports instead of crushing columns or pushing the page wide. */}
+    <div className="w-full overflow-x-auto">
+    <table className="w-full min-w-[640px] text-sm sm:min-w-0">
       <thead className="border-b">
         <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {selectable && (
@@ -162,6 +181,7 @@ export function DataTable<T>({
         )}
       </tbody>
     </table>
+    </div>
     </>
   );
 }

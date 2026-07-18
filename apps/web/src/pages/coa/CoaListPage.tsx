@@ -212,7 +212,7 @@ export default function CoaListPage() {
   }
 
   const columns: Column<Account>[] = [
-    { key: 'code', header: 'No.', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono text-muted-foreground">{r.code}</span> },
+    { key: 'code', header: 'Code', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono text-muted-foreground">{r.code}</span> },
     { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <span className="font-medium">{r.name}</span> },
     { key: 'account_type', header: 'Type', sortable: true, sortValue: r => r.account_type, render: r => <span className="capitalize">{r.account_type}</span> },
     { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => statusBadge(r.is_active) },
@@ -314,7 +314,7 @@ export default function CoaListPage() {
           defaultSortKey="code"
           defaultSortDir="asc"
           downloadable={{ filename: 'chart-of-accounts', title: 'Chart of Accounts' }}
-          emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, or add a new account to your chart." />}
+          emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, import accounts, or add a new account to your chart." />}
         />
       </CardContent></Card>
 
@@ -353,7 +353,7 @@ export default function CoaListPage() {
                     value={form.account_type}
                     onChange={e => setForm(f => ({ ...f, account_type: e.target.value }))}
                   >
-                    {['asset', 'liability', 'equity', 'revenue', 'expense'].map(t => (
+                    {ACCOUNT_TYPES.map(t => (
                       <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                     ))}
                   </select>

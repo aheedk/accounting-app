@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { currentYearLocal, todayLocal } from '@/lib/dates';
 
 type GroupBy = 'account' | 'month' | 'cost_center' | 'customer' | 'vendor';
 type Column = 'debit' | 'credit' | 'net';
@@ -63,8 +64,7 @@ function todayIso(): string {
 }
 
 function startOfYearIso(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-01-01`;
+  return `${currentYearLocal()}-01-01`;
 }
 
 function emptyForm(): { name: string; definition: Definition } {
@@ -100,6 +100,8 @@ export default function CustomReportsPage() {
   const [hasResult, setHasResult] = useState(false);
   const [busy, setBusy] = useState<'idle' | 'save' | 'run' | 'delete'>('idle');
   const [err, setErr] = useState<string | null>(null);
+  const [accountSearch, setAccountSearch] = useState('');
+  const [collapsedAccountTypes, setCollapsedAccountTypes] = useState<Set<string>>(new Set());
 
   async function reloadReports() {
     if (!bizId) return;
@@ -125,8 +127,10 @@ export default function CustomReportsPage() {
 
   const groupedAccounts = useMemo(() => {
     const groups: Record<string, Account[]> = {};
+    const q = accountSearch.trim().toLowerCase();
     for (const a of accounts) {
       if (!a.is_active) continue;
+      if (q && !a.name.toLowerCase().includes(q) && !a.code.toLowerCase().includes(q)) continue;
       const bucket = groups[a.account_type] ?? [];
       bucket.push(a);
       groups[a.account_type] = bucket;
@@ -135,7 +139,17 @@ export default function CustomReportsPage() {
       groups[k] = (groups[k] ?? []).slice().sort((x, y) => x.code.localeCompare(y.code));
     }
     return groups;
-  }, [accounts]);
+  }, [accounts, accountSearch]);
+
+  const activeAccountIds = useMemo(
+    () => accounts.filter(a => a.is_active).map(a => a.id),
+    [accounts],
+  );
+
+  function normalizeAccountSelection(ids: string[]): string[] {
+    const unique = [...new Set(ids)].filter(id => activeAccountIds.includes(id));
+    return unique.length === activeAccountIds.length ? [] : unique;
+  }
 
   function startNew() {
     setSelectedId(null);
@@ -155,11 +169,34 @@ export default function CustomReportsPage() {
 
   function toggleAccount(id: string) {
     setForm(f => {
-      const has = f.definition.account_ids.includes(id);
+      const current = f.definition.account_ids.length === 0 ? activeAccountIds : f.definition.account_ids;
+      const has = current.includes(id);
       const next = has
-        ? f.definition.account_ids.filter(x => x !== id)
-        : [...f.definition.account_ids, id];
-      return { ...f, definition: { ...f.definition, account_ids: next } };
+        ? current.filter(x => x !== id)
+        : [...current, id];
+      return { ...f, definition: { ...f.definition, account_ids: normalizeAccountSelection(next) } };
+    });
+  }
+
+  function toggleAccountType(type: string) {
+    const groupIds = groupedAccounts[type]?.map(a => a.id) ?? [];
+    if (groupIds.length === 0) return;
+    setForm(f => {
+      const current = f.definition.account_ids.length === 0 ? activeAccountIds : f.definition.account_ids;
+      const allInGroup = groupIds.every(id => current.includes(id));
+      const next = allInGroup
+        ? current.filter(id => !groupIds.includes(id))
+        : [...current, ...groupIds];
+      return { ...f, definition: { ...f.definition, account_ids: normalizeAccountSelection(next) } };
+    });
+  }
+
+  function toggleAccountTypeCollapsed(type: string) {
+    setCollapsedAccountTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
     });
   }
 
@@ -378,31 +415,56 @@ export default function CustomReportsPage() {
                     </Button>
                   )}
                 </div>
-                <div className="max-h-64 overflow-y-auto rounded-md border">
+                <Input
+                  className="mb-2 h-9"
+                  placeholder="Search by account code or name"
+                  value={accountSearch}
+                  onChange={e => setAccountSearch(e.target.value)}
+                />
+                <div className="max-h-72 overflow-y-auto rounded-md border">
                   {Object.keys(groupedAccounts).length === 0 ? (
-                    <p className="p-3 text-sm text-muted-foreground">No active accounts.</p>
+                    <p className="p-3 text-sm text-muted-foreground">
+                      {accountSearch.trim() ? 'No accounts match your search.' : 'No active accounts.'}
+                    </p>
                   ) : (
                     Object.keys(groupedAccounts).sort().map(type => (
                       <div key={type} className="border-b last:border-b-0">
-                        <div className="bg-muted/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {type}
+                        <div className="flex items-center justify-between bg-muted/40 px-3 py-1.5">
+                          <button
+                            type="button"
+                            className="inline-flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                            onClick={() => toggleAccountTypeCollapsed(type)}
+                          >
+                            {collapsedAccountTypes.has(type) ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            <span className="truncate">{type}</span>
+                            <span className="text-[11px] font-normal normal-case tracking-normal">
+                              {(groupedAccounts[type] ?? []).length}
+                            </span>
+                          </button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => toggleAccountType(type)}>
+                            {(groupedAccounts[type] ?? []).every(a => form.definition.account_ids.length === 0 || form.definition.account_ids.includes(a.id))
+                              ? 'Clear group'
+                              : 'Select group'}
+                          </Button>
                         </div>
-                        <ul>
-                          {(groupedAccounts[type] ?? []).map(a => (
-                            <li key={a.id} className="border-b last:border-b-0">
-                              <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4"
-                                  checked={form.definition.account_ids.includes(a.id)}
-                                  onChange={() => toggleAccount(a.id)}
-                                />
-                                <span className="font-mono text-xs">{a.code}</span>
-                                <span>{a.name}</span>
-                              </label>
-                            </li>
-                          ))}
-                        </ul>
+                        {!collapsedAccountTypes.has(type) && (
+                          <ul>
+                            {(groupedAccounts[type] ?? []).map(a => (
+                              <li key={a.id} className="border-b last:border-b-0">
+                                <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={form.definition.account_ids.length === 0 || form.definition.account_ids.includes(a.id)}
+                                    onChange={() => toggleAccount(a.id)}
+                                  />
+                                  <span className="font-mono text-xs">{a.code}</span>
+                                  <span>{a.name}</span>
+                                </label>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     ))
                   )}
@@ -412,7 +474,7 @@ export default function CustomReportsPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="sticky bottom-0 -mx-6 -mb-6 flex flex-wrap gap-2 border-t bg-background/95 px-6 py-3 backdrop-blur">
                 <Button
                   type="button"
                   onClick={saveAndRun}
@@ -439,7 +501,8 @@ export default function CustomReportsPage() {
                 {rows.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground">No matching journal activity for the selected filters.</p>
                 ) : (
-                  <table className="w-full text-sm">
+                  <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm sm:min-w-0">
                     <thead className="border-b bg-muted/40">
                       <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         <th className="text-left p-3">{groupColumnLabel(form.definition.group_by)}</th>
@@ -465,6 +528,7 @@ export default function CustomReportsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </CardContent>
             </Card>

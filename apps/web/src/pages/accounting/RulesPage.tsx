@@ -94,6 +94,7 @@ const SIGN_FILTER_LABELS: Record<SignFilter, string> = {
   outflow_only: 'Outflow only',
 };
 
+
 function directionLabel(s: SignFilter): string {
   return DIRECTION_OPTIONS.find(o => o.value === s)?.label ?? s;
 }
