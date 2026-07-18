@@ -4,6 +4,18 @@ import autoTable from 'jspdf-autotable';
 
 export function downloadAsExcel(headers: string[], rows: string[][], filename: string): void {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows.filter(r => r.some(c => c.trim()))]);
+  // Force all numeric cells to 2dp with comma grouping (#,##0.00).
+  // Without this, XLSX infers the format from the raw string (e.g. "2000.0000" → #,##0.0000).
+  const ref = ws['!ref'];
+  if (ref) {
+    const range = XLSX.utils.decode_range(ref);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (cell && cell.t === 'n') cell.z = '#,##0.00';
+      }
+    }
+  }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
   XLSX.writeFile(wb, `${filename}.xlsx`);
