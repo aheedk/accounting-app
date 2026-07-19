@@ -313,7 +313,6 @@ export default function CoaListPage() {
           columns={columns}
           defaultSortKey="code"
           defaultSortDir="asc"
-          downloadable={{ filename: 'chart-of-accounts', title: 'Chart of Accounts' }}
           emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, import accounts, or add a new account to your chart." />}
         />
       </CardContent></Card>
