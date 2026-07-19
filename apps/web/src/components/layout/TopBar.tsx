@@ -2,6 +2,7 @@ import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
+import { GlobalSearch } from '@/components/layout/GlobalSearch';
 
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
@@ -18,7 +19,12 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         </button>
         <BusinessSwitcher />
       </div>
-      <div className="flex items-center gap-3">
+
+      <div className="flex flex-1 justify-center">
+        <GlobalSearch />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-sm">
           <span className="font-medium text-foreground">{user?.full_name ?? ''}</span>
           {user?.role && (

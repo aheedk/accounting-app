@@ -5,10 +5,10 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
-import { pickErr } from '@/lib/apiErrors';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -47,6 +47,10 @@ type Account = {
   is_active: boolean;
 };
 
+type BankTransaction = {
+  id: string;
+  status: 'unreviewed' | 'matched' | 'categorized' | 'excluded';
+};
 
 type RuleFormState = {
   name: string;
@@ -58,6 +62,12 @@ type RuleFormState = {
   bank_account_id: string;
   priority: string;
   is_active: boolean;
+};
+
+type ApplyResult = {
+  applied: number;
+  rules_tried: number;
+  unreviewed_before: number;
 };
 
 const EMPTY_FORM: RuleFormState = {
@@ -78,10 +88,21 @@ const DIRECTION_OPTIONS: Array<{ value: SignFilter; label: string }> = [
   { value: 'any', label: 'Money out or in' },
 ];
 
+const SIGN_FILTER_LABELS: Record<SignFilter, string> = {
+  any: 'Any',
+  inflow_only: 'Inflow only',
+  outflow_only: 'Outflow only',
+};
+
+
 function directionLabel(s: SignFilter): string {
   return DIRECTION_OPTIONS.find(o => o.value === s)?.label ?? s;
 }
 
+function pickErr(e: unknown): string {
+  return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
+    ?.response?.data?.error?.message ?? 'Failed';
+}
 
 function amountRangeLabel(min: string | null, max: string | null): string {
   if (min == null && max == null) return '';
@@ -165,9 +186,8 @@ export default function RulesPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
 
   const [applyBankAccountId, setApplyBankAccountId] = useState<string>('');
+  const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
-  const [applyResult, setApplyResult] = useState<string | null>(null);
-  const [dryRun, setDryRun] = useState<{ matches: number; total_unreviewed: number } | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -262,6 +282,26 @@ export default function RulesPage() {
     setDrawerOpen(false);
     setEditingId(null);
     setErr(null);
+  }
+
+  async function applyRules(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bizId || !applyBankAccountId) return;
+    setApplyBusy(true); setErr(null); setApplyResult(null);
+    try {
+      const before = await api.get(`/businesses/${bizId}/bank-transactions`, {
+        params: { bank_account_id: applyBankAccountId, status: 'unreviewed' },
+      });
+      const unreviewedBefore: number = (before.data.bank_transactions as BankTransaction[]).length;
+      const r = await api.post(`/businesses/${bizId}/bank-rules/apply`, {
+        bank_account_id: applyBankAccountId,
+      });
+      setApplyResult({ applied: r.data.applied, rules_tried: r.data.rules_tried, unreviewed_before: unreviewedBefore });
+    } catch (e: unknown) {
+      setErr(pickErr(e));
+    } finally {
+      setApplyBusy(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -411,56 +451,12 @@ export default function RulesPage() {
         <thead><tr><th>Name</th><th>Direction</th><th>Conditions</th><th>Amount Range</th><th>Category</th><th>Priority</th><th>Active</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <script>window.onload = function(){ window.print(); }${'</'}script>
+      <script>window.onload = function(){ window.print(); }<\/script>
     </body></html>`);
     win.document.close();
   }
 
   const formValid = form.name.trim() !== '' && form.description_contains.trim() !== '' && form.offset_account_id !== '';
-
-  // Escape closes the rule drawer (parity with the Dialog-based modals).
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDrawer(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawerOpen]);
-
-  // Live match preview while the drawer is open (read-only dry run, debounced).
-  useEffect(() => {
-    if (!bizId || !drawerOpen || form.description_contains.trim() === '') {
-      setDryRun(null);
-      return;
-    }
-    const handle = setTimeout(() => {
-      api.post<{ matches: number; total_unreviewed: number }>(`/businesses/${bizId}/bank-rules/dry-run`, {
-        description_contains: form.description_contains.trim(),
-        min_amount: form.min_amount.trim() === '' ? null : form.min_amount.trim(),
-        max_amount: form.max_amount.trim() === '' ? null : form.max_amount.trim(),
-        sign_filter: form.sign_filter,
-        bank_account_id: form.bank_account_id === '' ? null : form.bank_account_id,
-      })
-        .then(r => setDryRun({ matches: r.data.matches, total_unreviewed: r.data.total_unreviewed }))
-        .catch(() => setDryRun(null));
-    }, 400);
-    return () => clearTimeout(handle);
-  }, [bizId, drawerOpen, form.description_contains, form.min_amount, form.max_amount, form.sign_filter, form.bank_account_id]);
-
-  async function applyRulesNow() {
-    if (!bizId || !applyBankAccountId) return;
-    setApplyBusy(true); setErr(null); setApplyResult(null);
-    try {
-      const r = await api.post<{ applied: number; rules_tried: number }>(`/businesses/${bizId}/bank-rules/apply`, {
-        bank_account_id: applyBankAccountId,
-      });
-      setApplyResult(`Categorized ${r.data.applied} transaction${r.data.applied === 1 ? '' : 's'} using ${r.data.rules_tried} active rule${r.data.rules_tried === 1 ? '' : 's'}.`);
-    } catch (e: unknown) {
-      setErr(pickErr(e));
-    } finally {
-      setApplyBusy(false);
-    }
-  }
 
   if (!bizId) return <div>Pick a business.</div>;
 
@@ -473,28 +469,6 @@ export default function RulesPage() {
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
-
-      {/* Apply rules to unreviewed transactions */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <span className="text-sm font-medium">Apply rules now</span>
-          <select
-            className="h-9 rounded-md border bg-background px-3 text-sm"
-            value={applyBankAccountId}
-            onChange={e => setApplyBankAccountId(e.target.value)}
-            aria-label="Bank account to apply rules to"
-          >
-            {bankAccounts.filter(ba => ba.is_active).map(ba => (
-              <option key={ba.id} value={ba.id}>{ba.name}</option>
-            ))}
-          </select>
-          <Button size="sm" onClick={applyRulesNow} disabled={applyBusy || !applyBankAccountId}>
-            {applyBusy ? 'Applying…' : 'Apply rules'}
-          </Button>
-          {applyResult && <span className="text-sm text-green-600">{applyResult}</span>}
-          <span className="ml-auto text-xs text-muted-foreground">Runs active rules against unreviewed transactions, first match wins.</span>
-        </CardContent>
-      </Card>
 
       {/* Rules table */}
       <Card>
@@ -596,8 +570,8 @@ export default function RulesPage() {
             <tbody>
               {filteredRules.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                    {rules.length === 0 ? 'No rules yet. Create one to auto-categorize bank transactions.' : 'No rules match your search.'}
+                  <td colSpan={9} className="p-0">
+                    <EmptyState title="No rules yet" hint="Create a rule above to auto-categorize incoming bank transactions by description, amount, and direction." />
                   </td>
                 </tr>
               ) : (
@@ -690,12 +664,7 @@ export default function RulesPage() {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="flex-1 bg-black/20" onClick={closeDrawer} />
-          <div
-            className="w-[420px] bg-background shadow-xl flex flex-col border-l overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-label={drawerMode === 'create' ? 'New rule' : 'Edit rule'}
-          >
+          <div className="w-[420px] bg-background shadow-xl flex flex-col border-l overflow-hidden">
             <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0">
               <h2 className="text-lg font-semibold">{drawerMode === 'create' ? 'New rule' : 'Edit rule'}</h2>
               <button type="button" className="text-muted-foreground hover:text-foreground text-lg" onClick={closeDrawer}>✕</button>
@@ -707,9 +676,8 @@ export default function RulesPage() {
 
                 {/* Rule name */}
                 <div>
-                  <Label className="text-sm font-medium" htmlFor="rule-name">What do you want to call this rule? <span className="text-destructive">*</span></Label>
+                  <Label className="text-sm font-medium">What do you want to call this rule? <span className="text-destructive">*</span></Label>
                   <Input
-                    id="rule-name"
                     className="mt-1"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -847,13 +815,6 @@ export default function RulesPage() {
                       <span className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
-                )}
-
-                {dryRun && (
-                  <p className="text-sm rounded-md border bg-muted/40 px-3 py-2">
-                    Preview: matches <span className="font-semibold">{dryRun.matches}</span> of{' '}
-                    {dryRun.total_unreviewed} unreviewed transaction{dryRun.total_unreviewed === 1 ? '' : 's'}.
-                  </p>
                 )}
 
                 {err && <p className="text-sm text-destructive">{err}</p>}

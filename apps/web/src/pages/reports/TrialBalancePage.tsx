@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FileDown, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -6,7 +7,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
-import { Button } from '@/components/ui/button';
 import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
@@ -102,12 +102,18 @@ export default function TrialBalancePage() {
             <div className="mb-1 text-xs text-muted-foreground">as of</div>
             <DateInput value={asOf} onChange={e => setAsOf(e.target.value)} />
           </div>
-          <Button variant="outline" disabled={excelBusy} onClick={() => void handleDownload('excel')}>
-            {excelBusy ? 'Downloading…' : 'Download Excel'}
-          </Button>
-          <Button variant="outline" disabled={pdfBusy} onClick={() => void handleDownload('pdf')}>
-            {pdfBusy ? 'Downloading…' : 'Download PDF'}
-          </Button>
+          <div className="relative group">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => void handleDownload('excel')} disabled={excelBusy} aria-label="Export to Excel">
+              <FileDown className="h-4 w-4" />
+            </button>
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
+          </div>
+          <div className="relative group">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => void handleDownload('pdf')} disabled={pdfBusy} aria-label="Print">
+              <Printer className="h-4 w-4" />
+            </button>
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
+          </div>
         </div>
       </div>
       {dlErr && <p className="text-sm text-destructive">{dlErr}</p>}

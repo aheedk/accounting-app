@@ -42,9 +42,9 @@ export default function CoaListPage() {
   const [form, setForm] = useState({ code: '', name: '', account_type: 'asset' });
   const [err, setErr] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState('');
+  const [excelBusy, setExcelBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState('active');
   const [search, setSearch] = useState('');
-  const [excelBusy, setExcelBusy] = useState(false);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -240,86 +240,81 @@ export default function CoaListPage() {
       {/* Header: title + split New account button */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Chart of Accounts</h1>
-        <div className="flex items-center" ref={dropdownRef}>
-          <Button
-            className="rounded-r-none border-r border-primary-foreground/20"
-            onClick={() => { setErr(null); setShowCreate(true); }}
-          >
-            New account
-          </Button>
-          <div className="relative">
-            <Button className="rounded-l-none px-2" onClick={() => setShowDropdown(d => !d)}>
-              <ChevronDown className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <div className="relative group">
+            <button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+              onClick={handleExport}
+              disabled={excelBusy}
+              aria-label="Export Chart of Accounts"
+            >
+              <FileDown className="h-4 w-4" />
+            </button>
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+              Export Chart of Accounts
+            </div>
+          </div>
+          <div className="relative group">
+            <button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              onClick={handlePrint}
+              aria-label="Print"
+            >
+              <Printer className="h-4 w-4" />
+            </button>
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+              Print
+            </div>
+          </div>
+          <div className="flex items-center" ref={dropdownRef}>
+            <Button
+              className="rounded-r-none border-r border-primary-foreground/20"
+              onClick={() => { setErr(null); setShowCreate(true); }}
+            >
+              New account
             </Button>
-            {showDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
-                <button
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
-                  onClick={() => { setShowDropdown(false); setImportRows([]); setImportDone(false); setImportParseErr(null); setShowImport(true); }}
-                >
-                  Import chart of accounts
-                </button>
-              </div>
-            )}
+            <div className="relative">
+              <Button className="rounded-l-none px-2" onClick={() => setShowDropdown(d => !d)}>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              {showDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
+                  <button
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+                    onClick={() => { setShowDropdown(false); setImportRows([]); setImportDone(false); setImportParseErr(null); setShowImport(true); }}
+                  >
+                    Import chart of accounts
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Toolbar: filter + icon buttons — right-aligned under New account */}
-      <div className="flex items-center gap-2 justify-end">
-        <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
-        >
-          <option value="">All types</option>
-          {ACCOUNT_TYPES.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-        <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="all">All statuses</option>
-        </select>
-        <Input
-          className="h-9 w-64"
-          placeholder="Search by name or code"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="relative group">
-          <button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-            onClick={handleExport}
-            disabled={excelBusy}
-            aria-label="Export Chart of Accounts"
-          >
-            <FileDown className="h-4 w-4" />
-          </button>
-          <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-            Export Chart of Accounts
-          </div>
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Account type</div>
+          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+            <option value="">All types</option>
+            {ACCOUNT_TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
+          </select>
         </div>
-        <div className="relative group">
-          <button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            onClick={handlePrint}
-            aria-label="Print"
-          >
-            <Printer className="h-4 w-4" />
-          </button>
-          <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-            Print
-          </div>
+        <div>
+          <div className="mb-1 text-xs text-muted-foreground">Status</div>
+          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <div className="min-w-[14rem] flex-1">
+          <div className="mb-1 text-xs text-muted-foreground">Search</div>
+          <Input className="h-9" placeholder="Search by name or number" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
-      {/* Table */}
+
       <Card><CardContent className="p-0">
         <DataTable
           rows={filtered}
@@ -327,6 +322,7 @@ export default function CoaListPage() {
           columns={columns}
           defaultSortKey="code"
           defaultSortDir="asc"
+          downloadable={{ filename: 'chart-of-accounts', title: 'Chart of Accounts' }}
           emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, import accounts, or add a new account to your chart." />}
         />
       </CardContent></Card>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Copy, Paperclip, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
@@ -28,12 +28,27 @@ export default function JournalNewPage() {
   const [lines, setLines] = useState<Line[]>(Array.from({ length: DEFAULT_ROWS }, blank));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [primarySaveAction, setPrimarySaveAction] = useState<'new' | 'close'>(
+    () => (localStorage.getItem('je_primarySaveAction') === 'close' ? 'close' : 'new')
+  );
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const saveMenuRef = useRef<HTMLDivElement>(null);
   const nav = useNavigate();
 
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts));
   }, [bizId]);
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) {
+        setShowSaveMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
 
   function update(i: number, patch: Partial<Line>) {
     setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -55,7 +70,7 @@ export default function JournalNewPage() {
     setDate(todayLocal());
   }
 
-  async function save(andNew = false) {
+  async function save(mode: 'new' | 'close' | 'detail' = 'detail') {
     if (!bizId || !balanced) return;
     setErr(null); setBusy(true);
     try {
@@ -72,7 +87,8 @@ export default function JournalNewPage() {
         })),
       };
       const r = await api.post(`/businesses/${bizId}/journal-entries`, body);
-      if (andNew) resetForm();
+      if (mode === 'new') resetForm();
+      else if (mode === 'close') nav('/journal');
       else nav(`/journal/${r.data.id}`);
     } catch (e: unknown) { setErr(pickErr(e)); }
     finally { setBusy(false); }
@@ -294,26 +310,48 @@ export default function JournalNewPage() {
         </button>
 
         <div className="flex items-center gap-2">
-          <Button type="button" disabled={!balanced || busy} onClick={() => save(false)}>
+          <Button type="button" disabled={!balanced || busy} onClick={() => save('detail')}>
             {busy ? 'Saving…' : 'Save'}
           </Button>
-          <div className="flex">
+          <div className="relative flex" ref={saveMenuRef}>
             <Button
               type="button"
               disabled={!balanced || busy}
-              onClick={() => save(true)}
+              onClick={() => save(primarySaveAction)}
               className="rounded-r-none"
             >
-              Save and new
+              {busy ? 'Saving…' : primarySaveAction === 'new' ? 'Save and new' : 'Save and close'}
             </Button>
-            <Button
-              type="button"
-              disabled={!balanced || busy}
-              className="rounded-l-none border-l border-l-primary-foreground/30 px-2"
-              aria-label="More save options"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
+            <div className="relative group">
+              <Button
+                type="button"
+                disabled={!balanced || busy}
+                aria-label="Save and new menu"
+                onClick={() => setShowSaveMenu(m => !m)}
+                className="rounded-l-none border-l border-l-primary-foreground/30 px-2"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              <div className="pointer-events-none absolute bottom-full right-0 mb-1.5 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                Save and new menu
+              </div>
+            </div>
+            {showSaveMenu && (
+              <div className="absolute bottom-full right-0 mb-1 w-44 rounded-md border bg-background shadow-lg z-50 py-1">
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+                  onClick={() => {
+                    const next = primarySaveAction === 'new' ? 'close' : 'new';
+                    setPrimarySaveAction(next);
+                    localStorage.setItem('je_primarySaveAction', next);
+                    setShowSaveMenu(false);
+                  }}
+                >
+                  {primarySaveAction === 'new' ? 'Save and close' : 'Save and new'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

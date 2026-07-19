@@ -1,11 +1,11 @@
 import { useState } from 'react';
+import { FileDown, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { todayLocal } from '@/lib/dates';
@@ -116,22 +116,18 @@ export default function SpreadsheetSyncPage() {
               <Label>To date</Label>
               <DateInput value={jeTo} onChange={e => setJeTo(e.target.value)} />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={jeExcelBusy}
-              onClick={() => void handleJe('excel')}
-            >
-              {jeExcelBusy ? 'Downloading…' : 'Download Excel'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={jePdfBusy}
-              onClick={() => void handleJe('pdf')}
-            >
-              {jePdfBusy ? 'Downloading…' : 'Download PDF'}
-            </Button>
+            <div className="relative group">
+              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => void handleJe('excel')} disabled={jeExcelBusy} aria-label="Export to Excel">
+                <FileDown className="h-4 w-4" />
+              </button>
+              <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
+            </div>
+            <div className="relative group">
+              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => void handleJe('pdf')} disabled={jePdfBusy} aria-label="Print">
+                <Printer className="h-4 w-4" />
+              </button>
+              <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
+            </div>
           </div>
           {jeErr && <p className="text-sm text-destructive">{jeErr}</p>}
         </CardContent>
