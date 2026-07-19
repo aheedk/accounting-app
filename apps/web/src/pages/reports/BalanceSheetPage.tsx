@@ -80,6 +80,7 @@ export default function BalanceSheetPage() {
     [report.equity_total, report.net_income_ytd],
   );
 
+  const [excelBusy, setExcelBusy] = useState(false);
   if (!bizId) return <div>Pick a business.</div>;
 
   const dlHeaders = ['Section', 'Code', 'Account', 'Amount'];
@@ -93,9 +94,6 @@ export default function BalanceSheetPage() {
     ['Equity', '', 'Total Equity + Net Income', equityPlusNi],
     ['', '', 'Total Liabilities + Equity', report.liabilities_equity_total],
   ];
-
-  const [excelBusy, setExcelBusy] = useState(false);
-
   function handleExport() {
     setExcelBusy(true);
     try { downloadAsExcel(dlHeaders, dlRows(), `balance-sheet-${asOf}`); } finally { setExcelBusy(false); }
@@ -105,7 +103,7 @@ export default function BalanceSheetPage() {
     const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Balance Sheet</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Balance Sheet — ${asOf}</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><title>Balance Sheet</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Balance Sheet — ${asOf}</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
     win.document.close();
   }
 

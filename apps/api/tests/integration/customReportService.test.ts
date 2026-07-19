@@ -119,7 +119,7 @@ describe('customReportService', () => {
   });
 
   it('account filter: all accounts vs one account vs an account-type group', async () => {
-    const { biz, rent, utilities, RANGE } = await bootstrapWithActivity();
+    const { biz, rent, RANGE } = await bootstrapWithActivity();
     const base = { date_range: RANGE, group_by: 'account' as const, columns: ['debit', 'credit', 'net'] as ('debit' | 'credit' | 'net')[] };
 
     const all = await cr.runReport(t.db, biz.id, { ...base, account_ids: [] });

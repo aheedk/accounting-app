@@ -98,21 +98,6 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-function statusBadge(status: BankTransactionStatus) {
-  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
-  switch (status) {
-    case 'unreviewed':
-      return <span className={`${base} bg-amber-100 text-amber-800`}>For review</span>;
-    case 'matched':
-      return <span className={`${base} bg-blue-100 text-blue-800`}>Matched</span>;
-    case 'categorized':
-      return <span className={`${base} bg-emerald-100 text-emerald-800`}>Categorized</span>;
-    case 'excluded':
-      return <span className={`${base} bg-muted text-muted-foreground`}>Excluded</span>;
-    default:
-      return <span className={base}>{status}</span>;
-  }
-}
 
 function defaultOffsetType(amount: string): 'revenue' | 'expense' {
   const n = parseFloat(amount);
@@ -374,7 +359,7 @@ export default function BankTransactionsInboxPage() {
     }).join('');
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Bank Transactions</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Bank Transactions</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><title>Bank Transactions</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Bank Transactions</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
     win.document.close();
   }
 

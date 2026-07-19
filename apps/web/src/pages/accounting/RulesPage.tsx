@@ -5,7 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -47,11 +47,6 @@ type Account = {
   is_active: boolean;
 };
 
-type BankTransaction = {
-  id: string;
-  status: 'unreviewed' | 'matched' | 'categorized' | 'excluded';
-};
-
 type RuleFormState = {
   name: string;
   description_contains: string;
@@ -62,12 +57,6 @@ type RuleFormState = {
   bank_account_id: string;
   priority: string;
   is_active: boolean;
-};
-
-type ApplyResult = {
-  applied: number;
-  rules_tried: number;
-  unreviewed_before: number;
 };
 
 const EMPTY_FORM: RuleFormState = {
@@ -87,12 +76,6 @@ const DIRECTION_OPTIONS: Array<{ value: SignFilter; label: string }> = [
   { value: 'inflow_only', label: 'Money in' },
   { value: 'any', label: 'Money out or in' },
 ];
-
-const SIGN_FILTER_LABELS: Record<SignFilter, string> = {
-  any: 'Any',
-  inflow_only: 'Inflow only',
-  outflow_only: 'Outflow only',
-};
 
 
 function directionLabel(s: SignFilter): string {
@@ -186,8 +169,6 @@ export default function RulesPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
 
   const [applyBankAccountId, setApplyBankAccountId] = useState<string>('');
-  const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
-  const [applyBusy, setApplyBusy] = useState(false);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
@@ -284,25 +265,6 @@ export default function RulesPage() {
     setErr(null);
   }
 
-  async function applyRules(e: React.FormEvent) {
-    e.preventDefault();
-    if (!bizId || !applyBankAccountId) return;
-    setApplyBusy(true); setErr(null); setApplyResult(null);
-    try {
-      const before = await api.get(`/businesses/${bizId}/bank-transactions`, {
-        params: { bank_account_id: applyBankAccountId, status: 'unreviewed' },
-      });
-      const unreviewedBefore: number = (before.data.bank_transactions as BankTransaction[]).length;
-      const r = await api.post(`/businesses/${bizId}/bank-rules/apply`, {
-        bank_account_id: applyBankAccountId,
-      });
-      setApplyResult({ applied: r.data.applied, rules_tried: r.data.rules_tried, unreviewed_before: unreviewedBefore });
-    } catch (e: unknown) {
-      setErr(pickErr(e));
-    } finally {
-      setApplyBusy(false);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -451,7 +413,7 @@ export default function RulesPage() {
         <thead><tr><th>Name</th><th>Direction</th><th>Conditions</th><th>Amount Range</th><th>Category</th><th>Priority</th><th>Active</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <script>window.onload = function(){ window.print(); }<\/script>
+      <script>window.onload = function(){ window.print(); }</script>
     </body></html>`);
     win.document.close();
   }

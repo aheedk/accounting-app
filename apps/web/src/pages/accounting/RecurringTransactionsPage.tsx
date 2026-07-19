@@ -206,7 +206,7 @@ export default function RecurringTransactionsPage() {
         <thead><tr><th>Template Name</th><th>Type</th><th>TXN Type</th><th>Interval</th><th>Previous Date</th><th>Next Date</th><th>Customer/Vendor</th><th>Amount</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <script>window.onload = function(){ window.print(); }<\/script>
+      <script>window.onload = function(){ window.print(); }</script>
     </body></html>`);
     win.document.close();
   }
