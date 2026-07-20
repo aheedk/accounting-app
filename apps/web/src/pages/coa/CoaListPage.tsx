@@ -44,7 +44,7 @@ interface ImportRow {
   error: string | null;
 }
 
-type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
+type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean; parent_id: string | null };
 type TbRow = { account_id: string; net: string };
 type BankAcct = { id: string; cash_account_id: string; bank_balance?: string };
 
@@ -62,9 +62,16 @@ function inactivePill() {
   return <span className="ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Inactive</span>;
 }
 
-type ColumnPrefs = { showType: boolean; showBalance: boolean; showBankBalance: boolean; pageSize: number };
+function statusBadge(active: boolean) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
+  return active
+    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
+    : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
+}
+
+type ColumnPrefs = { showType: boolean; showBalance: boolean; showBankBalance: boolean; showStatus: boolean; pageSize: number };
 const PREFS_KEY = 'coa.list.prefs';
-const DEFAULT_PREFS: ColumnPrefs = { showType: true, showBalance: true, showBankBalance: true, pageSize: 75 };
+const DEFAULT_PREFS: ColumnPrefs = { showType: true, showBalance: true, showBankBalance: true, showStatus: true, pageSize: 75 };
 
 function loadPrefs(): ColumnPrefs {
   try {
@@ -100,7 +107,7 @@ export default function CoaListPage() {
   const [prefs, setPrefs] = useState<ColumnPrefs>(loadPrefs);
 
   const [editAcct, setEditAcct] = useState<Account | null>(null);
-  const [editForm, setEditForm] = useState({ code: '', name: '' });
+  const [editForm, setEditForm] = useState({ code: '', name: '', parent_id: '', is_active: true });
   const [editErr, setEditErr] = useState<string | null>(null);
 
   const [showDropdown, setShowDropdown] = useState(false);
@@ -184,7 +191,7 @@ export default function CoaListPage() {
 
   function openEdit(a: Account) {
     setEditErr(null);
-    setEditForm({ code: a.code, name: a.name });
+    setEditForm({ code: a.code, name: a.name, parent_id: a.parent_id ?? '', is_active: a.is_active });
     setEditAcct(a);
     setRowMenuId(null);
   }
@@ -194,7 +201,12 @@ export default function CoaListPage() {
     if (!editAcct) return;
     setEditErr(null);
     try {
-      await api.patch(`/businesses/${bizId}/coa/${editAcct.id}`, { code: editForm.code, name: editForm.name });
+      await api.patch(`/businesses/${bizId}/coa/${editAcct.id}`, {
+        code: editForm.code,
+        name: editForm.name,
+        parent_id: editForm.parent_id || null,
+        is_active: editForm.is_active,
+      });
       setEditAcct(null);
       await reload();
     } catch (e: unknown) {
@@ -232,6 +244,38 @@ export default function CoaListPage() {
 
   // Selections don't survive filter changes — acting on hidden rows surprises.
   useEffect(() => { setSelectedIds(new Set()); }, [typeFilter, statusFilter, search]);
+
+  // Sub-account hierarchy: depth for name indenting, descendants to keep the
+  // parent picker acyclic. Cycle-guarded (the API only blocks self-reference).
+  const { depthById, childrenById } = useMemo(() => {
+    const byId = new Map(accounts.map(a => [a.id, a]));
+    const children = new Map<string, string[]>();
+    for (const a of accounts) {
+      if (!a.parent_id) continue;
+      children.set(a.parent_id, [...(children.get(a.parent_id) ?? []), a.id]);
+    }
+    const depth = new Map<string, number>();
+    for (const a of accounts) {
+      let d = 0;
+      const seen = new Set<string>([a.id]);
+      let cur = a.parent_id;
+      while (cur && byId.has(cur) && !seen.has(cur) && d < 6) { seen.add(cur); d++; cur = byId.get(cur)!.parent_id; }
+      depth.set(a.id, d);
+    }
+    return { depthById: depth, childrenById: children };
+  }, [accounts]);
+
+  function descendantsOf(id: string): Set<string> {
+    const out = new Set<string>();
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const c of childrenById.get(cur) ?? []) {
+        if (!out.has(c)) { out.add(c); stack.push(c); }
+      }
+    }
+    return out;
+  }
 
   function displayBalance(a: Account): string | null {
     if (!tbMap) return null;
@@ -362,7 +406,13 @@ export default function CoaListPage() {
     { key: 'code', header: 'Number', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono text-muted-foreground">{r.code}</span> },
     {
       key: 'name', header: 'Name', sortable: true, sortValue: r => r.name,
-      render: r => <span className="font-medium">{r.name}{!r.is_active && inactivePill()}</span>,
+      render: r => (
+        <span className="font-medium" style={{ paddingLeft: `${(depthById.get(r.id) ?? 0) * 16}px` }}>
+          {r.name}
+          {/* The inline pill only carries status when the Status column is hidden. */}
+          {!r.is_active && !prefs.showStatus && inactivePill()}
+        </span>
+      ),
     },
     ...(prefs.showType ? [{
       key: 'account_type', header: 'Account type', sortable: true, sortValue: (r: Account) => r.account_type,
@@ -384,6 +434,12 @@ export default function CoaListPage() {
       sortValue: (r: Account) => Number(bankMap.get(r.id) ?? Number.NEGATIVE_INFINITY),
       exportValue: (r: Account) => displayBankBalance(r) ?? '',
       render: (r: Account) => <span className="tabular-nums">{displayBankBalance(r) ?? ''}</span>,
+    }] : []),
+    ...(prefs.showStatus ? [{
+      key: 'status', header: 'Status', sortable: true,
+      sortValue: (r: Account) => (r.is_active ? 'active' : 'inactive'),
+      exportValue: (r: Account) => (r.is_active ? 'active' : 'inactive'),
+      render: (r: Account) => statusBadge(r.is_active),
     }] : []),
   ];
 
@@ -580,6 +636,10 @@ export default function CoaListPage() {
                     <input type="checkbox" checked={prefs.showBankBalance} onChange={e => savePrefs({ ...prefs, showBankBalance: e.target.checked })} />
                     Bank balance
                   </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefs.showStatus} onChange={e => savePrefs({ ...prefs, showStatus: e.target.checked })} />
+                    Status
+                  </label>
                   <div className="border-t pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Rows per page</div>
                   <select
                     className="h-8 w-full rounded-md border bg-background px-2 text-sm"
@@ -713,6 +773,31 @@ export default function CoaListPage() {
                     {editAcct.account_type}
                   </div>
                 </div>
+                <div>
+                  <Label>Sub-account of</Label>
+                  <select
+                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={editForm.parent_id}
+                    onChange={e => setEditForm(f => ({ ...f, parent_id: e.target.value }))}
+                  >
+                    <option value="">None (top-level account)</option>
+                    {(() => {
+                      // Same type only; never self or a descendant (would cycle).
+                      const blocked = descendantsOf(editAcct.id);
+                      return accounts
+                        .filter(a => a.account_type === editAcct.account_type && a.id !== editAcct.id && !blocked.has(a.id))
+                        .map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>);
+                    })()}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_active}
+                    onChange={e => setEditForm(f => ({ ...f, is_active: e.target.checked }))}
+                  />
+                  Active
+                </label>
                 {editErr && <p className="text-sm text-destructive">{editErr}</p>}
               </div>
               <div className="border-t px-6 py-4 flex items-center justify-end gap-2">
