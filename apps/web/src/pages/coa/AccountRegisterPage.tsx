@@ -81,8 +81,9 @@ export default function AccountRegisterPage() {
   const [state, setState] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([]);
   const [q, setQ] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // "Run report" (QBO QuickReport) deep-links here with ?from/?to prefilled.
+  const [dateFrom, setDateFrom] = useState(() => new URLSearchParams(location.search).get('from') ?? '');
+  const [dateTo, setDateTo] = useState(() => new URLSearchParams(location.search).get('to') ?? '');
 
   const listPath = location.pathname.startsWith('/settings') ? '/settings/coa' : '/setup/coa';
   const registerBase = location.pathname.startsWith('/settings') ? '/settings/coa'

@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { downloadAsExcel } from '@/lib/download';
+import { daysAgoLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -539,7 +540,8 @@ export default function CoaListPage() {
                 </button>
                 <button
                   className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
-                  onClick={() => { setRowMenuId(null); navigate(`${registerBase}/${r.id}/register`); }}
+                  // QBO QuickReport: the register pre-filtered to the last 90 days.
+                  onClick={() => { setRowMenuId(null); navigate(`${registerBase}/${r.id}/register?from=${daysAgoLocal(90)}`); }}
                 >
                   Run report
                 </button>
