@@ -349,6 +349,7 @@ export default function JournalNewPage() {
                     setPrimarySaveAction(next);
                     localStorage.setItem('je_primarySaveAction', next);
                     setShowSaveMenu(false);
+                    void save(next);
                   }}
                 >
                   {primarySaveAction === 'new' ? 'Save and close' : 'Save and new'}
