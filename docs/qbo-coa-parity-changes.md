@@ -23,7 +23,11 @@ Rebuilds **Chart of Accounts** to mirror the QuickBooks Online CoA list
     `coa.list.prefs`).
   - Row actions: **View register** + chevron menu (**Edit**, **Make
     inactive/active**, **Run report** → register). Edit opens a right-side
-    drawer (name + number; type immutable; disabled for system accounts).
+    drawer (name, number, **sub-account-of** picker — same type, self and
+    descendants excluded to stay acyclic — and an **Active** checkbox; type
+    immutable; disabled for system accounts).
+  - **Status** column (Active/Inactive badges) is a gear option, on by
+    default; names indent by sub-account depth.
   - QBO pager (`‹ Previous 1-75 Next ›`), client-side.
   - QBO's "Batch edit" grid was intentionally NOT built — batch actions +
     per-row edit cover the use cases without the inline-grid complexity.
@@ -31,7 +35,10 @@ Rebuilds **Chart of Accounts** to mirror the QuickBooks Online CoA list
   Ref no. / Type / Memo / Debit / Credit / running Balance, newest first,
   ending-balance header, Excel/PDF download, voided rows struck through with
   a pill. Shows a friendly notice if the API deployment predates the
-  register endpoint.
+  register endpoint. Toolbar: **account switcher** (jump straight to another
+  account's register), From/To date filters, and memo/ref/type search with a
+  clear-filters chip; the **Type** cell deep-links to `/journal/:id`. Rows
+  keep their true running balance even when neighbors are filtered out.
 - **`components/ui/DataTable.tsx`** — two opt-in, backward-compatible
   extensions: controlled selection (`selectedIds`/`onSelectedIdsChange`) and
   `pagination={{ pageSize }}` (slices after sorting; header checkbox operates
