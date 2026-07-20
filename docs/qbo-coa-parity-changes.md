@@ -4,7 +4,31 @@ Rebuilds **Chart of Accounts** to mirror the QuickBooks Online CoA list
 (user-supplied screenshot as the visual reference) and adds the account
 **register** view behind QBO's "View register" action.
 
-## Unification with the parallel `origin/main` implementation
+## Final direction (user decision, 2026-07-20 evening)
+
+The deployed (`origin/main`) **web pages are the base, verbatim** — their
+header, toolbar, settings panel (density, page size, report badges), drawers,
+row menu, and register page. The earlier union that used this branch's pages
+as the base was reverted. On top of their base, the **chart format** was
+re-added as data, not layout:
+
+- Columns **Number · Account Type (+ bank-link icon) · Detail Type · Balance ·
+  Bank Balance · Status** — wired into their existing column-toggle settings
+  panel (new Number/Status toggles added), all ON by default except
+  Description. Balance = trial-balance net in natural sign; Bank balance =
+  non-excluded bank-transaction sum for linked accounts; both degrade to
+  em-dash/blank if a source endpoint is unavailable.
+- Their stacked name-cell sub-line (code · detail type) now only shows data a
+  hidden column would otherwise carry; the inline Inactive pill shows only
+  when the Status column is off.
+- Excel/print export gained Number + Balance columns.
+- Their register page kept verbatim, plus: an adapter that renders BOTH
+  register payload shapes (deployed `{entries, balance}` and unified
+  `{rows, ending_balance}`), a catch on fetch failure, and voided-row
+  strike-through + badge. This also fixes the white-screen crash class in
+  either pairing of web and API generations.
+
+## Unification with the parallel `origin/main` implementation (API layer — still current)
 
 A parallel CoA/register implementation (`4ccd007`, `284836b`) had been pushed
 and deployed to Railway while this work was in flight. The merge unifies them:
