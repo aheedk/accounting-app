@@ -56,6 +56,20 @@ export async function postJournalEntry(
 ) {
   assertBalanced(input.lines);
 
+  // Locked accounts reject new postings (chart-of-accounts lock). One check at
+  // the ledger choke point covers every posting flow.
+  const lockedAccounts = await trx.selectFrom('chart_of_accounts')
+    .select(['code', 'name'])
+    .where('id', 'in', [...new Set(input.lines.map(l => l.account_id))])
+    .where('is_locked', '=', true)
+    .execute();
+  if (lockedAccounts.length > 0) {
+    throw new PreconditionError(
+      `Account ${lockedAccounts[0]!.code} ${lockedAccounts[0]!.name} is locked and cannot accept new postings`,
+      { accounts: lockedAccounts.map(a => a.code) },
+    );
+  }
+
   const period = await findPeriodForDate(trx as unknown as Kysely<DB>, input.business_id, input.entry_date);
   if (!period) {
     throw new PreconditionError(`No fiscal period covers ${input.entry_date}; create periods first`);

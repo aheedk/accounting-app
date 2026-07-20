@@ -99,6 +99,7 @@ export interface ChartOfAccountsTable {
   description: string | null;
   is_system: Generated<boolean>;
   is_active: Generated<boolean>;
+  is_locked: Generated<boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

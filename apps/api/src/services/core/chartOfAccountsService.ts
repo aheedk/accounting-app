@@ -18,6 +18,8 @@ export type CreateAccountInput = {
   // QBO-style opening balance: posts a JE against Opening Balance Equity.
   opening_balance?: string | null;
   opening_balance_as_of?: string | null;
+  // Locked accounts reject edits and new postings until unlocked.
+  is_locked?: boolean;
 };
 
 // QBO auto-creates "Opening Balance Equity" the first time an opening balance
@@ -54,7 +56,9 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
     .executeTakeFirst();
   if (dup) throw new BusinessRuleError(ERR.DUPLICATE_RESOURCE, `Account code ${input.code} already exists`);
 
-  const row = await trx.insertInto('chart_of_accounts').values({
+  // Insert unlocked even when a lock is requested — the opening-balance JE
+  // below must post before the lock takes effect. The lock is applied last.
+  let row = await trx.insertInto('chart_of_accounts').values({
     business_id: input.business_id,
     code: input.code,
     name: input.name,
@@ -63,14 +67,6 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
     detail_type: input.detail_type ?? null,
     description: input.description ?? null,
   }).returningAll().executeTakeFirstOrThrow();
-
-  await auditRecord(trx, ctx, {
-    action: AUDIT.COA_CREATE,
-    entity_type: 'chart_of_account',
-    entity_id: row.id,
-    before: null,
-    after: row,
-  });
 
   if (input.opening_balance != null && !isZero(input.opening_balance)) {
     // Opening balances only make sense for balance-sheet accounts.
@@ -103,16 +99,36 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
     });
   }
 
+  if (input.is_locked) {
+    row = await trx.updateTable('chart_of_accounts')
+      .set({ is_locked: true })
+      .where('id', '=', row.id)
+      .returningAll().executeTakeFirstOrThrow();
+  }
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.COA_CREATE,
+    entity_type: 'chart_of_account',
+    entity_id: row.id,
+    before: null,
+    after: row,
+  });
+
   return row;
 }
 
 export async function updateAccount(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { account_id: string; patch: { code?: string; name?: string; parent_id?: string | null; is_active?: boolean; detail_type?: string | null; description?: string | null } },
+  input: { account_id: string; patch: { code?: string; name?: string; parent_id?: string | null; is_active?: boolean; detail_type?: string | null; description?: string | null; is_locked?: boolean } },
 ) {
   const row = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', input.account_id).executeTakeFirst();
   if (!row) throw new BusinessRuleError(ERR.NOT_FOUND, `Account ${input.account_id} not found`);
+
+  // A locked account only accepts being unlocked; every other change waits.
+  if (row.is_locked && input.patch.is_locked !== false) {
+    throw new PreconditionError('Account is locked — unlock it before making changes', { code: row.code });
+  }
 
   if (row.is_system) {
     if (input.patch.name !== undefined || input.patch.parent_id !== undefined || input.patch.code !== undefined) {
@@ -142,6 +158,7 @@ export async function updateAccount(
       ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
       ...(input.patch.detail_type !== undefined ? { detail_type: input.patch.detail_type } : {}),
       ...(input.patch.description !== undefined ? { description: input.patch.description } : {}),
+      ...(input.patch.is_locked !== undefined ? { is_locked: input.patch.is_locked } : {}),
     })
     .where('id', '=', input.account_id)
     .returningAll()

@@ -48,6 +48,27 @@ code, QBO behavior). Income-statement accounts reject opening balances.
 3 new integration tests. Note: opening balances need the API deploy; the old
 prod schema strips the fields (account still created, no JE).
 
+## Account locking + batch edit (2026-07-20 evening)
+
+- **Real lock concept** (migration `0055`: `chart_of_accounts.is_locked`).
+  Locked ≠ inactive: a locked account stays visible with history intact but
+  rejects **edits** (updateAccount guard — only unlock is accepted) and **new
+  postings** (one guard in `ledgerService.postJournalEntry`, the choke point
+  for every posting flow; reversal-based voids still work). Create accepts
+  `is_locked`; when combined with an opening balance, the OB JE posts first
+  and the lock lands after. 3 integration tests.
+- **Batch actions menu**: Make inactive + **Lock accounts** (no batch unlock
+  by design — unlock is deliberate, via the row menu's Unlock account item).
+  Locked rows disable Edit/Make-inactive in the row menu; Status column shows
+  an amber 🔒 Locked pill.
+- **Batch edit** (QBO screenshot): the pencil switches the table to an inline
+  grid — Number and Name become inputs on every visible row (drafts keyed by
+  id survive paging/filtering), checkbox + Action columns hide, Cancel/Save
+  replace the tool cluster. Save PATCHes only changed rows and reports
+  per-row failures inline; system and locked rows render read-only with a
+  lock glyph. Create-drawer Lock toggle now maps to `is_locked` (was
+  inactive).
+
 ## Unification with the parallel `origin/main` implementation (API layer — still current)
 
 A parallel CoA/register implementation (`4ccd007`, `284836b`) had been pushed

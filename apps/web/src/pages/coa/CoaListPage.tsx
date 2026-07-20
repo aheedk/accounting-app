@@ -71,6 +71,7 @@ type Account = {
   description: string | null;
   is_system: boolean;
   is_active: boolean;
+  is_locked?: boolean; // absent on older API deploys
 };
 
 export default function CoaListPage() {
@@ -107,6 +108,13 @@ export default function CoaListPage() {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [showBatchMenu, setShowBatchMenu] = useState(false);
   const batchMenuRef = useRef<HTMLDivElement>(null);
+
+  // Batch edit (QBO): the table becomes an inline grid of Number/Name inputs
+  // with Cancel/Save; drafts are keyed by id so they survive paging/filtering.
+  const [batchEdit, setBatchEdit] = useState(false);
+  const [draft, setDraft] = useState<Record<string, { code: string; name: string }>>({});
+  const [batchSaveBusy, setBatchSaveBusy] = useState(false);
+  const [batchEditErr, setBatchEditErr] = useState<string | null>(null);
 
   // New account dropdown
   const [showNewDropdown, setShowNewDropdown] = useState(false);
@@ -260,23 +268,72 @@ export default function CoaListPage() {
   }
 
   // --- Batch actions ---
-  // Lock ≡ inactive (same model as the create drawer's Lock toggle): locked
-  // accounts can't be selected on new transactions.
   const [batchBusy, setBatchBusy] = useState(false);
-  async function batchSetActive(active: boolean) {
+  async function batchPatch(patch: { is_active?: boolean; is_locked?: boolean }) {
     if (batchBusy) return;
     setBatchBusy(true);
     try {
       const ids = [...checkedIds];
       for (const id of ids) {
         // eslint-disable-next-line no-await-in-loop
-        try { await api.patch(`/businesses/${bizId}/coa/${id}`, { is_active: active }); } catch { /* skip */ }
+        try { await api.patch(`/businesses/${bizId}/coa/${id}`, patch); } catch { /* skip (e.g. locked rows) */ }
       }
       setCheckedIds(new Set());
       await reload();
     } finally {
       setBatchBusy(false);
       setShowBatchMenu(false);
+    }
+  }
+
+  // --- Batch edit ---
+  function enterBatchEdit() {
+    setDraft({});
+    setBatchEditErr(null);
+    setBatchEdit(true);
+  }
+
+  function cancelBatchEdit() {
+    setBatchEdit(false);
+    setDraft({});
+    setBatchEditErr(null);
+  }
+
+  function draftFor(a: Account) {
+    return draft[a.id] ?? { code: a.code, name: a.name };
+  }
+
+  async function saveBatchEdit() {
+    if (batchSaveBusy) return;
+    setBatchSaveBusy(true);
+    setBatchEditErr(null);
+    const failures: string[] = [];
+    try {
+      const byId = new Map(accounts.map(a => [a.id, a]));
+      for (const [id, d] of Object.entries(draft)) {
+        const orig = byId.get(id);
+        if (!orig) continue;
+        const code = d.code.trim();
+        const name = d.name.trim();
+        if (code === orig.code && name === orig.name) continue;
+        if (!code || !name) { failures.push(`${orig.code}: number and name are required`); continue; }
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await api.patch(`/businesses/${bizId}/coa/${id}`, { code, name });
+        } catch (e: unknown) {
+          const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
+          failures.push(`${orig.code}: ${msg ?? 'save failed'}`);
+        }
+      }
+      await reload();
+      if (failures.length > 0) {
+        setBatchEditErr(failures.join(' · '));
+      } else {
+        setBatchEdit(false);
+        setDraft({});
+      }
+    } finally {
+      setBatchSaveBusy(false);
     }
   }
 
@@ -311,11 +368,10 @@ export default function CoaListPage() {
         // Balance-sheet accounts only; the API posts the JE against Opening Balance Equity.
         opening_balance: ob && isBalanceSheetType ? ob : null,
         opening_balance_as_of: ob && isBalanceSheetType ? form.opening_balance_as_of : null,
+        // Locked accounts reject edits and new postings until unlocked.
+        is_locked: createLocked,
       });
-      // "Lock account" = created inactive (can't be used on new transactions).
-      if (createLocked && r.data?.id) {
-        try { await api.patch(`/businesses/${bizId}/coa/${r.data.id}`, { is_active: false }); } catch { /* non-fatal */ }
-      }
+      void r;
       if (andNew) {
         setForm(blankCreateForm(true));
         setCreateLocked(false);
@@ -513,7 +569,7 @@ export default function CoaListPage() {
           <div className="relative" ref={batchMenuRef}>
             <button
               className="h-9 flex items-center gap-1.5 rounded-md border bg-background px-3 text-sm hover:bg-muted/50 disabled:opacity-40"
-              disabled={checkedIds.size === 0}
+              disabled={checkedIds.size === 0 || batchEdit}
               onClick={() => setShowBatchMenu(m => !m)}
             >
               Batch actions <ChevronDown className="h-3.5 w-3.5" />
@@ -521,20 +577,19 @@ export default function CoaListPage() {
             {showBatchMenu && (
               <div className="absolute left-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
                 <button
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
                   disabled={batchBusy}
-                  onClick={() => void batchSetActive(false)}
+                  onClick={() => void batchPatch({ is_active: false })}
                 >
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                  Lock accounts ({checkedIds.size})
+                  Make inactive ({checkedIds.size})
                 </button>
                 <button
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
                   disabled={batchBusy}
-                  onClick={() => void batchSetActive(true)}
+                  onClick={() => void batchPatch({ is_locked: true })}
                 >
-                  <Unlock className="h-4 w-4 text-muted-foreground" />
-                  Unlock accounts ({checkedIds.size})
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  Lock accounts ({checkedIds.size})
                 </button>
               </div>
             )}
@@ -576,11 +631,22 @@ export default function CoaListPage() {
         {/* Right side: Batch edit + icons + settings, then pagination below */}
         <div className="flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-1">
-            {/* Batch edit */}
+            {batchEdit ? (
+              // QBO batch-edit mode: Cancel / Save replace the tool cluster.
+              <div className="flex items-center gap-2">
+                {batchEditErr && <span className="max-w-[26rem] truncate text-xs text-destructive" title={batchEditErr}>{batchEditErr}</span>}
+                <Button variant="outline" className="h-9" disabled={batchSaveBusy} onClick={cancelBatchEdit}>Cancel</Button>
+                <Button className="h-9" disabled={batchSaveBusy} onClick={() => void saveBatchEdit()}>
+                  {batchSaveBusy ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            ) : (
+            <>
+            {/* Batch edit: inline-edit every visible row's number and name */}
             <button
-              className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-emerald-700 hover:bg-muted/50 disabled:opacity-40 transition-colors"
-              disabled={checkedIds.size === 0}
-              title={checkedIds.size === 0 ? 'Select accounts to batch edit' : 'Batch edit selected'}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-emerald-700 hover:bg-muted/50 transition-colors"
+              title="Edit account numbers and names inline"
+              onClick={enterBatchEdit}
             >
               <Pencil className="h-4 w-4" />
               Batch edit
@@ -711,6 +777,8 @@ export default function CoaListPage() {
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
 
           {/* Pagination below icons */}
@@ -743,17 +811,22 @@ export default function CoaListPage() {
       {/* ── Table ── */}
       {(() => {
         const pad = { roomy: 'py-5', comfortable: 'py-3.5', cozy: 'py-3', compact: 'py-1.5' }[density];
-        const colCount = 3 + (colNumber ? 1 : 0) + (colType ? 1 : 0) + (colDetailType ? 1 : 0) + (colDescription ? 1 : 0) + (colQBBalance ? 1 : 0) + (colBankBalance ? 1 : 0) + (colStatus ? 1 : 0);
+        // Batch edit forces the Number column on (it's the point of the mode)
+        // and hides the checkbox + action columns, like QBO.
+        const showNumber = colNumber || batchEdit;
+        const colCount = (batchEdit ? 1 : 3) + (showNumber ? 1 : 0) + (colType ? 1 : 0) + (colDetailType ? 1 : 0) + (colDescription ? 1 : 0) + (colQBBalance ? 1 : 0) + (colBankBalance ? 1 : 0) + (colStatus ? 1 : 0);
         const thCls = `px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide`;
         return (
       <div className="rounded-md border bg-background overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30">
             <tr>
-              <th className="w-10 px-3 py-2.5">
-                <input type="checkbox" checked={allPageChecked} onChange={toggleAll} className="h-4 w-4 rounded border-input cursor-pointer" />
-              </th>
-              {colNumber && <th className={`${thCls} w-24`}>Number</th>}
+              {!batchEdit && (
+                <th className="w-10 px-3 py-2.5">
+                  <input type="checkbox" checked={allPageChecked} onChange={toggleAll} className="h-4 w-4 rounded border-input cursor-pointer" />
+                </th>
+              )}
+              {showNumber && <th className={`${thCls} ${batchEdit ? 'w-32' : 'w-24'}`}>Number</th>}
               <th className={thCls}>Name</th>
               {colType && <th className={thCls}>Account Type</th>}
               {colDetailType && <th className={thCls}>Detail Type</th>}
@@ -761,7 +834,7 @@ export default function CoaListPage() {
               {colQBBalance && <th className={`${thCls} text-right`}>Balance</th>}
               {colBankBalance && <th className={`${thCls} text-right`}>Bank Balance</th>}
               {colStatus && <th className={thCls}>Status</th>}
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide w-48">Action</th>
+              {!batchEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide w-48">Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -772,18 +845,49 @@ export default function CoaListPage() {
                 </td>
               </tr>
             )}
-            {pagedAccounts.map(acct => (
+            {pagedAccounts.map(acct => {
+              const editable = batchEdit && !acct.is_system && !acct.is_locked;
+              const d = draftFor(acct);
+              return (
               <tr key={acct.id} className={`border-b last:border-b-0 hover:bg-muted/20 group ${!acct.is_active ? 'opacity-60' : ''}`}>
+                {!batchEdit && (
+                  <td className={`px-3 ${pad}`}>
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(acct.id)}
+                      onChange={() => toggleCheck(acct.id)}
+                      className="h-4 w-4 rounded border-input cursor-pointer"
+                    />
+                  </td>
+                )}
+                {showNumber && (
+                  <td className={`px-3 ${pad} font-mono text-sm text-muted-foreground`}>
+                    {editable ? (
+                      <Input
+                        className="h-8 w-28 font-mono"
+                        value={d.code}
+                        onChange={e => setDraft(prev => ({ ...prev, [acct.id]: { ...draftFor(acct), code: e.target.value } }))}
+                      />
+                    ) : acct.code}
+                  </td>
+                )}
                 <td className={`px-3 ${pad}`}>
-                  <input
-                    type="checkbox"
-                    checked={checkedIds.has(acct.id)}
-                    onChange={() => toggleCheck(acct.id)}
-                    className="h-4 w-4 rounded border-input cursor-pointer"
-                  />
-                </td>
-                {colNumber && <td className={`px-3 ${pad} font-mono text-sm text-muted-foreground`}>{acct.code}</td>}
-                <td className={`px-3 ${pad}`}>
+                  {batchEdit && (
+                    editable ? (
+                      <Input
+                        className="h-8 w-full max-w-md"
+                        value={d.name}
+                        onChange={e => setDraft(prev => ({ ...prev, [acct.id]: { ...draftFor(acct), name: e.target.value } }))}
+                      />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
+                        {acct.name}
+                        <Lock className="h-3 w-3" aria-label={acct.is_system ? 'System account' : 'Locked account'} />
+                      </span>
+                    )
+                  )}
+                  {!batchEdit && (
+                  <>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium">{acct.name}</span>
                     {!acct.is_active && !colStatus && <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">Inactive</span>}
@@ -798,6 +902,8 @@ export default function CoaListPage() {
                     <div className="text-xs text-muted-foreground font-mono mt-0.5">
                       {!colNumber ? acct.code : ''}{!colNumber && !colDetailType && acct.detail_type ? ' · ' : ''}{!colDetailType && acct.detail_type ? acct.detail_type : ''}
                     </div>
+                  )}
+                  </>
                   )}
                 </td>
                 {colType && (
@@ -814,11 +920,19 @@ export default function CoaListPage() {
                 {colBankBalance && <td className={`px-3 ${pad} text-right font-mono text-sm tabular-nums`}>{displayBankBalance(acct) ?? ''}</td>}
                 {colStatus && (
                   <td className={`px-3 ${pad}`}>
-                    {acct.is_active
-                      ? <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
-                      : <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Inactive</span>}
+                    <span className="inline-flex items-center gap-1.5">
+                      {acct.is_active
+                        ? <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
+                        : <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Inactive</span>}
+                      {acct.is_locked && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800" title="Locked — no edits or new postings until unlocked">
+                          <Lock className="h-3 w-3" /> Locked
+                        </span>
+                      )}
+                    </span>
                   </td>
                 )}
+                {!batchEdit && (
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1" data-row-menu={acct.id}>
                     <Link
@@ -838,7 +952,9 @@ export default function CoaListPage() {
                       {openRowMenu === acct.id && (
                         <div className="absolute right-0 top-full mt-1 w-52 rounded-md border bg-background shadow-lg z-50 py-1">
                           <button
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={acct.is_locked}
+                            title={acct.is_locked ? 'Unlock the account first' : undefined}
                             onClick={() => { setOpenRowMenu(null); openEdit(acct); }}
                           >
                             Edit
@@ -858,10 +974,24 @@ export default function CoaListPage() {
                             Create subaccount
                           </button>
                           <button
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={acct.is_locked}
+                            title={acct.is_locked ? 'Unlock the account first' : undefined}
                             onClick={() => { setOpenRowMenu(null); void toggleActive(acct); }}
                           >
                             {acct.is_active ? 'Make inactive (reduces usage)' : 'Make active'}
+                          </button>
+                          <button
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+                            onClick={async () => {
+                              setOpenRowMenu(null);
+                              try {
+                                const r = await api.patch(`/businesses/${bizId}/coa/${acct.id}`, { is_locked: !acct.is_locked });
+                                setAccounts(prev => prev.map(a => a.id === acct.id ? { ...a, is_locked: r.data.is_locked } : a));
+                              } catch { /* older API deploy without lock support */ }
+                            }}
+                          >
+                            {acct.is_locked ? 'Unlock account' : 'Lock account'}
                           </button>
                           <Link
                             to={`/reports/trial-balance`}
@@ -875,8 +1005,10 @@ export default function CoaListPage() {
                     </div>
                   </div>
                 </td>
+                )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1187,13 +1319,13 @@ export default function CoaListPage() {
                       type="button"
                       className={`inline-flex h-8 w-9 items-center justify-center border-l ${createLocked ? 'bg-muted text-foreground' : 'bg-background text-muted-foreground'}`}
                       aria-pressed={createLocked}
-                      title="Locked — account is created inactive and can't be used on new transactions"
+                      title="Locked — account rejects edits and new postings until unlocked"
                       onClick={() => setCreateLocked(true)}
                     >
                       <Lock className="h-4 w-4" />
                     </button>
                   </div>
-                  {createLocked && <span className="text-xs text-muted-foreground">Created inactive</span>}
+                  {createLocked && <span className="text-xs text-muted-foreground">Created locked — no edits or postings until unlocked</span>}
                 </div>
 
                 {/* New-account preview: where it lands among active same-type accounts */}

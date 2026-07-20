@@ -16,6 +16,8 @@ export const accountCreateSchema = z.object({
   // the given date. Balance-sheet accounts only (service-enforced).
   opening_balance: moneyStr.nullable().optional(),
   opening_balance_as_of: dateStr.nullable().optional(),
+  // Locked accounts reject edits and new postings until unlocked.
+  is_locked: z.boolean().optional(),
 });
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 
@@ -27,5 +29,6 @@ export const accountUpdateSchema = z.object({
   is_active: z.boolean().optional(),
   detail_type: z.string().max(80).nullable().optional(),
   description: z.string().max(500).nullable().optional(),
+  is_locked: z.boolean().optional(),
 });
 export type AccountUpdate = z.infer<typeof accountUpdateSchema>;

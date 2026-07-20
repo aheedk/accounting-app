@@ -74,6 +74,7 @@ router.post('/businesses/:businessId/coa', requireMinRole('accountant'), async (
         description: body.description ?? null,
         opening_balance: body.opening_balance ?? null,
         opening_balance_as_of: body.opening_balance_as_of ?? null,
+        is_locked: body.is_locked ?? false,
       }),
     );
     res.status(201).json(created);
@@ -90,6 +91,7 @@ router.patch('/businesses/:businessId/coa/:accountId', requireMinRole('accountan
       is_active?: boolean;
       detail_type?: string | null;
       description?: string | null;
+      is_locked?: boolean;
     } = {};
     if (parsed.code !== undefined) patch.code = parsed.code;
     if (parsed.name !== undefined) patch.name = parsed.name;
@@ -97,6 +99,7 @@ router.patch('/businesses/:businessId/coa/:accountId', requireMinRole('accountan
     if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;
     if (parsed.detail_type !== undefined) patch.detail_type = parsed.detail_type;
     if (parsed.description !== undefined) patch.description = parsed.description;
+    if (parsed.is_locked !== undefined) patch.is_locked = parsed.is_locked;
     const updated = await db.transaction().execute(trx =>
       coa.updateAccount(trx, ctxFromReq(req), {
         account_id: req.params['accountId']!,

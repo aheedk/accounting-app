@@ -232,6 +232,63 @@ describe('chartOfAccountsService', () => {
     expect(updated.description).toBeNull();
   });
 
+  // ── QBO parity: account locking ──────────────────────────────────────────
+
+  it('locked account rejects edits until unlocked; unlock alone is allowed', async () => {
+    const { biz, ctx } = await setup(t);
+    const acct = await makeAccount(t.db, biz.id, { code: '1800' });
+    await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: acct.id, patch: { is_locked: true } }),
+    );
+    await expect(
+      t.db.transaction().execute(trx =>
+        coa.updateAccount(trx, ctx, { account_id: acct.id, patch: { name: 'Renamed' } }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+    const unlocked = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: acct.id, patch: { is_locked: false } }),
+    );
+    expect(unlocked.is_locked).toBe(false);
+    const renamed = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: acct.id, patch: { name: 'Renamed' } }),
+    );
+    expect(renamed.name).toBe('Renamed');
+  });
+
+  it('locked account rejects new journal postings at the ledger choke point', async () => {
+    const { biz, ctx } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const cash = await makeAccount(t.db, biz.id, { code: '1810', account_type: 'asset' });
+    const revenue = await makeAccount(t.db, biz.id, { code: '4810', account_type: 'revenue' });
+    await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: cash.id, patch: { is_locked: true } }),
+    );
+    await expect(
+      t.db.transaction().execute(trx =>
+        ledger.postJournalEntry(trx, ctx, {
+          business_id: biz.id, entry_date: '2026-02-01', source_type: 'manual', memo: null,
+          lines: [
+            { account_id: cash.id, debit: '50.0000', credit: '0.0000', memo: null },
+            { account_id: revenue.id, debit: '0.0000', credit: '50.0000', memo: null },
+          ],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+  });
+
+  it('createAccount with is_locked and opening_balance: OB posts first, then the lock lands', async () => {
+    const { biz, ctx } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const acct = await t.db.transaction().execute(trx =>
+      coa.createAccount(trx, ctx, {
+        business_id: biz.id, code: '1820', name: 'Locked Savings', account_type: 'asset',
+        parent_id: null, opening_balance: '500.00', opening_balance_as_of: '2026-01-10', is_locked: true,
+      }),
+    );
+    expect(acct.is_locked).toBe(true);
+    expect(await ledger.computeAccountBalance(t.db, { account_id: acct.id, as_of: '2026-12-31' })).toBe('500.0000');
+  });
+
   // ── QBO parity: opening balances ─────────────────────────────────────────
 
   it('createAccount with opening_balance posts a JE against auto-created Opening Balance Equity', async () => {
