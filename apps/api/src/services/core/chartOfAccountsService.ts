@@ -12,6 +12,8 @@ export type CreateAccountInput = {
   name: string;
   account_type: AccountType;
   parent_id: string | null;
+  detail_type?: string | null;
+  description?: string | null;
 };
 
 export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateAccountInput) {
@@ -28,6 +30,8 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
     name: input.name,
     account_type: input.account_type,
     parent_id: input.parent_id,
+    detail_type: input.detail_type ?? null,
+    description: input.description ?? null,
   }).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
@@ -42,7 +46,7 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
 
 export async function updateAccount(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { account_id: string; patch: { name?: string; parent_id?: string | null; is_active?: boolean } },
+  input: { account_id: string; patch: { name?: string; parent_id?: string | null; is_active?: boolean; detail_type?: string | null; description?: string | null } },
 ) {
   const row = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', input.account_id).executeTakeFirst();
@@ -63,6 +67,8 @@ export async function updateAccount(
       ...(input.patch.name !== undefined ? { name: input.patch.name } : {}),
       ...(input.patch.parent_id !== undefined ? { parent_id: input.patch.parent_id } : {}),
       ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
+      ...(input.patch.detail_type !== undefined ? { detail_type: input.patch.detail_type } : {}),
+      ...(input.patch.description !== undefined ? { description: input.patch.description } : {}),
     })
     .where('id', '=', input.account_id)
     .returningAll()
