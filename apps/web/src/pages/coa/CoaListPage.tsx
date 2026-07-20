@@ -260,14 +260,24 @@ export default function CoaListPage() {
   }
 
   // --- Batch actions ---
-  async function batchMakeInactive() {
-    const ids = [...checkedIds];
-    for (const id of ids) {
-      try { await api.patch(`/businesses/${bizId}/coa/${id}`, { is_active: false }); } catch { /* skip */ }
+  // Lock ≡ inactive (same model as the create drawer's Lock toggle): locked
+  // accounts can't be selected on new transactions.
+  const [batchBusy, setBatchBusy] = useState(false);
+  async function batchSetActive(active: boolean) {
+    if (batchBusy) return;
+    setBatchBusy(true);
+    try {
+      const ids = [...checkedIds];
+      for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop
+        try { await api.patch(`/businesses/${bizId}/coa/${id}`, { is_active: active }); } catch { /* skip */ }
+      }
+      setCheckedIds(new Set());
+      await reload();
+    } finally {
+      setBatchBusy(false);
+      setShowBatchMenu(false);
     }
-    setCheckedIds(new Set());
-    setShowBatchMenu(false);
-    await reload();
   }
 
   // --- Create ---
@@ -509,9 +519,22 @@ export default function CoaListPage() {
               Batch actions <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {showBatchMenu && (
-              <div className="absolute left-0 top-full mt-1 w-48 rounded-md border bg-background shadow-lg z-50 py-1">
-                <button className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent" onClick={() => void batchMakeInactive()}>
-                  Make inactive
+              <div className="absolute left-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+                  disabled={batchBusy}
+                  onClick={() => void batchSetActive(false)}
+                >
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  Lock accounts ({checkedIds.size})
+                </button>
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+                  disabled={batchBusy}
+                  onClick={() => void batchSetActive(true)}
+                >
+                  <Unlock className="h-4 w-4 text-muted-foreground" />
+                  Unlock accounts ({checkedIds.size})
                 </button>
               </div>
             )}
