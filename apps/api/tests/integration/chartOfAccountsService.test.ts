@@ -232,6 +232,67 @@ describe('chartOfAccountsService', () => {
     expect(updated.description).toBeNull();
   });
 
+  // ── QBO parity: opening balances ─────────────────────────────────────────
+
+  it('createAccount with opening_balance posts a JE against auto-created Opening Balance Equity', async () => {
+    const { biz, ctx } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const acct = await t.db.transaction().execute(trx =>
+      coa.createAccount(trx, ctx, {
+        business_id: biz.id, code: '1002', name: 'New Checking', account_type: 'asset',
+        parent_id: null, opening_balance: '2500.00', opening_balance_as_of: '2026-01-15',
+      }),
+    );
+    const obe = await t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('business_id', '=', biz.id).where('name', '=', 'Opening Balance Equity').executeTakeFirstOrThrow();
+    expect(obe.code).toBe('3900');
+    expect(await ledger.computeAccountBalance(t.db, { account_id: acct.id, as_of: '2026-12-31' })).toBe('2500.0000');
+    expect(await ledger.computeAccountBalance(t.db, { account_id: obe.id, as_of: '2026-12-31' })).toBe('-2500.0000');
+    const je = await t.db.selectFrom('journal_entries').selectAll()
+      .where('source_id', '=', acct.id).where('source_type', '=', 'adjustment').executeTakeFirstOrThrow();
+    expect(je.status).toBe('posted');
+    expect(je.entry_date).toBe('2026-01-15');
+  });
+
+  it('createAccount opening_balance on a liability credits the account (natural sign)', async () => {
+    const { biz, ctx } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const acct = await t.db.transaction().execute(trx =>
+      coa.createAccount(trx, ctx, {
+        business_id: biz.id, code: '2500', name: 'Startup Loan', account_type: 'liability',
+        parent_id: null, opening_balance: '10000.00', opening_balance_as_of: '2026-01-15',
+      }),
+    );
+    // Liability: credit-normal → raw debit-minus-credit balance is negative.
+    expect(await ledger.computeAccountBalance(t.db, { account_id: acct.id, as_of: '2026-12-31' })).toBe('-10000.0000');
+    // Reuses the existing OBE account on the second opening balance.
+    const obeCount = await t.db.selectFrom('chart_of_accounts').select(({ fn }) => fn.countAll<string>().as('n'))
+      .where('business_id', '=', biz.id).where('name', '=', 'Opening Balance Equity').executeTakeFirstOrThrow();
+    expect(Number(obeCount.n)).toBe(1);
+  });
+
+  it('createAccount opening_balance rejected for income-statement accounts; zero posts nothing', async () => {
+    const { biz, ctx } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    await expect(
+      t.db.transaction().execute(trx =>
+        coa.createAccount(trx, ctx, {
+          business_id: biz.id, code: '5999', name: 'Bad', account_type: 'expense',
+          parent_id: null, opening_balance: '100.00', opening_balance_as_of: '2026-01-15',
+        }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+
+    const acct = await t.db.transaction().execute(trx =>
+      coa.createAccount(trx, ctx, {
+        business_id: biz.id, code: '1003', name: 'Zero OB', account_type: 'asset',
+        parent_id: null, opening_balance: '0', opening_balance_as_of: '2026-01-15',
+      }),
+    );
+    const jes = await t.db.selectFrom('journal_entries').selectAll().where('source_id', '=', acct.id).execute();
+    expect(jes).toHaveLength(0);
+  });
+
   // ── QBO parity: account register ─────────────────────────────────────────
 
   it('listAccountRegister: running balance in natural sign; void pair shown and nets to zero', async () => {

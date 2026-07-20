@@ -1,9 +1,10 @@
 import { Kysely, sql, type Transaction } from 'kysely';
-import { AUDIT, ERR, addMoney, subMoney, toMoneyString } from '@accounting/shared';
+import { AUDIT, ERR, addMoney, subMoney, toMoneyString, isZero } from '@accounting/shared';
 import type { DB, AccountType } from '../../db/types.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
+import { postJournalEntry } from './ledgerService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateAccountInput = {
@@ -14,7 +15,36 @@ export type CreateAccountInput = {
   parent_id: string | null;
   detail_type?: string | null;
   description?: string | null;
+  // QBO-style opening balance: posts a JE against Opening Balance Equity.
+  opening_balance?: string | null;
+  opening_balance_as_of?: string | null;
 };
+
+// QBO auto-creates "Opening Balance Equity" the first time an opening balance
+// is entered. Find it by name, else create it at the first free 39xx code.
+async function getOrCreateOpeningBalanceEquity(trx: Transaction<DB>, ctx: ServiceCtx, business_id: string) {
+  const existing = await trx.selectFrom('chart_of_accounts').selectAll()
+    .where('business_id', '=', business_id)
+    .where('name', '=', 'Opening Balance Equity')
+    .where('account_type', '=', 'equity')
+    .executeTakeFirst();
+  if (existing) return existing;
+
+  const taken = new Set(
+    (await trx.selectFrom('chart_of_accounts').select('code')
+      .where('business_id', '=', business_id)
+      .where('code', 'like', '39%')
+      .execute()).map(r => r.code),
+  );
+  let code = '3900';
+  for (let n = 3900; n <= 3999 && taken.has(code); n++) code = String(n + 1);
+  if (taken.has(code)) throw new PreconditionError('No free 39xx code for Opening Balance Equity');
+
+  return createAccount(trx, ctx, {
+    business_id, code, name: 'Opening Balance Equity', account_type: 'equity',
+    parent_id: null, detail_type: 'Opening Balance Equity',
+  });
+}
 
 export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateAccountInput) {
   const dup = await trx.selectFrom('chart_of_accounts')
@@ -41,6 +71,38 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
     before: null,
     after: row,
   });
+
+  if (input.opening_balance != null && !isZero(input.opening_balance)) {
+    // Opening balances only make sense for balance-sheet accounts.
+    if (input.account_type === 'revenue' || input.account_type === 'expense') {
+      throw new PreconditionError('Opening balances apply to balance-sheet accounts only', { code: input.code });
+    }
+    const obe = await getOrCreateOpeningBalanceEquity(trx, ctx, input.business_id);
+    const amount = toMoneyString(input.opening_balance);
+    const negative = amount.startsWith('-');
+    const abs = negative ? toMoneyString(amount.slice(1)) : amount;
+    // Positive OB increases the account in its natural sign; the offset lands
+    // on Opening Balance Equity. Negative OB flips the pair.
+    const debitNormal = input.account_type === 'asset';
+    const accountGetsDebit = debitNormal !== negative;
+    await postJournalEntry(trx, ctx, {
+      business_id: input.business_id,
+      entry_date: input.opening_balance_as_of ?? new Date().toISOString().slice(0, 10),
+      source_type: 'adjustment', // enum has no 'opening_balance'; memo carries intent
+      source_id: row.id,
+      memo: `Opening balance for ${row.code} ${row.name}`,
+      lines: accountGetsDebit
+        ? [
+            { account_id: row.id, debit: abs, credit: '0.0000', memo: null },
+            { account_id: obe.id, debit: '0.0000', credit: abs, memo: null },
+          ]
+        : [
+            { account_id: row.id, debit: '0.0000', credit: abs, memo: null },
+            { account_id: obe.id, debit: abs, credit: '0.0000', memo: null },
+          ],
+    });
+  }
+
   return row;
 }
 

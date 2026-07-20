@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+const moneyStr = z.string().regex(/^-?\d+(\.\d+)?$/);
+const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 export const accountTypeEnum = z.enum(['asset', 'liability', 'equity', 'revenue', 'expense']);
 
 export const accountCreateSchema = z.object({
@@ -9,6 +12,10 @@ export const accountCreateSchema = z.object({
   parent_id: z.string().uuid().nullable().optional(),
   detail_type: z.string().max(80).nullable().optional(),
   description: z.string().max(500).nullable().optional(),
+  // QBO-style opening balance: posts a JE against Opening Balance Equity as of
+  // the given date. Balance-sheet accounts only (service-enforced).
+  opening_balance: moneyStr.nullable().optional(),
+  opening_balance_as_of: dateStr.nullable().optional(),
 });
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 

@@ -28,6 +28,26 @@ re-added as data, not layout:
   strike-through + badge. This also fixes the white-screen crash class in
   either pairing of web and API generations.
 
+## QBO New-account panel parity (2026-07-20, after final direction)
+
+The create drawer now carries the full QBO field set (user screenshot):
+name* + number* row, type* + detail-type row, **Make this a subaccount** +
+parent-account select (same-type active accounts; type snaps to the parent's),
+**Opening balance + As of** (balance-sheet types only), description, **Lock
+account** (🔓/🔒 → locked accounts are created inactive via a follow-up
+PATCH), a **new-account preview** panel (report section + active same-type
+accounts sorted by code with the pending account highlighted), and a **Save
+split button** (Save / Save and new).
+
+API: `accountCreateSchema` gains `opening_balance` / `opening_balance_as_of`;
+`createAccount` posts the opening JE **in the same transaction** via
+`ledgerService.postJournalEntry` (source `adjustment` — the enum has no
+`opening_balance` value; the memo carries intent), against an
+**auto-created "Opening Balance Equity"** equity account (first free 39xx
+code, QBO behavior). Income-statement accounts reject opening balances.
+3 new integration tests. Note: opening balances need the API deploy; the old
+prod schema strips the fields (account still created, no JE).
+
 ## Unification with the parallel `origin/main` implementation (API layer — still current)
 
 A parallel CoA/register implementation (`4ccd007`, `284836b`) had been pushed

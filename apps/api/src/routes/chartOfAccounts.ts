@@ -72,6 +72,8 @@ router.post('/businesses/:businessId/coa', requireMinRole('accountant'), async (
         parent_id: body.parent_id ?? null,
         detail_type: body.detail_type ?? null,
         description: body.description ?? null,
+        opening_balance: body.opening_balance ?? null,
+        opening_balance_as_of: body.opening_balance_as_of ?? null,
       }),
     );
     res.status(201).json(created);
