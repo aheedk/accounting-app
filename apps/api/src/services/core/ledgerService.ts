@@ -193,7 +193,10 @@ export async function computeAccountBalance(
       fn.sum<string>('jel.credit').as('total_credit'),
     ])
     .where('jel.account_id', '=', q.account_id)
-    .where('je.status', '=', 'posted')
+    // Voids are reversal-based: the original flips to 'voided' and a posted
+    // reversal cancels it. Both legs must be counted or a void flips the sign
+    // of the entry's effect instead of nulling it. Drafts stay excluded.
+    .where('je.status', 'in', ['posted', 'voided'])
     .where('je.entry_date', '<=', q.as_of)
     .executeTakeFirstOrThrow();
   const debit = row.total_debit ?? '0';
@@ -225,7 +228,9 @@ export async function computeTrialBalance(
     .where('a.business_id', '=', q.business_id)
     .where(eb => eb.or([
       eb('je.id', 'is', null),
-      eb.and([eb('je.status', '=', 'posted'), eb('je.entry_date', '<=', q.as_of)]),
+      // 'voided' included alongside 'posted': see computeAccountBalance — the
+      // posted reversal cancels the voided original, keeping as-of math right.
+      eb.and([eb('je.status', 'in', ['posted', 'voided']), eb('je.entry_date', '<=', q.as_of)]),
     ]))
     .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type'])
     .orderBy('a.code')

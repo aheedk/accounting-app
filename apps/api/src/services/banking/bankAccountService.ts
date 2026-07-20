@@ -1,4 +1,4 @@
-import { type Kysely, type Transaction } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
 import { AUDIT } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
@@ -73,10 +73,16 @@ export async function updateBankAccount(trx: Transaction<DB>, ctx: ServiceCtx, i
 export async function listBankAccounts(db: Kysely<DB>, business_id: string) {
   return db.selectFrom('bank_accounts as ba')
     .innerJoin('chart_of_accounts as a', 'a.id', 'ba.cash_account_id')
-    .select([
+    .select(eb => [
       'ba.id', 'ba.name', 'ba.institution', 'ba.account_last_four',
       'ba.cash_account_id', 'ba.is_active',
       'a.code as cash_account_code', 'a.name as cash_account_name',
+      // Feed-side balance: sum of imported transactions, minus rows the user excluded.
+      eb.selectFrom('bank_transactions as bt')
+        .select(({ fn }) => fn.coalesce(fn.sum<string>('bt.amount'), sql.lit('0')).as('v'))
+        .whereRef('bt.bank_account_id', '=', 'ba.id')
+        .where('bt.status', '!=', 'excluded')
+        .as('bank_balance'),
     ])
     .where('ba.business_id', '=', business_id)
     .where('ba.deleted_at', 'is', null)

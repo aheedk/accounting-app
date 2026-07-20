@@ -153,4 +153,40 @@ describe('ledgerService.postJournalEntry', () => {
     const revBal = await ledger.computeAccountBalance(t.db, { account_id: revenue.id, as_of: '2026-12-31' });
     expect(revBal).toBe('-100.0000');
   });
+
+  it('void nets to zero in computeAccountBalance and computeTrialBalance (voided original + posted reversal)', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id, entry_date: '2026-04-10', source_type: 'manual', memo: 'kept',
+        lines: [
+          { account_id: cash.id,    debit: '100.0000', credit: '0.0000',   memo: null },
+          { account_id: revenue.id, debit: '0.0000',   credit: '100.0000', memo: null },
+        ],
+      }),
+    );
+    const je = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id, entry_date: '2026-04-15', source_type: 'manual', memo: 'voided later',
+        lines: [
+          { account_id: cash.id,    debit: '999.0000', credit: '0.0000',   memo: null },
+          { account_id: revenue.id, debit: '0.0000',   credit: '999.0000', memo: null },
+        ],
+      }),
+    );
+    await t.db.transaction().execute(trx =>
+      ledger.voidJournalEntry(trx, ctx, { journal_entry_id: je.id, void_reason: 'entered twice' }),
+    );
+
+    // The void pair (voided original + posted reversal) must cancel exactly,
+    // leaving only the kept entry. Counting just one leg flips the sign.
+    const cashBal = await ledger.computeAccountBalance(t.db, { account_id: cash.id, as_of: '2026-12-31' });
+    expect(cashBal).toBe('100.0000');
+
+    const tb = await ledger.computeTrialBalance(t.db, { business_id: biz.id, as_of: '2026-12-31' });
+    const cashRow = tb.rows.find(r => r.account_id === cash.id)!;
+    expect(cashRow.net).toBe('100.0000');
+    const revRow = tb.rows.find(r => r.account_id === revenue.id)!;
+    expect(revRow.net).toBe('-100.0000');
+  });
 });

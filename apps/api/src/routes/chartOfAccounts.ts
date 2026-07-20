@@ -31,6 +31,17 @@ router.get('/businesses/:businessId/coa', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// QBO-style account register: posted ledger lines + running balance. Read-only (staff+).
+router.get('/businesses/:businessId/coa/:accountId/register', async (req, res, next) => {
+  try {
+    const out = await coa.listAccountRegister(db, {
+      business_id: req.tenancy!.business_id,
+      account_id: req.params['accountId']!,
+    });
+    res.json(out);
+  } catch (e) { next(e); }
+});
+
 router.post('/businesses/:businessId/coa', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const body = schemas.accountCreateSchema.parse(req.body);
@@ -48,7 +59,8 @@ router.post('/businesses/:businessId/coa', requireMinRole('accountant'), async (
 router.patch('/businesses/:businessId/coa/:accountId', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const parsed = schemas.accountUpdateSchema.parse(req.body);
-    const patch: { name?: string; parent_id?: string | null; is_active?: boolean } = {};
+    const patch: { code?: string; name?: string; parent_id?: string | null; is_active?: boolean } = {};
+    if (parsed.code !== undefined) patch.code = parsed.code;
     if (parsed.name !== undefined) patch.name = parsed.name;
     if (parsed.parent_id !== undefined) patch.parent_id = parsed.parent_id;
     if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;

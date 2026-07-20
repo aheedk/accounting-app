@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadAsExcel, downloadAsPdf } from '@/lib/download';
 
@@ -20,10 +20,17 @@ export interface DataTableProps<T> {
   defaultSortKey?: string;
   defaultSortDir?: 'asc' | 'desc';
   selectable?: boolean;
+  // Controlled selection (QBO-style batch actions). When omitted, selection is
+  // managed internally as before.
+  selectedIds?: Set<string>;
+  onSelectedIdsChange?: (next: Set<string>) => void;
   actions?: (row: T) => ReactNode;
   actionsHeader?: ReactNode;
   emptyMessage?: ReactNode;
   downloadable?: { filename: string; title: string };
+  // QBO-style pager ("‹ Previous 1-75 Next ›"). Slices AFTER sorting so
+  // column sorts operate on the full data set.
+  pagination?: { pageSize: number };
 }
 
 export function DataTable<T>({
@@ -33,15 +40,21 @@ export function DataTable<T>({
   defaultSortKey,
   defaultSortDir = 'asc',
   selectable = true,
+  selectedIds,
+  onSelectedIdsChange,
   actions,
   actionsHeader,
   emptyMessage = 'No records.',
   downloadable,
+  pagination,
 }: DataTableProps<T>) {
   const firstSortable = columns.find(c => c.sortable);
   const [sortKey, setSortKey] = useState<string>(defaultSortKey ?? firstSortable?.key ?? '');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSortDir);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
+  const selected = selectedIds ?? internalSelected;
+  const setSelected = onSelectedIdsChange ?? setInternalSelected;
+  const [page, setPage] = useState(0);
   const [excelBusy, setExcelBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
 
@@ -64,15 +77,53 @@ export function DataTable<T>({
     });
   }, [rows, columns, sortKey, sortDir]);
 
+  // Clamp the page when the row set shrinks (filters, deletions).
+  const pageSize = pagination?.pageSize ?? 0;
+  const pageCount = pagination ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
+  useEffect(() => { if (page > pageCount - 1) setPage(Math.max(0, pageCount - 1)); }, [page, pageCount]);
+  const visibleRows = pagination ? sortedRows.slice(page * pageSize, (page + 1) * pageSize) : sortedRows;
+  const rangeStart = sortedRows.length === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = pagination ? Math.min(sortedRows.length, (page + 1) * pageSize) : sortedRows.length;
+
   function toggleSort(k: string) {
     if (sortKey === k) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortKey(k); setSortDir('asc'); }
   }
   function toggleRow(id: string) {
-    setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    const n = new Set(selected);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    setSelected(n);
   }
-  const allSelected = sortedRows.length > 0 && sortedRows.every(r => selected.has(getRowId(r)));
-  function toggleAll() { setSelected(allSelected ? new Set() : new Set(sortedRows.map(r => getRowId(r)))); }
+  // Header checkbox operates on the visible page (QBO behavior).
+  const allSelected = visibleRows.length > 0 && visibleRows.every(r => selected.has(getRowId(r)));
+  function toggleAll() {
+    const n = new Set(selected);
+    if (allSelected) visibleRows.forEach(r => n.delete(getRowId(r)));
+    else visibleRows.forEach(r => n.add(getRowId(r)));
+    setSelected(n);
+  }
+
+  const pager = pagination && (
+    <div className="flex items-center justify-end gap-1 text-sm">
+      <button
+        type="button"
+        onClick={() => setPage(p => Math.max(0, p - 1))}
+        disabled={page === 0}
+        className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded text-muted-foreground enabled:hover:text-foreground disabled:opacity-40"
+      >
+        <ChevronLeft className="h-4 w-4" /> Previous
+      </button>
+      <span className="px-1 tabular-nums">{rangeStart}-{rangeEnd}</span>
+      <button
+        type="button"
+        onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+        disabled={page >= pageCount - 1}
+        className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded text-muted-foreground enabled:hover:text-foreground disabled:opacity-40"
+      >
+        Next <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   const colSpan = (selectable ? 1 : 0) + columns.length + (actions ? 1 : 0);
 
@@ -118,6 +169,7 @@ export function DataTable<T>({
           </Button>
         </div>
       )}
+    {pagination && <div className="border-b px-3 py-1.5">{pager}</div>}
     {/* Wrap in a horizontal scroll container so dense tables stay usable on
         narrow viewports instead of crushing columns or pushing the page wide. */}
     <div className="w-full overflow-x-auto">
@@ -151,7 +203,7 @@ export function DataTable<T>({
         </tr>
       </thead>
       <tbody>
-        {sortedRows.map(row => {
+        {visibleRows.map(row => {
           const id = getRowId(row);
           return (
             <tr key={id} className="border-b last:border-b-0 hover:bg-muted/80 transition-colors">
@@ -182,6 +234,7 @@ export function DataTable<T>({
       </tbody>
     </table>
     </div>
+    {pagination && sortedRows.length > pageSize && <div className="border-t px-3 py-1.5">{pager}</div>}
     </>
   );
 }

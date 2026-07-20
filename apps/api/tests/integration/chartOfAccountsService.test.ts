@@ -169,6 +169,112 @@ describe('chartOfAccountsService', () => {
     await expect(coa.getSystemAccount(t.db, biz.id, '9999')).rejects.toMatchObject({ code: ERR.NOT_FOUND });
   });
 
+  // ── QBO parity: account renumbering ──────────────────────────────────────
+
+  it('updateAccount: renumbers a non-system account and writes audit', async () => {
+    const { biz, ctx } = await setup(t);
+    const account = await makeAccount(t.db, biz.id, { code: '1500' });
+    const updated = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: account.id, patch: { code: '1510' } }),
+    );
+    expect(updated.code).toBe('1510');
+    const audits = await t.db.selectFrom('audit_logs').selectAll().where('action', '=', 'coa.update').execute();
+    expect(audits.some(a => a.entity_id === account.id)).toBe(true);
+  });
+
+  it('updateAccount: duplicate code within business rejected with DUPLICATE_RESOURCE', async () => {
+    const { biz, ctx } = await setup(t);
+    await makeAccount(t.db, biz.id, { code: '1600' });
+    const other = await makeAccount(t.db, biz.id, { code: '1601' });
+    await expect(
+      t.db.transaction().execute(trx =>
+        coa.updateAccount(trx, ctx, { account_id: other.id, patch: { code: '1600' } }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
+  });
+
+  it('updateAccount: system account code change rejected', async () => {
+    const { biz, ctx } = await setup(t);
+    await t.db.transaction().execute(trx => coa.seedDefaultCoa(trx, ctx, { business_id: biz.id }));
+    const ar = await t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('business_id', '=', biz.id).where('code', '=', '1100').executeTakeFirstOrThrow();
+    await expect(
+      t.db.transaction().execute(trx =>
+        coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { code: '1199' } }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+  });
+
+  it('updateAccount: re-submitting the current code is a no-op success (no dup error)', async () => {
+    const { biz, ctx } = await setup(t);
+    const account = await makeAccount(t.db, biz.id, { code: '1700' });
+    const updated = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: account.id, patch: { code: '1700', name: 'Renamed' } }),
+    );
+    expect(updated.code).toBe('1700');
+    expect(updated.name).toBe('Renamed');
+  });
+
+  // ── QBO parity: account register ─────────────────────────────────────────
+
+  it('listAccountRegister: running balance in natural sign; void pair shown and nets to zero', async () => {
+    const { biz, ctx } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const cash = await makeAccount(t.db, biz.id, { code: '1001', account_type: 'asset' });
+    const revenue = await makeAccount(t.db, biz.id, { code: '4001', account_type: 'revenue' });
+
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-01-10', source_type: 'manual', memo: 'Sale 1',
+      lines: [
+        { account_id: cash.id, debit: '100.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '100.0000', memo: null },
+      ],
+    }));
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-01-15', source_type: 'manual', memo: 'Sale 2',
+      lines: [
+        { account_id: cash.id, debit: '50.0000', credit: '0.0000', memo: 'line memo wins' },
+        { account_id: revenue.id, debit: '0.0000', credit: '50.0000', memo: null },
+      ],
+    }));
+    const voided = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-01-20', source_type: 'manual', memo: 'Oops',
+      lines: [
+        { account_id: cash.id, debit: '999.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '999.0000', memo: null },
+      ],
+    }));
+    await t.db.transaction().execute(trx =>
+      ledger.voidJournalEntry(trx, ctx, { journal_entry_id: voided.id, void_reason: 'test' }),
+    );
+
+    // History keeps both legs of the void: the voided original AND its posted
+    // reversal (dated today) — they cancel, so the ending balance is unchanged.
+    const cashReg = await coa.listAccountRegister(t.db, { business_id: biz.id, account_id: cash.id });
+    expect(cashReg.rows).toHaveLength(4);
+    expect(cashReg.rows[0]!.balance).toBe('100.0000');
+    expect(cashReg.rows[1]!.balance).toBe('150.0000');
+    expect(cashReg.rows[1]!.memo).toBe('line memo wins');
+    expect(cashReg.rows[2]!.is_voided).toBe(true);
+    expect(cashReg.rows[3]!.source_type).toBe('reversal');
+    expect(cashReg.ending_balance).toBe('150.0000');
+
+    // Credit-normal account: revenue balance also runs positive and ends at 150.
+    const revReg = await coa.listAccountRegister(t.db, { business_id: biz.id, account_id: revenue.id });
+    expect(revReg.rows).toHaveLength(4);
+    expect(revReg.ending_balance).toBe('150.0000');
+  });
+
+  it('listAccountRegister: account in another business → NOT_FOUND', async () => {
+    const { biz } = await setup(t);
+    const otherFirm = await makeFirm(t.db, 'Other Firm');
+    const otherBiz = await makeBusiness(t.db, otherFirm.id, 'OtherBiz');
+    const foreign = await makeAccount(t.db, otherBiz.id, { code: '1001' });
+    await expect(
+      coa.listAccountRegister(t.db, { business_id: biz.id, account_id: foreign.id }),
+    ).rejects.toMatchObject({ code: ERR.NOT_FOUND });
+  });
+
   // ── Gap probes — these tests assert the CORRECT future behavior.
   //    They use it.fails() so the suite stays green while the gap exists.
   //    When a gap is fixed, that it.fails() will start FAILING — your signal

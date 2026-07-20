@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, FileDown, Printer } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronDown, FileDown, Landmark, Printer, Search, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { downloadAsExcel } from '@/lib/download';
+import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,19 +45,45 @@ interface ImportRow {
 }
 
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
+type TbRow = { account_id: string; net: string };
+type BankAcct = { id: string; cash_account_id: string; bank_balance?: string };
 
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
 
-function statusBadge(active: boolean) {
-  const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
-  return active
-    ? <span className={`${base} bg-emerald-100 text-emerald-800`}>Active</span>
-    : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
+// QBO shows balances in the account's natural sign: debit-normal for
+// asset/expense, credit-normal for liability/equity/revenue. TB nets are
+// debit-minus-credit, so credit-normal accounts flip sign for display.
+function naturalNet(accountType: string, net: string): number {
+  const n = Number(net);
+  return accountType === 'asset' || accountType === 'expense' ? n : -n;
+}
+
+function inactivePill() {
+  return <span className="ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Inactive</span>;
+}
+
+type ColumnPrefs = { showType: boolean; showBalance: boolean; showBankBalance: boolean; pageSize: number };
+const PREFS_KEY = 'coa.list.prefs';
+const DEFAULT_PREFS: ColumnPrefs = { showType: true, showBalance: true, showBankBalance: true, pageSize: 75 };
+
+function loadPrefs(): ColumnPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return DEFAULT_PREFS;
+    return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<ColumnPrefs>) };
+  } catch {
+    return DEFAULT_PREFS;
+  }
 }
 
 export default function CoaListPage() {
   const [bizId] = useActiveBusinessId();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  // null = source unavailable (older API deploy / fetch error) → show em-dash.
+  const [tbMap, setTbMap] = useState<Map<string, string> | null>(null);
+  const [bankMap, setBankMap] = useState<Map<string, string | null>>(new Map());
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', account_type: 'asset' });
   const [err, setErr] = useState<string | null>(null);
@@ -63,6 +91,17 @@ export default function CoaListPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState('active');
   const [search, setSearch] = useState('');
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [showBatchMenu, setShowBatchMenu] = useState(false);
+  const [showGearMenu, setShowGearMenu] = useState(false);
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState<ColumnPrefs>(loadPrefs);
+
+  const [editAcct, setEditAcct] = useState<Account | null>(null);
+  const [editForm, setEditForm] = useState({ code: '', name: '' });
+  const [editErr, setEditErr] = useState<string | null>(null);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -75,20 +114,49 @@ export default function CoaListPage() {
   const [importParseErr, setImportParseErr] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
 
+  // Register lives under whichever section the user is browsing.
+  const registerBase = location.pathname.startsWith('/settings') ? '/settings/coa' : '/setup/coa';
+
+  function savePrefs(next: ColumnPrefs) {
+    setPrefs(next);
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+  }
+
   async function reload() {
     if (!bizId) return;
     const r = await api.get(`/businesses/${bizId}/coa?include_inactive=true`);
     setAccounts(r.data.accounts);
+    // Balance + bank-link sources load independently; the list must still
+    // render if either endpoint is unavailable.
+    try {
+      const tb = await api.get(`/businesses/${bizId}/reports/trial-balance`);
+      setTbMap(new Map((tb.data.rows as TbRow[]).map(row => [row.account_id, row.net])));
+    } catch {
+      setTbMap(null);
+    }
+    try {
+      const ba = await api.get(`/businesses/${bizId}/bank-accounts`);
+      const m = new Map<string, string | null>();
+      for (const b of ba.data.bank_accounts as BankAcct[]) {
+        const prev = m.get(b.cash_account_id);
+        if (b.bank_balance === undefined) { m.set(b.cash_account_id, prev ?? null); continue; }
+        const sum = Number(prev ?? '0') + Number(b.bank_balance);
+        m.set(b.cash_account_id, String(sum));
+      }
+      setBankMap(m);
+    } catch {
+      setBankMap(new Map());
+    }
   }
   useEffect(() => { void reload(); }, [bizId]);
 
-  // Escape closes the create drawer (parity with the Dialog-based modals).
+  // Escape closes the drawers (parity with the Dialog-based modals).
   useEffect(() => {
-    if (!showCreate) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowCreate(false); };
+    if (!showCreate && !editAcct) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowCreate(false); setEditAcct(null); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showCreate]);
+  }, [showCreate, editAcct]);
 
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -114,6 +182,43 @@ export default function CoaListPage() {
     }
   }
 
+  function openEdit(a: Account) {
+    setEditErr(null);
+    setEditForm({ code: a.code, name: a.name });
+    setEditAcct(a);
+    setRowMenuId(null);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editAcct) return;
+    setEditErr(null);
+    try {
+      await api.patch(`/businesses/${bizId}/coa/${editAcct.id}`, { code: editForm.code, name: editForm.name });
+      setEditAcct(null);
+      await reload();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
+      setEditErr(msg ?? 'Failed');
+    }
+  }
+
+  async function setActive(ids: string[], active: boolean) {
+    setBatchBusy(true);
+    try {
+      for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop
+        await api.patch(`/businesses/${bizId}/coa/${id}`, { is_active: active });
+      }
+      setSelectedIds(new Set());
+      await reload();
+    } finally {
+      setBatchBusy(false);
+      setShowBatchMenu(false);
+      setRowMenuId(null);
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return accounts.filter(a => {
@@ -125,11 +230,27 @@ export default function CoaListPage() {
     });
   }, [accounts, typeFilter, statusFilter, search]);
 
+  // Selections don't survive filter changes — acting on hidden rows surprises.
+  useEffect(() => { setSelectedIds(new Set()); }, [typeFilter, statusFilter, search]);
+
+  function displayBalance(a: Account): string | null {
+    if (!tbMap) return null;
+    const net = tbMap.get(a.id);
+    if (net === undefined) return fmtMoney(0);
+    return fmtMoney(naturalNet(a.account_type, net));
+  }
+
+  function displayBankBalance(a: Account): string | null {
+    if (!bankMap.has(a.id)) return null; // not a bank-linked account → blank cell
+    const v = bankMap.get(a.id);
+    return v === null || v === undefined ? '—' : fmtMoney(v);
+  }
+
   function handleExport() {
     setExcelBusy(true);
     try {
-      const headers = ['Code', 'Name', 'Type', 'Status', 'System'];
-      const rows = filtered.map(a => [a.code, a.name, a.account_type, a.is_active ? 'active' : 'inactive', a.is_system ? 'yes' : 'no']);
+      const headers = ['Number', 'Name', 'Type', 'Balance', 'Status', 'System'];
+      const rows = filtered.map(a => [a.code, a.name, a.account_type, displayBalance(a) ?? '', a.is_active ? 'active' : 'inactive', a.is_system ? 'yes' : 'no']);
       downloadAsExcel(headers, rows, 'chart-of-accounts');
     } finally {
       setExcelBusy(false);
@@ -142,8 +263,8 @@ export default function CoaListPage() {
         <td>${a.code}</td>
         <td>${a.name}</td>
         <td style="text-transform:capitalize">${a.account_type}</td>
+        <td style="text-align:right">${displayBalance(a) ?? ''}</td>
         <td style="text-transform:capitalize">${a.is_active ? 'active' : 'inactive'}</td>
-        <td>${a.is_system ? 'yes' : 'no'}</td>
       </tr>`).join('');
     const win = window.open('', '_blank');
     if (!win) return;
@@ -154,13 +275,14 @@ export default function CoaListPage() {
         p { color: #666; font-size: 11px; margin-bottom: 16px; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f0f0f0; text-align: left; padding: 6px 8px; border-bottom: 2px solid #ccc; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        th.num, td.num { text-align: right; }
         td { padding: 5px 8px; border-bottom: 1px solid #e5e5e5; }
         tr:last-child td { border-bottom: none; }
       </style></head><body>
       <h2>Chart of Accounts</h2>
       <p>Generated ${new Date().toLocaleDateString()}</p>
       <table>
-        <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th>System</th></tr></thead>
+        <thead><tr><th>Number</th><th>Name</th><th>Type</th><th class="num">Balance</th><th>Status</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <script>window.onload = function(){ window.print(); }${'</'}script>
@@ -237,12 +359,84 @@ export default function CoaListPage() {
   }
 
   const columns: Column<Account>[] = [
-    { key: 'code', header: 'Code', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono text-muted-foreground">{r.code}</span> },
-    { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <span className="font-medium">{r.name}</span> },
-    { key: 'account_type', header: 'Type', sortable: true, sortValue: r => r.account_type, render: r => <span className="capitalize">{r.account_type}</span> },
-    { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => statusBadge(r.is_active) },
-    { key: 'system', header: 'Source', sortable: true, sortValue: r => r.is_system ? 'system' : 'user', render: r => <span className="text-muted-foreground">{r.is_system ? 'System' : 'User'}</span> },
+    { key: 'code', header: 'Number', sortable: true, sortValue: r => r.code, render: r => <span className="font-mono text-muted-foreground">{r.code}</span> },
+    {
+      key: 'name', header: 'Name', sortable: true, sortValue: r => r.name,
+      render: r => <span className="font-medium">{r.name}{!r.is_active && inactivePill()}</span>,
+    },
+    ...(prefs.showType ? [{
+      key: 'account_type', header: 'Account type', sortable: true, sortValue: (r: Account) => r.account_type,
+      render: (r: Account) => (
+        <span className="inline-flex items-center gap-1.5 capitalize">
+          {bankMap.has(r.id) && <Landmark className="h-3.5 w-3.5 text-muted-foreground" aria-label="Linked bank account" />}
+          {r.account_type}
+        </span>
+      ),
+    }] : []),
+    ...(prefs.showBalance ? [{
+      key: 'balance', header: 'Balance', align: 'right' as const, sortable: true,
+      sortValue: (r: Account) => (tbMap ? naturalNet(r.account_type, tbMap.get(r.id) ?? '0') : 0),
+      exportValue: (r: Account) => displayBalance(r) ?? '',
+      render: (r: Account) => <span className="tabular-nums">{displayBalance(r) ?? '—'}</span>,
+    }] : []),
+    ...(prefs.showBankBalance ? [{
+      key: 'bank_balance', header: 'Bank balance', align: 'right' as const, sortable: true,
+      sortValue: (r: Account) => Number(bankMap.get(r.id) ?? Number.NEGATIVE_INFINITY),
+      exportValue: (r: Account) => displayBankBalance(r) ?? '',
+      render: (r: Account) => <span className="tabular-nums">{displayBankBalance(r) ?? ''}</span>,
+    }] : []),
   ];
+
+  function rowActions(r: Account) {
+    return (
+      <div className="inline-flex items-center">
+        <button
+          type="button"
+          className="text-sm font-medium text-primary hover:underline"
+          onClick={() => navigate(`${registerBase}/${r.id}/register`)}
+        >
+          View register
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded text-primary hover:bg-accent"
+            aria-label="More actions"
+            onClick={() => setRowMenuId(id => (id === r.id ? null : r.id))}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+          {rowMenuId === r.id && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setRowMenuId(null)} />
+              <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-md border bg-background py-1 text-left shadow-lg">
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={r.is_system}
+                  title={r.is_system ? 'System accounts cannot be renamed or renumbered' : undefined}
+                  onClick={() => openEdit(r)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+                  onClick={() => void setActive([r.id], !r.is_active)}
+                >
+                  {r.is_active ? 'Make inactive' : 'Make active'}
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+                  onClick={() => { setRowMenuId(null); navigate(`${registerBase}/${r.id}/register`); }}
+                >
+                  Run report
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const validImportCount = importRows.filter(r => !r.error).length;
   const successImportCount = importRows.filter(r => r.status === 'ok').length;
@@ -256,7 +450,86 @@ export default function CoaListPage() {
       {/* Header: title + split New account button */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Chart of Accounts</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center" ref={dropdownRef}>
+          <Button
+            className="rounded-r-none border-r border-primary-foreground/20"
+            onClick={() => { setErr(null); setShowCreate(true); }}
+          >
+            New account
+          </Button>
+          <div className="relative">
+            <Button className="rounded-l-none px-2" onClick={() => setShowDropdown(d => !d)}>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            {showDropdown && (
+              <div className="absolute right-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
+                <button
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+                  onClick={() => { setShowDropdown(false); setImportRows([]); setImportDone(false); setImportParseErr(null); setShowImport(true); }}
+                >
+                  Import chart of accounts
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QBO-style toolbar: batch actions + filters left, tools right */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Button
+            variant="outline"
+            className="h-9 gap-1 font-medium"
+            disabled={selectedIds.size === 0 || batchBusy}
+            onClick={() => setShowBatchMenu(m => !m)}
+          >
+            {batchBusy ? 'Working…' : 'Batch actions'} <ChevronDown className="h-4 w-4" />
+          </Button>
+          {showBatchMenu && selectedIds.size > 0 && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowBatchMenu(false)} />
+              <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-md border bg-background py-1 shadow-lg">
+                <button className="w-full px-4 py-2 text-left text-sm hover:bg-accent" onClick={() => void setActive([...selectedIds], false)}>
+                  Make inactive ({selectedIds.size})
+                </button>
+                <button className="w-full px-4 py-2 text-left text-sm hover:bg-accent" onClick={() => void setActive([...selectedIds], true)}>
+                  Make active ({selectedIds.size})
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-8 w-64 h-9"
+            placeholder="Filter by name or number"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm capitalize"
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          aria-label="Account type"
+        >
+          <option value="">All</option>
+          {ACCOUNT_TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
+        </select>
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          aria-label="Status"
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="all">All statuses</option>
+        </select>
+
+        <div className="ml-auto flex items-center gap-2">
           <div className="relative group">
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
@@ -282,54 +555,45 @@ export default function CoaListPage() {
               Print
             </div>
           </div>
-          <div className="flex items-center" ref={dropdownRef}>
-            <Button
-              className="rounded-r-none border-r border-primary-foreground/20"
-              onClick={() => { setErr(null); setShowCreate(true); }}
+          <div className="relative">
+            <button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setShowGearMenu(m => !m)}
+              aria-label="Table settings"
             >
-              New account
-            </Button>
-            <div className="relative">
-              <Button className="rounded-l-none px-2" onClick={() => setShowDropdown(d => !d)}>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-              {showDropdown && (
-                <div className="absolute right-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
-                  <button
-                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
-                    onClick={() => { setShowDropdown(false); setImportRows([]); setImportDone(false); setImportParseErr(null); setShowImport(true); }}
+              <Settings className="h-4 w-4" />
+            </button>
+            {showGearMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowGearMenu(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border bg-background p-3 shadow-lg space-y-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Columns</div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefs.showType} onChange={e => savePrefs({ ...prefs, showType: e.target.checked })} />
+                    Account type
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefs.showBalance} onChange={e => savePrefs({ ...prefs, showBalance: e.target.checked })} />
+                    Balance
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefs.showBankBalance} onChange={e => savePrefs({ ...prefs, showBankBalance: e.target.checked })} />
+                    Bank balance
+                  </label>
+                  <div className="border-t pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Rows per page</div>
+                  <select
+                    className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+                    value={prefs.pageSize}
+                    onChange={e => savePrefs({ ...prefs, pageSize: Number(e.target.value) })}
                   >
-                    Import chart of accounts
-                  </button>
+                    {[75, 150, 300].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>
-
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <div className="mb-1 text-xs text-muted-foreground">Account type</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-            <option value="">All types</option>
-            {ACCOUNT_TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="mb-1 text-xs text-muted-foreground">Status</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="all">All</option>
-          </select>
-        </div>
-        <div className="min-w-[14rem] flex-1">
-          <div className="mb-1 text-xs text-muted-foreground">Search</div>
-          <Input className="h-9" placeholder="Search by name or number" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-      </div>
-
 
       <Card><CardContent className="p-0">
         <DataTable
@@ -338,6 +602,11 @@ export default function CoaListPage() {
           columns={columns}
           defaultSortKey="code"
           defaultSortDir="asc"
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          actions={rowActions}
+          actionsHeader="Action"
+          pagination={{ pageSize: prefs.pageSize }}
           emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, import accounts, or add a new account to your chart." />}
         />
       </CardContent></Card>
@@ -395,6 +664,59 @@ export default function CoaListPage() {
               </div>
               <div className="border-t px-6 py-4 flex items-center justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button type="submit">Save</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit account — right-side drawer (name + number; type is immutable) */}
+      {editAcct && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/20" onClick={() => setEditAcct(null)} />
+          <div className="w-96 bg-background shadow-xl flex flex-col border-l" role="dialog" aria-modal="true" aria-label="Edit account">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h2 className="text-lg font-semibold">Edit account</h2>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground text-lg"
+                onClick={() => setEditAcct(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <form className="flex flex-col flex-1 overflow-hidden" onSubmit={saveEdit}>
+              <div className="flex-1 overflow-auto p-6 space-y-4">
+                <div>
+                  <Label>Account name <span className="text-destructive">*</span></Label>
+                  <Input
+                    className="mt-1"
+                    value={editForm.name}
+                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <Label>Account number <span className="text-destructive">*</span></Label>
+                  <Input
+                    className="mt-1"
+                    value={editForm.code}
+                    onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Account type</Label>
+                  <div className="mt-1 h-10 flex items-center rounded-md border bg-muted/40 px-3 text-sm capitalize text-muted-foreground">
+                    {editAcct.account_type}
+                  </div>
+                </div>
+                {editErr && <p className="text-sm text-destructive">{editErr}</p>}
+              </div>
+              <div className="border-t px-6 py-4 flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditAcct(null)}>Cancel</Button>
                 <Button type="submit">Save</Button>
               </div>
             </form>

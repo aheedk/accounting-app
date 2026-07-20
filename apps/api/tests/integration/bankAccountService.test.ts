@@ -48,6 +48,25 @@ describe('bankAccountService', () => {
     expect(audit).toHaveLength(1);
   });
 
+  it('listBankAccounts: bank_balance sums imported transactions, excluding excluded rows', async () => {
+    const { biz, ctx, user, cash } = await setup(t);
+    const ba = await t.db.transaction().execute(trx =>
+      bankAcctSvc.createBankAccount(trx, ctx, {
+        business_id: biz.id, name: 'Sum Checking', institution: null, account_last_four: null,
+        cash_account_id: cash.id,
+      }),
+    );
+    await t.db.insertInto('bank_transactions').values([
+      { business_id: biz.id, bank_account_id: ba.id, transaction_date: '2026-01-05', description: 'Deposit', amount: '250.0000', external_id: null },
+      { business_id: biz.id, bank_account_id: ba.id, transaction_date: '2026-01-06', description: 'Withdrawal', amount: '-100.0000', external_id: null },
+      // bt_terminal_has_reviewer: terminal statuses require reviewer stamps.
+      { business_id: biz.id, bank_account_id: ba.id, transaction_date: '2026-01-07', description: 'Dupe', amount: '999.0000', external_id: null, status: 'excluded', excluded_reason: 'duplicate', reviewed_at: new Date(), reviewed_by_user_id: user.id },
+    ]).execute();
+    const list = await bankAcctSvc.listBankAccounts(t.db, biz.id);
+    const row = list.find(r => r.id === ba.id)!;
+    expect(Number(row.bank_balance)).toBe(150);
+  });
+
   it('createBankAccount rejects non-asset CoA row', async () => {
     const { biz, ctx, ap } = await setup(t);
     await expect(

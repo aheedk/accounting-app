@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import CoaListPage from '@/pages/coa/CoaListPage';
+import AccountRegisterPage from '@/pages/coa/AccountRegisterPage';
 import PeriodsPage from '@/pages/periods/PeriodsPage';
 import JournalListPage from '@/pages/journal/JournalListPage';
 import JournalDetailPage from '@/pages/journal/JournalDetailPage';
@@ -134,6 +135,7 @@ export default function App() {
 
             {/* Settings (existing) */}
             <Route path="/settings/coa" element={<CoaListPage />} />
+            <Route path="/settings/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/settings/tax-codes" element={<TaxCodesPage />} />
             <Route path="/settings/periods" element={<PeriodsPage />} />
 
@@ -176,6 +178,7 @@ export default function App() {
             <Route path="/clients/new" element={<AddClientPage />} />
             <Route path="/setup/entity" element={<EntityPage />} />
             <Route path="/setup/coa" element={<CoaListPage />} />
+            <Route path="/setup/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/setup/cost-centers" element={<CostCentersPage />} />
             <Route path="/setup/users" element={<UsersPage />} />
 
