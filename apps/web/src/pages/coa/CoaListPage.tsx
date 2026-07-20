@@ -500,9 +500,10 @@ export default function CoaListPage() {
           View register
         </button>
         <div className="relative">
+          {/* Boxed dropdown trigger, matching the deployed action-column style. */}
           <button
             type="button"
-            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded text-primary hover:bg-accent"
+            className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded border bg-background text-primary hover:bg-accent"
             aria-label="More actions"
             onClick={() => setRowMenuId(id => (id === r.id ? null : r.id))}
           >
@@ -511,9 +512,9 @@ export default function CoaListPage() {
           {rowMenuId === r.id && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setRowMenuId(null)} />
-              <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-md border bg-background py-1 text-left shadow-lg">
+              <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-md border bg-background py-1 text-left shadow-lg">
                 <button
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={r.is_system}
                   title={r.is_system ? 'System accounts cannot be renamed or renumbered' : undefined}
                   onClick={() => openEdit(r)}
@@ -521,7 +522,7 @@ export default function CoaListPage() {
                   Edit
                 </button>
                 <button
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent"
                   onClick={() => {
                     setRowMenuId(null);
                     setErr(null);
@@ -530,16 +531,16 @@ export default function CoaListPage() {
                     setShowCreate(true);
                   }}
                 >
-                  Create sub-account
+                  Create subaccount
                 </button>
                 <button
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent"
                   onClick={() => void setActive([r.id], !r.is_active)}
                 >
-                  {r.is_active ? 'Make inactive' : 'Make active'}
+                  {r.is_active ? 'Make inactive (reduces usage)' : 'Make active'}
                 </button>
                 <button
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent"
                   // QBO QuickReport: the register pre-filtered to the last 90 days.
                   onClick={() => { setRowMenuId(null); navigate(`${registerBase}/${r.id}/register?from=${daysAgoLocal(90)}`); }}
                 >
@@ -562,10 +563,14 @@ export default function CoaListPage() {
   return (
     <div className="space-y-4">
 
-      {/* Header: title + split New account button */}
+      {/* Header: title + Run report + split New account button */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Chart of Accounts</h1>
-        <div className="flex items-center" ref={dropdownRef}>
+        <h1 className="text-2xl font-semibold">Chart of accounts</h1>
+        <div className="flex items-center gap-2" ref={dropdownRef}>
+          {/* Page-level QBO "Run report" = the account list with balances (trial balance). */}
+          <Button variant="outline" onClick={() => navigate('/reports/trial-balance')}>
+            Run report
+          </Button>
           <Button
             className="rounded-r-none border-r border-primary-foreground/20"
             onClick={() => {
