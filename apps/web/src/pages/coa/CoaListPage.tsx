@@ -18,6 +18,24 @@ const IMPORT_COLS = [
   { key: 'account_type', header: 'Account Type', required: true },
 ];
 
+// Accepts common column name variations so uploads don't need to match exactly.
+const COL_ALIASES: Record<string, string> = {
+  'name': 'name',
+  'account name': 'name',
+  'acct name': 'name',
+  'code': 'code',
+  'no.': 'code',
+  'no': 'code',
+  '#': 'code',
+  'number': 'code',
+  'account code': 'code',
+  'acct code': 'code',
+  'account type': 'account_type',
+  'type': 'account_type',
+  'account_type': 'account_type',
+  'acct type': 'account_type',
+};
+
 interface ImportRow {
   data: Record<string, string>;
   status: 'pending' | 'ok' | 'error';
@@ -161,12 +179,10 @@ export default function CoaListPage() {
         if (!ws) { setImportParseErr('No sheet found in file.'); return; }
         const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
         if (raw.length === 0) { setImportParseErr('The sheet is empty.'); return; }
-        const colMap: Record<string, string> = {};
-        IMPORT_COLS.forEach(c => { colMap[c.header.toLowerCase()] = c.key; });
         const parsed: ImportRow[] = raw.map(r => {
           const row: Record<string, string> = {};
           for (const [k, v] of Object.entries(r)) {
-            const mapped = colMap[k.trim().toLowerCase()];
+            const mapped = COL_ALIASES[k.trim().toLowerCase()];
             if (mapped) row[mapped] = String(v ?? '').trim();
           }
           const missing = IMPORT_COLS.filter(c => c.required && !row[c.key]);
@@ -322,7 +338,6 @@ export default function CoaListPage() {
           columns={columns}
           defaultSortKey="code"
           defaultSortDir="asc"
-          downloadable={{ filename: 'chart-of-accounts', title: 'Chart of Accounts' }}
           emptyMessage={<EmptyState title="No accounts found" hint="Adjust the filters above, import accounts, or add a new account to your chart." />}
         />
       </CardContent></Card>
