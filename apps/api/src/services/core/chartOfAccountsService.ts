@@ -12,6 +12,8 @@ export type CreateAccountInput = {
   name: string;
   account_type: AccountType;
   parent_id: string | null;
+  detail_type?: string | null;
+  description?: string | null;
 };
 
 export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateAccountInput) {
@@ -28,6 +30,8 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
     name: input.name,
     account_type: input.account_type,
     parent_id: input.parent_id,
+    detail_type: input.detail_type ?? null,
+    description: input.description ?? null,
   }).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
@@ -42,7 +46,7 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
 
 export async function updateAccount(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { account_id: string; patch: { code?: string; name?: string; parent_id?: string | null; is_active?: boolean } },
+  input: { account_id: string; patch: { code?: string; name?: string; parent_id?: string | null; is_active?: boolean; detail_type?: string | null; description?: string | null } },
 ) {
   const row = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', input.account_id).executeTakeFirst();
@@ -74,6 +78,8 @@ export async function updateAccount(
       ...(input.patch.name !== undefined ? { name: input.patch.name } : {}),
       ...(input.patch.parent_id !== undefined ? { parent_id: input.patch.parent_id } : {}),
       ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
+      ...(input.patch.detail_type !== undefined ? { detail_type: input.patch.detail_type } : {}),
+      ...(input.patch.description !== undefined ? { description: input.patch.description } : {}),
     })
     .where('id', '=', input.account_id)
     .returningAll()
@@ -121,6 +127,7 @@ export type AccountRegisterRow = {
   credit: string;
   balance: string; // running balance in the account's natural sign, ascending by date
   is_voided: boolean;
+  counter_account: string; // name of the other side of the entry ("—" for multi-line splits resolved to first)
 };
 
 // QBO-style account register: every ledger line hitting the account, oldest
@@ -151,6 +158,23 @@ export async function listAccountRegister(
     .orderBy('jel.line_number', 'asc')
     .execute();
 
+  // The "other side" of each entry, QBO's Payee/Account column. First counter
+  // line wins for multi-line splits.
+  const jeIds = [...new Set(lines.map(l => l.journal_entry_id))];
+  const counterLines = jeIds.length > 0
+    ? await db.selectFrom('journal_entry_lines as jel')
+        .innerJoin('chart_of_accounts as ca', 'ca.id', 'jel.account_id')
+        .select(['jel.journal_entry_id', 'ca.name as account_name'])
+        .where('jel.journal_entry_id', 'in', jeIds)
+        .where('jel.account_id', '!=', q.account_id)
+        .orderBy('jel.line_number', 'asc')
+        .execute()
+    : [];
+  const counterMap = new Map<string, string>();
+  for (const cl of counterLines) {
+    if (!counterMap.has(cl.journal_entry_id)) counterMap.set(cl.journal_entry_id, cl.account_name);
+  }
+
   const debitNormal = account.account_type === 'asset' || account.account_type === 'expense';
   let running = '0.0000';
   const rows: AccountRegisterRow[] = lines.map(l => {
@@ -167,6 +191,7 @@ export async function listAccountRegister(
       credit: toMoneyString(l.credit),
       balance: running,
       is_voided: l.status === 'voided',
+      counter_account: counterMap.get(l.journal_entry_id) ?? '—',
     };
   });
 

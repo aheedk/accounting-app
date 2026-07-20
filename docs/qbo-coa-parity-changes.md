@@ -4,6 +4,30 @@ Rebuilds **Chart of Accounts** to mirror the QuickBooks Online CoA list
 (user-supplied screenshot as the visual reference) and adds the account
 **register** view behind QBO's "View register" action.
 
+## Unification with the parallel `origin/main` implementation
+
+A parallel CoA/register implementation (`4ccd007`, `284836b`) had been pushed
+and deployed to Railway while this work was in flight. The merge unifies them:
+
+- **Kept from theirs:** migration `0054` (`detail_type`, `description` on
+  `chart_of_accounts`), QBO detail-type picklists in create/edit, description
+  fields, "Create sub-account" row action, edit-drawer current-balance header,
+  `GET /coa/:accountId` (single account + balance), the register's
+  **counter-account** ("Payee/Account") column and Payment/Deposit split, and
+  the legacy `/coa/:accountId/register` web route.
+- **Kept from ours:** service-layer register (`listAccountRegister`, now with
+  `counter_account`) with money-string math, natural-sign running balance,
+  void-pair visibility, and tenancy tests; `code` renumbering; `bank_balance`;
+  the TB/account-balance void fix; DataTable selection + pagination; the CoA
+  toolbar (batch actions, gear, pager) and register toolbar (account switcher,
+  date/search filters, journal-entry deep links).
+- `GET /coa/:accountId` is reimplemented over `ledger.computeAccountBalance`
+  (the deployed inline SQL counted drafts and mishandled voids).
+- The web register **adapts the legacy `{account, entries, balance}` payload**
+  served by older API deploys, so the page works against production before the
+  unified API ships (fixes a white-screen crash: the page previously read
+  `data.rows` from the legacy payload and crashed on `undefined`).
+
 ---
 
 ## Web

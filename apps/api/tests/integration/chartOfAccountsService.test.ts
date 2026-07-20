@@ -215,6 +215,23 @@ describe('chartOfAccountsService', () => {
     expect(updated.name).toBe('Renamed');
   });
 
+  it('create/update roundtrip detail_type and description', async () => {
+    const { biz, ctx } = await setup(t);
+    const created = await t.db.transaction().execute(trx =>
+      coa.createAccount(trx, ctx, {
+        business_id: biz.id, code: '1050', name: 'Ops Checking', account_type: 'asset',
+        parent_id: null, detail_type: 'Checking', description: 'Day-to-day operating account',
+      }),
+    );
+    expect(created.detail_type).toBe('Checking');
+    expect(created.description).toBe('Day-to-day operating account');
+    const updated = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: created.id, patch: { detail_type: 'Savings', description: null } }),
+    );
+    expect(updated.detail_type).toBe('Savings');
+    expect(updated.description).toBeNull();
+  });
+
   // ── QBO parity: account register ─────────────────────────────────────────
 
   it('listAccountRegister: running balance in natural sign; void pair shown and nets to zero', async () => {
@@ -257,6 +274,7 @@ describe('chartOfAccountsService', () => {
     expect(cashReg.rows[1]!.memo).toBe('line memo wins');
     expect(cashReg.rows[2]!.is_voided).toBe(true);
     expect(cashReg.rows[3]!.source_type).toBe('reversal');
+    expect(cashReg.rows[0]!.counter_account).toBe('Account 4001'); // the other side of the entry
     expect(cashReg.ending_balance).toBe('150.0000');
 
     // Credit-normal account: revenue balance also runs positive and ends at 150.

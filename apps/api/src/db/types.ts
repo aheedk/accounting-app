@@ -95,6 +95,8 @@ export interface ChartOfAccountsTable {
   name: string;
   account_type: AccountType;
   parent_id: string | null;
+  detail_type: string | null;
+  description: string | null;
   is_system: Generated<boolean>;
   is_active: Generated<boolean>;
   created_at: Generated<Timestamp>;

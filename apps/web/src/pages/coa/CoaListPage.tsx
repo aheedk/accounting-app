@@ -44,11 +44,25 @@ interface ImportRow {
   error: string | null;
 }
 
-type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean; parent_id: string | null };
+type Account = {
+  id: string; code: string; name: string; account_type: string;
+  is_system: boolean; is_active: boolean; parent_id: string | null;
+  detail_type: string | null; description: string | null;
+};
 type TbRow = { account_id: string; net: string };
 type BankAcct = { id: string; cash_account_id: string; bank_balance?: string };
 
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
+
+// QBO-style detail types per account type (free-text on the API; these are the
+// standard picks).
+const DETAIL_TYPES: Record<string, string[]> = {
+  asset: ['Checking', 'Savings', 'Money Market', 'Cash on Hand', 'Accounts Receivable', 'Prepaid Expenses', 'Inventory', 'Fixed Assets', 'Buildings', 'Vehicles', 'Equipment', 'Accumulated Depreciation', 'Other Assets'],
+  liability: ['Accounts Payable', 'Credit Card', 'Line of Credit', 'Loan Payable', 'Sales Tax Payable', 'Accrued Liabilities', 'Customer Deposits', 'Notes Payable', 'Mortgage', 'Other Liabilities'],
+  equity: ['Opening Balance Equity', 'Retained Earnings', 'Common Stock', 'Partner Contributions', 'Partner Distributions', 'Paid-In Capital', 'Other Equity'],
+  revenue: ['Sales Income', 'Service Income', 'Interest Earned', 'Dividend Income', 'Other Income', 'Discounts Given'],
+  expense: ['Advertising', 'Auto', 'Bank Charges', 'Cost of Labor', 'Dues & Subscriptions', 'Equipment Rental', 'Insurance', 'Legal & Professional Fees', 'Meals & Entertainment', 'Office Expenses', 'Payroll Expenses', 'Rent', 'Repairs & Maintenance', 'Taxes & Licenses', 'Travel', 'Utilities', 'Other Expenses'],
+};
 
 // QBO shows balances in the account's natural sign: debit-normal for
 // asset/expense, credit-normal for liability/equity/revenue. TB nets are
@@ -69,9 +83,9 @@ function statusBadge(active: boolean) {
     : <span className={`${base} bg-muted text-muted-foreground`}>Inactive</span>;
 }
 
-type ColumnPrefs = { showType: boolean; showBalance: boolean; showBankBalance: boolean; showStatus: boolean; pageSize: number };
+type ColumnPrefs = { showType: boolean; showDetailType: boolean; showDescription: boolean; showBalance: boolean; showBankBalance: boolean; showStatus: boolean; pageSize: number };
 const PREFS_KEY = 'coa.list.prefs';
-const DEFAULT_PREFS: ColumnPrefs = { showType: true, showBalance: true, showBankBalance: true, showStatus: true, pageSize: 75 };
+const DEFAULT_PREFS: ColumnPrefs = { showType: true, showDetailType: true, showDescription: false, showBalance: true, showBankBalance: true, showStatus: true, pageSize: 75 };
 
 function loadPrefs(): ColumnPrefs {
   try {
@@ -92,7 +106,8 @@ export default function CoaListPage() {
   const [tbMap, setTbMap] = useState<Map<string, string> | null>(null);
   const [bankMap, setBankMap] = useState<Map<string, string | null>>(new Map());
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ code: '', name: '', account_type: 'asset' });
+  const [createParentId, setCreateParentId] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', name: '', account_type: 'asset', detail_type: '', description: '' });
   const [err, setErr] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState('');
   const [excelBusy, setExcelBusy] = useState(false);
@@ -107,7 +122,8 @@ export default function CoaListPage() {
   const [prefs, setPrefs] = useState<ColumnPrefs>(loadPrefs);
 
   const [editAcct, setEditAcct] = useState<Account | null>(null);
-  const [editForm, setEditForm] = useState({ code: '', name: '', parent_id: '', is_active: true });
+  const [editForm, setEditForm] = useState({ code: '', name: '', parent_id: '', is_active: true, detail_type: '', description: '' });
+  const [editBalance, setEditBalance] = useState<string | null>(null);
   const [editErr, setEditErr] = useState<string | null>(null);
 
   const [showDropdown, setShowDropdown] = useState(false);
@@ -179,8 +195,16 @@ export default function CoaListPage() {
     e.preventDefault();
     setErr(null);
     try {
-      await api.post(`/businesses/${bizId}/coa`, { ...form, parent_id: null });
-      setForm({ code: '', name: '', account_type: 'asset' });
+      await api.post(`/businesses/${bizId}/coa`, {
+        code: form.code,
+        name: form.name,
+        account_type: form.account_type,
+        parent_id: createParentId,
+        detail_type: form.detail_type || null,
+        description: form.description || null,
+      });
+      setForm({ code: '', name: '', account_type: 'asset', detail_type: '', description: '' });
+      setCreateParentId(null);
       setShowCreate(false);
       await reload();
     } catch (e: unknown) {
@@ -191,9 +215,17 @@ export default function CoaListPage() {
 
   function openEdit(a: Account) {
     setEditErr(null);
-    setEditForm({ code: a.code, name: a.name, parent_id: a.parent_id ?? '', is_active: a.is_active });
+    setEditForm({
+      code: a.code, name: a.name, parent_id: a.parent_id ?? '', is_active: a.is_active,
+      detail_type: a.detail_type ?? '', description: a.description ?? '',
+    });
     setEditAcct(a);
     setRowMenuId(null);
+    // Current balance shown in the drawer header; tolerate older API deploys.
+    setEditBalance(null);
+    api.get(`/businesses/${bizId}/coa/${a.id}`)
+      .then(r => setEditBalance(String(r.data.balance ?? '0')))
+      .catch(() => setEditBalance(null));
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -206,6 +238,8 @@ export default function CoaListPage() {
         name: editForm.name,
         parent_id: editForm.parent_id || null,
         is_active: editForm.is_active,
+        detail_type: editForm.detail_type || null,
+        description: editForm.description || null,
       });
       setEditAcct(null);
       await reload();
@@ -423,6 +457,17 @@ export default function CoaListPage() {
         </span>
       ),
     }] : []),
+    ...(prefs.showDetailType ? [{
+      key: 'detail_type', header: 'Detail type', sortable: true,
+      sortValue: (r: Account) => r.detail_type ?? '',
+      exportValue: (r: Account) => r.detail_type ?? '',
+      render: (r: Account) => <span className="text-muted-foreground">{r.detail_type ?? ''}</span>,
+    }] : []),
+    ...(prefs.showDescription ? [{
+      key: 'description', header: 'Description', sortable: false,
+      exportValue: (r: Account) => r.description ?? '',
+      render: (r: Account) => <span className="block max-w-[16rem] truncate text-muted-foreground" title={r.description ?? undefined}>{r.description ?? ''}</span>,
+    }] : []),
     ...(prefs.showBalance ? [{
       key: 'balance', header: 'Balance', align: 'right' as const, sortable: true,
       sortValue: (r: Account) => (tbMap ? naturalNet(r.account_type, tbMap.get(r.id) ?? '0') : 0),
@@ -476,6 +521,18 @@ export default function CoaListPage() {
                 </button>
                 <button
                   className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+                  onClick={() => {
+                    setRowMenuId(null);
+                    setErr(null);
+                    setCreateParentId(r.id);
+                    setForm({ code: '', name: '', account_type: r.account_type, detail_type: '', description: '' });
+                    setShowCreate(true);
+                  }}
+                >
+                  Create sub-account
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
                   onClick={() => void setActive([r.id], !r.is_active)}
                 >
                   {r.is_active ? 'Make inactive' : 'Make active'}
@@ -509,7 +566,12 @@ export default function CoaListPage() {
         <div className="flex items-center" ref={dropdownRef}>
           <Button
             className="rounded-r-none border-r border-primary-foreground/20"
-            onClick={() => { setErr(null); setShowCreate(true); }}
+            onClick={() => {
+              setErr(null);
+              setCreateParentId(null);
+              setForm({ code: '', name: '', account_type: 'asset', detail_type: '', description: '' });
+              setShowCreate(true);
+            }}
           >
             New account
           </Button>
@@ -629,6 +691,14 @@ export default function CoaListPage() {
                     Account type
                   </label>
                   <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefs.showDetailType} onChange={e => savePrefs({ ...prefs, showDetailType: e.target.checked })} />
+                    Detail type
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={prefs.showDescription} onChange={e => savePrefs({ ...prefs, showDescription: e.target.checked })} />
+                    Description
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={prefs.showBalance} onChange={e => savePrefs({ ...prefs, showBalance: e.target.checked })} />
                     Balance
                   </label>
@@ -677,7 +747,14 @@ export default function CoaListPage() {
           <div className="flex-1 bg-black/20" onClick={() => setShowCreate(false)} />
           <div className="w-96 bg-background shadow-xl flex flex-col border-l" role="dialog" aria-modal="true" aria-label="New account">
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">New account</h2>
+              <div>
+                <h2 className="text-lg font-semibold">{createParentId ? 'New sub-account' : 'New account'}</h2>
+                {createParentId && (
+                  <p className="text-xs text-muted-foreground">
+                    Under {accounts.find(a => a.id === createParentId)?.name ?? ''}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground text-lg"
@@ -702,12 +779,27 @@ export default function CoaListPage() {
                 <div>
                   <Label>Account type <span className="text-destructive">*</span></Label>
                   <select
-                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
                     value={form.account_type}
-                    onChange={e => setForm(f => ({ ...f, account_type: e.target.value }))}
+                    // Sub-accounts inherit the parent's type.
+                    disabled={createParentId !== null}
+                    onChange={e => setForm(f => ({ ...f, account_type: e.target.value, detail_type: '' }))}
                   >
                     {ACCOUNT_TYPES.map(t => (
                       <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Detail type</Label>
+                  <select
+                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={form.detail_type}
+                    onChange={e => setForm(f => ({ ...f, detail_type: e.target.value }))}
+                  >
+                    <option value="">Select detail type…</option>
+                    {(DETAIL_TYPES[form.account_type] ?? []).map(dt => (
+                      <option key={dt} value={dt}>{dt}</option>
                     ))}
                   </select>
                 </div>
@@ -718,6 +810,16 @@ export default function CoaListPage() {
                     placeholder="e.g. 1000"
                     value={form.code}
                     onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <textarea
+                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    rows={3}
+                    placeholder="What is this account used for?"
+                    value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   />
                 </div>
                 {err && <p className="text-sm text-destructive">{err}</p>}
@@ -737,7 +839,14 @@ export default function CoaListPage() {
           <div className="flex-1 bg-black/20" onClick={() => setEditAcct(null)} />
           <div className="w-96 bg-background shadow-xl flex flex-col border-l" role="dialog" aria-modal="true" aria-label="Edit account">
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">Edit account</h2>
+              <div>
+                <h2 className="text-lg font-semibold">Edit account</h2>
+                {editBalance !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    Current balance <span className="font-mono font-medium text-foreground">{fmtMoney(editBalance)}</span>
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground text-lg"
@@ -772,6 +881,33 @@ export default function CoaListPage() {
                   <div className="mt-1 h-10 flex items-center rounded-md border bg-muted/40 px-3 text-sm capitalize text-muted-foreground">
                     {editAcct.account_type}
                   </div>
+                </div>
+                <div>
+                  <Label>Detail type</Label>
+                  <select
+                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={editForm.detail_type}
+                    onChange={e => setEditForm(f => ({ ...f, detail_type: e.target.value }))}
+                  >
+                    <option value="">Select detail type…</option>
+                    {(DETAIL_TYPES[editAcct.account_type] ?? []).map(dt => (
+                      <option key={dt} value={dt}>{dt}</option>
+                    ))}
+                    {/* Preserve a non-standard stored value instead of silently dropping it. */}
+                    {editForm.detail_type && !(DETAIL_TYPES[editAcct.account_type] ?? []).includes(editForm.detail_type) && (
+                      <option value={editForm.detail_type}>{editForm.detail_type}</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <textarea
+                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    rows={3}
+                    placeholder="What is this account used for?"
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label>Sub-account of</Label>

@@ -136,6 +136,8 @@ export default function App() {
             {/* Settings (existing) */}
             <Route path="/settings/coa" element={<CoaListPage />} />
             <Route path="/settings/coa/:accountId/register" element={<AccountRegisterPage />} />
+            {/* Legacy path shipped on prod — keep so old links resolve. */}
+            <Route path="/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/settings/tax-codes" element={<TaxCodesPage />} />
             <Route path="/settings/periods" element={<PeriodsPage />} />
 

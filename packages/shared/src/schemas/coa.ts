@@ -7,6 +7,8 @@ export const accountCreateSchema = z.object({
   name: z.string().min(1).max(120),
   account_type: accountTypeEnum,
   parent_id: z.string().uuid().nullable().optional(),
+  detail_type: z.string().max(80).nullable().optional(),
+  description: z.string().max(500).nullable().optional(),
 });
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 
@@ -16,5 +18,7 @@ export const accountUpdateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   parent_id: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional(),
+  detail_type: z.string().max(80).nullable().optional(),
+  description: z.string().max(500).nullable().optional(),
 });
 export type AccountUpdate = z.infer<typeof accountUpdateSchema>;
