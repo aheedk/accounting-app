@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, FileDown, Printer, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, FileDown, Pencil, Printer, Search, Settings2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { api } from '@/lib/apiClient';
@@ -73,6 +73,19 @@ export default function CoaListPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+
+  // Settings panel
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const [colType, setColType] = useState(false);
+  const [colDetailType, setColDetailType] = useState(false);
+  const [colDescription, setColDescription] = useState(false);
+  const [colQBBalance, setColQBBalance] = useState(false);
+  const [colBankBalance, setColBankBalance] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [showReportBadges, setShowReportBadges] = useState(false);
+  const [pageSize, setPageSize] = useState(50);
+  const [density, setDensity] = useState<'roomy' | 'comfortable' | 'cozy' | 'compact'>('cozy');
 
   // Checkbox selection
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
@@ -157,22 +170,32 @@ export default function CoaListPage() {
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+  // Click-outside: settings panel
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setSettingsOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
   // --- Filter + paginate ---
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const effectiveStatus = showInactive ? 'all' : statusFilter;
     return accounts.filter(a => {
       if (typeFilter && a.account_type !== typeFilter) return false;
-      if (statusFilter === 'active' && !a.is_active) return false;
-      if (statusFilter === 'inactive' && a.is_active) return false;
+      if (effectiveStatus === 'active' && !a.is_active) return false;
+      if (effectiveStatus === 'inactive' && a.is_active) return false;
       if (q && !a.name.toLowerCase().includes(q) && !a.code.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [accounts, typeFilter, statusFilter, search]);
+  }, [accounts, typeFilter, statusFilter, search, showInactive]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const pagedAccounts = useMemo(() => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filtered, page]);
-  const startNum = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1;
-  const endNum = Math.min((page + 1) * PAGE_SIZE, filtered.length);
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const pagedAccounts = useMemo(() => filtered.slice(page * pageSize, (page + 1) * pageSize), [filtered, page, pageSize]);
+  const startNum = filtered.length === 0 ? 0 : page * pageSize + 1;
+  const endNum = Math.min((page + 1) * pageSize, filtered.length);
 
   // --- Checkbox helpers ---
   function toggleCheck(id: string) {
@@ -445,44 +468,165 @@ export default function CoaListPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Export / Print */}
-          <div className="relative group">
+        {/* Right side: Batch edit + icons + settings, then pagination below */}
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1">
+            {/* Batch edit */}
             <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent disabled:opacity-50"
-              onClick={handleExport} disabled={excelBusy} aria-label="Export to Excel"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-emerald-700 hover:bg-muted/50 disabled:opacity-40 transition-colors"
+              disabled={checkedIds.size === 0}
+              title={checkedIds.size === 0 ? 'Select accounts to batch edit' : 'Batch edit selected'}
             >
-              <FileDown className="h-4 w-4" />
+              <Pencil className="h-4 w-4" />
+              Batch edit
             </button>
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
-          </div>
-          <div className="relative group">
-            <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent"
-              onClick={handlePrint} aria-label="Print"
-            >
-              <Printer className="h-4 w-4" />
-            </button>
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
+
+            {/* Export */}
+            <div className="relative group">
+              <button
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:opacity-50"
+                onClick={handleExport} disabled={excelBusy} aria-label="Export to Excel"
+              >
+                <FileDown className="h-4 w-4" />
+              </button>
+              <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
+            </div>
+
+            {/* Print */}
+            <div className="relative group">
+              <button
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                onClick={handlePrint} aria-label="Print"
+              >
+                <Printer className="h-4 w-4" />
+              </button>
+              <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
+            </div>
+
+            {/* Settings gear */}
+            <div className="relative" ref={settingsRef}>
+              <button
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors ${settingsOpen ? 'bg-accent text-foreground' : ''}`}
+                onClick={() => setSettingsOpen(o => !o)}
+                aria-label="Settings"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+
+              {settingsOpen && (
+                <div className="absolute right-0 top-full mt-1 w-72 rounded-lg border bg-background shadow-xl z-50">
+                  <div className="flex items-center justify-between px-4 py-3 border-b">
+                    <span className="font-semibold text-sm">Settings</span>
+                    <button onClick={() => setSettingsOpen(false)} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-5 max-h-[70vh] overflow-y-auto">
+
+                    {/* Columns */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Columns</p>
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Type', state: colType, set: setColType },
+                          { label: 'Detail type', state: colDetailType, set: setColDetailType },
+                          { label: 'Description', state: colDescription, set: setColDescription },
+                          { label: 'QuickBooks balance', state: colQBBalance, set: setColQBBalance },
+                          { label: 'Bank balance', state: colBankBalance, set: setColBankBalance },
+                        ].map(({ label, state, set }) => (
+                          <label key={label} className="flex items-center gap-3 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={state}
+                              onChange={e => set(e.target.checked)}
+                              className="h-4 w-4 rounded border-input cursor-pointer"
+                            />
+                            <span className="text-sm">{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Other */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Other</p>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="h-4 w-4 rounded border-input cursor-pointer" />
+                          <span className="text-sm">Show inactive accounts</span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <input type="checkbox" checked={showReportBadges} onChange={e => setShowReportBadges(e.target.checked)} className="h-4 w-4 rounded border-input cursor-pointer" />
+                          <span className="text-sm">Show report type badges</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Page size */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Page size</p>
+                      <div className="space-y-2">
+                        {[50, 75, 100, 200, 300].map(n => (
+                          <label key={n} className="flex items-center gap-3 cursor-pointer select-none">
+                            <input
+                              type="radio"
+                              name="pageSize"
+                              checked={pageSize === n}
+                              onChange={() => { setPageSize(n); setPage(0); }}
+                              className="h-4 w-4 accent-emerald-600 cursor-pointer"
+                            />
+                            <span className="text-sm">{n}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Table density */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Table Density</p>
+                      <div className="space-y-2">
+                        {(['roomy', 'comfortable', 'cozy', 'compact'] as const).map(d => (
+                          <label key={d} className="flex items-center gap-3 cursor-pointer select-none">
+                            <input
+                              type="radio"
+                              name="density"
+                              checked={density === d}
+                              onChange={() => setDensity(d)}
+                              className="h-4 w-4 accent-emerald-600 cursor-pointer"
+                            />
+                            <span className="text-sm capitalize">{d}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination below icons */}
           {filtered.length > 0 && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground ml-2">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <button
-                className="h-8 px-2 rounded border bg-background text-xs hover:bg-muted/50 disabled:opacity-40"
+                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
                 disabled={page === 0}
                 onClick={() => setPage(p => p - 1)}
+                aria-label="Previous page"
               >
-                Previous
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 tabular-nums">{startNum}–{endNum} of {filtered.length}</span>
+              <span className="px-1 tabular-nums text-xs">
+                {page === 0 && totalPages <= 1 ? `1 - ${filtered.length}` : `${startNum} - ${endNum}`}
+              </span>
               <button
-                className="h-8 px-2 rounded border bg-background text-xs hover:bg-muted/50 disabled:opacity-40"
+                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(p => p + 1)}
+                aria-label="Next page"
               >
-                Next
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -490,33 +634,38 @@ export default function CoaListPage() {
       </div>
 
       {/* ── Table ── */}
+      {(() => {
+        const pad = { roomy: 'py-5', comfortable: 'py-3.5', cozy: 'py-3', compact: 'py-1.5' }[density];
+        const colCount = 3 + (colType ? 1 : 0) + (colDetailType ? 1 : 0) + (colDescription ? 1 : 0) + (colQBBalance ? 1 : 0) + (colBankBalance ? 1 : 0);
+        const thCls = `px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide`;
+        return (
       <div className="rounded-md border bg-background overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30">
             <tr>
-              <th className="w-10 px-3 py-3">
-                <input
-                  type="checkbox"
-                  checked={allPageChecked}
-                  onChange={toggleAll}
-                  className="h-4 w-4 rounded border-input cursor-pointer"
-                />
+              <th className="w-10 px-3 py-2.5">
+                <input type="checkbox" checked={allPageChecked} onChange={toggleAll} className="h-4 w-4 rounded border-input cursor-pointer" />
               </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-              <th className="px-3 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide w-48">Action</th>
+              <th className={thCls}>Name</th>
+              {colType && <th className={thCls}>Type</th>}
+              {colDetailType && <th className={thCls}>Detail Type</th>}
+              {colDescription && <th className={thCls}>Description</th>}
+              {colQBBalance && <th className={`${thCls} text-right`}>QB Balance</th>}
+              {colBankBalance && <th className={`${thCls} text-right`}>Bank Balance</th>}
+              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide w-48">Action</th>
             </tr>
           </thead>
           <tbody>
             {pagedAccounts.length === 0 && (
               <tr>
-                <td colSpan={3} className="py-12 text-center text-muted-foreground text-sm">
+                <td colSpan={colCount} className="py-12 text-center text-muted-foreground text-sm">
                   No accounts found. Adjust the filters or add a new account.
                 </td>
               </tr>
             )}
             {pagedAccounts.map(acct => (
-              <tr key={acct.id} className="border-b last:border-b-0 hover:bg-muted/20 group">
-                <td className="px-3 py-3">
+              <tr key={acct.id} className={`border-b last:border-b-0 hover:bg-muted/20 group ${!acct.is_active ? 'opacity-60' : ''}`}>
+                <td className={`px-3 ${pad}`}>
                   <input
                     type="checkbox"
                     checked={checkedIds.has(acct.id)}
@@ -524,10 +673,23 @@ export default function CoaListPage() {
                     className="h-4 w-4 rounded border-input cursor-pointer"
                   />
                 </td>
-                <td className="px-3 py-3">
-                  <div className="font-medium">{acct.name}</div>
+                <td className={`px-3 ${pad}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{acct.name}</span>
+                    {!acct.is_active && <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">Inactive</span>}
+                    {showReportBadges && (
+                      <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold ${['asset','liability','equity'].includes(acct.account_type) ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'}`}>
+                        {['asset','liability','equity'].includes(acct.account_type) ? 'Balance Sheet' : 'Income Statement'}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground font-mono mt-0.5">{acct.code}{acct.detail_type ? ` · ${acct.detail_type}` : ''}</div>
                 </td>
+                {colType && <td className={`px-3 ${pad} text-sm capitalize text-muted-foreground`}>{acct.account_type}</td>}
+                {colDetailType && <td className={`px-3 ${pad} text-sm text-muted-foreground`}>{acct.detail_type ?? <span className="opacity-30">—</span>}</td>}
+                {colDescription && <td className={`px-3 ${pad} text-sm text-muted-foreground max-w-[200px] truncate`}>{acct.description ?? <span className="opacity-30">—</span>}</td>}
+                {colQBBalance && <td className={`px-3 ${pad} text-right font-mono text-sm text-muted-foreground`}>—</td>}
+                {colBankBalance && <td className={`px-3 ${pad} text-right font-mono text-sm text-muted-foreground`}>—</td>}
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1" data-row-menu={acct.id}>
                     <Link
@@ -587,6 +749,8 @@ export default function CoaListPage() {
           </tbody>
         </table>
       </div>
+        );
+      })()}
 
       {/* ── Edit slide-over ── */}
       {editAccount && (
