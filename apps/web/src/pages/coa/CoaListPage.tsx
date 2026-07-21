@@ -37,6 +37,51 @@ const COL_ALIASES: Record<string, string> = {
 
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
 
+// Import sheets often use QBO-style type names ("Bank", "AR", "Credit Card").
+// Normalize them to our five account types; when the original name is also a
+// known detail type, carry it through.
+const TYPE_ALIASES: Record<string, { type: string; detail?: string }> = {
+  'asset': { type: 'asset' },
+  'assets': { type: 'asset' },
+  'bank': { type: 'asset', detail: 'Checking' },
+  'cash': { type: 'asset', detail: 'Cash on Hand' },
+  'ar': { type: 'asset', detail: 'Accounts Receivable' },
+  'a/r': { type: 'asset', detail: 'Accounts Receivable' },
+  'accounts receivable': { type: 'asset', detail: 'Accounts Receivable' },
+  'inventory': { type: 'asset', detail: 'Inventory' },
+  'fixed asset': { type: 'asset', detail: 'Fixed Assets' },
+  'fixed assets': { type: 'asset', detail: 'Fixed Assets' },
+  'other current asset': { type: 'asset' },
+  'other current assets': { type: 'asset' },
+  'other asset': { type: 'asset', detail: 'Other Assets' },
+  'other assets': { type: 'asset', detail: 'Other Assets' },
+  'liability': { type: 'liability' },
+  'liabilities': { type: 'liability' },
+  'ap': { type: 'liability', detail: 'Accounts Payable' },
+  'a/p': { type: 'liability', detail: 'Accounts Payable' },
+  'accounts payable': { type: 'liability', detail: 'Accounts Payable' },
+  'credit card': { type: 'liability', detail: 'Credit Card' },
+  'loan': { type: 'liability', detail: 'Loan Payable' },
+  'other current liability': { type: 'liability' },
+  'other current liabilities': { type: 'liability' },
+  'long term liability': { type: 'liability' },
+  'long-term liability': { type: 'liability' },
+  'equity': { type: 'equity' },
+  "owner's equity": { type: 'equity' },
+  'owner equity': { type: 'equity' },
+  'retained earnings': { type: 'equity', detail: 'Retained Earnings' },
+  'revenue': { type: 'revenue' },
+  'income': { type: 'revenue' },
+  'sales': { type: 'revenue', detail: 'Sales Income' },
+  'other income': { type: 'revenue', detail: 'Other Income' },
+  'expense': { type: 'expense' },
+  'expenses': { type: 'expense' },
+  'cost of goods sold': { type: 'expense', detail: 'Cost of Labor' },
+  'cogs': { type: 'expense', detail: 'Cost of Labor' },
+  'other expense': { type: 'expense', detail: 'Other Expenses' },
+  'other expenses': { type: 'expense', detail: 'Other Expenses' },
+};
+
 const DETAIL_TYPES: Record<string, string[]> = {
   asset: ['Checking', 'Savings', 'Money Market', 'Cash on Hand', 'Accounts Receivable', 'Prepaid Expenses', 'Inventory', 'Fixed Assets', 'Buildings', 'Vehicles', 'Equipment', 'Accumulated Depreciation', 'Other Assets'],
   liability: ['Accounts Payable', 'Credit Card', 'Line of Credit', 'Loan Payable', 'Sales Tax Payable', 'Accrued Liabilities', 'Customer Deposits', 'Notes Payable', 'Mortgage', 'Other Liabilities'],
@@ -479,7 +524,18 @@ export default function CoaListPage() {
             if (mapped) row[mapped] = String(v ?? '').trim();
           }
           const missing = IMPORT_COLS.filter(c => c.required && !row[c.key]);
-          return { data: row, status: 'pending', error: missing.length ? `Missing: ${missing.map(c => c.header).join(', ')}` : null };
+          if (missing.length) {
+            return { data: row, status: 'pending' as const, error: `Missing: ${missing.map(c => c.header).join(', ')}` };
+          }
+          // Normalize QBO-style type names so validation issues surface in
+          // the preview instead of failing at the API.
+          const alias = TYPE_ALIASES[row['account_type']!.toLowerCase()];
+          if (!alias) {
+            return { data: row, status: 'pending' as const, error: `Unknown account type "${row['account_type']}"` };
+          }
+          row['account_type'] = alias.type;
+          if (alias.detail) row['detail_type'] = alias.detail;
+          return { data: row, status: 'pending' as const, error: null };
         });
         setImportRows(parsed);
       } catch { setImportParseErr('Could not read file.'); }
@@ -501,7 +557,13 @@ export default function CoaListPage() {
       if (row.error) { row.status = 'error'; continue; }
       try {
         // eslint-disable-next-line no-await-in-loop
-        await api.post(`/businesses/${bizId}/coa`, { code: row.data['code'], name: row.data['name'], account_type: row.data['account_type'], parent_id: null });
+        await api.post(`/businesses/${bizId}/coa`, {
+          code: row.data['code'],
+          name: row.data['name'],
+          account_type: row.data['account_type'],
+          detail_type: row.data['detail_type'] ?? null,
+          parent_id: null,
+        });
         row.status = 'ok';
       } catch (e: unknown) {
         row.status = 'error';
