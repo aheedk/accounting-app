@@ -7,7 +7,11 @@ import { GlobalSearch } from '@/components/layout/GlobalSearch';
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur">
+    // relative z-30: backdrop-blur creates a stacking context at z-auto, which
+    // let positioned page content (toolbars, inputs) paint OVER the header's
+    // dropdowns (company switcher, menus). Fixed inset-0 z-50 overlays still
+    // cover the header.
+    <header className="relative z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <button
           type="button"
