@@ -87,6 +87,7 @@ const groups: NavGroup[] = [
       { to: '/reports/standard', label: 'Standard Reports' },
       { to: '/reports/pnl', label: 'Profit & Loss' },
       { to: '/reports/balance-sheet', label: 'Balance Sheet' },
+      { to: '/reports/general-ledger', label: 'General Ledger' },
       { to: '/reports/cash-flow', label: 'Cash Flow' },
       { to: '/reports/custom', label: 'Custom Reports' },
       { to: '/reports/management', label: 'Management Reports' },
@@ -94,7 +95,6 @@ const groups: NavGroup[] = [
       { to: '/reports/financial-planning', label: 'Financial Planning' },
       { to: '/reports/spreadsheet-sync', label: 'Spreadsheet Sync' },
       { to: '/reports/trial-balance', label: 'Trial Balance' },
-      { to: '/reports/general-ledger', label: 'General Ledger' },
     ],
   },
   {
