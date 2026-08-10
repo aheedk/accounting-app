@@ -2,12 +2,13 @@ import { z } from 'zod';
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const money = z.string().regex(/^\d+(\.\d{1,4})?$/);
-const paymentMethodEnum = z.enum(['cash', 'check', 'ach', 'wire', 'card', 'other']);
+export const paymentMethodSchema = z.enum(['cash', 'check', 'ach', 'wire', 'card', 'other']);
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 
 export const paymentDraftCreateSchema = z.object({
   customer_id: z.string().uuid(),
   payment_date: dateString,
-  payment_method: paymentMethodEnum,
+  payment_method: paymentMethodSchema,
   reference: z.string().max(200).nullable().optional(),
   amount: money,
   cash_account_id: z.string().uuid(),

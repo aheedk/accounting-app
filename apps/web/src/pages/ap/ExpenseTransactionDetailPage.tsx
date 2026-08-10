@@ -11,6 +11,7 @@ import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetail
 import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { paymentMethodLabel, type PaymentMethod } from '@/lib/paymentMethods';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 
@@ -22,6 +23,7 @@ type ExpenseTransaction = {
   vendor_id: string | null;
   expense_account_id: string;
   payment_account_id: string;
+  payment_method: PaymentMethod;
   amount: string;
   memo: string | null;
   status: ExpenseStatus;
@@ -146,10 +148,11 @@ export default function ExpenseTransactionDetailPage() {
 
       {err && <p className="text-sm text-destructive">{err}</p>}
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <DetailMetric label="Expense date" value={fmtLongDate(data.transaction_date)} />
         <DetailMetric label="Expense account" value={accountMap.get(data.expense_account_id) ?? data.expense_account_id.slice(0, 8)} />
         <DetailMetric label="Paid from" value={accountMap.get(data.payment_account_id) ?? data.payment_account_id.slice(0, 8)} />
+        <DetailMetric label="Payment method" value={paymentMethodLabel(data.payment_method)} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -160,6 +163,7 @@ export default function ExpenseTransactionDetailPage() {
             <DetailField label="Transaction date" value={fmtLongDate(data.transaction_date)} />
             <DetailField label="Expense account" value={accountMap.get(data.expense_account_id) ?? data.expense_account_id.slice(0, 8)} />
             <DetailField label="Payment account" value={accountMap.get(data.payment_account_id) ?? data.payment_account_id.slice(0, 8)} />
+            <DetailField label="Payment method" value={paymentMethodLabel(data.payment_method)} />
             <DetailField label="Memo" className="sm:col-span-2" value={data.memo} />
           </CardContent>
         </Card>

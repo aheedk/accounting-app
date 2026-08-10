@@ -354,6 +354,7 @@ export interface ExpenseTransactionsTable {
   vendor_id: string | null;
   expense_account_id: string;
   payment_account_id: string;
+  payment_method: Generated<PaymentMethod>;
   amount: ColumnType<string, string | number, string | number>;
   memo: string | null;
   status: Generated<ExpenseTransactionStatus>;

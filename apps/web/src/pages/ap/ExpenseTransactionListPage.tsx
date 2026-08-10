@@ -13,6 +13,7 @@ import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { daysAgoLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
+import { PAYMENT_METHOD_OPTIONS, paymentMethodLabel, type PaymentMethod } from '@/lib/paymentMethods';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 type StatusFilter = ExpenseStatus | 'all';
@@ -25,6 +26,7 @@ type ExpenseTransaction = {
   vendor_id: string | null;
   expense_account_id: string;
   payment_account_id: string;
+  payment_method: PaymentMethod;
   amount: string;
   memo: string | null;
   status: ExpenseStatus;
@@ -90,6 +92,7 @@ export default function ExpenseTransactionListPage() {
 
   const [excelBusy, setExcelBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<PaymentMethod | 'all'>('all');
   const [dateFilter, setDateFilter] = useState<string>('12m');
   const [items, setItems] = useState<ExpenseTransaction[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -101,14 +104,15 @@ export default function ExpenseTransactionListPage() {
     if (!bizId) { setItems([]); return; }
     setErr(null);
     try {
-      const params: { status?: ExpenseStatus } = {};
+      const params: { status?: ExpenseStatus; payment_method?: PaymentMethod } = {};
       if (statusFilter !== 'all') params.status = statusFilter;
+      if (paymentMethodFilter !== 'all') params.payment_method = paymentMethodFilter;
       const r = await api.get<ListResponse>(`/businesses/${bizId}/expense-transactions`, { params });
       setItems(r.data.expense_transactions);
     } catch (e: unknown) {
       setErr(pickErr(e));
     }
-  }, [bizId, statusFilter]);
+  }, [bizId, statusFilter, paymentMethodFilter]);
 
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
@@ -166,6 +170,7 @@ export default function ExpenseTransactionListPage() {
     { key: 'type', header: 'Type', sortable: false, render: () => 'Expense' },
     { key: 'payee', header: 'Payee', sortable: true, sortValue: r => r.payee_name, render: r => r.payee_name || <span className="text-muted-foreground">—</span> },
     { key: 'category', header: 'Category', sortable: true, sortValue: r => r.category_name, render: r => r.category_name || <span className="text-muted-foreground">—</span> },
+    { key: 'payment_method', header: 'Payment method', sortable: true, sortValue: r => paymentMethodLabel(r.payment_method), render: r => paymentMethodLabel(r.payment_method) },
     { key: 'amount', header: 'Total', align: 'right', sortable: true, sortValue: r => Number(r.amount), render: r => <span className="font-mono">{fmtMoney(r.amount)}</span> },
     { key: 'status', header: 'Status', sortable: true, sortValue: r => r.status, render: r => statusBadge(r.status) },
   ];
@@ -225,6 +230,16 @@ export default function ExpenseTransactionListPage() {
           onChange={e => setDateFilter(e.target.value)}
         >
           {DATE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={paymentMethodFilter}
+          onChange={e => setPaymentMethodFilter(e.target.value as PaymentMethod | 'all')}
+        >
+          <option value="all">All payment methods</option>
+          {PAYMENT_METHOD_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </select>
         {range && range.days > 0 && (
           <span className="inline-flex h-9 items-center gap-2 rounded-full border bg-muted/40 px-3 text-sm">

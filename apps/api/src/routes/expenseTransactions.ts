@@ -6,6 +6,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as et from '../services/ap/expenseTransactionService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
+import type { PaymentMethod } from '../db/types.js';
 
 const router = Router({ mergeParams: true });
 
@@ -23,8 +24,13 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 router.get('/businesses/:businessId/expense-transactions', async (req, res, next) => {
   try {
     const status = req.query['status'];
-    const opts: { status?: 'draft' | 'posted' | 'void' } = {};
+    const paymentMethod = schemas.paymentMethodSchema.safeParse(req.query['payment_method']);
+    const opts: {
+      status?: 'draft' | 'posted' | 'void';
+      payment_method?: PaymentMethod;
+    } = {};
     if (status === 'draft' || status === 'posted' || status === 'void') opts.status = status;
+    if (paymentMethod.success) opts.payment_method = paymentMethod.data;
     res.json({ expense_transactions: await et.listExpenses(db, req.tenancy!.business_id, opts) });
   } catch (e) { next(e); }
 });
@@ -45,6 +51,7 @@ router.post('/businesses/:businessId/expense-transactions', requireMinRole('staf
         vendor_id: body.vendor_id ?? null,
         expense_account_id: body.expense_account_id,
         payment_account_id: body.payment_account_id,
+        payment_method: body.payment_method,
         amount: body.amount,
         memo: body.memo ?? null,
       }),

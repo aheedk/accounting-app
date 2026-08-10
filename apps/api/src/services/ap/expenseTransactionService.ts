@@ -1,6 +1,6 @@
 import { sql, type Transaction, type Kysely } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
-import type { DB } from '../../db/types.js';
+import type { DB, PaymentMethod } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
@@ -14,6 +14,7 @@ export type CreateDraftInput = {
   vendor_id?: string | null;
   expense_account_id: string;
   payment_account_id: string;
+  payment_method: PaymentMethod;
   amount: string;
   memo?: string | null;
 };
@@ -42,6 +43,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     vendor_id: input.vendor_id ?? null,
     expense_account_id: input.expense_account_id,
     payment_account_id: input.payment_account_id,
+    payment_method: input.payment_method,
     amount: input.amount,
     memo: input.memo ?? null,
     created_by_user_id: ctx.user_id,
@@ -118,10 +120,15 @@ export async function voidExpense(trx: Transaction<DB>, ctx: ServiceCtx, input: 
   return updated;
 }
 
-export async function listExpenses(db: Kysely<DB>, business_id: string, opts: { status?: 'draft' | 'posted' | 'void' } = {}) {
+export async function listExpenses(
+  db: Kysely<DB>,
+  business_id: string,
+  opts: { status?: 'draft' | 'posted' | 'void'; payment_method?: PaymentMethod } = {},
+) {
   let q = db.selectFrom('expense_transactions').selectAll()
     .where('business_id', '=', business_id);
   if (opts.status) q = q.where('status', '=', opts.status);
+  if (opts.payment_method) q = q.where('payment_method', '=', opts.payment_method);
   return q.orderBy('transaction_date', 'desc').execute();
 }
 

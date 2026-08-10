@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paymentMethodSchema } from './payment.js';
 const moneyStr = z.string().regex(/^\d+(\.\d+)?$/);
 
 export const expenseTransactionCreateSchema = z.object({
@@ -7,6 +8,7 @@ export const expenseTransactionCreateSchema = z.object({
   vendor_id: z.string().uuid().nullable().optional(),
   expense_account_id: z.string().uuid(),
   payment_account_id: z.string().uuid(),
+  payment_method: paymentMethodSchema,
   amount: moneyStr,
   memo: z.string().max(500).nullable().optional(),
 }).refine(
@@ -21,6 +23,7 @@ export const expenseTransactionUpdateSchema = z.object({
   vendor_id: z.string().uuid().nullable().optional(),
   expense_account_id: z.string().uuid().optional(),
   payment_account_id: z.string().uuid().optional(),
+  payment_method: paymentMethodSchema.optional(),
   amount: moneyStr.optional(),
   memo: z.string().max(500).nullable().optional(),
 });

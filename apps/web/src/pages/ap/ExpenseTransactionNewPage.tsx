@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { PAYMENT_METHOD_OPTIONS, type PaymentMethod } from '@/lib/paymentMethods';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -32,8 +33,19 @@ type CreateBody = {
   vendor_id: string | null;
   expense_account_id: string;
   payment_account_id: string;
+  payment_method: PaymentMethod;
   amount: string;
   memo: string | null;
+};
+
+type ExpenseForm = {
+  transaction_date: string;
+  payee_text: string;
+  expense_account_id: string;
+  payment_account_id: string;
+  payment_method: PaymentMethod | '';
+  amount: string;
+  memo: string;
 };
 
 const AMOUNT_RE = /^\d+(\.\d+)?$/;
@@ -47,11 +59,12 @@ export default function ExpenseTransactionNewPage() {
   const nav = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ExpenseForm>({
     transaction_date: today(),
     payee_text: '',
     expense_account_id: '',
     payment_account_id: '',
+    payment_method: '',
     amount: '',
     memo: '',
   });
@@ -65,7 +78,7 @@ export default function ExpenseTransactionNewPage() {
   }, [bizId]);
 
   const paymentAccounts = useMemo(
-    () => accounts.filter((a) => a.account_type === 'asset' && a.is_active),
+    () => accounts.filter((a) => (a.account_type === 'asset' || a.account_type === 'liability') && a.is_active),
     [accounts],
   );
   const expenseAccounts = useMemo(
@@ -79,6 +92,7 @@ export default function ExpenseTransactionNewPage() {
     e.preventDefault();
     setErr(null);
     if (!AMOUNT_RE.test(form.amount)) { setErr('Amount must be a positive number like 125.00'); return; }
+    if (!form.payment_method) { setErr('Choose a payment method'); return; }
     setBusy(true);
     try {
       // QBO payee combo: an exact vendor-name match links the vendor, otherwise free text.
@@ -89,6 +103,7 @@ export default function ExpenseTransactionNewPage() {
         vendor_id: vendor?.id ?? null,
         expense_account_id: form.expense_account_id,
         payment_account_id: form.payment_account_id,
+        payment_method: form.payment_method,
         amount: form.amount,
         memo: form.memo || null,
       };
@@ -111,7 +126,7 @@ export default function ExpenseTransactionNewPage() {
         </div>
       </div>
 
-      <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-3">
+      <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label className="text-xs text-muted-foreground">Payee</Label>
           <Input
@@ -134,6 +149,20 @@ export default function ExpenseTransactionNewPage() {
             required
             placeholder="Which account paid?"
           />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Payment method</Label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            value={form.payment_method}
+            onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value as PaymentMethod | '' }))}
+            required
+          >
+            <option value="">Choose payment method</option>
+            {PAYMENT_METHOD_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Payment date</Label>

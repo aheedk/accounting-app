@@ -28,10 +28,11 @@ describe('expenseTransactionService', () => {
       et.createDraft(trx, ctx, {
         business_id: biz.id, transaction_date: '2026-04-15',
         payee_text: 'Staples', expense_account_id: expense.id,
-        payment_account_id: cash.id, amount: '42.50', memo: 'pens',
+        payment_account_id: cash.id, payment_method: 'card', amount: '42.50', memo: 'pens',
       }),
     );
     expect(row.status).toBe('draft');
+    expect(row.payment_method).toBe('card');
     expect(row.journal_entry_id).toBeNull();
   });
 
@@ -41,7 +42,7 @@ describe('expenseTransactionService', () => {
       et.createDraft(trx, ctx, {
         business_id: biz.id, transaction_date: '2026-04-15',
         payee_text: 'Staples', expense_account_id: expense.id,
-        payment_account_id: cash.id, amount: '42.50',
+        payment_account_id: cash.id, payment_method: 'check', amount: '42.50',
       }),
     );
     const posted = await t.db.transaction().execute(trx =>
@@ -65,7 +66,7 @@ describe('expenseTransactionService', () => {
       et.createDraft(trx, ctx, {
         business_id: biz.id, transaction_date: '2026-04-15',
         payee_text: 'Staples', expense_account_id: expense.id,
-        payment_account_id: cash.id, amount: '42.50',
+        payment_account_id: cash.id, payment_method: 'cash', amount: '42.50',
       }),
     );
     const posted = await t.db.transaction().execute(trx =>
@@ -79,5 +80,24 @@ describe('expenseTransactionService', () => {
     // Audit trail: void preserves the original JE link
     expect(voided.journal_entry_id).toBe(posted.journal_entry_id);
     expect(voided.posted_at).not.toBeNull();
+  });
+
+  it('filters the expense list by payment method', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    for (const payment_method of ['cash', 'card'] as const) {
+      await t.db.transaction().execute(trx => et.createDraft(trx, ctx, {
+        business_id: biz.id,
+        transaction_date: '2026-04-15',
+        payee_text: payment_method,
+        expense_account_id: expense.id,
+        payment_account_id: cash.id,
+        payment_method,
+        amount: '10.00',
+      }));
+    }
+
+    const rows = await et.listExpenses(t.db, biz.id, { payment_method: 'card' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.payment_method).toBe('card');
   });
 });

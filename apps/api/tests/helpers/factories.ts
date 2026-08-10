@@ -1,6 +1,6 @@
 // apps/api/tests/helpers/factories.ts
 import { Kysely, sql } from 'kysely';
-import type { DB, UserRole, AccountType } from '../../src/db/types.js';
+import type { DB, UserRole, AccountType, PaymentMethod } from '../../src/db/types.js';
 import { hashPassword } from '../../src/services/auth/passwordHasher.js';
 
 export async function makeFirm(db: Kysely<DB>, name = 'Test Firm'): Promise<{ id: string; name: string }> {
@@ -177,12 +177,13 @@ export async function makeExpenseTransaction(
   business_id: string,
   expense_account_id: string,
   payment_account_id: string,
-  opts: Partial<{ amount: string; payee_text: string; transaction_date: string }> = {},
+  opts: Partial<{ amount: string; payee_text: string; transaction_date: string; payment_method: PaymentMethod }> = {},
 ) {
   return db.insertInto('expense_transactions').values({
     business_id,
     expense_account_id,
     payment_account_id,
+    payment_method: opts.payment_method ?? 'other',
     amount: opts.amount ?? '50.00',
     payee_text: opts.payee_text ?? 'Test Payee',
     transaction_date: opts.transaction_date ?? '2026-04-01',
