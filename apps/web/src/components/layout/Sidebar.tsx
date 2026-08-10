@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   BookOpen,
   Briefcase,
@@ -166,7 +166,6 @@ type SidebarNavProps = {
 // the mobile drawer. Interaction mode switches between hover (mouse) and tap.
 export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const pathname = location.pathname;
 
   const activeGroupId = useMemo(() => {
@@ -186,11 +185,6 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
     if (!expandOnHover) setOpenGroupId(activeGroupId);
   }, [activeGroupId, expandOnHover]);
 
-  function go(to: string) {
-    navigate(to);
-    onNavigate?.();
-  }
-
   return (
     <nav
       className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3"
@@ -204,6 +198,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
         const isOpen = expandOnHover
           ? hoveredGroupId === group.id || (hoveredGroupId === null && isActiveGroup)
           : openGroupId === group.id;
+        const firstChild = group.children?.[0];
 
         if (!group.children || group.children.length === 0) {
           const to = group.to ?? '/';
@@ -240,34 +235,51 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
               if (expandOnHover) setHoveredGroupId(group.id);
             }}
           >
-            <button
-              type="button"
-              onClick={() => {
-                if (expandOnHover) {
-                  const first = group.children?.[0];
-                  if (first) navigate(first.to);
-                } else {
-                  setOpenGroupId(id => (id === group.id ? null : group.id));
-                }
-              }}
-              aria-expanded={isOpen}
-              className={cn(
-                'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                'hover:bg-sidebar-hover hover:text-white',
-                isActiveGroup
-                  ? 'bg-sidebar-active text-white'
-                  : 'text-sidebar-muted',
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1 text-left">{group.label}</span>
-              <ChevronRight
+            {expandOnHover && firstChild ? (
+              <NavLink
+                to={firstChild.to}
+                onClick={() => onNavigate?.()}
+                aria-expanded={isOpen}
                 className={cn(
-                  'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
-                  isOpen && 'rotate-90',
+                  'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'hover:bg-sidebar-hover hover:text-white',
+                  isActiveGroup
+                    ? 'bg-sidebar-active text-white'
+                    : 'text-sidebar-muted',
                 )}
-              />
-            </button>
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">{group.label}</span>
+                <ChevronRight
+                  className={cn(
+                    'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
+                    isOpen && 'rotate-90',
+                  )}
+                />
+              </NavLink>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setOpenGroupId(id => (id === group.id ? null : group.id))}
+                aria-expanded={isOpen}
+                className={cn(
+                  'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'hover:bg-sidebar-hover hover:text-white',
+                  isActiveGroup
+                    ? 'bg-sidebar-active text-white'
+                    : 'text-sidebar-muted',
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">{group.label}</span>
+                <ChevronRight
+                  className={cn(
+                    'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
+                    isOpen && 'rotate-90',
+                  )}
+                />
+              </button>
+            )}
 
             <div
               className={cn(
@@ -283,11 +295,11 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                   {group.children.map((child, idx) => {
                     const childActive = pathMatchesChild(pathname, child);
                     return (
-                      <button
+                      <NavLink
                         key={`${group.id}-${child.to}`}
-                        type="button"
+                        to={child.to}
                         tabIndex={isOpen ? 0 : -1}
-                        onClick={() => go(child.to)}
+                        onClick={() => onNavigate?.()}
                         style={{
                           transitionDelay: isOpen ? `${idx * 20}ms` : '0ms',
                         }}
@@ -300,7 +312,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                         )}
                       >
                         {child.label}
-                      </button>
+                      </NavLink>
                     );
                   })}
                 </div>
