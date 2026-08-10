@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FileDown, Printer } from 'lucide-react';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
@@ -49,6 +50,15 @@ function monthRange(now: Date): { start: string; end: string } {
     return `${yy}-${mm}-${dd}`;
   };
   return { start: iso(first), end: iso(last) };
+}
+
+function generalLedgerUrl(accountId: string, periodStart: string, periodEnd: string): string {
+  const params = new URLSearchParams({
+    account_id: accountId,
+    period_start: periodStart,
+    period_end: periodEnd,
+  });
+  return `/reports/general-ledger?${params.toString()}`;
 }
 
 export default function ProfitLossPage() {
@@ -187,7 +197,15 @@ export default function ProfitLossPage() {
                 {report.revenue_lines.map(r => (
                   <tr key={r.account_id} className="border-b hover:bg-muted/30">
                     <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{r.account_code}</span>{r.account_name}</td>
-                    <td className="p-3 text-right font-mono">{fmtMoney(r.amount)}</td>
+                    <td className="p-3 text-right font-mono">
+                      <Link
+                        className="text-primary underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+                        to={generalLedgerUrl(r.account_id, report.period_start, report.period_end)}
+                        title={`View ${r.account_name} transactions in the General Ledger`}
+                      >
+                        {fmtMoney(r.amount)}
+                      </Link>
+                    </td>
                   </tr>
                 ))}
                 <tr className="border-b font-semibold">
@@ -204,7 +222,15 @@ export default function ProfitLossPage() {
                 {report.expense_lines.map(r => (
                   <tr key={r.account_id} className="border-b hover:bg-muted/30">
                     <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{r.account_code}</span>{r.account_name}</td>
-                    <td className="p-3 text-right font-mono">{fmtMoney(r.amount)}</td>
+                    <td className="p-3 text-right font-mono">
+                      <Link
+                        className="text-primary underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+                        to={generalLedgerUrl(r.account_id, report.period_start, report.period_end)}
+                        title={`View ${r.account_name} transactions in the General Ledger`}
+                      >
+                        {fmtMoney(r.amount)}
+                      </Link>
+                    </td>
                   </tr>
                 ))}
                 <tr className="border-b font-semibold">

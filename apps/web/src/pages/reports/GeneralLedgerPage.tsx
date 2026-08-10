@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FileDown, Printer } from 'lucide-react';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
@@ -115,12 +115,13 @@ function exportRows(report: GeneralLedgerReport): string[][] {
 
 export default function GeneralLedgerPage() {
   const [businessId] = useActiveBusinessId();
+  const [searchParams] = useSearchParams();
   const { businesses } = useAuth();
   const businessName = businesses.find(business => business.id === businessId)?.name ?? '';
   const defaults = currentMonthRange();
-  const [periodStart, setPeriodStart] = useState(defaults.start);
-  const [periodEnd, setPeriodEnd] = useState(defaults.end);
-  const [accountId, setAccountId] = useState('');
+  const [periodStart, setPeriodStart] = useState(() => searchParams.get('period_start') ?? defaults.start);
+  const [periodEnd, setPeriodEnd] = useState(() => searchParams.get('period_end') ?? defaults.end);
+  const [accountId, setAccountId] = useState(() => searchParams.get('account_id') ?? '');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [report, setReport] = useState<GeneralLedgerReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -129,9 +130,13 @@ export default function GeneralLedgerPage() {
 
   useEffect(() => {
     if (!businessId) return;
-    setAccountId('');
     api.get<{ accounts: Account[] }>(`/businesses/${businessId}/coa`, { params: { include_inactive: 'true' } })
-      .then(response => setAccounts(response.data.accounts))
+      .then(response => {
+        setAccounts(response.data.accounts);
+        setAccountId(current => (
+          current && !response.data.accounts.some(account => account.id === current) ? '' : current
+        ));
+      })
       .catch(() => setAccounts([]));
   }, [businessId]);
 
