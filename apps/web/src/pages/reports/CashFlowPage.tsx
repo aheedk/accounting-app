@@ -9,12 +9,15 @@ import { useAuth } from '@/auth/useAuth';
 import { fmtMoney } from '@/lib/money';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
-import { fmtLongDate } from '@/lib/dates';
+import { addDaysLocal, fmtLongDate } from '@/lib/dates';
+import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
+import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 
 type CashFlowLine = {
   entry_date: string;
   journal_entry_id: string;
   source_type: string;
+  status: 'posted' | 'voided';
   memo: string | null;
   debit: string;
   credit: string;
@@ -157,15 +160,39 @@ export default function CashFlowPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Beginning Balance</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-semibold font-mono">{fmtMoney(report.beginning_balance)}</div></CardContent>
+              <CardContent>
+                <ReportAmountLink
+                  className="font-mono text-2xl font-semibold"
+                  to={generalLedgerDrilldownUrl({ accountId: report.cash_account_id, periodStart: LEDGER_HISTORY_START, periodEnd: addDaysLocal(report.period_start, -1) })}
+                  title="View the cash account activity behind the beginning balance"
+                >
+                  {fmtMoney(report.beginning_balance)}
+                </ReportAmountLink>
+              </CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Net Change</CardTitle></CardHeader>
-              <CardContent><div className={`text-2xl font-semibold font-mono ${netClass(report.net_change)}`}>{fmtMoney(report.net_change)}</div></CardContent>
+              <CardContent>
+                <ReportAmountLink
+                  className={`font-mono text-2xl font-semibold ${netClass(report.net_change)}`}
+                  to={generalLedgerDrilldownUrl({ accountId: report.cash_account_id, periodStart: report.period_start, periodEnd: report.period_end })}
+                  title="View the cash account transactions behind the net change"
+                >
+                  {fmtMoney(report.net_change)}
+                </ReportAmountLink>
+              </CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Ending Balance</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-semibold font-mono">{fmtMoney(report.ending_balance)}</div></CardContent>
+              <CardContent>
+                <ReportAmountLink
+                  className="font-mono text-2xl font-semibold"
+                  to={generalLedgerDrilldownUrl({ accountId: report.cash_account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.period_end })}
+                  title="View the cash account activity behind the ending balance"
+                >
+                  {fmtMoney(report.ending_balance)}
+                </ReportAmountLink>
+              </CardContent>
             </Card>
           </div>
 
@@ -194,18 +221,42 @@ export default function CashFlowPage() {
                   {report.lines.map(l => (
                     <tr key={l.journal_entry_id} className="border-b hover:bg-muted/30">
                       <td className="p-3 whitespace-nowrap">{l.entry_date}</td>
-                      <td className="p-3"><span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize">{l.source_type}</span></td>
+                      <td className="p-3">
+                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize">{l.source_type}</span>
+                        {l.status === 'voided' && <span className="ml-2 text-xs uppercase text-muted-foreground">Voided</span>}
+                      </td>
                       <td className="p-3">{l.memo ?? ''}</td>
-                      <td className="p-3 text-right font-mono">{fmtMoney(l.debit)}</td>
-                      <td className="p-3 text-right font-mono">{fmtMoney(l.credit)}</td>
-                      <td className={`p-3 text-right font-mono ${netClass(l.net_amount)}`}>{fmtMoney(l.net_amount)}</td>
+                      <td className="p-3 text-right font-mono">
+                        <ReportAmountLink to={`/journal/${l.journal_entry_id}`} title="View this journal entry">{fmtMoney(l.debit)}</ReportAmountLink>
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        <ReportAmountLink to={`/journal/${l.journal_entry_id}`} title="View this journal entry">{fmtMoney(l.credit)}</ReportAmountLink>
+                      </td>
+                      <td className={`p-3 text-right font-mono ${netClass(l.net_amount)}`}>
+                        <ReportAmountLink className={netClass(l.net_amount)} to={`/journal/${l.journal_entry_id}`} title="View this journal entry">{fmtMoney(l.net_amount)}</ReportAmountLink>
+                      </td>
                       <td className="p-3 text-right font-mono">{fmtMoney(l.running_balance)}</td>
                     </tr>
                   ))}
                   <tr className="font-semibold">
                     <td colSpan={5} className="p-3">NET CHANGE IN CASH</td>
-                    <td className={`p-3 text-right font-mono ${netClass(report.net_change)}`}>{fmtMoney(report.net_change)}</td>
-                    <td className="p-3 text-right font-mono">{fmtMoney(report.ending_balance)}</td>
+                    <td className={`p-3 text-right font-mono ${netClass(report.net_change)}`}>
+                      <ReportAmountLink
+                        className={netClass(report.net_change)}
+                        to={generalLedgerDrilldownUrl({ accountId: report.cash_account_id, periodStart: report.period_start, periodEnd: report.period_end })}
+                        title="View the cash account transactions behind the net change"
+                      >
+                        {fmtMoney(report.net_change)}
+                      </ReportAmountLink>
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      <ReportAmountLink
+                        to={generalLedgerDrilldownUrl({ accountId: report.cash_account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.period_end })}
+                        title="View the cash account activity behind the ending balance"
+                      >
+                        {fmtMoney(report.ending_balance)}
+                      </ReportAmountLink>
+                    </td>
                   </tr>
                 </tbody>
               </table>

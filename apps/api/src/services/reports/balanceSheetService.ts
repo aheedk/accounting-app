@@ -39,7 +39,9 @@ export async function balanceSheet(db: Kysely<DB>, q: { business_id: string; as_
     .where(eb => eb.or([
       eb('je.id', 'is', null),
       eb.and([
-        eb('je.status', '=', 'posted'),
+        // Voids are reversal-based: count the voided original and its posted
+        // reversal so the account balance cancels instead of flipping sign.
+        eb('je.status', 'in', ['posted', 'voided']),
         eb('je.entry_date', '<=', q.as_of),
       ]),
     ]))
@@ -89,7 +91,7 @@ export async function balanceSheet(db: Kysely<DB>, q: { business_id: string; as_
     .where(eb => eb.or([
       eb('je.id', 'is', null),
       eb.and([
-        eb('je.status', '=', 'posted'),
+        eb('je.status', 'in', ['posted', 'voided']),
         eb('je.entry_date', '>=', ytdStart),
         eb('je.entry_date', '<=', q.as_of),
       ]),

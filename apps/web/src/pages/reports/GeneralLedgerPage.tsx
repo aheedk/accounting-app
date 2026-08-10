@@ -10,6 +10,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { dateToLocalIso, fmtLongDate } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
 import { fmtMoney, fmtSigned } from '@/lib/money';
+import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 
 type Account = {
   id: string;
@@ -327,8 +328,16 @@ function AccountSection({ account }: { account: GeneralLedgerAccount }) {
           </td>
           <td className="p-3 font-mono text-xs">{line.reference ?? '—'}</td>
           <td className="max-w-[22rem] truncate p-3" title={line.memo ?? undefined}>{line.memo ?? '—'}</td>
-          <td className="p-3 text-right font-mono">{line.debit === '0.0000' ? '' : fmtMoney(line.debit)}</td>
-          <td className="p-3 text-right font-mono">{line.credit === '0.0000' ? '' : fmtMoney(line.credit)}</td>
+          <td className="p-3 text-right font-mono">
+            {line.debit === '0.0000' ? '' : (
+              <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{fmtMoney(line.debit)}</ReportAmountLink>
+            )}
+          </td>
+          <td className="p-3 text-right font-mono">
+            {line.credit === '0.0000' ? '' : (
+              <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{fmtMoney(line.credit)}</ReportAmountLink>
+            )}
+          </td>
           <td className="p-3 text-right font-mono">{fmtSigned(line.running_balance)}</td>
         </tr>
       ))}

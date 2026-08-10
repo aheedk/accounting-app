@@ -11,6 +11,8 @@ import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
+import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
+import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 
 type BsLine = {
   account_id: string;
@@ -165,7 +167,14 @@ export default function BalanceSheetPage() {
             {report.asset_lines.map(l => (
               <tr key={l.account_id} className="border-b hover:bg-muted/30">
                 <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
-                <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
+                <td className="p-3 text-right font-mono">
+                  <ReportAmountLink
+                    to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
+                    title={`View ${l.account_name} transactions in the General Ledger`}
+                  >
+                    {fmtMoney(l.amount)}
+                  </ReportAmountLink>
+                </td>
               </tr>
             ))}
             <tr className="border-b font-semibold">
@@ -182,7 +191,14 @@ export default function BalanceSheetPage() {
             {report.liability_lines.map(l => (
               <tr key={l.account_id} className="border-b hover:bg-muted/30">
                 <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
-                <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
+                <td className="p-3 text-right font-mono">
+                  <ReportAmountLink
+                    to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
+                    title={`View ${l.account_name} transactions in the General Ledger`}
+                  >
+                    {fmtMoney(l.amount)}
+                  </ReportAmountLink>
+                </td>
               </tr>
             ))}
             <tr className="border-b font-semibold">
@@ -196,7 +212,14 @@ export default function BalanceSheetPage() {
             {report.equity_lines.map(l => (
               <tr key={l.account_id} className="border-b hover:bg-muted/30">
                 <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
-                <td className="p-3 text-right font-mono">{fmtMoney(l.amount)}</td>
+                <td className="p-3 text-right font-mono">
+                  <ReportAmountLink
+                    to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
+                    title={`View ${l.account_name} transactions in the General Ledger`}
+                  >
+                    {fmtMoney(l.amount)}
+                  </ReportAmountLink>
+                </td>
               </tr>
             ))}
             <tr className="border-b hover:bg-muted/30">

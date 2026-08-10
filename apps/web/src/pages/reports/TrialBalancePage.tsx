@@ -10,6 +10,8 @@ import { useAuth } from '@/auth/useAuth';
 import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
+import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
+import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 
 function parseCSVLine(line: string): string[] {
   const cells: string[] = [];
@@ -136,9 +138,30 @@ export default function TrialBalancePage() {
                 <td className="p-3 font-mono">{r.code}</td>
                 <td className="p-3">{r.name}</td>
                 <td className="p-3 capitalize">{r.account_type}</td>
-                <td className="p-3 text-right font-mono">{fmtMoney(r.total_debit)}</td>
-                <td className="p-3 text-right font-mono">{fmtMoney(r.total_credit)}</td>
-                <td className="p-3 text-right font-mono">{fmtSigned(r.net)}</td>
+                <td className="p-3 text-right font-mono">
+                  <ReportAmountLink
+                    to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: asOf })}
+                    title={`View ${r.name} debit transactions in the General Ledger`}
+                  >
+                    {fmtMoney(r.total_debit)}
+                  </ReportAmountLink>
+                </td>
+                <td className="p-3 text-right font-mono">
+                  <ReportAmountLink
+                    to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: asOf })}
+                    title={`View ${r.name} credit transactions in the General Ledger`}
+                  >
+                    {fmtMoney(r.total_credit)}
+                  </ReportAmountLink>
+                </td>
+                <td className="p-3 text-right font-mono">
+                  <ReportAmountLink
+                    to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: asOf })}
+                    title={`View ${r.name} transactions in the General Ledger`}
+                  >
+                    {fmtSigned(r.net)}
+                  </ReportAmountLink>
+                </td>
               </tr>
             ))}
             <tr className="font-semibold">

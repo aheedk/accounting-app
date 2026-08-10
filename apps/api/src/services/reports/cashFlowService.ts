@@ -1,11 +1,12 @@
 import { type Kysely, sql } from 'kysely';
 import { addMoney, subMoney, toMoneyString } from '@accounting/shared';
-import type { DB } from '../../db/types.js';
+import type { DB, JournalEntryStatus } from '../../db/types.js';
 
 export type CashFlowLine = {
   entry_date: string;
   journal_entry_id: string;
   source_type: string;
+  status: JournalEntryStatus;
   memo: string | null;
   debit: string;
   credit: string;
@@ -33,7 +34,8 @@ async function cashAccountBalance(db: Kysely<DB>, cash_account_id: string, as_of
       fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('total_credit'),
     ])
     .where('jel.account_id', '=', cash_account_id)
-    .where('je.status', '=', 'posted')
+    // Include both legs of reversal-based voids; drafts remain excluded.
+    .where('je.status', 'in', ['posted', 'voided'])
     .where('je.entry_date', '<=', as_of)
     .executeTakeFirst();
   return toMoneyString(subMoney(row?.total_debit ?? '0', row?.total_credit ?? '0'));
@@ -63,9 +65,9 @@ export async function cashFlow(db: Kysely<DB>, q: { business_id: string; period_
 
   const activity = await db.selectFrom('journal_entry_lines as jel')
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
-    .select(['je.entry_date', 'je.id as journal_entry_id', 'je.source_type', 'je.memo', 'jel.debit', 'jel.credit'])
+    .select(['je.entry_date', 'je.id as journal_entry_id', 'je.source_type', 'je.status', 'je.memo', 'jel.debit', 'jel.credit'])
     .where('jel.account_id', '=', cashAccountId)
-    .where('je.status', '=', 'posted')
+    .where('je.status', 'in', ['posted', 'voided'])
     .where('je.entry_date', '>=', q.period_start)
     .where('je.entry_date', '<=', q.period_end)
     .orderBy('je.entry_date')
@@ -78,7 +80,7 @@ export async function cashFlow(db: Kysely<DB>, q: { business_id: string; period_
     running = toMoneyString(addMoney(running, net));
     return {
       entry_date: r.entry_date, journal_entry_id: r.journal_entry_id,
-      source_type: r.source_type, memo: r.memo,
+      source_type: r.source_type, status: r.status, memo: r.memo,
       debit: toMoneyString(addMoney(r.debit, '0')), credit: toMoneyString(addMoney(r.credit, '0')),
       net_amount: net, running_balance: running,
     };
