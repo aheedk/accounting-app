@@ -11,6 +11,7 @@ import JournalListPage from '@/pages/journal/JournalListPage';
 import JournalDetailPage from '@/pages/journal/JournalDetailPage';
 import JournalNewPage from '@/pages/journal/JournalNewPage';
 import TrialBalancePage from '@/pages/reports/TrialBalancePage';
+import GeneralLedgerPage from '@/pages/reports/GeneralLedgerPage';
 import AgingReportPage from '@/pages/reports/AgingReportPage';
 import StandardReportsPage from '@/pages/reports/StandardReportsPage';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
@@ -123,6 +124,7 @@ export default function App() {
             {/* Reports */}
             <Route path="/reports/standard" element={<StandardReportsPage />} />
             <Route path="/reports/trial-balance" element={<TrialBalancePage />} />
+            <Route path="/reports/general-ledger" element={<GeneralLedgerPage />} />
             <Route path="/reports/aging" element={<AgingReportPage />} />
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />

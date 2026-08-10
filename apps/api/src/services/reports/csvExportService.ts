@@ -1,6 +1,7 @@
 import { type Kysely } from 'kysely';
 import type { DB } from '../../db/types.js';
 import * as ledger from '../core/ledgerService.js';
+import * as generalLedgerReport from './generalLedgerService.js';
 
 export type CsvFile = { filename: string; content_type: string; body: Buffer };
 
@@ -82,5 +83,55 @@ export async function exportJournalEntryLines(
     filename: `journal-entries-${from}-to-${to}.csv`,
     content_type: 'text/csv',
     body: Buffer.from(csv, 'utf-8'),
+  };
+}
+
+export async function exportGeneralLedger(
+  db: Kysely<DB>,
+  business_id: string,
+  periodStart: string,
+  periodEnd: string,
+  account_id?: string,
+): Promise<CsvFile> {
+  const report = await generalLedgerReport.generalLedger(db, {
+    business_id,
+    period_start: periodStart,
+    period_end: periodEnd,
+    ...(account_id !== undefined ? { account_id } : {}),
+  });
+  const rows: Array<Record<string, string | number | null>> = [];
+  for (const account of report.accounts) {
+    rows.push({
+      account_code: account.account_code,
+      account_name: account.account_name,
+      date: null,
+      transaction_type: 'Beginning Balance',
+      reference: null,
+      memo: null,
+      debit: null,
+      credit: null,
+      balance: account.beginning_balance,
+    });
+    for (const line of account.lines) {
+      rows.push({
+        account_code: account.account_code,
+        account_name: account.account_name,
+        date: line.entry_date,
+        transaction_type: line.status === 'voided' ? `${line.source_type} (voided)` : line.source_type,
+        reference: line.reference,
+        memo: line.memo,
+        debit: line.debit,
+        credit: line.credit,
+        balance: line.running_balance,
+      });
+    }
+  }
+  const body = rowsToCsv(rows, [
+    'account_code', 'account_name', 'date', 'transaction_type', 'reference', 'memo', 'debit', 'credit', 'balance',
+  ]);
+  return {
+    filename: `general-ledger-${periodStart}-to-${periodEnd}.csv`,
+    content_type: 'text/csv',
+    body: Buffer.from(body, 'utf-8'),
   };
 }

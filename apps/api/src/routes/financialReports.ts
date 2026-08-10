@@ -7,6 +7,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import * as pnl from '../services/reports/profitLossService.js';
 import * as bs from '../services/reports/balanceSheetService.js';
 import * as cf from '../services/reports/cashFlowService.js';
+import * as gl from '../services/reports/generalLedgerService.js';
 
 const router = Router({ mergeParams: true });
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
@@ -51,6 +52,23 @@ router.get('/businesses/:businessId/reports/cash-flow', async (req: Request, res
       period_start: q.period_start,
       period_end: q.period_end,
       ...(q.cash_account_id !== undefined ? { cash_account_id: q.cash_account_id } : {}),
+    });
+    res.json(report);
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/reports/general-ledger', async (req: Request, res, next) => {
+  try {
+    const q = schemas.generalLedgerQuerySchema.parse({
+      period_start: req.query['period_start'],
+      period_end: req.query['period_end'],
+      ...(typeof req.query['account_id'] === 'string' ? { account_id: req.query['account_id'] } : {}),
+    });
+    const report = await gl.generalLedger(db, {
+      business_id: req.tenancy!.business_id,
+      period_start: q.period_start,
+      period_end: q.period_end,
+      ...(q.account_id !== undefined ? { account_id: q.account_id } : {}),
     });
     res.json(report);
   } catch (e) { next(e); }

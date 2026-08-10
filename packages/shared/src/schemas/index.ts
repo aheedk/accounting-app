@@ -3,6 +3,7 @@ export * from './coa.js';
 export * from './fiscalPeriod.js';
 export * from './journalEntry.js';
 export * from './trialBalance.js';
+export * from './generalLedger.js';
 export * from './customer.js';
 export * from './taxCode.js';
 export * from './invoice.js';

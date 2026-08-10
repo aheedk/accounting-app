@@ -17,6 +17,7 @@ const groups: ReportGroup[] = [
   {
     heading: 'For my accountant',
     reports: [
+      { to: '/reports/general-ledger', name: 'General Ledger', description: 'Detailed transactions, opening balances, and running balances grouped by account.' },
       { to: '/reports/trial-balance', name: 'Trial Balance', description: 'Debit and credit balances for every account as of a chosen date.' },
     ],
   },
