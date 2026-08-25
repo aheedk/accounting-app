@@ -455,7 +455,7 @@ git commit -m "feat(journal): expose correction and line-level reads"
 - Produces: `JournalEntryFormValues` and `JournalEntryFormLine`
 - Produces: `blankJournalLine()`, `journalEntryToForm(detail)`, `journalEntryPayload(form)`, and `journalEntryTotals(lines)`
 
-- [ ] **Step 1: Write failing pure mapping tests**
+- [x] **Step 1: Write failing pure mapping tests**
 
 Use a complete literal API fixture and assert:
 
@@ -479,23 +479,23 @@ expect(form.lines[0]).toMatchObject({
 
 Add a serialization test with literal expected decimal strings and a totals test that expects `{ debit: '50.0000', credit: '50.0000', balanced: true }`.
 
-- [ ] **Step 2: Run helper tests and verify RED**
+- [x] **Step 2: Run helper tests and verify RED**
 
 Run: `npm -w @accounting/web test -- src/pages/journal/journalEntryForm.test.ts`
 
 Expected: FAIL because the helper module does not exist.
 
-- [ ] **Step 3: Implement the pure types and mappings**
+- [x] **Step 3: Implement the pure types and mappings**
 
 Use `Decimal` for totals and `parseMoneyInput` for payload values. Loaded lines preserve exact API strings and append blank rows until there are at least eight; never truncate an entry with more than eight lines. Filter payload lines by `account_id`, and map `description` to API `memo`.
 
-- [ ] **Step 4: Run helper tests and verify GREEN**
+- [x] **Step 4: Run helper tests and verify GREEN**
 
 Run the Step 2 command.
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/pages/journal/journalEntryTypes.ts apps/web/src/pages/journal/journalEntryForm.ts apps/web/src/pages/journal/journalEntryForm.test.ts
