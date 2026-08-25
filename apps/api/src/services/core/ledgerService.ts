@@ -17,6 +17,8 @@ export type LineInput = {
   debit: string;
   credit: string;
   memo: string | null;
+  name?: string | null;
+  class_name?: string | null;
 };
 
 export type PostJournalEntryInput = {
@@ -26,6 +28,7 @@ export type PostJournalEntryInput = {
   source_id?: string | null;
   memo: string | null;
   reference?: string | null;
+  corrected_from_entry_id?: string | null;
   lines: LineInput[];
 };
 
@@ -56,13 +59,19 @@ export async function postJournalEntry(
 ) {
   assertBalanced(input.lines);
 
-  // Locked accounts reject new postings (chart-of-accounts lock). One check at
-  // the ledger choke point covers every posting flow.
-  const lockedAccounts = await trx.selectFrom('chart_of_accounts')
-    .select(['code', 'name'])
-    .where('id', 'in', [...new Set(input.lines.map(l => l.account_id))])
-    .where('is_locked', '=', true)
+  // Validate account tenancy and posting eligibility at the ledger choke point
+  // so every source flow receives the same protection.
+  const accountIds = [...new Set(input.lines.map(line => line.account_id))];
+  const postingAccounts = await trx.selectFrom('chart_of_accounts')
+    .select(['id', 'code', 'name', 'is_locked'])
+    .where('business_id', '=', input.business_id)
+    .where('id', 'in', accountIds)
+    .where('is_active', '=', true)
     .execute();
+  if (postingAccounts.length !== accountIds.length) {
+    throw new PreconditionError('Every journal line must use an active account from this business');
+  }
+  const lockedAccounts = postingAccounts.filter(account => account.is_locked);
   if (lockedAccounts.length > 0) {
     throw new PreconditionError(
       `Account ${lockedAccounts[0]!.code} ${lockedAccounts[0]!.name} is locked and cannot accept new postings`,
@@ -87,6 +96,7 @@ export async function postJournalEntry(
     status: 'draft',
     source_type: input.source_type,
     source_id: input.source_id ?? null,
+    corrected_from_entry_id: input.corrected_from_entry_id ?? null,
     created_by_user_id: ctx.user_id,
   }).returningAll().executeTakeFirstOrThrow();
 
@@ -99,6 +109,8 @@ export async function postJournalEntry(
       debit: l.debit,
       credit: l.credit,
       memo: l.memo,
+      name: l.name ?? null,
+      class_name: l.class_name ?? null,
     }).execute();
   }
 

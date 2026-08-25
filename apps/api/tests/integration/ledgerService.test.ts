@@ -35,7 +35,14 @@ describe('ledgerService.postJournalEntry', () => {
         business_id: biz.id, entry_date: '2026-04-15', source_type: 'manual',
         memo: 'Cash sale',
         lines: [
-          { account_id: cash.id,    debit: '100.0000', credit: '0.0000',   memo: null },
+          {
+            account_id: cash.id,
+            debit: '100.0000',
+            credit: '0.0000',
+            memo: null,
+            name: 'Patient A',
+            class_name: 'Clinic',
+          },
           { account_id: revenue.id, debit: '0.0000',   credit: '100.0000', memo: null },
         ],
       }),
@@ -43,7 +50,11 @@ describe('ledgerService.postJournalEntry', () => {
     expect(je.status).toBe('posted');
     const lines = await t.db.selectFrom('journal_entry_lines').selectAll().where('journal_entry_id', '=', je.id).orderBy('line_number').execute();
     expect(lines).toHaveLength(2);
-    expect(lines[0]!.debit).toBe('100.0000');
+    expect(lines[0]).toMatchObject({
+      debit: '100.0000',
+      name: 'Patient A',
+      class_name: 'Clinic',
+    });
     expect(lines[1]!.credit).toBe('100.0000');
     const audit = await t.db.selectFrom('audit_logs').selectAll().where('action', '=', 'journal_entry.post').execute();
     expect(audit).toHaveLength(1);
@@ -88,6 +99,31 @@ describe('ledgerService.postJournalEntry', () => {
         ledger.postJournalEntry(trx, ctx, {
           business_id: biz.id, entry_date: '2026-04-15', source_type: 'manual', memo: null,
           lines: [{ account_id: cash.id, debit: '50.0000', credit: '0.0000', memo: null }],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+  });
+
+  it('rejects accounts from another business', async () => {
+    const { firm, biz, ctx, cash } = await setup(t);
+    const otherBusiness = await makeBusiness(t.db, firm.id, 'Other Biz');
+    const otherRevenue = await makeAccount(t.db, otherBusiness.id, {
+      code: '4020',
+      name: 'Other Sales',
+      account_type: 'revenue',
+    });
+
+    await expect(
+      t.db.transaction().execute(trx =>
+        ledger.postJournalEntry(trx, ctx, {
+          business_id: biz.id,
+          entry_date: '2026-04-15',
+          source_type: 'manual',
+          memo: null,
+          lines: [
+            { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
+            { account_id: otherRevenue.id, debit: '0.0000', credit: '10.0000', memo: null },
+          ],
         }),
       ),
     ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });

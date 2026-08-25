@@ -144,7 +144,7 @@ git commit -m "feat(journal): add correction and line metadata schema"
 - Produces: `LineInput` optional `name` and `class_name`
 - Produces: `PostJournalEntryInput.corrected_from_entry_id?: string | null`
 
-- [ ] **Step 1: Extend the real post test to require metadata persistence**
+- [x] **Step 1: Extend the real post test to require metadata persistence**
 
 Change the first balanced-post fixture's cash line to include `name: 'Patient A'` and `class_name: 'Clinic'`, then assert literal persisted values:
 
@@ -156,13 +156,13 @@ expect(lines[0]).toMatchObject({
 });
 ```
 
-- [ ] **Step 2: Run the single integration test and verify RED**
+- [x] **Step 2: Run the single integration test and verify RED**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/ledgerService.test.ts -t "posts a balanced manual JE"`
 
 Expected: FAIL because the service input or inserted row does not carry the new fields.
 
-- [ ] **Step 3: Pass metadata and correction linkage through `postJournalEntry`**
+- [x] **Step 3: Pass metadata and correction linkage through `postJournalEntry`**
 
 Extend the input types:
 
@@ -184,13 +184,13 @@ export type PostJournalEntryInput = {
 
 Set `corrected_from_entry_id` on the entry insert and `name` / `class_name` on each line insert, defaulting omitted values to null.
 
-- [ ] **Step 4: Run the targeted integration test and verify GREEN**
+- [x] **Step 4: Run the targeted integration test and verify GREEN**
 
 Run the Step 2 command.
 
 Expected: PASS.
 
-- [ ] **Step 5: Add a failing tenant-integrity test for posting accounts**
+- [x] **Step 5: Add a failing tenant-integrity test for posting accounts**
 
 Create a second business and account, then attempt to post that account under the first business:
 
@@ -207,17 +207,17 @@ await expect(t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx,
 }))).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
 ```
 
-- [ ] **Step 6: Run the tenant-integrity test and verify RED**
+- [x] **Step 6: Run the tenant-integrity test and verify RED**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/ledgerService.test.ts -t "rejects accounts from another business"`
 
 Expected: FAIL because current posting only checks locked accounts by ID.
 
-- [ ] **Step 7: Validate all unique posting accounts belong to the business and are active**
+- [x] **Step 7: Validate all unique posting accounts belong to the business and are active**
 
 Select unique IDs from `chart_of_accounts` with both `business_id = input.business_id` and `is_active = true`. If the selected count differs from the unique input count, throw `PreconditionError('Every journal line must use an active account from this business')`. Reuse those selected rows for the locked-account check.
 
-- [ ] **Step 8: Run ledger integration tests and commit**
+- [x] **Step 8: Run ledger integration tests and commit**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/ledgerService.test.ts`
 
