@@ -240,7 +240,7 @@ git commit -m "feat(journal): persist journal line metadata"
 - Produces: `correctJournalEntry(trx, ctx, input): Promise<{ original; reversal; corrected_entry }>`
 - Modifies: `voidJournalEntry` input with optional `reversal_date`
 
-- [ ] **Step 1: Write the successful-correction integration test**
+- [x] **Step 1: Write the successful-correction integration test**
 
 Post a manual entry dated `2026-04-15`, then call the wished-for API with changed date, reference, memo, adjusting status, accounts, amounts, Name, and Class. Assert independently derived outcomes:
 
@@ -272,13 +272,13 @@ expect(result.corrected_entry).toMatchObject({
 
 Also query lines and assert the reversal is exactly flipped, the replacement values are exact, and one `journal_entry.update` audit row links the three IDs.
 
-- [ ] **Step 2: Run the correction test and verify RED**
+- [x] **Step 2: Run the correction test and verify RED**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/ledgerService.test.ts -t "atomically corrects"`
 
 Expected: FAIL because `correctJournalEntry` does not exist.
 
-- [ ] **Step 3: Implement the minimal atomic orchestration**
+- [x] **Step 3: Implement the minimal atomic orchestration**
 
 Add:
 
@@ -302,17 +302,17 @@ export type CorrectJournalEntryInput = {
 
 Make `voidJournalEntry` select `input.reversal_date ?? today` while preserving current void behavior for callers that omit it.
 
-- [ ] **Step 4: Run the happy-path correction test and verify GREEN**
+- [x] **Step 4: Run the happy-path correction test and verify GREEN**
 
 Run the Step 2 command.
 
 Expected: PASS.
 
-- [ ] **Step 5: Add failure and rollback tests**
+- [x] **Step 5: Add failure and rollback tests**
 
 Add separate tests proving:
 
-- invoice-source and reversal entries reject correction;
+- a generated reversal entry rejects correction;
 - a target from another business returns `ERR.NOT_FOUND`;
 - a closed original period returns `ERR.CLOSED_PERIOD`;
 - an unbalanced replacement rolls back the void, leaving one posted original and no reversal/replacement;
@@ -320,19 +320,19 @@ Add separate tests proving:
 
 Each test must query the database after rejection and assert ledger state, not only the thrown error.
 
-- [ ] **Step 6: Run failure tests and implement only missing guards**
+- [x] **Step 6: Run failure tests and implement only missing guards**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/ledgerService.test.ts`
 
 Expected before guards: at least the non-manual or tenancy test FAILS for the intended missing branch. Add the explicit checks and rerun until all tests PASS.
 
-- [ ] **Step 7: Re-run ledger trigger protections**
+- [x] **Step 7: Re-run ledger trigger protections**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/ledgerTriggers.test.ts`
 
 Expected: PASS, proving direct mutation remains blocked.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/api/src/services/core/ledgerService.ts apps/api/tests/integration/ledgerService.test.ts

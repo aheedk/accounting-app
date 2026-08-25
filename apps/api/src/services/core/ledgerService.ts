@@ -1,5 +1,5 @@
 import { Kysely, sql, type Transaction } from 'kysely';
-import { AUDIT, ERR, addMoney, subMoney, toMoneyString, equalMoney, isZero } from '@accounting/shared';
+import { AUDIT, ERR, addMoney, subMoney, toMoneyString, equalMoney, hasMinRole, isZero } from '@accounting/shared';
 import type { DB, JournalEntrySourceType } from '../../db/types.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 import {
@@ -30,6 +30,11 @@ export type PostJournalEntryInput = {
   reference?: string | null;
   corrected_from_entry_id?: string | null;
   lines: LineInput[];
+};
+
+export type CorrectJournalEntryInput = {
+  journal_entry_id: string;
+  replacement: PostJournalEntryInput;
 };
 
 function assertBalanced(lines: LineInput[]) {
@@ -132,7 +137,7 @@ export async function postJournalEntry(
 
 export async function voidJournalEntry(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { journal_entry_id: string; void_reason: string },
+  input: { journal_entry_id: string; void_reason: string; reversal_date?: string },
 ) {
   const orig = await trx.selectFrom('journal_entries').selectAll()
     .where('id', '=', input.journal_entry_id).executeTakeFirst();
@@ -148,7 +153,8 @@ export async function voidJournalEntry(
     .where('journal_entry_id', '=', orig.id).orderBy('line_number').execute();
 
   const today = new Date().toISOString().slice(0, 10);
-  const reversalPeriod = await findPeriodForDate(trx as unknown as Kysely<DB>, orig.business_id, today)
+  const reversalDate = input.reversal_date ?? today;
+  const reversalPeriod = await findPeriodForDate(trx as unknown as Kysely<DB>, orig.business_id, reversalDate)
                        ?? await findPeriodForDate(trx as unknown as Kysely<DB>, orig.business_id, orig.entry_date);
   if (!reversalPeriod) throw new PreconditionError('No fiscal period available for reversal');
   if (reversalPeriod.status === 'closed' && (await currentSetting(trx, 'app.admin_override')) !== 'on') {
@@ -158,7 +164,7 @@ export async function voidJournalEntry(
   const reversal = await trx.insertInto('journal_entries').values({
     business_id: orig.business_id,
     period_id: reversalPeriod.id,
-    entry_date: reversalPeriod.starts_on <= today && today <= reversalPeriod.ends_on ? today : orig.entry_date,
+    entry_date: reversalPeriod.starts_on <= reversalDate && reversalDate <= reversalPeriod.ends_on ? reversalDate : orig.entry_date,
     memo: `Reversal of ${orig.id}: ${input.void_reason}`,
     reference: orig.reference,
     status: 'draft',
@@ -177,6 +183,8 @@ export async function voidJournalEntry(
       debit: l.credit,
       credit: l.debit,
       memo: l.memo,
+      name: l.name,
+      class_name: l.class_name,
     }).execute();
   }
 
@@ -207,6 +215,70 @@ export async function voidJournalEntry(
   });
 
   return reversalPosted;
+}
+
+export async function correctJournalEntry(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: CorrectJournalEntryInput,
+) {
+  if (!hasMinRole(ctx.effective_role, 'accountant')) {
+    throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to correct journal entries');
+  }
+  if (input.replacement.business_id !== ctx.business_id) {
+    throw new BusinessRuleError(ERR.NOT_FOUND, 'Journal entry not found');
+  }
+
+  const originalBefore = await trx.selectFrom('journal_entries').selectAll()
+    .where('id', '=', input.journal_entry_id)
+    .where('business_id', '=', ctx.business_id)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!originalBefore) {
+    throw new BusinessRuleError(ERR.NOT_FOUND, `Journal entry ${input.journal_entry_id} not found`);
+  }
+  if (originalBefore.status !== 'posted') {
+    throw new InvalidStateTransitionError('journal_entry', originalBefore.id, originalBefore.status, 'voided');
+  }
+  if (originalBefore.source_type !== 'manual' && originalBefore.source_type !== 'adjustment') {
+    throw new BusinessRuleError(
+      ERR.IMMUTABLE_RECORD,
+      'Source-generated and reversing journal entries must be corrected from their source transaction',
+    );
+  }
+  if (input.replacement.source_type !== 'manual' && input.replacement.source_type !== 'adjustment') {
+    throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'A corrected journal entry must be manual or adjusting');
+  }
+
+  const originalLines = await trx.selectFrom('journal_entry_lines').selectAll()
+    .where('journal_entry_id', '=', originalBefore.id)
+    .orderBy('line_number')
+    .execute();
+
+  const reversal = await voidJournalEntry(trx, ctx, {
+    journal_entry_id: originalBefore.id,
+    void_reason: 'Corrected through journal entry editor',
+    reversal_date: originalBefore.entry_date,
+  });
+  const correctedEntry = await postJournalEntry(trx, ctx, {
+    ...input.replacement,
+    corrected_from_entry_id: originalBefore.id,
+  });
+  const original = await trx.selectFrom('journal_entries').selectAll()
+    .where('id', '=', originalBefore.id)
+    .executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.JOURNAL_ENTRY_UPDATE,
+    entity_type: 'journal_entry',
+    entity_id: originalBefore.id,
+    before: { entry: originalBefore, lines: originalLines },
+    after: {
+      original_id: originalBefore.id,
+      reversal_id: reversal.id,
+      corrected_entry_id: correctedEntry.id,
+    },
+  });
+
+  return { original, reversal, corrected_entry: correctedEntry };
 }
 
 export async function computeAccountBalance(

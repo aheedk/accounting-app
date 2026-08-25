@@ -173,6 +173,346 @@ describe('ledgerService.postJournalEntry', () => {
     ).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
   });
 
+  it('atomically corrects a posted manual entry with a same-date reversal and linked replacement', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: 'Original cash sale',
+        reference: 'JE-22',
+        lines: [
+          {
+            account_id: cash.id,
+            debit: '100.0000',
+            credit: '0.0000',
+            memo: 'Original debit',
+            name: 'Patient A',
+            class_name: 'Clinic',
+          },
+          {
+            account_id: revenue.id,
+            debit: '0.0000',
+            credit: '100.0000',
+            memo: 'Original credit',
+          },
+        ],
+      }),
+    );
+
+    const result = await t.db.transaction().execute(trx =>
+      ledger.correctJournalEntry(trx, ctx, {
+        journal_entry_id: original.id,
+        replacement: {
+          business_id: biz.id,
+          entry_date: '2026-05-02',
+          source_type: 'adjustment',
+          memo: 'Corrected cash sale',
+          reference: 'AJE-22',
+          lines: [
+            {
+              account_id: cash.id,
+              debit: '125.0000',
+              credit: '0.0000',
+              memo: 'Correct debit',
+              name: 'Patient A',
+              class_name: 'Clinic',
+            },
+            {
+              account_id: revenue.id,
+              debit: '0.0000',
+              credit: '125.0000',
+              memo: 'Correct credit',
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(result.original).toMatchObject({ id: original.id, status: 'voided' });
+    expect(result.reversal).toMatchObject({
+      entry_date: '2026-04-15',
+      reversed_entry_id: original.id,
+      source_type: 'reversal',
+      status: 'posted',
+    });
+    expect(result.corrected_entry).toMatchObject({
+      entry_date: '2026-05-02',
+      source_type: 'adjustment',
+      corrected_from_entry_id: original.id,
+      status: 'posted',
+      reference: 'AJE-22',
+    });
+
+    const reversalLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', result.reversal.id).orderBy('line_number').execute();
+    expect(reversalLines[0]).toMatchObject({
+      account_id: cash.id,
+      debit: '0.0000',
+      credit: '100.0000',
+      name: 'Patient A',
+      class_name: 'Clinic',
+    });
+
+    const correctedLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', result.corrected_entry.id).orderBy('line_number').execute();
+    expect(correctedLines[0]).toMatchObject({
+      account_id: cash.id,
+      debit: '125.0000',
+      credit: '0.0000',
+      memo: 'Correct debit',
+      name: 'Patient A',
+      class_name: 'Clinic',
+    });
+
+    const updateAudit = await t.db.selectFrom('audit_logs').selectAll()
+      .where('action', '=', 'journal_entry.update').executeTakeFirstOrThrow();
+    expect(updateAudit.entity_id).toBe(original.id);
+    expect(updateAudit.after_state).toMatchObject({
+      original_id: original.id,
+      reversal_id: result.reversal.id,
+      corrected_entry_id: result.corrected_entry.id,
+    });
+  });
+
+  it('rejects correction of a generated reversal entry and leaves it posted', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: 'Entry to reverse',
+        lines: [
+          { account_id: cash.id, debit: '40.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '40.0000', memo: null },
+        ],
+      }),
+    );
+    const generated = await t.db.transaction().execute(trx =>
+      ledger.voidJournalEntry(trx, ctx, {
+        journal_entry_id: original.id,
+        void_reason: 'Create a generated reversal for the test',
+        reversal_date: original.entry_date,
+      }),
+    );
+
+    await expect(t.db.transaction().execute(trx =>
+      ledger.correctJournalEntry(trx, ctx, {
+        journal_entry_id: generated.id,
+        replacement: {
+          business_id: biz.id,
+          entry_date: '2026-04-16',
+          source_type: 'manual',
+          memo: 'Should not post',
+          lines: [
+            { account_id: cash.id, debit: '50.0000', credit: '0.0000', memo: null },
+            { account_id: revenue.id, debit: '0.0000', credit: '50.0000', memo: null },
+          ],
+        },
+      }),
+    )).rejects.toMatchObject({ code: ERR.IMMUTABLE_RECORD });
+
+    const after = await t.db.selectFrom('journal_entries').selectAll()
+      .where('id', '=', generated.id).executeTakeFirstOrThrow();
+    expect(after.status).toBe('posted');
+  });
+
+  it('rejects correction when the caller lacks accountant access', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: cash.id, debit: '30.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '30.0000', memo: null },
+        ],
+      }),
+    );
+
+    await expect(t.db.transaction().execute(trx =>
+      ledger.correctJournalEntry(trx, { ...ctx, effective_role: 'staff' }, {
+        journal_entry_id: original.id,
+        replacement: {
+          business_id: biz.id,
+          entry_date: '2026-04-16',
+          source_type: 'manual',
+          memo: null,
+          lines: [
+            { account_id: cash.id, debit: '35.0000', credit: '0.0000', memo: null },
+            { account_id: revenue.id, debit: '0.0000', credit: '35.0000', memo: null },
+          ],
+        },
+      }),
+    )).rejects.toMatchObject({ code: ERR.FORBIDDEN });
+
+    const after = await t.db.selectFrom('journal_entries').selectAll()
+      .where('id', '=', original.id).executeTakeFirstOrThrow();
+    expect(after.status).toBe('posted');
+  });
+
+  it('hides a correction target belonging to another business', async () => {
+    const { firm, biz, ctx, cash, revenue } = await setup(t);
+    const otherBusiness = await makeBusiness(t.db, firm.id, 'Other Biz');
+    await seedYearPeriods(t.db, otherBusiness.id, 2026);
+    const otherCash = await makeAccount(t.db, otherBusiness.id, { code: '1110', name: 'Other Cash', account_type: 'asset' });
+    const otherRevenue = await makeAccount(t.db, otherBusiness.id, { code: '4110', name: 'Other Sales', account_type: 'revenue' });
+    const otherCtx = { ...ctx, business_id: otherBusiness.id };
+    const otherEntry = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, otherCtx, {
+        business_id: otherBusiness.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: otherCash.id, debit: '60.0000', credit: '0.0000', memo: null },
+          { account_id: otherRevenue.id, debit: '0.0000', credit: '60.0000', memo: null },
+        ],
+      }),
+    );
+
+    await expect(t.db.transaction().execute(trx =>
+      ledger.correctJournalEntry(trx, ctx, {
+        journal_entry_id: otherEntry.id,
+        replacement: {
+          business_id: biz.id,
+          entry_date: '2026-04-16',
+          source_type: 'manual',
+          memo: null,
+          lines: [
+            { account_id: cash.id, debit: '65.0000', credit: '0.0000', memo: null },
+            { account_id: revenue.id, debit: '0.0000', credit: '65.0000', memo: null },
+          ],
+        },
+      }),
+    )).rejects.toMatchObject({ code: ERR.NOT_FOUND });
+
+    const after = await t.db.selectFrom('journal_entries').selectAll()
+      .where('id', '=', otherEntry.id).executeTakeFirstOrThrow();
+    expect(after.status).toBe('posted');
+  });
+
+  it('rejects correction in a closed original period without changing the ledger', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: cash.id, debit: '70.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '70.0000', memo: null },
+        ],
+      }),
+    );
+    const period = (await periods.findPeriodForDate(t.db, biz.id, '2026-04-15'))!;
+    await t.db.transaction().execute(trx =>
+      periods.closePeriod(trx, { ...ctx, effective_role: 'firm_admin' }, { period_id: period.id }),
+    );
+
+    await expect(t.db.transaction().execute(trx =>
+      ledger.correctJournalEntry(trx, ctx, {
+        journal_entry_id: original.id,
+        replacement: {
+          business_id: biz.id,
+          entry_date: '2026-05-02',
+          source_type: 'manual',
+          memo: null,
+          lines: [
+            { account_id: cash.id, debit: '75.0000', credit: '0.0000', memo: null },
+            { account_id: revenue.id, debit: '0.0000', credit: '75.0000', memo: null },
+          ],
+        },
+      }),
+    )).rejects.toMatchObject({ code: ERR.CLOSED_PERIOD });
+
+    const entries = await t.db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.status).toBe('posted');
+  });
+
+  it('rolls back the void when replacement data is unbalanced', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: cash.id, debit: '80.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '80.0000', memo: null },
+        ],
+      }),
+    );
+
+    await expect(t.db.transaction().execute(trx =>
+      ledger.correctJournalEntry(trx, ctx, {
+        journal_entry_id: original.id,
+        replacement: {
+          business_id: biz.id,
+          entry_date: '2026-04-16',
+          source_type: 'manual',
+          memo: null,
+          lines: [
+            { account_id: cash.id, debit: '85.0000', credit: '0.0000', memo: null },
+            { account_id: revenue.id, debit: '0.0000', credit: '84.0000', memo: null },
+          ],
+        },
+      }),
+    )).rejects.toMatchObject({ code: ERR.UNBALANCED_ENTRY });
+
+    const entries = await t.db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ id: original.id, status: 'posted' });
+  });
+
+  it('rejects a second correction of the same original', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: cash.id, debit: '90.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '90.0000', memo: null },
+        ],
+      }),
+    );
+    const replacement = {
+      business_id: biz.id,
+      entry_date: '2026-04-16',
+      source_type: 'manual' as const,
+      memo: null,
+      lines: [
+        { account_id: cash.id, debit: '95.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '95.0000', memo: null },
+      ],
+    };
+
+    await t.db.transaction().execute(trx => ledger.correctJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+      replacement,
+    }));
+    await expect(t.db.transaction().execute(trx => ledger.correctJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+      replacement,
+    }))).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
+
+    const entries = await t.db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(entries).toHaveLength(3);
+  });
+
   it('computeAccountBalance sums debits minus credits across posted lines only', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     await t.db.transaction().execute(trx =>
