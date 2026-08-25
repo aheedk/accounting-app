@@ -572,9 +572,9 @@ git commit -m "feat(journal): reuse entry grid for corrections"
 - Produces: `filterJournalEntries(entries, status, search)`
 - Produces: `journalExportRows(entries)` matching the visible line-level columns
 
-- [ ] **Step 1: Write failing report-helper tests**
+- [x] **Step 1: Write failing report-helper tests**
 
-Use two entries with three literal lines and assert:
+Use two entries with four literal lines and assert:
 
 - `month` on 2026-08-25 produces `{ period_start: '2026-08-01', period_end: '2026-08-31' }`;
 - `all` produces no date params;
@@ -582,23 +582,23 @@ Use two entries with three literal lines and assert:
 - export rows contain one row per journal line plus per-entry totals and a report total;
 - literal totals equal debit `150.0000` and credit `150.0000`.
 
-- [ ] **Step 2: Run report-helper tests and verify RED**
+- [x] **Step 2: Run report-helper tests and verify RED**
 
 Run: `npm -w @accounting/web test -- src/pages/journal/journalReport.test.ts`
 
 Expected: FAIL because the helper module does not exist.
 
-- [ ] **Step 3: Implement pure period, filter, and export helpers**
+- [x] **Step 3: Implement pure period, filter, and export helpers**
 
 Use local calendar constructors plus `dateToLocalIso` for date boundaries and Decimal for debit/credit totals. Search one normalized string containing entry reference, memo, source, status, and every line's account code/name, memo, Name, and Class.
 
-- [ ] **Step 4: Run report-helper tests and verify GREEN**
+- [x] **Step 4: Run report-helper tests and verify GREEN**
 
 Run the Step 2 command.
 
 Expected: PASS.
 
-- [ ] **Step 5: Replace the summary DataTable with grouped line rows**
+- [x] **Step 5: Replace the summary DataTable with grouped line rows**
 
 Retain the existing page header, New Entry split button, import modal, Excel export, and print. Add Date period preset plus custom `DateInput` controls. Request nested entries with the selected period params and a limit of 200.
 
@@ -613,11 +613,11 @@ const JOURNAL_HEADERS = [
 
 Each group renders a linked header, linked line values, linked non-zero debit/credit amounts, and linked per-entry amount totals. Use `<Link to={`/journal/${entry.id}`}>` for every non-empty transaction value rather than click handlers. Add the report total row and visible-entry count. Render voided groups muted but present.
 
-- [ ] **Step 6: Make export and print mirror visible rows**
+- [x] **Step 6: Make export and print mirror visible rows**
 
 Feed `journalExportRows(filteredEntries)` to Excel and print. HTML-escape every printed cell using the existing local escape pattern; preserve numeric right alignment.
 
-- [ ] **Step 7: Run web verification and commit**
+- [x] **Step 7: Run web verification and commit**
 
 Run: `npm -w @accounting/web test`
 
