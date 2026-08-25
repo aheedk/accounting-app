@@ -128,6 +128,7 @@ export interface JournalEntriesTable {
   source_type: Generated<JournalEntrySourceType>;
   source_id: string | null;
   reversed_entry_id: string | null;
+  corrected_from_entry_id: string | null;
   posted_at: Timestamp | null;
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;
@@ -148,6 +149,8 @@ export interface JournalEntryLinesTable {
   debit: ColumnType<string, string | number, string | number>;
   credit: ColumnType<string, string | number, string | number>;
   memo: string | null;
+  name: string | null;
+  class_name: string | null;
 }
 
 export type InvoiceStatus = 'draft' | 'posted' | 'voided' | 'paid';

@@ -40,7 +40,7 @@
 - Produces: `journalEntryCreateSchema` with `is_adjusting`, line `name`, and line `class_name`
 - Produces: `journalEntryCorrectionSchema` and `JournalEntryCorrection`
 
-- [ ] **Step 1: Write a failing shared-schema test for real editor fields**
+- [x] **Step 1: Write a failing shared-schema test for real editor fields**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -63,13 +63,13 @@ describe('journalEntryCreateSchema', () => {
 });
 ```
 
-- [ ] **Step 2: Run the schema test and verify RED**
+- [x] **Step 2: Run the schema test and verify RED**
 
 Run: `npm -w @accounting/shared test -- src/schemas/journalEntry.test.ts`
 
 Expected: FAIL because Zod strips `is_adjusting`, `name`, and `class_name`.
 
-- [ ] **Step 3: Extend the schemas minimally**
+- [x] **Step 3: Extend the schemas minimally**
 
 ```ts
 const optionalLineText = z.string().max(255).nullable().optional();
@@ -97,13 +97,13 @@ export type JournalEntryCorrection = z.infer<typeof journalEntryCorrectionSchema
 
 Retain the existing debit/credit refinements around the extended object.
 
-- [ ] **Step 4: Run the schema test and verify GREEN**
+- [x] **Step 4: Run the schema test and verify GREEN**
 
 Run: `npm -w @accounting/shared test -- src/schemas/journalEntry.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Add the migration and Kysely fields**
+- [x] **Step 5: Add the migration and Kysely fields**
 
 ```sql
 ALTER TABLE journal_entries
@@ -120,13 +120,13 @@ ALTER TABLE journal_entry_lines
 
 Add matching `string | null` properties to `JournalEntriesTable` and `JournalEntryLinesTable`. Do not wrap them in `Generated<>`.
 
-- [ ] **Step 6: Typecheck schema and API consumers**
+- [x] **Step 6: Typecheck schema and API consumers**
 
 Run: `npm run typecheck`
 
 Expected: PASS; optional insert fields do not break existing callers.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add db/migrations/0057_journal_entry_corrections.sql packages/shared/src/schemas/journalEntry.ts packages/shared/src/schemas/journalEntry.test.ts apps/api/src/db/types.ts
@@ -687,4 +687,3 @@ If verification reveals a defect, first add a failing regression test, verify RE
 - [ ] **Step 5: Merge locally without pushing**
 
 Use the finishing-development-branch workflow to merge `slice-14-journal-entry-editing` into local `main`, rerun the fast verification on `main`, and leave pushing to the user as requested.
-
