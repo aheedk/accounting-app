@@ -352,7 +352,7 @@ git commit -m "feat(journal): correct posted entries atomically"
 - Produces: `getJournalEntryDetail(db, ctx, id)`
 - Produces: `POST /businesses/:businessId/journal-entries/:id/correct`
 
-- [ ] **Step 1: Write failing query-service integration tests**
+- [x] **Step 1: Write failing query-service integration tests**
 
 Use real posted entries and assert:
 
@@ -369,13 +369,13 @@ expect(result.entries[0]!.lines[0]).toMatchObject({ account_code: '1010', accoun
 
 For detail, assert an accountant sees `can_correct: true` for a posted manual entry, while a generated entry, closed-period entry, and staff viewer each receive `can_correct: false` with a non-empty reason.
 
-- [ ] **Step 2: Run query-service tests and verify RED**
+- [x] **Step 2: Run query-service tests and verify RED**
 
 Run: `npm -w @accounting/api run test:integration -- tests/integration/journalEntryQueryService.test.ts`
 
 Expected: FAIL because the query service does not exist.
 
-- [ ] **Step 3: Implement the read service**
+- [x] **Step 3: Implement the read service**
 
 Define concrete response types. `listJournalEntries` selects business-scoped entries with optional status and date predicates, stable ordering, limit/offset, then performs one joined line/account query for all returned entry IDs and groups lines by `journal_entry_id`. `getJournalEntryDetail` joins the fiscal period and returns line/account data plus editability derived in this order:
 
@@ -387,13 +387,13 @@ Define concrete response types. `listJournalEntries` selects business-scoped ent
 
 Use `hasMinRole` from `@accounting/shared`; do not duplicate role ranking.
 
-- [ ] **Step 4: Run query tests and verify GREEN**
+- [x] **Step 4: Run query tests and verify GREEN**
 
 Run the Step 2 command.
 
 Expected: PASS.
 
-- [ ] **Step 5: Route all journal reads and corrections through one service call**
+- [x] **Step 5: Route all journal reads and corrections through one service call**
 
 Replace direct GET queries with the query-service methods. On create, pass `is_adjusting ? 'adjustment' : 'manual'` and line Name/Class values. Add the correction route:
 
@@ -430,7 +430,7 @@ router.post('/businesses/:businessId/journal-entries/:id/correct', requireMinRol
 
 Build `force` and `reason` exactly like the existing create/void routes.
 
-- [ ] **Step 6: Run API typecheck, query tests, and commit**
+- [x] **Step 6: Run API typecheck, query tests, and commit**
 
 Run: `npm -w @accounting/api run typecheck`
 

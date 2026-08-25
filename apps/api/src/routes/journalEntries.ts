@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import type { Request } from 'express';
 import type { Transaction } from 'kysely';
-import { schemas, ERR } from '@accounting/shared';
+import { schemas } from '@accounting/shared';
 import { db } from '../db/index.js';
 import type { DB, JournalEntryStatus } from '../db/types.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as ledger from '../services/core/ledgerService.js';
+import * as journalQueries from '../services/core/journalEntryQueryService.js';
 import { runWithClosedPeriodOverride } from '../services/admin/adminOverrideService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
-import { BusinessRuleError } from '../lib/errors.js';
 
 const router = Router({ mergeParams: true });
 
@@ -30,27 +30,23 @@ router.get('/businesses/:businessId/journal-entries', async (req, res, next) => 
     const limit = Math.min(parseInt(String(req.query['limit'] ?? 50), 10) || 50, 200);
     const offset = parseInt(String(req.query['offset'] ?? 0), 10) || 0;
     const status = req.query['status'] as string | undefined;
-    let q = db.selectFrom('journal_entries').selectAll().where('business_id', '=', req.tenancy!.business_id);
-    if (status) q = q.where('status', '=', status as JournalEntryStatus);
-    const rows = await q.orderBy('entry_date', 'desc').orderBy('created_at', 'desc').limit(limit).offset(offset).execute();
-    res.json({ entries: rows, limit, offset });
+    const periodStart = req.query['period_start'] as string | undefined;
+    const periodEnd = req.query['period_end'] as string | undefined;
+    const result = await journalQueries.listJournalEntries(db, ctxFromReq(req), {
+      limit,
+      offset,
+      ...(status ? { status: status as JournalEntryStatus } : {}),
+      ...(periodStart ? { period_start: periodStart } : {}),
+      ...(periodEnd ? { period_end: periodEnd } : {}),
+    });
+    res.json(result);
   } catch (e) { next(e); }
 });
 
 router.get('/businesses/:businessId/journal-entries/:id', async (req, res, next) => {
   try {
-    const je = await db.selectFrom('journal_entries').selectAll()
-      .where('id', '=', req.params['id']!)
-      .where('business_id', '=', req.tenancy!.business_id)
-      .executeTakeFirst();
-    if (!je) throw new BusinessRuleError(ERR.NOT_FOUND, 'Journal entry not found');
-    const lines = await db.selectFrom('journal_entry_lines as jel')
-      .innerJoin('chart_of_accounts as a', 'a.id', 'jel.account_id')
-      .select(['jel.id', 'jel.line_number', 'jel.account_id', 'a.code as account_code', 'a.name as account_name', 'jel.debit', 'jel.credit', 'jel.memo'])
-      .where('jel.journal_entry_id', '=', je.id)
-      .orderBy('jel.line_number')
-      .execute();
-    res.json({ entry: je, lines });
+    const result = await journalQueries.getJournalEntryDetail(db, ctxFromReq(req), req.params['id']!);
+    res.json(result);
   } catch (e) { next(e); }
 });
 
@@ -64,15 +60,54 @@ router.post('/businesses/:businessId/journal-entries', requireMinRole('accountan
       ledger.postJournalEntry(trx, ctx, {
         business_id: req.tenancy!.business_id,
         entry_date: body.entry_date,
-        source_type: 'manual',
+        source_type: body.is_adjusting ? 'adjustment' : 'manual',
         memo: body.memo ?? null,
         reference: body.reference ?? null,
-        lines: body.lines.map(l => ({ account_id: l.account_id, debit: l.debit, credit: l.credit, memo: l.memo ?? null })),
+        lines: body.lines.map(l => ({
+          account_id: l.account_id,
+          debit: l.debit,
+          credit: l.credit,
+          memo: l.memo ?? null,
+          name: l.name ?? null,
+          class_name: l.class_name ?? null,
+        })),
       });
     const je = force
       ? await runWithClosedPeriodOverride(db, ctx, reason, work)
       : await db.transaction().execute(work);
     res.status(201).json(je);
+  } catch (e) { next(e); }
+});
+
+router.post('/businesses/:businessId/journal-entries/:id/correct', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const body = schemas.journalEntryCorrectionSchema.parse(req.body);
+    const ctx = ctxFromReq(req);
+    const force = req.query['admin_override'] === 'true';
+    const reason = (req.body?.admin_override_reason as string | undefined) ?? '';
+    const work = (trx: Transaction<DB>) =>
+      ledger.correctJournalEntry(trx, ctx, {
+        journal_entry_id: req.params['id']!,
+        replacement: {
+          business_id: req.tenancy!.business_id,
+          entry_date: body.entry_date,
+          source_type: body.is_adjusting ? 'adjustment' : 'manual',
+          memo: body.memo ?? null,
+          reference: body.reference ?? null,
+          lines: body.lines.map(line => ({
+            account_id: line.account_id,
+            debit: line.debit,
+            credit: line.credit,
+            memo: line.memo ?? null,
+            name: line.name ?? null,
+            class_name: line.class_name ?? null,
+          })),
+        },
+      });
+    const result = force
+      ? await runWithClosedPeriodOverride(db, ctx, reason, work)
+      : await db.transaction().execute(work);
+    res.json(result);
   } catch (e) { next(e); }
 });
 
