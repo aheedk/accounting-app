@@ -515,11 +515,11 @@ git commit -m "feat(journal): add shared editor data model"
 - Create Save: `POST /journal-entries`
 - Edit Save: `POST /journal-entries/:id/correct`, navigate to `corrected_entry.id`
 
-- [ ] **Step 1: Extract the current grid into `JournalEntryEditor` without changing behavior**
+- [x] **Step 1: Extract the current grid into `JournalEntryEditor` without changing behavior**
 
 Move the current New page state, account loading, table, totals, row copy/delete/add/clear, memo, error, and sticky actions into the component. Initialize state from `existing ? journalEntryToForm(existing) : newJournalEntryForm()`. Keep native date inputs and existing styling.
 
-- [ ] **Step 2: Make all controls honor server editability**
+- [x] **Step 2: Make all controls honor server editability**
 
 Set `readOnly = existing !== undefined && !existing.can_correct`. Disable input/select/checkbox and row-mutating controls when read-only. Render `existing.correction_block_reason` in a visible neutral banner. For editable existing entries, render:
 
@@ -529,19 +529,19 @@ Set `readOnly = existing !== undefined && !existing.can_correct`. Disable input/
 </div>
 ```
 
-- [ ] **Step 3: Wire create and correction saves**
+- [x] **Step 3: Wire create and correction saves**
 
 Build the body only through `journalEntryPayload`. For existing entries call `/journal-entries/${existing.entry.id}/correct`, then navigate to `/journal/${response.data.corrected_entry.id}`. For create keep Save, Save and new, and Save and close behavior. Keep entered state and display `pickErr(error)` if either request fails.
 
-- [ ] **Step 4: Preserve manual voiding without enabling source-ledger divergence**
+- [x] **Step 4: Preserve manual voiding without enabling source-ledger divergence**
 
 Show `Void entry` only for posted manual/adjustment entries. Use the existing void endpoint and prompt. Do not show it for generated or reversal entries.
 
-- [ ] **Step 5: Replace route pages with thin wrappers**
+- [x] **Step 5: Replace route pages with thin wrappers**
 
 `JournalNewPage` returns `<JournalEntryEditor />`. `JournalDetailPage` fetches `JournalEntryDetail`, renders loading/error states, then returns `<JournalEntryEditor existing={data} />`. Do not change the `/journal/new` or `/journal/:id` routes.
 
-- [ ] **Step 6: Run web tests, typecheck, and build**
+- [x] **Step 6: Run web tests, typecheck, and build**
 
 Run: `npm -w @accounting/web test -- src/pages/journal/journalEntryForm.test.ts`
 
@@ -551,7 +551,7 @@ Run: `npm -w @accounting/web run build`
 
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/web/src/pages/journal/JournalEntryEditor.tsx apps/web/src/pages/journal/JournalNewPage.tsx apps/web/src/pages/journal/JournalDetailPage.tsx
