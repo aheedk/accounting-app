@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add audit-safe journal-entry correction in the existing grid editor and replace the journal summary list with a clickable line-level journal report.
+**Goal:** Add audit-safe journal-entry correction in the existing grid editor, open that grid directly from Accounting → New Journal Entry, and use General Ledger as the line-level report and drill-down surface.
 
-**Architecture:** Keep posted ledger rows immutable. A new ledger orchestration method atomically voids and reverses an eligible manual entry, posts its replacement, and links the correction chain. Read queries return account-enriched lines and explicit editability metadata; the React create and detail routes share one editor, while the journal index renders the same data as a grouped report.
+**Architecture:** Keep posted ledger rows immutable. A new ledger orchestration method atomically voids and reverses an eligible manual entry, posts its replacement, and links the correction chain. Read queries return account-enriched lines and explicit editability metadata; the React create and detail routes share one editor. `/journal` is the create landing page, while General Ledger remains the report that links into journal details.
 
 **Tech Stack:** PostgreSQL migrations, Kysely, Express, Zod, React 18, React Router, Tailwind/shadcn, Decimal.js, Vitest, Testcontainers.
 
@@ -634,6 +634,8 @@ git add apps/web/src/pages/journal/journalReport.ts apps/web/src/pages/journal/j
 git commit -m "feat(journal): add clickable line-level journal report"
 ```
 
+> **Superseded by user direction on 2026-08-26:** General Ledger already provides this report, so the duplicate Journal Entries report and its helpers are removed. `/journal` now renders the new-entry editor, the Accounting item is renamed **New Journal Entry**, and `/journal/:id` remains the detail/correction route. The failing-first landing contract is covered by `journalLanding.test.tsx`.
+
 ### Task 8: Full-system verification and handoff
 
 **Files:**
@@ -662,10 +664,10 @@ Expected: all commands exit 0. Record exact test counts in the final handoff.
 
 Verify:
 
-1. `/journal` shows grouped line rows, American dates, per-entry totals, and report totals.
-2. Date and search filters update visible groups.
-3. A value and amount link can be opened in a new tab.
-4. `/journal/new` creates both manual and adjusting entries and retains Name/Class.
+1. Accounting → New Journal Entry and `/journal` open a blank shared editor directly.
+2. `/journal/new` remains a compatible alias for the same create screen.
+3. A General Ledger value or amount link opens `/journal/:id` and supports opening in a new tab.
+4. The shared editor creates both manual and adjusting entries and retains Name/Class.
 5. Opening a posted manual entry shows the same grid enabled.
 6. Saving a change lands on the replacement; the old entry is voided, reversal-linked, and read-only.
 7. Opening a generated entry shows the same grid disabled with a source-edit explanation.

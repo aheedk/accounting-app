@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { MyMenu } from './MyMenu';
 import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
+import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalLanding';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -76,7 +77,7 @@ const groups: NavGroup[] = [
       { to: '/settings/coa', label: 'Chart of Accounts' },
       { to: '/accounting/recurring', label: 'Recurring Transactions' },
       { to: '/accounting/fixed-assets', label: 'Fixed Assets' },
-      { to: '/journal', label: 'Journal Entries' },
+      { to: JOURNAL_NAV_ITEM.path, label: JOURNAL_NAV_ITEM.label },
     ],
   },
   {

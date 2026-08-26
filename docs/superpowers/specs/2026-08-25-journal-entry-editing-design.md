@@ -1,10 +1,10 @@
-# Journal Entry Editing and Journal Report - Design Spec
+# Journal Entry Editing - Design Spec
 
 **Status:** Approved by user 2026-08-25.
 
 ## Goal
 
-Make Journal Entries work like the supplied QuickBooks references: the main page is a line-level journal report whose transaction values drill into a familiar journal-entry grid, and eligible manual entries can be corrected from that grid without mutating posted ledger history.
+Make journal entries work like the supplied QuickBooks references: users can create entries in a familiar journal-entry grid and correct eligible manual entries from the same grid without mutating posted ledger history. General Ledger remains the line-level report and drill-down surface, avoiding a duplicate Journal Entries report.
 
 ## Locked accounting decisions
 
@@ -91,29 +91,17 @@ For eligible existing entries, Save calls the correction endpoint and navigates 
 
 The existing unimplemented attachment drop zone and recurring-entry action are outside this feature. They remain visually unchanged; this work does not claim or add attachment/recurring behavior.
 
-## Journal main page
+## Journal navigation
 
-`/journal` changes from one summary row per entry to a grouped, line-level journal report.
+The Accounting navigation destination is labeled **New Journal Entry**. Both `/journal` and the compatibility alias `/journal/new` open a blank `JournalEntryEditor` directly.
 
-Columns follow the supplied reference:
+There is no separate Journal Entries report page. General Ledger already provides the line-level account report, customization, export, print, and native-link drill-down behavior. Its journal links continue to open `/journal/:id`, which uses the shared editor for editable manual entries and the same grid in read-only mode for generated or locked entries.
 
-- Transaction date
-- Transaction type
-- Number
-- Name
-- Description
-- Account number
-- Account name
-- Debit
-- Credit
+This keeps the workflow focused:
 
-Each journal entry renders as one group, followed by its line rows and a per-entry debit/credit total. The bottom of the table shows total debits and credits for the visible result set. Voided originals and their posted reversals remain visible so the report reflects the audit trail rather than silently rewriting history.
-
-All non-empty transaction values and transaction amount totals are native React Router links to `/journal/:id`. This gives normal click, Ctrl/Cmd-click, and right-click/open-in-new-tab behavior. A generated or otherwise locked entry still opens the shared editor in read-only mode.
-
-The page keeps New Entry, Excel export, Print, status filtering, search, and Excel import. It adds an All Dates / This Month / This Year / Custom period control, defaulting to All Dates to preserve the current page's coverage. Export and print use the same expanded line rows currently displayed.
-
-Dates render in the app's locale-aware American-style journal format (`M/D/YY`); API and form values remain ISO `YYYY-MM-DD`.
+- Accounting → New Journal Entry records a new manual or adjusting entry.
+- General Ledger and other source pages are the places to find posted entries.
+- `/journal/:id` displays or corrects the selected entry without changing the source report route.
 
 ## Error handling
 
@@ -127,9 +115,9 @@ Dates render in the app's locale-aware American-style journal format (`M/D/YY`);
 
 - Shared-schema tests cover adjusting, line Name/Class, and invalid correction payloads.
 - Postgres-backed ledger integration tests cover successful atomic correction, exact reversal/replacement links and lines, line metadata persistence, audit rows, non-manual rejection, closed-period rejection, cross-business rejection, and rollback on invalid replacement data.
-- Pure web helper tests cover API-to-form mapping, eight-row padding, adjusting-source mapping, balanced totals, correction payload serialization, and expanded report/export rows.
+- Pure web helper tests cover API-to-form mapping, eight-row padding, adjusting-source mapping, balanced totals, correction payload serialization, and the journal landing/navigation contract.
 - Typecheck, unit tests, integration tests, lint, and production build must pass.
-- Browser verification covers the expanded journal report, native-link open-in-new-tab behavior, editable manual entry, read-only generated entry, and redirect to the corrected replacement after Save.
+- Browser verification covers the New Journal Entry landing page, a native General Ledger link to an editable manual entry, a read-only generated entry, and redirect to the corrected replacement after Save.
 
 ## Out of scope
 
@@ -139,4 +127,3 @@ Dates render in the app's locale-aware American-style journal format (`M/D/YY`);
 - New attachment storage behavior
 - Recurring journal-entry scheduling
 - New accounting Class or Name master-data systems; these remain optional line text fields in this slice
-

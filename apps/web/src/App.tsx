@@ -7,9 +7,9 @@ import DashboardPage from '@/pages/DashboardPage';
 import CoaListPage from '@/pages/coa/CoaListPage';
 import AccountRegisterPage from '@/pages/coa/AccountRegisterPage';
 import PeriodsPage from '@/pages/periods/PeriodsPage';
-import JournalListPage from '@/pages/journal/JournalListPage';
 import JournalDetailPage from '@/pages/journal/JournalDetailPage';
 import JournalNewPage from '@/pages/journal/JournalNewPage';
+import { JOURNAL_NAV_ITEM, JournalLandingPage } from '@/pages/journal/journalLanding';
 import TrialBalancePage from '@/pages/reports/TrialBalancePage';
 import GeneralLedgerPage from '@/pages/reports/GeneralLedgerPage';
 import AgingReportPage from '@/pages/reports/AgingReportPage';
@@ -117,7 +117,7 @@ export default function App() {
             <Route path="/credit-memos/:id" element={<CreditMemoDetailPage />} />
 
             {/* Accounting */}
-            <Route path="/journal" element={<JournalListPage />} />
+            <Route path={JOURNAL_NAV_ITEM.path} element={<JournalLandingPage />} />
             <Route path="/journal/new" element={<JournalNewPage />} />
             <Route path="/journal/:id" element={<JournalDetailPage />} />
 

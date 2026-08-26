@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalLanding';
 
 type Page = { label: string; group: string; to: string };
 
@@ -34,7 +35,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Chart of Accounts', group: 'Accounting', to: '/settings/coa' },
   { label: 'Recurring Transactions', group: 'Accounting', to: '/accounting/recurring' },
   { label: 'Fixed Assets', group: 'Accounting', to: '/accounting/fixed-assets' },
-  { label: 'Journal Entries', group: 'Accounting', to: '/journal' },
+  { label: JOURNAL_NAV_ITEM.label, group: 'Accounting', to: JOURNAL_NAV_ITEM.path },
   // Reports
   { label: 'Standard Reports', group: 'Reports', to: '/reports/standard' },
   { label: 'Profit & Loss', group: 'Reports', to: '/reports/pnl' },
@@ -73,7 +74,7 @@ const QUICK_LINKS: Page[] = [
   { label: 'Payments', group: 'Accounts Receivable', to: '/payments' },
   { label: 'Bills', group: 'Accounts Payable', to: '/ap/bills' },
   { label: 'Bank Transactions', group: 'Accounting', to: '/accounting/bank-transactions' },
-  { label: 'Journal Entries', group: 'Accounting', to: '/journal' },
+  { label: JOURNAL_NAV_ITEM.label, group: 'Accounting', to: JOURNAL_NAV_ITEM.path },
   { label: 'Profit & Loss', group: 'Reports', to: '/reports/pnl' },
   { label: 'Trial Balance', group: 'Reports', to: '/reports/trial-balance' },
   { label: 'Employees', group: 'Payroll', to: '/payroll/employees' },
