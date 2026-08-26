@@ -125,7 +125,11 @@ export async function voidVendorCredit(
   if (apps.length > 0) throw new PreconditionError(`Vendor credit has ${apps.length} active application(s); unapply before voiding`, { application_ids: apps.map(a => a.id) });
 
   if (!vc.posted_journal_entry_id) throw new PreconditionError('vendor_credit has no JE to reverse');
-  await voidJournalEntry(trx, ctx, { journal_entry_id: vc.posted_journal_entry_id, void_reason: `Void vendor credit: ${input.void_reason}` });
+  await voidJournalEntry(trx, ctx, {
+    journal_entry_id: vc.posted_journal_entry_id,
+    void_reason: `Void vendor credit: ${input.void_reason}`,
+    source_guard: { source_type: 'vendor_credit', source_id: vc.id },
+  });
 
   await sql`SELECT set_config('app.allow_void', 'on', true)`.execute(trx);
   const updated = await trx.updateTable('vendor_credits')

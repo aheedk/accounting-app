@@ -39,8 +39,10 @@ BEGIN
       USING ERRCODE = '23514';
   END IF;
 
-  IF v_original.status <> 'voided' OR v_original.source_type NOT IN ('manual', 'adjustment') THEN
-    RAISE EXCEPTION 'corrected journal entry must reference a voided manual or adjustment entry'
+  IF v_original.status <> 'voided'
+     OR v_original.source_type NOT IN ('manual', 'adjustment')
+     OR v_original.source_id IS NOT NULL THEN
+    RAISE EXCEPTION 'corrected journal entry must reference a voided, unlinked manual or adjustment entry'
       USING ERRCODE = '23514';
   END IF;
 

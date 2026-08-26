@@ -176,7 +176,11 @@ export async function voidInvoice(
   if (apps.length > 0) throw new InvoiceHasApplicationsError(inv.id, apps.length);
 
   if (!inv.posted_journal_entry_id) throw new PreconditionError('Invoice has no posted JE to reverse');
-  await voidJournalEntry(trx, ctx, { journal_entry_id: inv.posted_journal_entry_id, void_reason: `Void invoice ${inv.invoice_number}: ${input.void_reason}` });
+  await voidJournalEntry(trx, ctx, {
+    journal_entry_id: inv.posted_journal_entry_id,
+    void_reason: `Void invoice ${inv.invoice_number}: ${input.void_reason}`,
+    source_guard: { source_type: 'invoice', source_id: inv.id },
+  });
 
   // Now flip invoice status (allow_void was set inside voidJournalEntry's wrapper if needed; we set it explicitly here)
   await sql`SELECT set_config('app.allow_void', 'on', true)`.execute(trx);

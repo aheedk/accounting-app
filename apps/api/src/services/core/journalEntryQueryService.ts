@@ -7,6 +7,7 @@ import type {
   JournalEntryStatus,
 } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { isSourceGeneratedJournalEntry } from './ledgerService.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 
 export type JournalEntryLineRead = {
@@ -100,7 +101,13 @@ export async function listJournalEntries(
 
 function correctionBlockReason(
   effectiveRole: ServiceCtx['effective_role'],
-  entry: { status: JournalEntryStatus; source_type: JournalEntrySourceType; period_status: 'open' | 'closed' },
+  entry: {
+    status: JournalEntryStatus;
+    source_type: JournalEntrySourceType;
+    source_id: string | null;
+    period_status: 'open' | 'closed';
+  },
+  sourceGenerated: boolean,
 ): string | null {
   if (!hasMinRole(effectiveRole, 'accountant')) {
     return 'Accountant access is required to correct journal entries.';
@@ -110,7 +117,7 @@ function correctionBlockReason(
       ? 'This journal entry is voided and cannot be corrected.'
       : 'Only posted journal entries can be corrected.';
   }
-  if (entry.source_type !== 'manual' && entry.source_type !== 'adjustment') {
+  if (sourceGenerated) {
     return 'This entry was created by a source transaction. Correct the source transaction instead.';
   }
   if (entry.period_status === 'closed') {
@@ -132,7 +139,8 @@ export async function getJournalEntryDetail(
   if (!entry) throw new BusinessRuleError(ERR.NOT_FOUND, 'Journal entry not found');
 
   const lines = await readLines(db, [entry.id]);
-  const blockReason = correctionBlockReason(ctx.effective_role, entry);
+  const sourceGenerated = await isSourceGeneratedJournalEntry(db, entry);
+  const blockReason = correctionBlockReason(ctx.effective_role, entry, sourceGenerated);
   return {
     entry,
     lines,

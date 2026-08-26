@@ -127,6 +127,25 @@ describe('journalEntryQueryService', () => {
     expect(staffDetail.correction_block_reason).toMatch(/accountant access/i);
   });
 
+  it('treats source-linked adjustments as generated and read-only', async () => {
+    const data = await setup(t);
+    const generated = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, data.ctx, {
+      business_id: data.business.id,
+      entry_date: '2026-04-15',
+      source_type: 'adjustment',
+      source_id: data.business.id,
+      memo: 'Generated adjustment',
+      lines: [
+        { account_id: data.cash.id, debit: '15.0000', credit: '0.0000', memo: null },
+        { account_id: data.revenue.id, debit: '0.0000', credit: '15.0000', memo: null },
+      ],
+    }));
+
+    const detail = await journalQueries.getJournalEntryDetail(t.db, data.ctx, generated.id);
+    expect(detail.can_correct).toBe(false);
+    expect(detail.correction_block_reason).toMatch(/source transaction/i);
+  });
+
   it('marks entries in closed periods read-only and hides cross-business IDs', async () => {
     const data = await setup(t);
     const entry = await postEntry(t, data, '2026-04-15', 'Closing entry');

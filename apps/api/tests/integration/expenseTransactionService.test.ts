@@ -50,6 +50,12 @@ describe('expenseTransactionService', () => {
     );
     expect(posted.status).toBe('posted');
     expect(posted.journal_entry_id).not.toBeNull();
+    const entry = await t.db.selectFrom('journal_entries').selectAll()
+      .where('id', '=', posted.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(entry).toMatchObject({
+      source_type: 'adjustment',
+      source_id: posted.id,
+    });
 
     const lines = await t.db.selectFrom('journal_entry_lines').selectAll()
       .where('journal_entry_id', '=', posted.journal_entry_id!).execute();

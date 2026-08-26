@@ -85,6 +85,12 @@ describe('payRunService', () => {
     );
     expect(finalized.status).toBe('finalized');
     expect(finalized.journal_entry_id).not.toBeNull();
+    const entry = await t.db.selectFrom('journal_entries').selectAll()
+      .where('id', '=', finalized.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(entry).toMatchObject({
+      source_type: 'adjustment',
+      source_id: finalized.id,
+    });
 
     const jeLines = await t.db.selectFrom('journal_entry_lines').selectAll()
       .where('journal_entry_id', '=', finalized.journal_entry_id!).execute();

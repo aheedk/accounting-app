@@ -109,6 +109,37 @@ describe('ledger DB triggers (adversarial)', () => {
     ).rejects.toThrow(/manual entry must not have source_id/);
   });
 
+  it('correction link rejects a source-generated adjustment', async () => {
+    const { biz, ctx, cash, rev } = await setup();
+    const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'adjustment',
+      source_id: biz.id,
+      memo: 'Generated adjustment',
+      lines: [
+        { account_id: cash.id, debit: '12.0000', credit: '0.0000', memo: null },
+        { account_id: rev.id, debit: '0.0000', credit: '12.0000', memo: null },
+      ],
+    }));
+    await t.db.transaction().execute(trx => ledger.voidJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+      void_reason: 'Source transaction void',
+      source_guard: { source_type: 'adjustment', source_id: biz.id },
+    }));
+    const period = (await periods.findPeriodForDate(t.db, biz.id, '2026-04-16'))!;
+
+    await expect(t.db.insertInto('journal_entries').values({
+      business_id: biz.id,
+      period_id: period.id,
+      entry_date: '2026-04-16',
+      source_type: 'adjustment',
+      corrected_from_entry_id: original.id,
+      status: 'draft',
+      created_by_user_id: ctx.user_id,
+    }).execute()).rejects.toThrow(/unlinked manual or adjustment/);
+  });
+
   it('date range: entry_date outside period range is blocked', async () => {
     const { biz } = await setup();
     const period = (await periods.findPeriodForDate(t.db, biz.id, '2026-04-15'))!;

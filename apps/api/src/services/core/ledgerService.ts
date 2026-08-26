@@ -37,6 +37,19 @@ export type CorrectJournalEntryInput = {
   replacement: PostJournalEntryInput;
 };
 
+export type JournalEntrySourceGuard = {
+  source_type: JournalEntrySourceType;
+  source_id: string;
+  allow_legacy_manual?: boolean;
+};
+
+export type VoidJournalEntryInput = {
+  journal_entry_id: string;
+  void_reason: string;
+  reversal_date?: string;
+  source_guard?: JournalEntrySourceGuard;
+};
+
 function assertBalanced(lines: LineInput[]) {
   if (lines.length < 2) throw new PreconditionError('Journal entry must have at least 2 lines');
   let totalD = '0.0000';
@@ -137,12 +150,36 @@ export async function postJournalEntry(
 
 export async function voidJournalEntry(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { journal_entry_id: string; void_reason: string; reversal_date?: string },
+  input: VoidJournalEntryInput,
 ) {
   const orig = await trx.selectFrom('journal_entries').selectAll()
-    .where('id', '=', input.journal_entry_id).executeTakeFirst();
+    .where('id', '=', input.journal_entry_id)
+    .where('business_id', '=', ctx.business_id)
+    .forUpdate()
+    .executeTakeFirst();
   if (!orig) throw new BusinessRuleError(ERR.NOT_FOUND, `Journal entry ${input.journal_entry_id} not found`);
   if (orig.status !== 'posted') throw new InvalidStateTransitionError('journal_entry', orig.id, orig.status, 'voided');
+
+  const sourceGuardMatches = input.source_guard && (
+    (orig.source_type === input.source_guard.source_type && orig.source_id === input.source_guard.source_id)
+    || (
+      input.source_guard.allow_legacy_manual === true
+      && orig.source_type === 'manual'
+      && orig.source_id === null
+    )
+  );
+  if (input.source_guard && !sourceGuardMatches) {
+    throw new BusinessRuleError(
+      ERR.IMMUTABLE_RECORD,
+      'Journal entry does not belong to the source transaction requesting the void',
+    );
+  }
+  if (!input.source_guard && await isSourceGeneratedJournalEntry(trx, orig)) {
+    throw new BusinessRuleError(
+      ERR.IMMUTABLE_RECORD,
+      'Source-generated journal entries must be voided from their source transaction',
+    );
+  }
 
   const period = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', orig.period_id).executeTakeFirstOrThrow();
   if (period.status === 'closed' && (await currentSetting(trx, 'app.admin_override')) !== 'on') {
@@ -197,7 +234,12 @@ export async function voidJournalEntry(
   const voided = await trx.updateTable('journal_entries')
     .set({ status: 'voided', voided_at: sql`now()`, voided_by_user_id: ctx.user_id, void_reason: input.void_reason })
     .where('id', '=', orig.id)
-    .returningAll().executeTakeFirstOrThrow();
+    .where('business_id', '=', ctx.business_id)
+    .where('status', '=', 'posted')
+    .returningAll().executeTakeFirst();
+  if (!voided) {
+    throw new InvalidStateTransitionError('journal_entry', orig.id, orig.status, 'voided');
+  }
 
   await auditRecord(trx, ctx, {
     action: AUDIT.JOURNAL_ENTRY_VOID,
@@ -242,6 +284,12 @@ export async function correctJournalEntry(
     throw new BusinessRuleError(
       ERR.IMMUTABLE_RECORD,
       'Source-generated and reversing journal entries must be corrected from their source transaction',
+    );
+  }
+  if (await isSourceGeneratedJournalEntry(trx, originalBefore)) {
+    throw new BusinessRuleError(
+      ERR.IMMUTABLE_RECORD,
+      'Source-generated journal entries must be corrected from their source transaction',
     );
   }
   if (input.replacement.source_type !== 'manual' && input.replacement.source_type !== 'adjustment') {
@@ -355,4 +403,31 @@ export async function computeTrialBalance(
 async function currentSetting(trx: Transaction<DB>, key: string): Promise<string | null> {
   const r = await sql<{ v: string | null }>`SELECT current_setting(${key}, true) AS v`.execute(trx);
   return r.rows[0]?.v ?? null;
+}
+
+export async function isSourceGeneratedJournalEntry(
+  trx: Kysely<DB>,
+  entry: { id: string; source_type: JournalEntrySourceType; source_id: string | null },
+): Promise<boolean> {
+  if (entry.source_type !== 'manual' && entry.source_type !== 'adjustment') return true;
+  if (entry.source_id !== null) return true;
+
+  // Older source services posted entries as unlinked "manual" rows. Keep
+  // those rows protected by checking the source-table back-links as well.
+  const linked = await sql<{ is_linked: boolean }>`
+    SELECT EXISTS (
+      SELECT 1 FROM expense_transactions WHERE journal_entry_id = ${entry.id}
+      UNION ALL
+      SELECT 1 FROM pay_runs WHERE journal_entry_id = ${entry.id}
+      UNION ALL
+      SELECT 1 FROM payroll_tax_liabilities WHERE payment_journal_entry_id = ${entry.id}
+      UNION ALL
+      SELECT 1 FROM bank_transactions WHERE matched_journal_entry_id = ${entry.id}
+      UNION ALL
+      SELECT 1 FROM integration_inbox WHERE matched_journal_entry_id = ${entry.id}
+      UNION ALL
+      SELECT 1 FROM depreciation_entries WHERE journal_entry_id = ${entry.id}
+    ) AS is_linked
+  `.execute(trx);
+  return linked.rows[0]?.is_linked === true;
 }

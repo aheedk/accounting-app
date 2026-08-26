@@ -186,7 +186,11 @@ export async function voidPayment(
   if (apps.length > 0) throw new PaymentHasApplicationsError(payment.id, apps.length);
 
   if (!payment.posted_journal_entry_id) throw new PreconditionError('Payment has no JE to reverse');
-  await voidJournalEntry(trx, ctx, { journal_entry_id: payment.posted_journal_entry_id, void_reason: `Void payment: ${input.void_reason}` });
+  await voidJournalEntry(trx, ctx, {
+    journal_entry_id: payment.posted_journal_entry_id,
+    void_reason: `Void payment: ${input.void_reason}`,
+    source_guard: { source_type: 'payment', source_id: payment.id },
+  });
 
   await sql`SELECT set_config('app.allow_void', 'on', true)`.execute(trx);
   const updated = await trx.updateTable('payments')
