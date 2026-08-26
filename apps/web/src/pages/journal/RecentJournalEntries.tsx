@@ -17,7 +17,7 @@ export default function RecentJournalEntries({ businessId }: { businessId: strin
   useEffect(() => {
     if (!open || loaded) return;
     api.get<{ entries: JournalEntryListItem[] }>(`/businesses/${businessId}/journal-entries`, {
-      params: { limit: 10 },
+      params: { limit: 10, sort: 'recent' },
     }).then(response => {
       setEntries(response.data.entries);
       setLoaded(true);

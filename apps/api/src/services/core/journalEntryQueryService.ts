@@ -29,6 +29,7 @@ export type JournalEntryListItem = Selectable<JournalEntriesTable> & {
 };
 
 export type JournalEntryListQuery = {
+  sort?: 'entry_date' | 'recent';
   status?: JournalEntryStatus;
   period_start?: string;
   period_end?: string;
@@ -80,10 +81,11 @@ export async function listJournalEntries(
   if (query.period_start) entriesQuery = entriesQuery.where('entry_date', '>=', query.period_start);
   if (query.period_end) entriesQuery = entriesQuery.where('entry_date', '<=', query.period_end);
 
-  const entries = await entriesQuery
-    .orderBy('entry_date', 'desc')
-    .orderBy('created_at', 'desc')
-    .orderBy('id', 'desc')
+  const orderedEntries = query.sort === 'recent'
+    ? entriesQuery.orderBy('created_at', 'desc').orderBy('id', 'desc')
+    : entriesQuery.orderBy('entry_date', 'desc').orderBy('created_at', 'desc').orderBy('id', 'desc');
+
+  const entries = await orderedEntries
     .limit(limit)
     .offset(offset)
     .execute();

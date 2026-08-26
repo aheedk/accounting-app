@@ -33,9 +33,11 @@ router.get('/businesses/:businessId/journal-entries', async (req, res, next) => 
     const status = req.query['status'] as string | undefined;
     const periodStart = req.query['period_start'] as string | undefined;
     const periodEnd = req.query['period_end'] as string | undefined;
+    const sort = req.query['sort'] === 'recent' ? 'recent' as const : undefined;
     const result = await journalQueries.listJournalEntries(db, ctxFromReq(req), {
       limit,
       offset,
+      ...(sort ? { sort } : {}),
       ...(status ? { status: status as JournalEntryStatus } : {}),
       ...(periodStart ? { period_start: periodStart } : {}),
       ...(periodEnd ? { period_end: periodEnd } : {}),

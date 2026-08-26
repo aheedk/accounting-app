@@ -88,6 +88,20 @@ describe('journalEntryQueryService', () => {
     });
   });
 
+  it('can list recently created entries even when the newest one is backdated', async () => {
+    const data = await setup(t);
+    await postEntry(t, data, '2026-05-02', 'Created first');
+    const backdated = await postEntry(t, data, '2026-04-15', 'Created second');
+
+    const result = await journalQueries.listJournalEntries(t.db, data.ctx, {
+      sort: 'recent',
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(result.entries[0]?.id).toBe(backdated.id);
+  });
+
   it('returns an editable posted manual entry for an accountant', async () => {
     const data = await setup(t);
     const entry = await postEntry(t, data, '2026-04-15', 'Editable entry');
