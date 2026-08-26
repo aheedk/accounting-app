@@ -12,17 +12,21 @@ import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import {
   blankJournalLine,
+  journalAccountsForLine,
   journalEntryPayload,
   journalEntryToForm,
   journalEntryTotals,
   newJournalEntryForm,
   type JournalEntryFormLine,
   type JournalEntryFormValues,
+  type JournalAccount,
 } from './journalEntryForm';
 import type { JournalEntryDetail } from './journalEntryTypes';
-
-type Account = { id: string; code: string; name: string; account_type: string };
-type SaveDestination = 'new' | 'close' | 'detail';
+import {
+  JOURNAL_CLOSE_PATH,
+  journalDestinationPath,
+  type JournalSaveDestination,
+} from './journalNavigation';
 
 type JournalEntryEditorProps = {
   existing?: JournalEntryDetail;
@@ -30,7 +34,7 @@ type JournalEntryEditorProps = {
 
 export default function JournalEntryEditor({ existing }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<JournalAccount[]>([]);
   const [form, setForm] = useState<JournalEntryFormValues>(() => (
     existing ? journalEntryToForm(existing) : newJournalEntryForm(todayLocal())
   ));
@@ -49,7 +53,7 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
 
   useEffect(() => {
     if (!businessId) return;
-    api.get<{ accounts: Account[] }>(`/businesses/${businessId}/coa`, {
+    api.get<{ accounts: JournalAccount[] }>(`/businesses/${businessId}/coa`, {
       params: { include_inactive: 'true' },
     }).then(response => setAccounts(response.data.accounts));
   }, [businessId]);
@@ -93,7 +97,7 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
     setForm(current => ({ ...current, lines: Array.from({ length: 8 }, blankJournalLine) }));
   }
 
-  async function save(destination: SaveDestination = 'detail') {
+  async function save(destination: JournalSaveDestination = 'detail') {
     if (!businessId || !canSave) return;
     setError(null);
     setBusy(true);
@@ -112,12 +116,10 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
       }
 
       if (destination === 'new') {
-        if (existing) navigate('/journal/new');
+        if (existing) navigate(journalDestinationPath(destination, savedId));
         else setForm(newJournalEntryForm(todayLocal()));
-      } else if (destination === 'close') {
-        navigate('/journal');
       } else {
-        navigate(`/journal/${savedId}`);
+        navigate(journalDestinationPath(destination, savedId));
       }
     } catch (requestError: unknown) {
       setError(pickErr(requestError));
@@ -136,7 +138,7 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
       await api.post(`/businesses/${businessId}/journal-entries/${existing.entry.id}/void`, {
         void_reason: reason,
       });
-      navigate('/journal');
+      navigate(JOURNAL_CLOSE_PATH);
     } catch (requestError: unknown) {
       setError(pickErr(requestError));
     } finally {
@@ -245,7 +247,7 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
                   <td className="px-2 py-1.5 text-xs text-muted-foreground">{index + 1}</td>
                   <td className="px-2 py-1.5">
                     <AccountSelect
-                      accounts={accounts}
+                      accounts={journalAccountsForLine(accounts, line.account_id)}
                       value={line.account_id}
                       onChange={accountId => updateLine(index, { account_id: accountId })}
                       placeholder=""
@@ -391,7 +393,7 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
       {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
 
       <div className="sticky bottom-0 flex items-center gap-3 border-t bg-background px-6 py-3">
-        <Button type="button" variant="outline" onClick={() => navigate('/journal')}>
+        <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
           {readOnly ? 'Back' : 'Cancel'}
         </Button>
         {existing?.can_correct && (

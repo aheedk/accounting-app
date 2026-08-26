@@ -19,6 +19,15 @@ export type JournalEntryFormValues = {
   lines: JournalEntryFormLine[];
 };
 
+export type JournalAccount = {
+  id: string;
+  code: string;
+  name: string;
+  account_type: string;
+  is_active: boolean;
+  is_locked: boolean;
+};
+
 export type JournalEntryPayload = {
   entry_date: string;
   reference: string | null;
@@ -105,4 +114,14 @@ export function journalEntryTotals(lines: JournalEntryFormLine[]): {
     credit: credit.toFixed(4),
     balanced: debit.greaterThan(0) && debit.equals(credit),
   };
+}
+
+export function journalAccountsForLine(
+  accounts: JournalAccount[],
+  selectedAccountId: string,
+): JournalAccount[] {
+  return accounts.filter(account => (
+    (account.is_active && !account.is_locked)
+    || account.id === selectedAccountId
+  ));
 }

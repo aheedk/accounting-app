@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalLanding';
+import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type Page = { label: string; group: string; to: string };
 

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bookmark, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalLanding';
+import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type BookmarkItem = { id: string; label: string; path: string };
 type EditState = { bookmarkId: string | null; label: string; path: string };

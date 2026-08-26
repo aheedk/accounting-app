@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import JournalNewPage from './JournalNewPage';
-import { JOURNAL_NAV_ITEM, JournalLandingPage } from './journalLanding';
+import { JournalLandingPage } from './journalLanding';
+import {
+  JOURNAL_CLOSE_PATH,
+  JOURNAL_NAV_ITEM,
+  journalDestinationPath,
+} from './journalNavigation';
 
 describe('journal landing', () => {
   it('opens the new journal entry editor instead of a duplicate report', () => {
@@ -14,5 +19,12 @@ describe('journal landing', () => {
       path: '/journal',
       label: 'New Journal Entry',
     });
+  });
+
+  it('closes the editor to the General Ledger instead of reopening the same form', () => {
+    expect(JOURNAL_CLOSE_PATH).toBe('/reports/general-ledger');
+    expect(journalDestinationPath('close', 'saved-id')).toBe('/reports/general-ledger');
+    expect(journalDestinationPath('detail', 'saved-id')).toBe('/journal/saved-id');
+    expect(journalDestinationPath('new', 'saved-id')).toBe('/journal/new');
   });
 });

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { MyMenu } from './MyMenu';
 import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
-import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalLanding';
+import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {

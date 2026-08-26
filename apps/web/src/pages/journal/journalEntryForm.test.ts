@@ -3,6 +3,7 @@ import {
   journalEntryPayload,
   journalEntryToForm,
   journalEntryTotals,
+  journalAccountsForLine,
   newJournalEntryForm,
 } from './journalEntryForm';
 import type { JournalEntryDetail } from './journalEntryTypes';
@@ -136,5 +137,19 @@ describe('journal entry form mappings', () => {
     expect(form.date).toBe('2026-08-25');
     expect(form.isAdjusting).toBe(false);
     expect(form.lines).toHaveLength(8);
+  });
+
+  it('offers active unlocked accounts while preserving a historical selected account', () => {
+    const accounts = [
+      { id: 'active', code: '1000', name: 'Active', account_type: 'asset', is_active: true, is_locked: false },
+      { id: 'inactive', code: '1001', name: 'Inactive', account_type: 'asset', is_active: false, is_locked: false },
+      { id: 'locked', code: '1002', name: 'Locked', account_type: 'asset', is_active: true, is_locked: true },
+    ];
+
+    expect(journalAccountsForLine(accounts, '').map(account => account.id)).toEqual(['active']);
+    expect(journalAccountsForLine(accounts, 'inactive').map(account => account.id)).toEqual([
+      'active',
+      'inactive',
+    ]);
   });
 });

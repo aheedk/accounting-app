@@ -81,6 +81,7 @@ export async function listJournalEntries(
   const entries = await entriesQuery
     .orderBy('entry_date', 'desc')
     .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
     .limit(limit)
     .offset(offset)
     .execute();
