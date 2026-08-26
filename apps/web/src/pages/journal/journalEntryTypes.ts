@@ -32,6 +32,7 @@ export type JournalEntryRecord = {
   entry_date: string;
   memo: string | null;
   reference: string | null;
+  journal_number: string;
   status: JournalEntryStatus;
   source_type: JournalEntrySourceType;
   source_id: string | null;
@@ -56,4 +57,6 @@ export type JournalEntryDetail = {
   lines: JournalEntryLine[];
   can_correct: boolean;
   correction_block_reason: string | null;
+  can_reverse: boolean;
+  reversal_block_reason: string | null;
 };

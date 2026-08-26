@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Copy, Paperclip, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Paperclip, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -12,6 +12,7 @@ import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import {
   blankJournalLine,
+  copyJournalEntryToForm,
   journalAccountsForLine,
   journalEntryPayload,
   journalEntryToForm,
@@ -22,6 +23,7 @@ import {
   type JournalAccount,
 } from './journalEntryForm';
 import type { JournalEntryDetail } from './journalEntryTypes';
+import RecentJournalEntries from './RecentJournalEntries';
 import {
   JOURNAL_CLOSE_PATH,
   journalDestinationPath,
@@ -30,14 +32,21 @@ import {
 
 type JournalEntryEditorProps = {
   existing?: JournalEntryDetail;
+  copySource?: JournalEntryDetail;
 };
 
-export default function JournalEntryEditor({ existing }: JournalEntryEditorProps) {
+export default function JournalEntryEditor({ existing, copySource }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
   const [accounts, setAccounts] = useState<JournalAccount[]>([]);
   const [form, setForm] = useState<JournalEntryFormValues>(() => (
-    existing ? journalEntryToForm(existing) : newJournalEntryForm(todayLocal())
+    existing
+      ? journalEntryToForm(existing)
+      : copySource
+        ? copyJournalEntryToForm(copySource, '')
+        : newJournalEntryForm(todayLocal())
   ));
+  const [automaticJournalNumber, setAutomaticJournalNumber] = useState(existing === undefined);
+  const [numberRefresh, setNumberRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [primarySaveAction, setPrimarySaveAction] = useState<'new' | 'close'>(
@@ -57,6 +66,16 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
       params: { include_inactive: 'true' },
     }).then(response => setAccounts(response.data.accounts));
   }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId || existing) return;
+    api.get<{ journal_number: string }>(`/businesses/${businessId}/journal-entries/next-number`)
+      .then(response => {
+        setForm(current => ({ ...current, journalNo: response.data.journal_number }));
+        setAutomaticJournalNumber(true);
+      })
+      .catch((requestError: unknown) => setError(pickErr(requestError)));
+  }, [businessId, existing, numberRefresh]);
 
   useEffect(() => {
     function handle(event: MouseEvent) {
@@ -102,7 +121,9 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
     setError(null);
     setBusy(true);
     try {
-      const body = journalEntryPayload(form);
+      const body = journalEntryPayload(form, {
+        automaticNumber: !existing && automaticJournalNumber,
+      });
       let savedId: string;
       if (existing) {
         const response = await api.post<{ corrected_entry: { id: string } }>(
@@ -117,10 +138,34 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
 
       if (destination === 'new') {
         if (existing) navigate(journalDestinationPath(destination, savedId));
-        else setForm(newJournalEntryForm(todayLocal()));
+        else {
+          setForm(newJournalEntryForm(todayLocal()));
+          setNumberRefresh(current => current + 1);
+        }
       } else {
         navigate(journalDestinationPath(destination, savedId));
       }
+    } catch (requestError: unknown) {
+      setError(pickErr(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reverseEntry() {
+    if (!businessId || !existing?.can_reverse) return;
+    const confirmed = window.confirm(
+      'Reverse this entry on the first day of the next month? The original entry will remain posted.',
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await api.post<{ reversal: { id: string } }>(
+        `/businesses/${businessId}/journal-entries/${existing.entry.id}/reverse`,
+        {},
+      );
+      navigate(`/journal/${response.data.reversal.id}`);
     } catch (requestError: unknown) {
       setError(pickErr(requestError));
     } finally {
@@ -151,6 +196,7 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col -mx-6 -my-6">
       <div className="flex flex-wrap items-center gap-3 border-b bg-background px-6 py-4">
+        <RecentJournalEntries businessId={businessId} />
         <h1 className="text-xl font-semibold">
           Journal Entry{form.journalNo ? ` #${form.journalNo}` : ''}
         </h1>
@@ -164,6 +210,14 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
           </span>
         )}
         <div className="ml-auto flex flex-wrap gap-3 text-xs text-muted-foreground">
+          {existing && (
+            <Button asChild type="button" variant="ghost" size="sm">
+              <Link to={`/journal/new?copy=${existing.entry.id}`}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy
+              </Link>
+            </Button>
+          )}
           {existing?.entry.corrected_from_entry_id && (
             <Link className="text-primary hover:underline" to={`/journal/${existing.entry.corrected_from_entry_id}`}>
               Correction of JE {existing.entry.corrected_from_entry_id.slice(0, 8)}
@@ -208,7 +262,10 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
           </label>
           <Input
             value={form.journalNo}
-            onChange={event => updateForm({ journalNo: event.target.value })}
+            onChange={event => {
+              setAutomaticJournalNumber(false);
+              updateForm({ journalNo: event.target.value });
+            }}
             placeholder="e.g. AJE3"
             disabled={readOnly}
             className="w-44"
@@ -399,6 +456,12 @@ export default function JournalEntryEditor({ existing }: JournalEntryEditorProps
         {existing?.can_correct && (
           <Button type="button" variant="destructive" onClick={() => { void voidEntry(); }} disabled={busy}>
             Void entry
+          </Button>
+        )}
+        {existing?.can_reverse && (
+          <Button type="button" variant="outline" onClick={() => { void reverseEntry(); }} disabled={busy}>
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reverse
           </Button>
         )}
 

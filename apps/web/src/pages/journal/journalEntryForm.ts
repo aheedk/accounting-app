@@ -14,6 +14,7 @@ export type JournalEntryFormLine = {
 export type JournalEntryFormValues = {
   date: string;
   journalNo: string;
+  reference: string;
   isAdjusting: boolean;
   memo: string;
   lines: JournalEntryFormLine[];
@@ -30,6 +31,7 @@ export type JournalAccount = {
 
 export type JournalEntryPayload = {
   entry_date: string;
+  journal_number: string | null;
   reference: string | null;
   memo: string | null;
   is_adjusting: boolean;
@@ -53,6 +55,7 @@ export function newJournalEntryForm(date: string): JournalEntryFormValues {
   return {
     date,
     journalNo: '',
+    reference: '',
     isAdjusting: false,
     memo: '',
     lines: Array.from({ length: DEFAULT_ROWS }, blankJournalLine),
@@ -71,17 +74,29 @@ export function journalEntryToForm(detail: JournalEntryDetail): JournalEntryForm
   while (lines.length < DEFAULT_ROWS) lines.push(blankJournalLine());
   return {
     date: detail.entry.entry_date,
-    journalNo: detail.entry.reference ?? '',
+    journalNo: detail.entry.journal_number,
+    reference: detail.entry.reference ?? '',
     isAdjusting: detail.entry.source_type === 'adjustment',
     memo: detail.entry.memo ?? '',
     lines,
   };
 }
 
-export function journalEntryPayload(form: JournalEntryFormValues): JournalEntryPayload {
+export function copyJournalEntryToForm(
+  detail: JournalEntryDetail,
+  journalNumber: string,
+): JournalEntryFormValues {
+  return { ...journalEntryToForm(detail), journalNo: journalNumber };
+}
+
+export function journalEntryPayload(
+  form: JournalEntryFormValues,
+  options: { automaticNumber?: boolean } = {},
+): JournalEntryPayload {
   return {
     entry_date: form.date,
-    reference: form.journalNo || null,
+    journal_number: options.automaticNumber ? null : form.journalNo || null,
+    reference: form.reference || null,
     memo: form.memo || null,
     is_adjusting: form.isAdjusting,
     lines: form.lines.filter(line => line.account_id).map(line => ({

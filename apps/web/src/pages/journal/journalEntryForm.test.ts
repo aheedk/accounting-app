@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  copyJournalEntryToForm,
   journalEntryPayload,
   journalEntryToForm,
   journalEntryTotals,
@@ -20,6 +21,7 @@ const detail: JournalEntryDetail = {
     entry_date: '2026-08-20',
     memo: 'Adjustment',
     reference: 'JE-22',
+    journal_number: '23',
     status: 'posted',
     source_type: 'adjustment',
     source_id: null,
@@ -64,6 +66,8 @@ const detail: JournalEntryDetail = {
   ],
   can_correct: true,
   correction_block_reason: null,
+  can_reverse: true,
+  reversal_block_reason: null,
 };
 
 describe('journal entry form mappings', () => {
@@ -72,7 +76,8 @@ describe('journal entry form mappings', () => {
 
     expect(form).toMatchObject({
       date: '2026-08-20',
-      journalNo: 'JE-22',
+      journalNo: '23',
+      reference: 'JE-22',
       isAdjusting: true,
       memo: 'Adjustment',
     });
@@ -97,6 +102,7 @@ describe('journal entry form mappings', () => {
 
     expect(journalEntryPayload(form)).toEqual({
       entry_date: '2026-08-20',
+      journal_number: '23',
       reference: 'JE-22',
       memo: 'Adjustment',
       is_adjusting: true,
@@ -118,6 +124,32 @@ describe('journal entry form mappings', () => {
           class_name: null,
         },
       ],
+    });
+  });
+
+  it('lets the server assign an automatic number without losing the displayed suggestion', () => {
+    const form = journalEntryToForm(detail);
+
+    expect(journalEntryPayload(form, { automaticNumber: true }).journal_number).toBeNull();
+    expect(form.journalNo).toBe('23');
+  });
+
+  it('copies the entry details under a supplied new journal number', () => {
+    const copy = copyJournalEntryToForm(detail, '24');
+
+    expect(copy).toMatchObject({
+      date: '2026-08-20',
+      journalNo: '24',
+      reference: 'JE-22',
+      memo: 'Adjustment',
+      isAdjusting: true,
+    });
+    expect(copy.lines[0]).toMatchObject({
+      account_id: CASH_ID,
+      debit: '50.0000',
+      description: 'Debit line',
+      name: 'Patient A',
+      class_name: 'Clinic',
     });
   });
 
