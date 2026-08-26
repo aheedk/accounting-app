@@ -174,7 +174,7 @@ async function materializeOnce(
     await postJournalEntry(trx, ctx, {
       business_id: t.business_id,
       entry_date: runDate,
-      source_type: 'manual',
+      source_type: payload.is_adjusting ? 'adjustment' : 'manual',
       memo: payload.memo ?? `Recurring: ${t.name}`,
       reference: payload.reference ?? null,
       lines: payload.lines.map(l => ({
@@ -182,6 +182,8 @@ async function materializeOnce(
         debit: l.debit,
         credit: l.credit,
         memo: l.memo ?? null,
+        name: l.name ?? null,
+        class_name: l.class_name ?? null,
       })),
     });
   } else if (t.template_type === 'invoice') {

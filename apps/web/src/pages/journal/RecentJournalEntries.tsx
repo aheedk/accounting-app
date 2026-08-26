@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import type { JournalEntryListItem } from './journalEntryTypes';
-import { recentJournalEntryDate, recentJournalEntryLabel } from './recentJournalEntries';
+import { recentJournalEntryDate, recentJournalEntryLabel } from './journalRecent';
 import { JOURNAL_CLOSE_PATH } from './journalNavigation';
 
 export default function RecentJournalEntries({ businessId }: { businessId: string }) {

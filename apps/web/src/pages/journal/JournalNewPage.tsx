@@ -25,5 +25,6 @@ export default function JournalNewPage() {
   if (copyId && !businessId) return <div>Pick a business.</div>;
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (copyId && !copySource) return <div>Loading journal entry copy...</div>;
-  return <JournalEntryEditor key={copyId ?? 'new'} copySource={copySource ?? undefined} />;
+  if (copySource) return <JournalEntryEditor key={copyId ?? 'copy'} copySource={copySource} />;
+  return <JournalEntryEditor key="new" />;
 }

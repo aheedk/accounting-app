@@ -24,6 +24,7 @@ import {
 } from './journalEntryForm';
 import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
+import JournalRecurringDialog from './JournalRecurringDialog';
 import {
   JOURNAL_CLOSE_PATH,
   journalDestinationPath,
@@ -48,7 +49,9 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const [automaticJournalNumber, setAutomaticJournalNumber] = useState(existing === undefined);
   const [numberRefresh, setNumberRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recurringOpen, setRecurringOpen] = useState(false);
   const [primarySaveAction, setPrimarySaveAction] = useState<'new' | 'close'>(
     () => (localStorage.getItem('je_primarySaveAction') === 'close' ? 'close' : 'new'),
   );
@@ -56,6 +59,9 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const readOnly = existing !== undefined && !existing.can_correct;
+  const supportsManualActions = existing === undefined
+    || existing.entry.source_type === 'manual'
+    || existing.entry.source_type === 'adjustment';
   const totals = journalEntryTotals(form.lines);
   const filledLineCount = form.lines.filter(line => line.account_id).length;
   const canSave = !readOnly && totals.balanced && filledLineCount >= 2 && !busy;
@@ -210,7 +216,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           </span>
         )}
         <div className="ml-auto flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {existing && (
+          {existing && supportsManualActions && (
             <Button asChild type="button" variant="ghost" size="sm">
               <Link to={`/journal/new?copy=${existing.entry.id}`}>
                 <Copy className="mr-2 h-4 w-4" />
@@ -448,6 +454,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       </div>
 
       {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
+      {notice && <p className="px-6 pb-2 text-sm text-emerald-700">{notice}</p>}
 
       <div className="sticky bottom-0 flex items-center gap-3 border-t bg-background px-6 py-3">
         <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
@@ -465,8 +472,13 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           </Button>
         )}
 
-        {!readOnly && (
-          <button type="button" className="mx-auto text-sm font-medium text-emerald-600 hover:underline">
+        {supportsManualActions && (
+          <button
+            type="button"
+            onClick={() => setRecurringOpen(true)}
+            disabled={!totals.balanced || filledLineCount < 2}
+            className="mx-auto text-sm font-medium text-emerald-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+          >
             Make recurring
           </button>
         )}
@@ -515,6 +527,13 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           </div>
         )}
       </div>
+      <JournalRecurringDialog
+        businessId={businessId}
+        form={form}
+        open={recurringOpen}
+        onOpenChange={setRecurringOpen}
+        onCreated={() => setNotice('Recurring journal template created.')}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recentJournalEntryDate, recentJournalEntryLabel } from './recentJournalEntries';
+import { recentJournalEntryDate, recentJournalEntryLabel } from './journalRecent';
 
 describe('recent journal entry presentation', () => {
   it('shows the sequential journal number and an unambiguous US date', () => {

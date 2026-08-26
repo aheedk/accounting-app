@@ -7,11 +7,14 @@ import { billLineCreateSchema } from './bill.js';
 export const recurringJePayloadSchema = z.object({
   memo: z.string().max(1000).nullable().optional(),
   reference: z.string().max(200).nullable().optional(),
+  is_adjusting: z.boolean().optional(),
   lines: z.array(z.object({
     account_id: z.string().uuid(),
     debit: z.string().regex(/^\d+(\.\d{1,4})?$/),
     credit: z.string().regex(/^\d+(\.\d{1,4})?$/),
     memo: z.string().max(500).nullable().optional(),
+    name: z.string().max(200).nullable().optional(),
+    class_name: z.string().max(200).nullable().optional(),
   })).min(2),
 });
 export type RecurringJePayload = z.infer<typeof recurringJePayloadSchema>;
