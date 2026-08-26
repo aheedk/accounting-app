@@ -41,6 +41,8 @@ export type JournalEntryDetail = {
   lines: JournalEntryLineRead[];
   can_correct: boolean;
   correction_block_reason: string | null;
+  can_reverse: boolean;
+  reversal_block_reason: string | null;
 };
 
 async function readLines(db: Kysely<DB>, journalEntryIds: string[]): Promise<JournalEntryLineRead[]> {
@@ -109,6 +111,7 @@ function correctionBlockReason(
     period_status: 'open' | 'closed';
   },
   sourceGenerated: boolean,
+  hasReversal: boolean,
 ): string | null {
   if (!hasMinRole(effectiveRole, 'accountant')) {
     return 'Accountant access is required to correct journal entries.';
@@ -121,8 +124,32 @@ function correctionBlockReason(
   if (sourceGenerated) {
     return 'This entry was created by a source transaction. Correct the source transaction instead.';
   }
+  if (hasReversal) {
+    return 'This journal entry has already been reversed.';
+  }
   if (entry.period_status === 'closed') {
     return 'This journal entry is in a closed accounting period.';
+  }
+  return null;
+}
+
+function reversalBlockReason(
+  effectiveRole: ServiceCtx['effective_role'],
+  entry: { status: JournalEntryStatus },
+  sourceGenerated: boolean,
+  hasReversal: boolean,
+): string | null {
+  if (!hasMinRole(effectiveRole, 'accountant')) {
+    return 'Accountant access is required to reverse journal entries.';
+  }
+  if (entry.status !== 'posted') {
+    return 'Only posted journal entries can be reversed.';
+  }
+  if (sourceGenerated) {
+    return 'This entry was created by a source transaction. Reverse the source transaction instead.';
+  }
+  if (hasReversal) {
+    return 'This journal entry has already been reversed.';
   }
   return null;
 }
@@ -141,11 +168,24 @@ export async function getJournalEntryDetail(
 
   const lines = await readLines(db, [entry.id]);
   const sourceGenerated = await isSourceGeneratedJournalEntry(db, entry);
-  const blockReason = correctionBlockReason(ctx.effective_role, entry, sourceGenerated);
+  const existingReversal = await db.selectFrom('journal_entries').select('id')
+    .where('business_id', '=', ctx.business_id)
+    .where('reversed_entry_id', '=', entry.id)
+    .executeTakeFirst();
+  const hasReversal = existingReversal !== undefined;
+  const blockReason = correctionBlockReason(ctx.effective_role, entry, sourceGenerated, hasReversal);
+  const reverseBlockReason = reversalBlockReason(
+    ctx.effective_role,
+    entry,
+    sourceGenerated,
+    hasReversal,
+  );
   return {
     entry,
     lines,
     can_correct: blockReason === null,
     correction_block_reason: blockReason,
+    can_reverse: reverseBlockReason === null,
+    reversal_block_reason: reverseBlockReason,
   };
 }

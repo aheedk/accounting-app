@@ -124,6 +124,37 @@ describe('ledger DB triggers (adversarial)', () => {
     expect(inserted.journal_number).toBe('1');
   });
 
+  it('allows only one reversal link for an original journal entry', async () => {
+    const { biz, ctx, cash, rev } = await setup();
+    const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual',
+      memo: null,
+      lines: [
+        { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
+        { account_id: rev.id, debit: '0.0000', credit: '10.0000', memo: null },
+      ],
+    }));
+    const period = (await periods.findPeriodForDate(t.db, biz.id, '2026-05-01'))!;
+    const reversal = {
+      business_id: biz.id,
+      period_id: period.id,
+      entry_date: '2026-05-01',
+      source_type: 'reversal' as const,
+      source_id: original.id,
+      reversed_entry_id: original.id,
+      status: 'draft' as const,
+      created_by_user_id: ctx.user_id,
+    };
+    await t.db.insertInto('journal_entries').values({ ...reversal, journal_number: '1R' }).execute();
+
+    await expect(t.db.insertInto('journal_entries').values({
+      ...reversal,
+      journal_number: '1R-duplicate',
+    }).execute()).rejects.toThrow(/reversal/i);
+  });
+
   it('correction link rejects a source-generated adjustment', async () => {
     const { biz, ctx, cash, rev } = await setup();
     const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {

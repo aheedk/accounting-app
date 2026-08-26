@@ -136,4 +136,18 @@ router.post('/businesses/:businessId/journal-entries/:id/void', requireMinRole('
   } catch (e) { next(e); }
 });
 
+router.post('/businesses/:businessId/journal-entries/:id/reverse', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const ctx = ctxFromReq(req);
+    const force = req.query['admin_override'] === 'true';
+    const reason = (req.body?.admin_override_reason as string | undefined) ?? '';
+    const work = (trx: Transaction<DB>) =>
+      ledger.reverseJournalEntry(trx, ctx, { journal_entry_id: req.params['id']! });
+    const reversal = force
+      ? await runWithClosedPeriodOverride(db, ctx, reason, work)
+      : await db.transaction().execute(work);
+    res.status(201).json({ reversal });
+  } catch (e) { next(e); }
+});
+
 export default router;

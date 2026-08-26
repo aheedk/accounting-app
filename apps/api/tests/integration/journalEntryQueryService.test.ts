@@ -101,6 +101,8 @@ describe('journalEntryQueryService', () => {
     });
     expect(result.can_correct).toBe(true);
     expect(result.correction_block_reason).toBeNull();
+    expect(result.can_reverse).toBe(true);
+    expect(result.reversal_block_reason).toBeNull();
     expect(result.lines).toHaveLength(2);
   });
 
@@ -116,6 +118,8 @@ describe('journalEntryQueryService', () => {
     const generatedDetail = await journalQueries.getJournalEntryDetail(t.db, data.ctx, reversal.id);
     expect(generatedDetail.can_correct).toBe(false);
     expect(generatedDetail.correction_block_reason).toMatch(/source transaction/i);
+    expect(generatedDetail.can_reverse).toBe(false);
+    expect(generatedDetail.reversal_block_reason).toMatch(/source transaction/i);
 
     const replacement = await postEntry(t, data, '2026-05-02', 'Staff cannot edit');
     const staffDetail = await journalQueries.getJournalEntryDetail(
@@ -144,6 +148,20 @@ describe('journalEntryQueryService', () => {
     const detail = await journalQueries.getJournalEntryDetail(t.db, data.ctx, generated.id);
     expect(detail.can_correct).toBe(false);
     expect(detail.correction_block_reason).toMatch(/source transaction/i);
+  });
+
+  it('marks an entry with a standalone reversal read-only for further correction or reversal', async () => {
+    const data = await setup(t);
+    const original = await postEntry(t, data, '2026-04-15', 'Reversed entry');
+    await t.db.transaction().execute(trx => ledger.reverseJournalEntry(trx, data.ctx, {
+      journal_entry_id: original.id,
+    }));
+
+    const detail = await journalQueries.getJournalEntryDetail(t.db, data.ctx, original.id);
+    expect(detail.can_correct).toBe(false);
+    expect(detail.correction_block_reason).toMatch(/already been reversed/i);
+    expect(detail.can_reverse).toBe(false);
+    expect(detail.reversal_block_reason).toMatch(/already been reversed/i);
   });
 
   it('marks entries in closed periods read-only and hides cross-business IDs', async () => {

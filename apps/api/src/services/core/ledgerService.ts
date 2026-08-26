@@ -204,6 +204,9 @@ export async function voidJournalEntry(
       'Source-generated journal entries must be voided from their source transaction',
     );
   }
+  if (await hasPostedReversal(trx, orig.business_id, orig.id)) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'Journal entry has already been reversed');
+  }
 
   const period = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', orig.period_id).executeTakeFirstOrThrow();
   if (period.status === 'closed' && (await currentSetting(trx, 'app.admin_override')) !== 'on') {
@@ -283,6 +286,98 @@ export async function voidJournalEntry(
   });
 
   return reversalPosted;
+}
+
+export async function reverseJournalEntry(
+  trx: Transaction<DB>,
+  ctx: ServiceCtx,
+  input: { journal_entry_id: string },
+) {
+  if (!hasMinRole(ctx.effective_role, 'accountant')) {
+    throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to reverse journal entries');
+  }
+
+  const original = await trx.selectFrom('journal_entries').selectAll()
+    .where('id', '=', input.journal_entry_id)
+    .where('business_id', '=', ctx.business_id)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!original) {
+    throw new BusinessRuleError(ERR.NOT_FOUND, `Journal entry ${input.journal_entry_id} not found`);
+  }
+  if (original.status !== 'posted') {
+    throw new InvalidStateTransitionError('journal_entry', original.id, original.status, 'reversed');
+  }
+  if (await isSourceGeneratedJournalEntry(trx, original)) {
+    throw new BusinessRuleError(
+      ERR.IMMUTABLE_RECORD,
+      'Source-generated journal entries must be reversed from their source transaction',
+    );
+  }
+  if (await hasPostedReversal(trx, original.business_id, original.id)) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'Journal entry has already been reversed');
+  }
+
+  const reversalDate = firstDayOfNextMonth(original.entry_date);
+  const reversalPeriod = await findPeriodForDate(
+    trx as unknown as Kysely<DB>,
+    original.business_id,
+    reversalDate,
+  );
+  if (!reversalPeriod) {
+    throw new PreconditionError(`No fiscal period covers reversal date ${reversalDate}`);
+  }
+  if (reversalPeriod.status === 'closed' && (await currentSetting(trx, 'app.admin_override')) !== 'on') {
+    throw new ClosedPeriodError(reversalPeriod.id, reversalPeriod.closed_at?.toString());
+  }
+
+  const lines = await trx.selectFrom('journal_entry_lines').selectAll()
+    .where('journal_entry_id', '=', original.id)
+    .orderBy('line_number')
+    .execute();
+  const reversal = await trx.insertInto('journal_entries').values({
+    business_id: original.business_id,
+    period_id: reversalPeriod.id,
+    entry_date: reversalDate,
+    journal_number: `${original.journal_number}R`,
+    memo: original.memo,
+    reference: original.reference,
+    status: 'draft',
+    source_type: 'reversal',
+    source_id: original.id,
+    reversed_entry_id: original.id,
+    created_by_user_id: ctx.user_id,
+  }).returningAll().executeTakeFirstOrThrow();
+
+  for (const line of lines) {
+    await trx.insertInto('journal_entry_lines').values({
+      journal_entry_id: reversal.id,
+      line_number: line.line_number,
+      account_id: line.account_id,
+      debit: line.credit,
+      credit: line.debit,
+      memo: line.memo,
+      name: line.name,
+      class_name: line.class_name,
+    }).execute();
+  }
+
+  const posted = await trx.updateTable('journal_entries')
+    .set({ status: 'posted', posted_at: sql`now()`, posted_by_user_id: ctx.user_id })
+    .where('id', '=', reversal.id)
+    .where('business_id', '=', ctx.business_id)
+    .where('status', '=', 'draft')
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.JOURNAL_ENTRY_REVERSE,
+    entity_type: 'journal_entry',
+    entity_id: posted.id,
+    before: null,
+    after: posted,
+  });
+  return posted;
 }
 
 export async function correctJournalEntry(
@@ -429,6 +524,27 @@ export async function computeTrialBalance(
 async function currentSetting(trx: Transaction<DB>, key: string): Promise<string | null> {
   const r = await sql<{ v: string | null }>`SELECT current_setting(${key}, true) AS v`.execute(trx);
   return r.rows[0]?.v ?? null;
+}
+
+function firstDayOfNextMonth(entryDate: string): string {
+  const [yearText, monthText] = entryDate.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (month === 12) return `${year + 1}-01-01`;
+  return `${year}-${String(month + 1).padStart(2, '0')}-01`;
+}
+
+async function hasPostedReversal(
+  db: Kysely<DB>,
+  businessId: string,
+  journalEntryId: string,
+): Promise<boolean> {
+  const reversal = await db.selectFrom('journal_entries').select('id')
+    .where('business_id', '=', businessId)
+    .where('reversed_entry_id', '=', journalEntryId)
+    .where('status', '=', 'posted')
+    .executeTakeFirst();
+  return reversal !== undefined;
 }
 
 export async function isSourceGeneratedJournalEntry(
