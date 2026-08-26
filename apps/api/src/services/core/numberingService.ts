@@ -1,4 +1,4 @@
-import { sql, type Transaction } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../db/types.js';
 
 export type NumberedEntityType = 'invoice' | 'bill' | 'purchase_order' | 'sales_order';
@@ -45,4 +45,33 @@ export async function nextCounter(
     RETURNING last_value
   `.execute(trx);
   return Number(result.rows[0]!.last_value);
+}
+
+export async function reserveCounterAtLeast(
+  trx: Transaction<DB>,
+  business_id: string,
+  entity_type: string,
+  minimum: number,
+): Promise<number> {
+  const result = await sql<{ last_value: string | number }>`
+    INSERT INTO numbering_counters (business_id, entity_type, last_value)
+    VALUES (${business_id}, ${entity_type}, ${minimum})
+    ON CONFLICT (business_id, entity_type) DO UPDATE
+      SET last_value = GREATEST(numbering_counters.last_value, EXCLUDED.last_value)
+    RETURNING last_value
+  `.execute(trx);
+  return Number(result.rows[0]!.last_value);
+}
+
+export async function peekNextCounter(
+  db: Kysely<DB>,
+  business_id: string,
+  entity_type: string,
+): Promise<number> {
+  const row = await db.selectFrom('numbering_counters')
+    .select('last_value')
+    .where('business_id', '=', business_id)
+    .where('entity_type', '=', entity_type)
+    .executeTakeFirst();
+  return Number(row?.last_value ?? 0) + 1;
 }

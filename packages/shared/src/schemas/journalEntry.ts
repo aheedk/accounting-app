@@ -18,6 +18,7 @@ export type JournalLineInput = z.infer<typeof journalLineInputSchema>;
 
 export const journalEntryCreateSchema = z.object({
   entry_date: dateString,
+  journal_number: z.string().trim().min(1).max(100).nullable().optional(),
   memo: z.string().max(1000).nullable().optional(),
   reference: z.string().max(100).nullable().optional(),
   is_adjusting: z.boolean().optional().default(false),

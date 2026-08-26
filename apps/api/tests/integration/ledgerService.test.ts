@@ -60,6 +60,90 @@ describe('ledgerService.postJournalEntry', () => {
     expect(audit).toHaveLength(1);
   });
 
+  it('assigns sequential journal numbers independently per business', async () => {
+    const { firm, biz, ctx, cash, revenue } = await setup(t);
+    const post = (businessId: string, serviceCtx: ServiceCtx, debitAccountId: string, creditAccountId: string) =>
+      t.db.transaction().execute(trx => ledger.postJournalEntry(trx, serviceCtx, {
+        business_id: businessId,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: debitAccountId, debit: '10.0000', credit: '0.0000', memo: null },
+          { account_id: creditAccountId, debit: '0.0000', credit: '10.0000', memo: null },
+        ],
+      }));
+
+    const first = await post(biz.id, ctx, cash.id, revenue.id);
+    const second = await post(biz.id, ctx, cash.id, revenue.id);
+
+    const otherBusiness = await makeBusiness(t.db, firm.id, 'Numbered Biz');
+    await seedYearPeriods(t.db, otherBusiness.id, 2026);
+    const otherCash = await makeAccount(t.db, otherBusiness.id, {
+      code: '1120', name: 'Other Cash', account_type: 'asset',
+    });
+    const otherRevenue = await makeAccount(t.db, otherBusiness.id, {
+      code: '4120', name: 'Other Sales', account_type: 'revenue',
+    });
+    const otherFirst = await post(
+      otherBusiness.id,
+      { ...ctx, business_id: otherBusiness.id },
+      otherCash.id,
+      otherRevenue.id,
+    );
+
+    expect(first.journal_number).toBe('1');
+    expect(second.journal_number).toBe('2');
+    expect(otherFirst.journal_number).toBe('1');
+  });
+
+  it('accepts a unique custom journal number and advances past numeric overrides', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const custom = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual',
+      journal_number: '25',
+      memo: null,
+      lines: [
+        { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '10.0000', memo: null },
+      ],
+    }));
+    const automatic = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-16',
+      source_type: 'manual',
+      memo: null,
+      lines: [
+        { account_id: cash.id, debit: '11.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '11.0000', memo: null },
+      ],
+    }));
+
+    expect(custom.journal_number).toBe('25');
+    expect(automatic.journal_number).toBe('26');
+  });
+
+  it('rejects a duplicate custom journal number within the business', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const input = {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual' as const,
+      journal_number: 'AJE-7',
+      memo: null,
+      lines: [
+        { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '10.0000', memo: null },
+      ],
+    };
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, input));
+
+    await expect(t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, input)))
+      .rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
+  });
+
   it('rejects unbalanced entry with UNBALANCED_ENTRY (service-layer guard)', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     await expect(

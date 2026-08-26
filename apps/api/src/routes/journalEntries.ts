@@ -9,6 +9,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as ledger from '../services/core/ledgerService.js';
 import * as journalQueries from '../services/core/journalEntryQueryService.js';
+import { peekNextCounter } from '../services/core/numberingService.js';
 import { runWithClosedPeriodOverride } from '../services/admin/adminOverrideService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
@@ -43,6 +44,13 @@ router.get('/businesses/:businessId/journal-entries', async (req, res, next) => 
   } catch (e) { next(e); }
 });
 
+router.get('/businesses/:businessId/journal-entries/next-number', async (req, res, next) => {
+  try {
+    const nextNumber = await peekNextCounter(db, req.tenancy!.business_id, 'journal_entry');
+    res.json({ journal_number: String(nextNumber) });
+  } catch (e) { next(e); }
+});
+
 router.get('/businesses/:businessId/journal-entries/:id', async (req, res, next) => {
   try {
     const result = await journalQueries.getJournalEntryDetail(db, ctxFromReq(req), req.params['id']!);
@@ -60,6 +68,7 @@ router.post('/businesses/:businessId/journal-entries', requireMinRole('accountan
       ledger.postJournalEntry(trx, ctx, {
         business_id: req.tenancy!.business_id,
         entry_date: body.entry_date,
+        journal_number: body.journal_number ?? null,
         source_type: body.is_adjusting ? 'adjustment' : 'manual',
         memo: body.memo ?? null,
         reference: body.reference ?? null,
@@ -91,6 +100,7 @@ router.post('/businesses/:businessId/journal-entries/:id/correct', requireMinRol
         replacement: {
           business_id: req.tenancy!.business_id,
           entry_date: body.entry_date,
+          journal_number: body.journal_number ?? null,
           source_type: body.is_adjusting ? 'adjustment' : 'manual',
           memo: body.memo ?? null,
           reference: body.reference ?? null,

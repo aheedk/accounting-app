@@ -10,6 +10,7 @@ import {
 } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { findPeriodForDate } from './fiscalPeriodService.js';
+import { nextCounter, reserveCounterAtLeast } from './numberingService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type LineInput = {
@@ -24,6 +25,7 @@ export type LineInput = {
 export type PostJournalEntryInput = {
   business_id: string;
   entry_date: string;
+  journal_number?: string | null;
   source_type: JournalEntrySourceType;
   source_id?: string | null;
   memo: string | null;
@@ -105,10 +107,32 @@ export async function postJournalEntry(
     throw new ClosedPeriodError(period.id, period.closed_at?.toString());
   }
 
+  const requestedNumber = input.journal_number?.trim() || null;
+  let journalNumber: string;
+  if (requestedNumber) {
+    const numericNumber = /^[1-9]\d*$/.test(requestedNumber) ? Number(requestedNumber) : 0;
+    await reserveCounterAtLeast(trx, input.business_id, 'journal_entry', numericNumber);
+    const duplicate = await trx.selectFrom('journal_entries').select('id')
+      .where('business_id', '=', input.business_id)
+      .where('journal_number', '=', requestedNumber)
+      .where('status', '<>', 'voided')
+      .executeTakeFirst();
+    if (duplicate) {
+      throw new BusinessRuleError(
+        ERR.DUPLICATE_RESOURCE,
+        `Journal number ${requestedNumber} already exists`,
+      );
+    }
+    journalNumber = requestedNumber;
+  } else {
+    journalNumber = String(await nextCounter(trx, input.business_id, 'journal_entry'));
+  }
+
   const je = await trx.insertInto('journal_entries').values({
     business_id: input.business_id,
     period_id: period.id,
     entry_date: input.entry_date,
+    journal_number: journalNumber,
     memo: input.memo,
     reference: input.reference ?? null,
     status: 'draft',
@@ -197,11 +221,13 @@ export async function voidJournalEntry(
   if (reversalPeriod.status === 'closed' && (await currentSetting(trx, 'app.admin_override')) !== 'on') {
     throw new ClosedPeriodError(reversalPeriod.id);
   }
+  const reversalJournalNumber = String(await nextCounter(trx, orig.business_id, 'journal_entry'));
 
   const reversal = await trx.insertInto('journal_entries').values({
     business_id: orig.business_id,
     period_id: reversalPeriod.id,
     entry_date: reversalPeriod.starts_on <= reversalDate && reversalDate <= reversalPeriod.ends_on ? reversalDate : orig.entry_date,
+    journal_number: reversalJournalNumber,
     memo: `Reversal of ${orig.id}: ${input.void_reason}`,
     reference: orig.reference,
     status: 'draft',

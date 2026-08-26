@@ -109,6 +109,21 @@ describe('ledger DB triggers (adversarial)', () => {
     ).rejects.toThrow(/manual entry must not have source_id/);
   });
 
+  it('assigns a journal number when a trusted direct insert omits one', async () => {
+    const { biz } = await setup();
+    const period = (await periods.findPeriodForDate(t.db, biz.id, '2026-04-15'))!;
+
+    const inserted = await t.db.insertInto('journal_entries').values({
+      business_id: biz.id,
+      period_id: period.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual',
+      status: 'draft',
+    }).returningAll().executeTakeFirstOrThrow();
+
+    expect(inserted.journal_number).toBe('1');
+  });
+
   it('correction link rejects a source-generated adjustment', async () => {
     const { biz, ctx, cash, rev } = await setup();
     const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {

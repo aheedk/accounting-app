@@ -122,6 +122,7 @@ export interface JournalEntriesTable {
   business_id: string;
   period_id: string;
   entry_date: ColumnType<string, string, string>;
+  journal_number: Generated<string>;
   memo: string | null;
   reference: string | null;
   status: Generated<JournalEntryStatus>;

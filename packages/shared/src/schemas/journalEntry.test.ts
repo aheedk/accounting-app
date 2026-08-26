@@ -5,6 +5,7 @@ describe('journalEntryCreateSchema', () => {
   it('preserves the adjusting flag and optional line Name and Class', () => {
     const parsed = journalEntryCreateSchema.parse({
       entry_date: '2026-08-25',
+      journal_number: 'AJE-25',
       is_adjusting: true,
       lines: [
         {
@@ -28,6 +29,7 @@ describe('journalEntryCreateSchema', () => {
       class_name?: string;
     };
     expect(result.is_adjusting).toBe(true);
+    expect(result.journal_number).toBe('AJE-25');
     expect(firstLine).toMatchObject({ name: 'Patient A', class_name: 'Clinic' });
   });
 });
