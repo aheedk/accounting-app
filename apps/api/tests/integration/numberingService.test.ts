@@ -54,11 +54,11 @@ describe('numberingService.nextNumber', () => {
     const firm = await makeFirm(t.db);
     const biz = await makeBusiness(t.db, firm.id);
 
-    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe(1);
-    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe(1);
+    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe('1');
+    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe('1');
 
     const claimed = await t.db.transaction().execute(trx => nextCounter(trx, biz.id, 'journal_entry'));
-    expect(claimed).toBe(1);
-    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe(2);
+    expect(claimed).toBe('1');
+    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe('2');
   });
 });

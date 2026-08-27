@@ -110,8 +110,18 @@ export async function postJournalEntry(
   const requestedNumber = input.journal_number?.trim() || null;
   let journalNumber: string;
   if (requestedNumber) {
-    const numericNumber = /^[1-9]\d*$/.test(requestedNumber) ? Number(requestedNumber) : 0;
-    await reserveCounterAtLeast(trx, input.business_id, 'journal_entry', numericNumber);
+    const standaloneManual = (input.source_type === 'manual' || input.source_type === 'adjustment')
+      && input.source_id == null;
+    if (standaloneManual && (requestedNumber.length > 99 || requestedNumber.endsWith('R'))) {
+      throw new PreconditionError(
+        requestedNumber.endsWith('R')
+          ? 'Journal numbers ending in R are reserved for reversal entries'
+          : 'Journal numbers must be 99 characters or fewer so they can be reversed',
+      );
+    }
+    if (/^[1-9]\d{0,17}$/.test(requestedNumber)) {
+      await reserveCounterAtLeast(trx, input.business_id, 'journal_entry', requestedNumber);
+    }
     const duplicate = await trx.selectFrom('journal_entries').select('id')
       .where('business_id', '=', input.business_id)
       .where('journal_number', '=', requestedNumber)
@@ -319,6 +329,21 @@ export async function reverseJournalEntry(
   }
 
   const reversalDate = firstDayOfNextMonth(original.entry_date);
+  const reversalJournalNumber = `${original.journal_number}R`;
+  if (reversalJournalNumber.length > 100) {
+    throw new PreconditionError('This legacy journal number is too long to create a reversal number');
+  }
+  const numberConflict = await trx.selectFrom('journal_entries').select('id')
+    .where('business_id', '=', original.business_id)
+    .where('journal_number', '=', reversalJournalNumber)
+    .where('status', '<>', 'voided')
+    .executeTakeFirst();
+  if (numberConflict) {
+    throw new BusinessRuleError(
+      ERR.DUPLICATE_RESOURCE,
+      `Journal number ${reversalJournalNumber} is already in use`,
+    );
+  }
   const reversalPeriod = await findPeriodForDate(
     trx as unknown as Kysely<DB>,
     original.business_id,
@@ -339,7 +364,7 @@ export async function reverseJournalEntry(
     business_id: original.business_id,
     period_id: reversalPeriod.id,
     entry_date: reversalDate,
-    journal_number: `${original.journal_number}R`,
+    journal_number: reversalJournalNumber,
     memo: original.memo,
     reference: original.reference,
     status: 'draft',

@@ -23,20 +23,19 @@ export async function nextNumber(
       .doUpdateSet({ last_value: sql`numbering_counters.last_value + 1` }))
     .returning('last_value')
     .executeTakeFirstOrThrow();
-  return `${prefix}-${String(Number(row.last_value)).padStart(4, '0')}`;
+  return `${prefix}-${String(row.last_value).padStart(4, '0')}`;
 }
 
 /**
  * Raw-counter variant of the same upsert; returns the bare integer so callers
- * format the number themselves. Shares numbering_counters rows with nextNumber,
- * so the two never hand out the same value for an entity_type. last_value may
- * come back as a string (bigint column), hence the Number() coercion.
+ * format the number themselves. The database value stays a decimal string so
+ * bigint counters never pass through JavaScript's lossy Number representation.
  */
 export async function nextCounter(
   trx: Transaction<DB>,
   business_id: string,
   entity_type: string,
-): Promise<number> {
+): Promise<string> {
   const result = await sql<{ last_value: string | number }>`
     INSERT INTO numbering_counters (business_id, entity_type, last_value)
     VALUES (${business_id}, ${entity_type}, 1)
@@ -44,15 +43,15 @@ export async function nextCounter(
       SET last_value = numbering_counters.last_value + 1
     RETURNING last_value
   `.execute(trx);
-  return Number(result.rows[0]!.last_value);
+  return String(result.rows[0]!.last_value);
 }
 
 export async function reserveCounterAtLeast(
   trx: Transaction<DB>,
   business_id: string,
   entity_type: string,
-  minimum: number,
-): Promise<number> {
+  minimum: string,
+): Promise<string> {
   const result = await sql<{ last_value: string | number }>`
     INSERT INTO numbering_counters (business_id, entity_type, last_value)
     VALUES (${business_id}, ${entity_type}, ${minimum})
@@ -60,18 +59,18 @@ export async function reserveCounterAtLeast(
       SET last_value = GREATEST(numbering_counters.last_value, EXCLUDED.last_value)
     RETURNING last_value
   `.execute(trx);
-  return Number(result.rows[0]!.last_value);
+  return String(result.rows[0]!.last_value);
 }
 
 export async function peekNextCounter(
   db: Kysely<DB>,
   business_id: string,
   entity_type: string,
-): Promise<number> {
+): Promise<string> {
   const row = await db.selectFrom('numbering_counters')
     .select('last_value')
     .where('business_id', '=', business_id)
     .where('entity_type', '=', entity_type)
     .executeTakeFirst();
-  return Number(row?.last_value ?? 0) + 1;
+  return (BigInt(row?.last_value ?? '0') + 1n).toString();
 }

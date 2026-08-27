@@ -13,8 +13,8 @@ export const recurringJePayloadSchema = z.object({
     debit: z.string().regex(/^\d+(\.\d{1,4})?$/),
     credit: z.string().regex(/^\d+(\.\d{1,4})?$/),
     memo: z.string().max(500).nullable().optional(),
-    name: z.string().max(200).nullable().optional(),
-    class_name: z.string().max(200).nullable().optional(),
+    name: z.string().max(255).nullable().optional(),
+    class_name: z.string().max(255).nullable().optional(),
   })).min(2),
 });
 export type RecurringJePayload = z.infer<typeof recurringJePayloadSchema>;

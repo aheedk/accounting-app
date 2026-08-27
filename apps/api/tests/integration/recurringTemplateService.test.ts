@@ -79,6 +79,31 @@ describe('recurringTemplateService', () => {
     });
   });
 
+  it('materializes a due occurrence only once when two workers race', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const today = new Date().toISOString().slice(0, 10);
+    await t.db.transaction().execute(trx => rt.create(trx, ctx, {
+      business_id: biz.id,
+      name: 'Concurrent rent',
+      template_type: 'journal_entry',
+      payload: { lines: [
+        { account_id: expense.id, debit: '75', credit: '0' },
+        { account_id: cash.id, debit: '0', credit: '75' },
+      ] },
+      recurrence: 'monthly',
+      next_run_date: today,
+    }));
+
+    await Promise.all([
+      rt.runDueForBusiness(t.db, ctx, biz.id),
+      rt.runDueForBusiness(t.db, ctx, biz.id),
+    ]);
+
+    const entries = await t.db.selectFrom('journal_entries').select('id')
+      .where('business_id', '=', biz.id).execute();
+    expect(entries).toHaveLength(1);
+  });
+
   it('runDue catches up multiple cycles when next_run_date is in the past', async () => {
     const { biz, ctx, expense, cash } = await bootstrap();
     // 3 months ago next_run_date → expect >= 3 runs (the past one + 2-3 catch-ups, depending on alignment)

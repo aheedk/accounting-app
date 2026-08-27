@@ -18,13 +18,19 @@ export default function JournalNewPage() {
     setError(null);
     if (!copyId || !businessId) return;
     api.get<JournalEntryDetail>(`/businesses/${businessId}/journal-entries/${copyId}`)
-      .then(response => setCopySource(response.data))
+      .then(response => {
+        if (!response.data.is_standalone_manual) {
+          setError('Only standalone manual or adjusting journal entries can be copied.');
+          return;
+        }
+        setCopySource(response.data);
+      })
       .catch((requestError: unknown) => setError(pickErr(requestError)));
   }, [businessId, copyId]);
 
   if (copyId && !businessId) return <div>Pick a business.</div>;
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (copyId && !copySource) return <div>Loading journal entry copy...</div>;
-  if (copySource) return <JournalEntryEditor key={copyId ?? 'copy'} copySource={copySource} />;
-  return <JournalEntryEditor key="new" />;
+  if (copySource) return <JournalEntryEditor key={`${businessId}-${copyId ?? 'copy'}`} copySource={copySource} />;
+  return <JournalEntryEditor key={`${businessId ?? 'none'}-new`} />;
 }

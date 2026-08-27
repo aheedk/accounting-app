@@ -59,4 +59,5 @@ export type JournalEntryDetail = {
   correction_block_reason: string | null;
   can_reverse: boolean;
   reversal_block_reason: string | null;
+  is_standalone_manual: boolean;
 };

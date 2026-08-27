@@ -7,3 +7,7 @@ export function recentJournalEntryDate(iso: string): string {
   if (!match) return iso;
   return `${match[2]}/${match[3]}/${match[1]}`;
 }
+
+export function hasMoreRecentJournalEntries(pageLength: number, pageSize = 10): boolean {
+  return pageLength === pageSize;
+}

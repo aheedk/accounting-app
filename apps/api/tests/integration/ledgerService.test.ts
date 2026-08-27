@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, makeAccount, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, makeAccount, makeCustomer, seedYearPeriods } from '../helpers/factories.js';
 import * as ledger from '../../src/services/core/ledgerService.js';
 import * as periods from '../../src/services/core/fiscalPeriodService.js';
 import { ERR } from '@accounting/shared';
@@ -123,6 +123,31 @@ describe('ledgerService.postJournalEntry', () => {
 
     expect(custom.journal_number).toBe('25');
     expect(automatic.journal_number).toBe('26');
+  });
+
+  it('advances an 18-digit numeric override without JavaScript precision loss', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const lines = [
+      { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
+      { account_id: revenue.id, debit: '0.0000', credit: '10.0000', memo: null },
+    ];
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual',
+      journal_number: '999999999999999998',
+      memo: null,
+      lines,
+    }));
+    const automatic = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-16',
+      source_type: 'manual',
+      memo: null,
+      lines,
+    }));
+
+    expect(automatic.journal_number).toBe('999999999999999999');
   });
 
   it('rejects a duplicate custom journal number within the business', async () => {
@@ -308,6 +333,63 @@ describe('ledgerService.postJournalEntry', () => {
       .toBe('35.0000');
     expect(await ledger.computeAccountBalance(t.db, { account_id: cash.id, as_of: '2026-05-01' }))
       .toBe('0.0000');
+  });
+
+  it('allows a 99-character base number and rejects a typed reversal-number collision', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const lines = [
+      { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
+      { account_id: revenue.id, debit: '0.0000', credit: '10.0000', memo: null },
+    ];
+    const longOriginal = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual',
+      journal_number: 'A'.repeat(99),
+      memo: null,
+      lines,
+    }));
+    const longReversal = await t.db.transaction().execute(trx => ledger.reverseJournalEntry(
+      trx, ctx, { journal_entry_id: longOriginal.id },
+    ));
+    expect(longReversal.journal_number).toBe(`${'A'.repeat(99)}R`);
+
+    const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-16',
+      source_type: 'manual',
+      journal_number: '25',
+      memo: null,
+      lines,
+    }));
+    const customer = await makeCustomer(t.db, biz.id);
+    const invoice = await t.db.insertInto('invoices').values({
+      business_id: biz.id,
+      customer_id: customer.id,
+      invoice_number: 'INV-COLLISION',
+      issue_date: '2026-04-16',
+      due_date: '2026-04-30',
+      subtotal: '10.0000',
+      tax_total: '0.0000',
+      total: '10.0000',
+      ar_account_id: cash.id,
+      memo: null,
+      terms: null,
+      created_by_user_id: ctx.user_id,
+    }).returningAll().executeTakeFirstOrThrow();
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-16',
+      source_type: 'invoice',
+      source_id: invoice.id,
+      journal_number: '25R',
+      memo: null,
+      lines,
+    }));
+
+    await expect(t.db.transaction().execute(trx => ledger.reverseJournalEntry(
+      trx, ctx, { journal_entry_id: original.id },
+    ))).rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
   });
 
   it('rejects standalone reversal of a source-generated entry', async () => {

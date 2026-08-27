@@ -117,6 +117,7 @@ describe('journalEntryQueryService', () => {
     expect(result.correction_block_reason).toBeNull();
     expect(result.can_reverse).toBe(true);
     expect(result.reversal_block_reason).toBeNull();
+    expect(result.is_standalone_manual).toBe(true);
     expect(result.lines).toHaveLength(2);
   });
 
@@ -134,6 +135,7 @@ describe('journalEntryQueryService', () => {
     expect(generatedDetail.correction_block_reason).toMatch(/source transaction/i);
     expect(generatedDetail.can_reverse).toBe(false);
     expect(generatedDetail.reversal_block_reason).toMatch(/source transaction/i);
+    expect(generatedDetail.is_standalone_manual).toBe(false);
 
     const replacement = await postEntry(t, data, '2026-05-02', 'Staff cannot edit');
     const staffDetail = await journalQueries.getJournalEntryDetail(

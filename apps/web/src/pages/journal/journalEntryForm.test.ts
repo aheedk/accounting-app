@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyJournalNumberSuggestion,
   copyJournalEntryToForm,
   journalEntryPayload,
+  journalSupportsManualActions,
   journalEntryToForm,
   journalEntryTotals,
   journalAccountsForLine,
@@ -68,6 +70,7 @@ const detail: JournalEntryDetail = {
   correction_block_reason: null,
   can_reverse: true,
   reversal_block_reason: null,
+  is_standalone_manual: true,
 };
 
 describe('journal entry form mappings', () => {
@@ -169,6 +172,20 @@ describe('journal entry form mappings', () => {
     expect(form.date).toBe('2026-08-25');
     expect(form.isAdjusting).toBe(false);
     expect(form.lines).toHaveLength(8);
+  });
+
+  it('does not overwrite a journal number the user entered while a suggestion was loading', () => {
+    const blank = newJournalEntryForm('2026-08-26');
+    expect(applyJournalNumberSuggestion(blank, '81', false).journalNo).toBe('81');
+
+    const manuallyNumbered = { ...blank, journalNo: 'AJE-81' };
+    expect(applyJournalNumberSuggestion(manuallyNumbered, '81', true)).toBe(manuallyNumbered);
+  });
+
+  it('uses the API-derived standalone status for copy and recurring actions', () => {
+    expect(journalSupportsManualActions()).toBe(true);
+    expect(journalSupportsManualActions(detail)).toBe(true);
+    expect(journalSupportsManualActions({ ...detail, is_standalone_manual: false })).toBe(false);
   });
 
   it('offers active unlocked accounts while preserving a historical selected account', () => {

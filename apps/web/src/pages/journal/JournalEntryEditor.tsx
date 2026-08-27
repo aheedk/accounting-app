@@ -12,9 +12,11 @@ import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import {
   blankJournalLine,
+  applyJournalNumberSuggestion,
   copyJournalEntryToForm,
   journalAccountsForLine,
   journalEntryPayload,
+  journalSupportsManualActions,
   journalEntryToForm,
   journalEntryTotals,
   newJournalEntryForm,
@@ -48,6 +50,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   ));
   const [automaticJournalNumber, setAutomaticJournalNumber] = useState(existing === undefined);
   const [numberRefresh, setNumberRefresh] = useState(0);
+  const journalNumberEditedRef = useRef(existing !== undefined);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,9 +62,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const readOnly = existing !== undefined && !existing.can_correct;
-  const supportsManualActions = existing === undefined
-    || existing.entry.source_type === 'manual'
-    || existing.entry.source_type === 'adjustment';
+  const supportsManualActions = journalSupportsManualActions(existing);
   const totals = journalEntryTotals(form.lines);
   const filledLineCount = form.lines.filter(line => line.account_id).length;
   const canSave = !readOnly && totals.balanced && filledLineCount >= 2 && !busy;
@@ -77,7 +78,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     if (!businessId || existing) return;
     api.get<{ journal_number: string }>(`/businesses/${businessId}/journal-entries/next-number`)
       .then(response => {
-        setForm(current => ({ ...current, journalNo: response.data.journal_number }));
+        if (journalNumberEditedRef.current) return;
+        setForm(current => applyJournalNumberSuggestion(
+          current,
+          response.data.journal_number,
+          journalNumberEditedRef.current,
+        ));
         setAutomaticJournalNumber(true);
       })
       .catch((requestError: unknown) => setError(pickErr(requestError)));
@@ -146,6 +152,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         if (existing) navigate(journalDestinationPath(destination, savedId));
         else {
           setForm(newJournalEntryForm(todayLocal()));
+          journalNumberEditedRef.current = false;
           setNumberRefresh(current => current + 1);
         }
       } else {
@@ -269,6 +276,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           <Input
             value={form.journalNo}
             onChange={event => {
+              journalNumberEditedRef.current = true;
               setAutomaticJournalNumber(false);
               updateForm({ journalNo: event.target.value });
             }}

@@ -62,6 +62,19 @@ export function newJournalEntryForm(date: string): JournalEntryFormValues {
   };
 }
 
+export function applyJournalNumberSuggestion(
+  form: JournalEntryFormValues,
+  suggestion: string,
+  numberEdited: boolean,
+): JournalEntryFormValues {
+  if (numberEdited || form.journalNo) return form;
+  return { ...form, journalNo: suggestion };
+}
+
+export function journalSupportsManualActions(existing?: JournalEntryDetail): boolean {
+  return existing === undefined || existing.is_standalone_manual;
+}
+
 export function journalEntryToForm(detail: JournalEntryDetail): JournalEntryFormValues {
   const lines = detail.lines.map(line => ({
     account_id: line.account_id,

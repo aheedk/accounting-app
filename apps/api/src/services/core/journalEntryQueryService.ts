@@ -44,6 +44,7 @@ export type JournalEntryDetail = {
   correction_block_reason: string | null;
   can_reverse: boolean;
   reversal_block_reason: string | null;
+  is_standalone_manual: boolean;
 };
 
 async function readLines(db: Kysely<DB>, journalEntryIds: string[]): Promise<JournalEntryLineRead[]> {
@@ -137,9 +138,10 @@ function correctionBlockReason(
 
 function reversalBlockReason(
   effectiveRole: ServiceCtx['effective_role'],
-  entry: { status: JournalEntryStatus },
+  entry: { status: JournalEntryStatus; journal_number: string },
   sourceGenerated: boolean,
   hasReversal: boolean,
+  reversalNumberConflict: boolean,
 ): string | null {
   if (!hasMinRole(effectiveRole, 'accountant')) {
     return 'Accountant access is required to reverse journal entries.';
@@ -152,6 +154,12 @@ function reversalBlockReason(
   }
   if (hasReversal) {
     return 'This journal entry has already been reversed.';
+  }
+  if (`${entry.journal_number}R`.length > 100) {
+    return 'This legacy journal number is too long to create a reversal.';
+  }
+  if (reversalNumberConflict) {
+    return `Journal number ${entry.journal_number}R is already in use.`;
   }
   return null;
 }
@@ -175,12 +183,18 @@ export async function getJournalEntryDetail(
     .where('reversed_entry_id', '=', entry.id)
     .executeTakeFirst();
   const hasReversal = existingReversal !== undefined;
+  const reversalNumberConflict = await db.selectFrom('journal_entries').select('id')
+    .where('business_id', '=', ctx.business_id)
+    .where('journal_number', '=', `${entry.journal_number}R`)
+    .where('status', '<>', 'voided')
+    .executeTakeFirst();
   const blockReason = correctionBlockReason(ctx.effective_role, entry, sourceGenerated, hasReversal);
   const reverseBlockReason = reversalBlockReason(
     ctx.effective_role,
     entry,
     sourceGenerated,
     hasReversal,
+    reversalNumberConflict !== undefined,
   );
   return {
     entry,
@@ -189,5 +203,8 @@ export async function getJournalEntryDetail(
     correction_block_reason: blockReason,
     can_reverse: reverseBlockReason === null,
     reversal_block_reason: reverseBlockReason,
+    is_standalone_manual: !sourceGenerated
+      && entry.source_id == null
+      && (entry.source_type === 'manual' || entry.source_type === 'adjustment'),
   };
 }
