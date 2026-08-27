@@ -14,6 +14,7 @@ import {
   blankJournalLine,
   applyJournalNumberSuggestion,
   copyJournalEntryToForm,
+  copyUnsavedJournalEntry,
   journalAccountsForLine,
   journalEntryPayload,
   journalSupportsManualActions,
@@ -128,6 +129,15 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     setForm(current => ({ ...current, lines: Array.from({ length: 8 }, blankJournalLine) }));
   }
 
+  function copyUnsavedEntry() {
+    setForm(current => copyUnsavedJournalEntry(current));
+    journalNumberEditedRef.current = false;
+    setAutomaticJournalNumber(true);
+    setError(null);
+    setNotice('Copied into a new unsaved journal entry.');
+    setNumberRefresh(current => current + 1);
+  }
+
   async function save(destination: JournalSaveDestination = 'detail') {
     if (!businessId || !canSave) return;
     setError(null);
@@ -229,6 +239,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                 <Copy className="mr-2 h-4 w-4" />
                 Copy
               </Link>
+            </Button>
+          )}
+          {!existing && (
+            <Button type="button" variant="ghost" size="sm" onClick={copyUnsavedEntry}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy
             </Button>
           )}
           {existing?.entry.corrected_from_entry_id && (

@@ -102,6 +102,16 @@ export function copyJournalEntryToForm(
   return { ...journalEntryToForm(detail), journalNo: journalNumber };
 }
 
+export function copyUnsavedJournalEntry(
+  form: JournalEntryFormValues,
+): JournalEntryFormValues {
+  return {
+    ...form,
+    journalNo: '',
+    lines: form.lines.map(line => ({ ...line })),
+  };
+}
+
 export function journalEntryPayload(
   form: JournalEntryFormValues,
   options: { automaticNumber?: boolean } = {},

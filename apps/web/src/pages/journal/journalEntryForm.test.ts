@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyJournalNumberSuggestion,
   copyJournalEntryToForm,
+  copyUnsavedJournalEntry,
   journalEntryPayload,
   journalSupportsManualActions,
   journalEntryToForm,
@@ -154,6 +155,16 @@ describe('journal entry form mappings', () => {
       name: 'Patient A',
       class_name: 'Clinic',
     });
+  });
+
+  it('duplicates an unsaved entry while returning its number to automatic assignment', () => {
+    const source = journalEntryToForm(detail);
+    const copy = copyUnsavedJournalEntry(source);
+
+    expect(copy).toEqual({ ...source, journalNo: '' });
+    expect(copy).not.toBe(source);
+    expect(copy.lines).not.toBe(source.lines);
+    expect(copy.lines[0]).not.toBe(source.lines[0]);
   });
 
   it('computes exact balanced totals without floating-point equality', () => {
