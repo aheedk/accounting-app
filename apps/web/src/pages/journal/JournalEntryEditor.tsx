@@ -28,6 +28,7 @@ import {
 import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
 import JournalRecurringDialog from './JournalRecurringDialog';
+import { JournalNumberRequestGate } from './journalNumberPreview';
 import {
   JOURNAL_CLOSE_PATH,
   journalDestinationPath,
@@ -52,6 +53,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const [automaticJournalNumber, setAutomaticJournalNumber] = useState(existing === undefined);
   const [numberRefresh, setNumberRefresh] = useState(0);
   const journalNumberEditedRef = useRef(existing !== undefined);
+  const journalNumberRequestGateRef = useRef(new JournalNumberRequestGate());
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,8 +79,10 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
 
   useEffect(() => {
     if (!businessId || existing) return;
+    const requestGeneration = journalNumberRequestGateRef.current.start();
     api.get<{ journal_number: string }>(`/businesses/${businessId}/journal-entries/next-number`)
       .then(response => {
+        if (!journalNumberRequestGateRef.current.isCurrent(requestGeneration)) return;
         if (journalNumberEditedRef.current) return;
         setForm(current => applyJournalNumberSuggestion(
           current,
@@ -87,7 +91,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         ));
         setAutomaticJournalNumber(true);
       })
-      .catch((requestError: unknown) => setError(pickErr(requestError)));
+      .catch((requestError: unknown) => {
+        if (journalNumberRequestGateRef.current.isCurrent(requestGeneration)) {
+          setError(pickErr(requestError));
+        }
+      });
+    return () => journalNumberRequestGateRef.current.invalidate();
   }, [businessId, existing, numberRefresh]);
 
   useEffect(() => {
@@ -130,6 +139,8 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   }
 
   function copyUnsavedEntry() {
+    if (busy) return;
+    journalNumberRequestGateRef.current.invalidate();
     setForm(current => copyUnsavedJournalEntry(current));
     journalNumberEditedRef.current = false;
     setAutomaticJournalNumber(true);
@@ -161,6 +172,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       if (destination === 'new') {
         if (existing) navigate(journalDestinationPath(destination, savedId));
         else {
+          journalNumberRequestGateRef.current.invalidate();
           setForm(newJournalEntryForm(todayLocal()));
           journalNumberEditedRef.current = false;
           setNumberRefresh(current => current + 1);
@@ -242,7 +254,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
             </Button>
           )}
           {!existing && (
-            <Button type="button" variant="ghost" size="sm" onClick={copyUnsavedEntry}>
+            <Button type="button" variant="ghost" size="sm" onClick={copyUnsavedEntry} disabled={busy}>
               <Copy className="mr-2 h-4 w-4" />
               Copy
             </Button>
@@ -292,6 +304,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           <Input
             value={form.journalNo}
             onChange={event => {
+              journalNumberRequestGateRef.current.invalidate();
               journalNumberEditedRef.current = true;
               setAutomaticJournalNumber(false);
               updateForm({ journalNo: event.target.value });
