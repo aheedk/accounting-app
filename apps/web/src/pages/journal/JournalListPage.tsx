@@ -66,7 +66,7 @@ export default function JournalListPage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/journal-entries`).then(r => setEntries(r.data.entries));
+    api.get(`/businesses/${bizId}/journal-entries?limit=500`).then(r => setEntries(r.data.entries));
   }, [bizId]);
 
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function JournalListPage() {
     }
     setImporting(false);
     setImportDone(true);
-    api.get(`/businesses/${bizId}/journal-entries`).then(r => setEntries(r.data.entries));
+    api.get(`/businesses/${bizId}/journal-entries?limit=500`).then(r => setEntries(r.data.entries));
   }
 
   const columns: Column<JE>[] = [

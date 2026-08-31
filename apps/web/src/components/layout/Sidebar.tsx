@@ -69,6 +69,7 @@ const groups: NavGroup[] = [
       { to: '/accounting/books-review', label: 'Books Review' },
       { to: '/accounting/bank-accounts', label: 'Bank Accounts' },
       { to: '/accounting/bank-transactions', label: 'Bank Transactions' },
+      { to: '/accounting/email-imports', label: 'Email Import Review' },
       { to: '/accounting/integrations', label: 'Integration Transactions' },
       { to: '/accounting/receipts', label: 'Receipts' },
       { to: '/accounting/reconcile', label: 'Reconcile' },

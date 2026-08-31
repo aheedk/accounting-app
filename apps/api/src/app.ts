@@ -56,6 +56,8 @@ import complianceRouter from './routes/compliance.js';
 import payrollTaxesRouter from './routes/payrollTaxes.js';
 import payrollOverviewRouter from './routes/payrollOverview.js';
 import payRunsRouter from './routes/payRuns.js';
+import gmailAuthRouter from './routes/gmailAuth.js';
+import emailImportsRouter from './routes/emailImports.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -72,6 +74,7 @@ export function makeApp(): Express {
   app.use(express.json({ limit: '1mb' }));
   app.use(healthRoutes);
   app.use(authRoutes);
+  app.use(gmailAuthRouter);
   app.use(meRoutes);
   app.use(coaRoutes);
   app.use(periodRoutes);
@@ -121,6 +124,7 @@ export function makeApp(): Express {
   app.use(payrollTaxesRouter);
   app.use(payrollOverviewRouter);
   app.use(payRunsRouter);
+  app.use(emailImportsRouter);
   app.use(errorHandler);
   return app;
 }

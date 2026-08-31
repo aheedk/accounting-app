@@ -50,6 +50,7 @@ import SpreadsheetSyncPage from '@/pages/reports/SpreadsheetSyncPage';
 import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 import BankAccountListPage from '@/pages/banking/BankAccountListPage';
 import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
+import EmailImportReviewPage from '@/pages/banking/EmailImportReviewPage';
 import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage';
 import ReconcilePage from '@/pages/banking/ReconcilePage';
 import RulesPage from '@/pages/accounting/RulesPage';
@@ -168,6 +169,7 @@ export default function App() {
             <Route path="/accounting/books-review" element={<BooksReviewPage />} />
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
+            <Route path="/accounting/email-imports" element={<EmailImportReviewPage />} />
             <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />
             <Route path="/accounting/integrations" element={<IntegrationInboxPage />} />
             <Route path="/accounting/receipts" element={<ReceiptsPage />} />
