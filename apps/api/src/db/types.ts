@@ -86,7 +86,7 @@ export type JournalEntryStatus = 'draft' | 'posted' | 'voided';
 export type JournalEntrySourceType =
   | 'manual' | 'invoice' | 'payment' | 'credit_memo'
   | 'bill' | 'bill_payment' | 'vendor_credit'
-  | 'reversal' | 'adjustment';
+  | 'reversal' | 'adjustment' | 'bank_import';
 
 export interface ChartOfAccountsTable {
   id: Generated<string>;
@@ -961,4 +961,19 @@ export interface DB {
   compliance_items: ComplianceItemsTable;
   numbering_counters: NumberingCountersTable;
   bank_import_batches: BankImportBatchesTable;
+  email_import_staging: EmailImportStagingTable;
+}
+
+export interface EmailImportStagingTable {
+  id: Generated<string>;
+  business_id: string | null;
+  gmail_message_id: string;
+  email_from: string | null;
+  email_subject: string | null;
+  received_at: string;
+  extracted_transactions: string;
+  status: string;
+  approved_by_user_id: string | null;
+  approved_at: string | null;
+  created_at: Generated<string>;
 }
