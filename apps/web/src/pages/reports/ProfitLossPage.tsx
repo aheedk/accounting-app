@@ -39,25 +39,22 @@ function pickErr(e: unknown): string {
     ?.response?.data?.error?.message ?? 'Failed to load report';
 }
 
-function monthRange(now: Date): { start: string; end: string } {
+function ytdRange(now: Date): { start: string; end: string } {
   const y = now.getFullYear();
-  const m = now.getMonth();
-  const first = new Date(y, m, 1);
-  const last = new Date(y, m + 1, 0);
   const iso = (d: Date): string => {
     const yy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yy}-${mm}-${dd}`;
   };
-  return { start: iso(first), end: iso(last) };
+  return { start: `${y}-01-01`, end: iso(now) };
 }
 
 export default function ProfitLossPage() {
   const [bizId] = useActiveBusinessId();
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
-  const defaults = monthRange(new Date());
+  const defaults = ytdRange(new Date());
   const [periodStart, setPeriodStart] = useState<string>(defaults.start);
   const [periodEnd, setPeriodEnd] = useState<string>(defaults.end);
   const [report, setReport] = useState<PnlReport | null>(null);

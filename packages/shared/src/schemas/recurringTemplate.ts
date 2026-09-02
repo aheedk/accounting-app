@@ -9,8 +9,8 @@ export const recurringJePayloadSchema = z.object({
   reference: z.string().max(200).nullable().optional(),
   lines: z.array(z.object({
     account_id: z.string().uuid(),
-    debit: z.string().regex(/^\d+(\.\d{1,4})?$/),
-    credit: z.string().regex(/^\d+(\.\d{1,4})?$/),
+    debit: z.union([z.string(), z.number()]).transform(v => String(v)),
+    credit: z.union([z.string(), z.number()]).transform(v => String(v)),
     memo: z.string().max(500).nullable().optional(),
   })).min(2),
 });

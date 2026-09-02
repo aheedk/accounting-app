@@ -58,6 +58,7 @@ import payrollOverviewRouter from './routes/payrollOverview.js';
 import payRunsRouter from './routes/payRuns.js';
 import gmailAuthRouter from './routes/gmailAuth.js';
 import emailImportsRouter from './routes/emailImports.js';
+import invoiceImportsRouter from './routes/invoiceImports.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -125,6 +126,7 @@ export function makeApp(): Express {
   app.use(payrollOverviewRouter);
   app.use(payRunsRouter);
   app.use(emailImportsRouter);
+  app.use(invoiceImportsRouter);
   app.use(errorHandler);
   return app;
 }

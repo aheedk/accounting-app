@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
+import { db } from '../db/index.js';
+import { requireAuth } from '../middleware/auth.js';
+import { triggerPoll } from '../jobs/gmailWorker.js';
 
 const router = Router();
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -36,6 +39,16 @@ router.get('/auth/gmail/callback', async (req, res, next) => {
     fs.mkdirSync(path.resolve('secrets'), { recursive: true });
     fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
     res.send('<h2>Gmail authorized!</h2><p>Token saved. You can close this tab and restart the dev server.</p>');
+  } catch (e: unknown) {
+    next(e);
+  }
+});
+
+// Manually trigger an immediate Gmail poll (authenticated users only)
+router.post('/email-imports/poll', requireAuth, async (_req, res, next) => {
+  try {
+    await triggerPoll(db);
+    res.json({ ok: true });
   } catch (e: unknown) {
     next(e);
   }

@@ -170,6 +170,7 @@ export default function App() {
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
             <Route path="/accounting/email-imports" element={<EmailImportReviewPage />} />
+            <Route path="/accounting/invoice-imports" element={<EmailImportReviewPage />} />
             <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />
             <Route path="/accounting/integrations" element={<IntegrationInboxPage />} />
             <Route path="/accounting/receipts" element={<ReceiptsPage />} />
