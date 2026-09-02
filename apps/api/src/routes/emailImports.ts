@@ -24,15 +24,18 @@ function ctx(req: Request): ServiceCtx {
   };
 }
 
-// List pending email imports (not yet assigned to a business or pending approval)
+// List email imports — ?history=1 returns approved+rejected, default returns pending
 router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
   try {
-    const rows = await db
+    const history = req.query['history'] === '1';
+    let q = db
       .selectFrom('email_import_staging')
       .selectAll()
-      .where('status', '=', 'pending')
-      .orderBy('received_at', 'desc')
-      .execute();
+      .orderBy('received_at', 'desc');
+    q = history
+      ? q.where('status', 'in', ['approved', 'rejected']).limit(100)
+      : q.where('status', '=', 'pending');
+    const rows = await q.execute();
     res.json({ imports: rows.map(r => ({
       ...r,
       extracted_transactions: typeof r.extracted_transactions === 'string'

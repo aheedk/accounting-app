@@ -16,3 +16,6 @@ packages/shared/dist/
 *.tsbuildinfo
 
 
+
+# OAuth credentials — never commit
+secrets/

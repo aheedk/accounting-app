@@ -41,6 +41,8 @@ const PAGE_NAMES: Record<string, string> = {
   '/accounting/books-review': 'Books Review',
   '/accounting/bank-accounts': 'Bank Accounts',
   '/accounting/bank-transactions': 'Bank Transactions',
+  '/accounting/email-imports': 'Email Import Review',
+  '/accounting/invoice-imports': 'Email Import Review',
   '/accounting/integrations': 'Integration Transactions',
   '/accounting/receipts': 'Receipts',
   '/accounting/reconcile': 'Reconcile',

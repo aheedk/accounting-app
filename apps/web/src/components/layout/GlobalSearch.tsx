@@ -27,6 +27,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Books Review', group: 'Accounting', to: '/accounting/books-review' },
   { label: 'Bank Accounts', group: 'Accounting', to: '/accounting/bank-accounts' },
   { label: 'Bank Transactions', group: 'Accounting', to: '/accounting/bank-transactions' },
+  { label: 'Email Import Review', group: 'Accounting', to: '/accounting/email-imports' },
   { label: 'Integration Transactions', group: 'Accounting', to: '/accounting/integrations' },
   { label: 'Receipts', group: 'Accounting', to: '/accounting/receipts' },
   { label: 'Reconcile', group: 'Accounting', to: '/accounting/reconcile' },
@@ -84,11 +85,11 @@ function highlight(text: string, query: string): React.ReactNode {
   const idx = text.toLowerCase().indexOf(query.toLowerCase().trim());
   if (idx === -1) return text;
   return (
-    <>
+    <span>
       {text.slice(0, idx)}
       <mark className="bg-yellow-100 text-foreground rounded-[2px]">{text.slice(idx, idx + query.trim().length)}</mark>
       {text.slice(idx + query.trim().length)}
-    </>
+    </span>
   );
 }
 

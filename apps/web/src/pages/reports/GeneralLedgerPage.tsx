@@ -87,8 +87,8 @@ const NON_NUMERIC_COLUMNS: GeneralLedgerColumnKey[] = ['date', 'transaction', 'r
 function currentMonthRange(): { start: string; end: string } {
   const today = new Date();
   return {
-    start: dateToLocalIso(new Date(today.getFullYear(), today.getMonth(), 1)),
-    end: dateToLocalIso(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+    start: `${today.getFullYear()}-01-01`,
+    end: dateToLocalIso(today),
   };
 }
 
