@@ -125,7 +125,11 @@ export async function voidCreditMemo(
   if (apps.length > 0) throw new PreconditionError(`Credit memo has ${apps.length} active application(s); unapply before voiding`, { application_ids: apps.map(a => a.id) });
 
   if (!cm.posted_journal_entry_id) throw new PreconditionError('credit_memo has no JE to reverse');
-  await voidJournalEntry(trx, ctx, { journal_entry_id: cm.posted_journal_entry_id, void_reason: `Void credit memo: ${input.void_reason}` });
+  await voidJournalEntry(trx, ctx, {
+    journal_entry_id: cm.posted_journal_entry_id,
+    void_reason: `Void credit memo: ${input.void_reason}`,
+    source_guard: { source_type: 'credit_memo', source_id: cm.id },
+  });
 
   await sql`SELECT set_config('app.allow_void', 'on', true)`.execute(trx);
   const updated = await trx.updateTable('credit_memos')

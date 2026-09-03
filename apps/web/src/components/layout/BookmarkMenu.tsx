@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bookmark, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type BookmarkItem = { id: string; label: string; path: string };
 type EditState = { bookmarkId: string | null; label: string; path: string };
@@ -50,7 +51,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/settings/coa': 'Chart of Accounts',
   '/accounting/recurring': 'Recurring Transactions',
   '/accounting/fixed-assets': 'Fixed Assets',
-  '/journal': 'Journal Entries',
+  [JOURNAL_NAV_ITEM.path]: JOURNAL_NAV_ITEM.label,
   '/reports/standard': 'Standard Reports',
   '/reports/pnl': 'Profit & Loss',
   '/reports/balance-sheet': 'Balance Sheet',

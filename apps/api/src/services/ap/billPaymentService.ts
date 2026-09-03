@@ -187,7 +187,11 @@ export async function voidBillPayment(
   if (apps.length > 0) throw new BillPaymentHasApplicationsError(payment.id, apps.length);
 
   if (!payment.posted_journal_entry_id) throw new PreconditionError('Bill payment has no JE to reverse');
-  await voidJournalEntry(trx, ctx, { journal_entry_id: payment.posted_journal_entry_id, void_reason: `Void bill payment: ${input.void_reason}` });
+  await voidJournalEntry(trx, ctx, {
+    journal_entry_id: payment.posted_journal_entry_id,
+    void_reason: `Void bill payment: ${input.void_reason}`,
+    source_guard: { source_type: 'bill_payment', source_id: payment.id },
+  });
 
   await sql`SELECT set_config('app.allow_void', 'on', true)`.execute(trx);
   const updated = await trx.updateTable('bill_payments')

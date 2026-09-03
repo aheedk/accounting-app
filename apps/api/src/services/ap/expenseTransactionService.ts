@@ -66,7 +66,8 @@ export async function post(trx: Transaction<DB>, ctx: ServiceCtx, input: { expen
   const je = await postJournalEntry(trx, ctx, {
     business_id: before.business_id,
     entry_date: before.transaction_date,
-    source_type: 'manual',
+    source_type: 'adjustment',
+    source_id: before.id,
     memo: before.memo ?? `Expense — ${before.payee_text ?? 'vendor'}`,
     reference: null,
     lines: [
@@ -100,6 +101,11 @@ export async function voidExpense(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     await voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: input.void_reason ?? 'expense voided',
+      source_guard: {
+        source_type: 'adjustment',
+        source_id: before.id,
+        allow_legacy_manual: true,
+      },
     });
   }
 
