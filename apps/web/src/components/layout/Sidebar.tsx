@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   BookOpen,
@@ -162,6 +163,92 @@ type SidebarNavProps = {
   // Fired after navigating to a destination — lets the mobile drawer close itself.
   onNavigate?: () => void;
 };
+
+// Portal keeps flyouts outside the sidebar's scroll clipping without moving its rows.
+function DesktopSidebarNav() {
+  const { pathname } = useLocation();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [position, setPosition] = useState({ left: 256, top: 8 });
+  const navRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const group = groups.find(item => item.id === openId);
+
+  function cancelClose() { clearTimeout(closeTimer.current); }
+  function scheduleClose() {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpenId(null), 220);
+  }
+  function openGroup(id: string, trigger: HTMLButtonElement) {
+    cancelClose();
+    triggerRef.current = trigger;
+    const rect = trigger.getBoundingClientRect();
+    const count = groups.find(item => item.id === id)?.children?.length ?? 0;
+    const height = Math.min(count * 38 + 60, window.innerHeight - 16);
+    setPosition({ left: navRef.current?.getBoundingClientRect().right ?? rect.right, top: Math.max(8, Math.min(rect.top, window.innerHeight - height - 8)) });
+    setOpenId(id);
+  }
+
+  useEffect(() => { setOpenId(null); }, [pathname]);
+  useEffect(() => {
+    function outside(event: PointerEvent) {
+      if (event.target instanceof Node && !navRef.current?.contains(event.target) && !panelRef.current?.contains(event.target)) setOpenId(null);
+    }
+    function escape(event: KeyboardEvent) {
+      if (event.key === 'Escape' && panelRef.current) {
+        setOpenId(null);
+        triggerRef.current?.focus();
+      }
+    }
+    function resize() { setOpenId(null); }
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    window.addEventListener('resize', resize);
+    return () => {
+      clearTimeout(closeTimer.current);
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <nav ref={navRef} aria-label="Main navigation" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3" onScroll={() => setOpenId(null)}>
+      {groups.map(item => {
+        const Icon = item.icon;
+        const active = item.children?.some(child => pathMatchesChild(pathname, child)) ?? pathname === item.to;
+        const rowClass = cn('flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-hover hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', active || openId === item.id ? 'bg-sidebar-active text-white' : 'text-sidebar-muted');
+        if (!item.children) return <NavLink key={item.id} to={item.to ?? '/'} end className={rowClass} onMouseEnter={() => setOpenId(null)}><Icon className="h-4 w-4 shrink-0" />{item.label}</NavLink>;
+        return (
+          <button key={item.id} type="button" className={rowClass} aria-expanded={openId === item.id} aria-controls={openId === item.id ? 'sidebar-flyout' : undefined}
+            onMouseEnter={event => openGroup(item.id, event.currentTarget)} onMouseLeave={scheduleClose}
+            onClick={event => openGroup(item.id, event.currentTarget)}
+            onKeyDown={event => {
+              if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                openGroup(item.id, event.currentTarget);
+                requestAnimationFrame(() => panelRef.current?.querySelector<HTMLAnchorElement>('a')?.focus());
+              }
+            }}>
+            <Icon className="h-4 w-4 shrink-0" /><span className="flex-1 text-left">{item.label}</span><ChevronRight className="h-4 w-4 shrink-0" />
+          </button>
+        );
+      })}
+      {group?.children && createPortal(
+        <div ref={panelRef} id="sidebar-flyout" aria-label={`${group.label} pages`} className="fixed z-50 flex w-72 flex-col rounded-r-lg border border-white/10 bg-sidebar p-3 text-sidebar-foreground shadow-xl"
+          style={{ left: position.left, top: position.top, maxHeight: 'calc(100dvh - 16px)' }}
+          onMouseEnter={cancelClose} onMouseLeave={scheduleClose} onFocus={cancelClose}
+          onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpenId(null); }}>
+          <div className="shrink-0 border-b border-white/10 px-3 pb-3 text-sm font-semibold text-white">{group.label}</div>
+          <div className="mt-2 flex min-h-0 flex-col gap-0.5 overflow-y-auto">
+            {group.children.map(child => <NavLink key={child.to} to={child.to} onClick={() => setOpenId(null)} className={cn('shrink-0 rounded-md border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', pathMatchesChild(pathname, child) ? 'border-gold bg-sidebar-active font-medium text-white' : 'border-transparent text-sidebar-muted hover:bg-sidebar-hover hover:text-white')}>{child.label}</NavLink>)}
+          </div>
+        </div>, document.body,
+      )}
+    </nav>
+  );
+}
 
 // The navigation list itself, rendered both inside the static desktop sidebar and
 // the mobile drawer. Interaction mode switches between hover (mouse) and tap.
@@ -335,7 +422,7 @@ export function Sidebar() {
       <MyMenu />
       <CreateMenu />
       <BookmarkMenu />
-      <SidebarNav />
+      <DesktopSidebarNav />
     </aside>
   );
 }
