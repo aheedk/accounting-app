@@ -184,6 +184,10 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     await renderEditor();
     await click(container.querySelector('#journal-account-0')!);
 
+    const accountList = document.querySelector('[role="listbox"]');
+    expect(accountList).not.toBeNull();
+    expect(container.contains(accountList)).toBe(false);
+
     const addAccount = Array.from(document.querySelectorAll('button'))
       .find(button => button.textContent?.trim() === 'Add new account');
     expect(addAccount).toBeDefined();
