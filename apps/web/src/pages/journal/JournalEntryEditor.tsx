@@ -21,6 +21,7 @@ import {
   journalEntryToForm,
   journalEntryTotals,
   newJournalEntryForm,
+  shouldAppendJournalLines,
   type JournalEntryFormLine,
   type JournalEntryFormValues,
   type JournalAccount,
@@ -63,6 +64,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   );
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const saveMenuRef = useRef<HTMLDivElement>(null);
+  const pendingAccountFocusRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const readOnly = existing !== undefined && !existing.can_correct;
   const supportsManualActions = journalSupportsManualActions(existing);
@@ -109,6 +111,13 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+  useEffect(() => {
+    const rowIndex = pendingAccountFocusRef.current;
+    if (rowIndex === null) return;
+    pendingAccountFocusRef.current = null;
+    document.getElementById(`journal-account-${rowIndex}`)?.focus();
+  }, [form.lines.length]);
+
   function updateForm(patch: Partial<Omit<JournalEntryFormValues, 'lines'>>) {
     setForm(current => ({ ...current, ...patch }));
   }
@@ -136,6 +145,22 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
 
   function clearLines() {
     setForm(current => ({ ...current, lines: Array.from({ length: 8 }, blankJournalLine) }));
+  }
+
+  function handleLastLineTab(event: React.KeyboardEvent<HTMLInputElement>, rowIndex: number) {
+    if (!shouldAppendJournalLines({
+      key: event.key,
+      shiftKey: event.shiftKey,
+      rowIndex,
+      rowCount: form.lines.length,
+    })) return;
+
+    event.preventDefault();
+    pendingAccountFocusRef.current = form.lines.length;
+    setForm(current => ({
+      ...current,
+      lines: [...current.lines, blankJournalLine(), blankJournalLine(), blankJournalLine()],
+    }));
   }
 
   function copyUnsavedEntry() {
@@ -347,6 +372,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                   <td className="px-2 py-1.5 text-xs text-muted-foreground">{index + 1}</td>
                   <td className="px-2 py-1.5">
                     <AccountSelect
+                      id={`journal-account-${index}`}
                       accounts={journalAccountsForLine(accounts, line.account_id)}
                       value={line.account_id}
                       onChange={accountId => updateLine(index, { account_id: accountId })}
@@ -399,6 +425,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     <Input
                       value={line.class_name}
                       onChange={event => updateLine(index, { class_name: event.target.value })}
+                      onKeyDown={event => handleLastLineTab(event, index)}
                       disabled={readOnly}
                       className="w-full"
                     />
