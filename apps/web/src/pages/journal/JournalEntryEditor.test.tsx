@@ -8,6 +8,9 @@ import JournalEntryEditor from './JournalEntryEditor';
 import type { JournalEntryDetail } from './journalEntryTypes';
 
 const CASH_ID = '11111111-1111-4111-8111-111111111111';
+const NEW_ACCOUNT_ID = '99999999-9999-4999-8999-999999999999';
+
+const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
 
 vi.mock('@/lib/business', () => ({
   useActiveBusinessId: () => ['44444444-4444-4444-8444-444444444444'],
@@ -29,7 +32,7 @@ vi.mock('@/lib/apiClient', () => ({
           }
         : { journal_number: '84' },
     })),
-    post: vi.fn(),
+    post: apiPost,
   },
 }));
 
@@ -125,6 +128,18 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     return event;
   }
 
+  async function click(element: Element) {
+    await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  }
+
+  function setFieldValue(field: HTMLInputElement | HTMLSelectElement, value: string) {
+    const prototype = field instanceof HTMLSelectElement
+      ? HTMLSelectElement.prototype
+      : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
+  }
+
   it('adds three rows and focuses the labelled Account field after forward Tab on the final Class field', async () => {
     await renderEditor();
     const event = await pressTab(classField(dataRows()[7]!));
@@ -153,5 +168,43 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     expect(finalClass.disabled).toBe(true);
     expect((await pressTab(finalClass)).defaultPrevented).toBe(false);
     expect(dataRows()).toHaveLength(8);
+  });
+
+  it('creates and selects a new account from the Account dropdown', async () => {
+    apiPost.mockResolvedValue({
+      data: {
+        id: NEW_ACCOUNT_ID,
+        code: '6990',
+        name: 'Miscellaneous Expense',
+        account_type: 'expense',
+        is_active: true,
+        is_locked: false,
+      },
+    });
+    await renderEditor();
+    await click(container.querySelector('#journal-account-0')!);
+
+    const addAccount = Array.from(document.querySelectorAll('button'))
+      .find(button => button.textContent?.trim() === 'Add new account');
+    expect(addAccount).toBeDefined();
+    await click(addAccount!);
+
+    const code = document.querySelector<HTMLInputElement>('#new-journal-account-code')!;
+    const name = document.querySelector<HTMLInputElement>('#new-journal-account-name')!;
+    const type = document.querySelector<HTMLSelectElement>('#new-journal-account-type')!;
+    await act(async () => {
+      setFieldValue(code, '6990');
+      setFieldValue(name, 'Miscellaneous Expense');
+      setFieldValue(type, 'expense');
+    });
+    await act(async () => document.querySelector<HTMLFormElement>('#new-journal-account-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+
+    expect(apiPost).toHaveBeenCalledWith(
+      '/businesses/44444444-4444-4444-8444-444444444444/coa',
+      { code: '6990', name: 'Miscellaneous Expense', account_type: 'expense' },
+    );
+    expect(container.querySelector('#journal-account-0')?.getAttribute('aria-label'))
+      .toBe('Account, line 1: 6990 Miscellaneous Expense');
   });
 });

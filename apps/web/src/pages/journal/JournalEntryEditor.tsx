@@ -29,6 +29,7 @@ import {
 import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
 import JournalRecurringDialog from './JournalRecurringDialog';
+import JournalAccountDialog from './JournalAccountDialog';
 import { JournalNumberRequestGate } from './journalNumberPreview';
 import {
   JOURNAL_CLOSE_PATH,
@@ -59,6 +60,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
+  const [newAccountLineIndex, setNewAccountLineIndex] = useState<number | null>(null);
   const [primarySaveAction, setPrimarySaveAction] = useState<'new' | 'close'>(
     () => (localStorage.getItem('je_primarySaveAction') === 'close' ? 'close' : 'new'),
   );
@@ -127,6 +129,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       ...current,
       lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line),
     }));
+  }
+
+  function handleAccountCreated(account: JournalAccount) {
+    setAccounts(current => [...current.filter(item => item.id !== account.id), account]);
+    if (newAccountLineIndex !== null) {
+      updateLine(newAccountLineIndex, { account_id: account.id });
+    }
+    setNewAccountLineIndex(null);
   }
 
   function copyLine(index: number) {
@@ -381,6 +391,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                       placeholder=""
                       disabled={readOnly}
                       className="w-full"
+                      {...(!readOnly ? { onCreate: () => setNewAccountLineIndex(index) } : {})}
                     />
                   </td>
                   <td className="px-2 py-1.5">
@@ -599,6 +610,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         open={recurringOpen}
         onOpenChange={setRecurringOpen}
         onCreated={() => setNotice('Recurring journal template created.')}
+      />
+      <JournalAccountDialog
+        businessId={businessId}
+        open={newAccountLineIndex !== null}
+        onOpenChange={open => {
+          if (!open) setNewAccountLineIndex(null);
+        }}
+        onCreated={handleAccountCreated}
       />
     </div>
   );

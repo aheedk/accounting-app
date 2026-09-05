@@ -27,6 +27,7 @@ export interface AccountSelectProps {
   id?: string;
   ariaLabel?: string;
   emptyText?: string;
+  onCreate?: () => void;
 }
 
 export function AccountSelect({
@@ -40,6 +41,7 @@ export function AccountSelect({
   id,
   ariaLabel,
   emptyText = 'No matching accounts',
+  onCreate,
 }: AccountSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -90,13 +92,19 @@ export function AccountSelect({
   React.useEffect(() => {
     if (!open || !listRef.current) return;
     const item = listRef.current.children[activeIdx] as HTMLElement | undefined;
-    item?.scrollIntoView({ block: 'nearest' });
+    item?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIdx, open]);
 
   function pick(a: AccountLike) {
     onChange(a.id);
     setOpen(false);
     setQuery('');
+  }
+
+  function createAccount() {
+    setOpen(false);
+    setQuery('');
+    onCreate?.();
   }
 
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -204,6 +212,17 @@ export function AccountSelect({
               </ul>
             )}
           </div>
+          {onCreate && (
+            <div className="border-t p-1">
+              <button
+                type="button"
+                onClick={createAccount}
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+              >
+                Add new account
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
