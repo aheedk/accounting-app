@@ -89,10 +89,12 @@ export default function ProfitLossPage() {
   const dlHeaders = ['Section', 'Code', 'Account', 'Amount'];
   const dlRows = () => report ? [
     ...report.revenue_lines.map(l => ['Revenue', l.account_code, l.account_name, l.amount]),
-    ['Revenue', '', 'Total Revenue', report.revenue_total],
+    ['Income', '', 'Total Income', report.revenue_total],
+    ['Income', '', 'GROSS PROFIT', report.gross_profit],
     ...report.expense_lines.map(l => ['Expense', l.account_code, l.account_name, l.amount]),
-    ['Expense', '', 'Total Expense', report.expense_total],
-    ['', '', 'Net Income', report.net_income],
+    ['Expenses', '', 'Total Expenses', report.expense_total],
+    ['Expenses', '', 'NET OPERATING INCOME', report.operating_income],
+    ['', '', 'NET INCOME', report.net_income],
   ] : [];
 
   const netIncomeNum = report ? parseFloat(report.net_income) : 0;
@@ -203,6 +205,10 @@ export default function ProfitLossPage() {
                   <td className="p-3">Total Income</td>
                   <td className="p-3 text-right font-mono">{fmtMoney(report.revenue_total)}</td>
                 </tr>
+                <tr className="border-b font-semibold">
+                  <td className="p-3">GROSS PROFIT</td>
+                  <td className="p-3 text-right font-mono">{fmtSigned(report.gross_profit)}</td>
+                </tr>
 
                 <tr className="border-b">
                   <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Expenses</td>
@@ -228,12 +234,8 @@ export default function ProfitLossPage() {
                   <td className="p-3 text-right font-mono">{fmtMoney(report.expense_total)}</td>
                 </tr>
 
-                <tr className="border-b">
-                  <td className="p-3 text-muted-foreground">Gross profit</td>
-                  <td className="p-3 text-right font-mono">{fmtSigned(report.gross_profit)}</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="p-3 text-muted-foreground">Operating income</td>
+                <tr className="border-b font-semibold">
+                  <td className="p-3">NET OPERATING INCOME</td>
                   <td className="p-3 text-right font-mono">{fmtSigned(report.operating_income)}</td>
                 </tr>
                 <tr className="font-semibold">
