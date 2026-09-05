@@ -3,6 +3,7 @@ import { ChevronDown, Copy, Paperclip, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
@@ -21,6 +22,7 @@ import {
   journalEntryToForm,
   journalEntryTotals,
   newJournalEntryForm,
+  shouldAppendJournalLines,
   type JournalEntryFormLine,
   type JournalEntryFormValues,
   type JournalAccount,
@@ -28,6 +30,7 @@ import {
 import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
 import JournalRecurringDialog from './JournalRecurringDialog';
+import AccountCreateDrawer from '@/pages/coa/AccountCreateDrawer';
 import { JournalNumberRequestGate } from './journalNumberPreview';
 import {
   JOURNAL_CLOSE_PATH,
@@ -40,9 +43,26 @@ type JournalEntryEditorProps = {
   copySource?: JournalEntryDetail;
 };
 
+type FiscalPeriod = {
+  id: string;
+  starts_on: string;
+  ends_on: string;
+  status: 'open' | 'closed';
+};
+
+function fmtJournalDate(iso: string) {
+  const [year, month, day] = iso.split('-');
+  if (!year || !month || !day) return iso;
+  return `${Number(month)}/${Number(day)}/${year}`;
+}
+
 export default function JournalEntryEditor({ existing, copySource }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<JournalAccount[]>([]);
+  const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
+  const [periodsLoaded, setPeriodsLoaded] = useState(false);
+  const [periodBusy, setPeriodBusy] = useState(false);
   const [form, setForm] = useState<JournalEntryFormValues>(() => (
     existing
       ? journalEntryToForm(existing)
@@ -58,23 +78,43 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
+  const [newAccountLineIndex, setNewAccountLineIndex] = useState<number | null>(null);
   const [primarySaveAction, setPrimarySaveAction] = useState<'new' | 'close'>(
     () => (localStorage.getItem('je_primarySaveAction') === 'close' ? 'close' : 'new'),
   );
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const saveMenuRef = useRef<HTMLDivElement>(null);
+  const pendingAccountFocusRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const readOnly = existing !== undefined && !existing.can_correct;
   const supportsManualActions = journalSupportsManualActions(existing);
   const totals = journalEntryTotals(form.lines);
   const filledLineCount = form.lines.filter(line => line.account_id).length;
-  const canSave = !readOnly && totals.balanced && filledLineCount >= 2 && !busy;
+  const selectedPeriod = periods.find(period => (
+    period.starts_on <= form.date && period.ends_on >= form.date
+  ));
+  const hasCompleteDate = /^\d{4}-\d{2}-\d{2}$/.test(form.date);
+  const missingPeriod = periodsLoaded && hasCompleteDate && !selectedPeriod;
+  const closedPeriod = selectedPeriod?.status === 'closed';
+  const canSave = !readOnly && totals.balanced && filledLineCount >= 2
+    && !busy && !periodBusy && !missingPeriod && !closedPeriod;
 
   useEffect(() => {
     if (!businessId) return;
     api.get<{ accounts: JournalAccount[] }>(`/businesses/${businessId}/coa`, {
       params: { include_inactive: 'true' },
     }).then(response => setAccounts(response.data.accounts));
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    setPeriodsLoaded(false);
+    api.get<{ periods: FiscalPeriod[] }>(`/businesses/${businessId}/periods`)
+      .then(response => {
+        setPeriods(response.data.periods);
+        setPeriodsLoaded(true);
+      })
+      .catch(() => setPeriodsLoaded(false));
   }, [businessId]);
 
   useEffect(() => {
@@ -109,6 +149,13 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+  useEffect(() => {
+    const rowIndex = pendingAccountFocusRef.current;
+    if (rowIndex === null) return;
+    pendingAccountFocusRef.current = null;
+    document.getElementById(`journal-account-${rowIndex}`)?.focus();
+  }, [form.lines.length]);
+
   function updateForm(patch: Partial<Omit<JournalEntryFormValues, 'lines'>>) {
     setForm(current => ({ ...current, ...patch }));
   }
@@ -118,6 +165,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       ...current,
       lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line),
     }));
+  }
+
+  function handleAccountCreated(account: JournalAccount) {
+    setAccounts(current => [...current.filter(item => item.id !== account.id), account]);
+    if (newAccountLineIndex !== null) {
+      updateLine(newAccountLineIndex, { account_id: account.id });
+    }
+    setNewAccountLineIndex(null);
   }
 
   function copyLine(index: number) {
@@ -136,6 +191,23 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
 
   function clearLines() {
     setForm(current => ({ ...current, lines: Array.from({ length: 8 }, blankJournalLine) }));
+  }
+
+  function handleLastLineTab(event: React.KeyboardEvent<HTMLInputElement>, rowIndex: number) {
+    if (readOnly) return;
+    if (!shouldAppendJournalLines({
+      key: event.key,
+      shiftKey: event.shiftKey,
+      rowIndex,
+      rowCount: form.lines.length,
+    })) return;
+
+    event.preventDefault();
+    pendingAccountFocusRef.current = form.lines.length;
+    setForm(current => ({
+      ...current,
+      lines: [...current.lines, blankJournalLine(), blankJournalLine(), blankJournalLine()],
+    }));
   }
 
   function copyUnsavedEntry() {
@@ -184,6 +256,29 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       setError(pickErr(requestError));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function createMissingPeriods() {
+    if (!businessId || !missingPeriod || user?.role !== 'firm_admin') return;
+    const year = Number(form.date.slice(0, 4));
+    if (!Number.isInteger(year)) return;
+    setPeriodBusy(true);
+    setError(null);
+    try {
+      const response = await api.post<{ periods: FiscalPeriod[] }>(
+        `/businesses/${businessId}/periods/seed-year`,
+        { year },
+      );
+      setPeriods(current => [
+        ...current.filter(period => !response.data.periods.some(created => created.id === period.id)),
+        ...response.data.periods,
+      ]);
+      setNotice(`${year} fiscal periods created. You can save this journal entry now.`);
+    } catch (requestError: unknown) {
+      setError(pickErr(requestError));
+    } finally {
+      setPeriodBusy(false);
     }
   }
 
@@ -284,6 +379,24 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         </div>
       )}
 
+      {missingPeriod && (
+        <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span>No fiscal period covers {fmtJournalDate(form.date)}.</span>
+          {user?.role === 'firm_admin' ? (
+            <Button type="button" size="sm" variant="outline" disabled={periodBusy} onClick={() => { void createMissingPeriods(); }}>
+              {periodBusy ? 'Creating...' : `Create ${form.date.slice(0, 4)} periods`}
+            </Button>
+          ) : (
+            <Link className="font-medium underline" to="/settings/periods">Open Fiscal Periods</Link>
+          )}
+        </div>
+      )}
+      {closedPeriod && (
+        <div className="mx-6 mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          The fiscal period covering {fmtJournalDate(form.date)} is closed. Reopen it before posting this entry.
+        </div>
+      )}
+
       <div className="flex flex-wrap items-end gap-8 border-b bg-muted/10 px-6 pb-4 pt-5">
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -347,12 +460,15 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                   <td className="px-2 py-1.5 text-xs text-muted-foreground">{index + 1}</td>
                   <td className="px-2 py-1.5">
                     <AccountSelect
+                      id={`journal-account-${index}`}
+                      ariaLabel={`Account, line ${index + 1}`}
                       accounts={journalAccountsForLine(accounts, line.account_id)}
                       value={line.account_id}
                       onChange={accountId => updateLine(index, { account_id: accountId })}
                       placeholder=""
                       disabled={readOnly}
                       className="w-full"
+                      {...(!readOnly ? { onCreate: () => setNewAccountLineIndex(index) } : {})}
                     />
                   </td>
                   <td className="px-2 py-1.5">
@@ -399,6 +515,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     <Input
                       value={line.class_name}
                       onChange={event => updateLine(index, { class_name: event.target.value })}
+                      onKeyDown={event => handleLastLineTab(event, index)}
                       disabled={readOnly}
                       className="w-full"
                     />
@@ -571,6 +688,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         onOpenChange={setRecurringOpen}
         onCreated={() => setNotice('Recurring journal template created.')}
       />
+      {newAccountLineIndex !== null && (
+        <AccountCreateDrawer
+          businessId={businessId}
+          accounts={accounts}
+          onClose={() => setNewAccountLineIndex(null)}
+          onCreated={handleAccountCreated}
+        />
+      )}
     </div>
   );
 }

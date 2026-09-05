@@ -51,6 +51,17 @@ export function blankJournalLine(): JournalEntryFormLine {
   return { account_id: '', debit: '', credit: '', description: '', name: '', class_name: '' };
 }
 
+export function shouldAppendJournalLines(input: {
+  key: string;
+  shiftKey: boolean;
+  rowIndex: number;
+  rowCount: number;
+}): boolean {
+  return input.key === 'Tab'
+    && !input.shiftKey
+    && input.rowIndex === input.rowCount - 1;
+}
+
 export function newJournalEntryForm(date: string): JournalEntryFormValues {
   return {
     date,

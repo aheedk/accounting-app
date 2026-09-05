@@ -9,6 +9,7 @@ import {
   journalEntryTotals,
   journalAccountsForLine,
   newJournalEntryForm,
+  shouldAppendJournalLines,
 } from './journalEntryForm';
 import type { JournalEntryDetail } from './journalEntryTypes';
 
@@ -211,5 +212,32 @@ describe('journal entry form mappings', () => {
       'active',
       'inactive',
     ]);
+  });
+
+  it('appends journal lines when Tab leaves the final row', () => {
+    expect(shouldAppendJournalLines({
+      key: 'Tab',
+      shiftKey: false,
+      rowIndex: 7,
+      rowCount: 8,
+    })).toBe(true);
+  });
+
+  it('does not append journal lines when tabbing backward', () => {
+    expect(shouldAppendJournalLines({
+      key: 'Tab',
+      shiftKey: true,
+      rowIndex: 7,
+      rowCount: 8,
+    })).toBe(false);
+  });
+
+  it('does not append journal lines before the final row', () => {
+    expect(shouldAppendJournalLines({
+      key: 'Tab',
+      shiftKey: false,
+      rowIndex: 6,
+      rowCount: 8,
+    })).toBe(false);
   });
 });

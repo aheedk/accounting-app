@@ -4,6 +4,8 @@
 
 **Do not ask the user clarifying questions.** Make decisions and proceed. The user has explicitly delegated all design and implementation choices.
 
+**Keep verification proportional.** For narrow, low-risk UI changes, run one focused test plus the relevant typecheck/lint only. The user will handle localhost acceptance testing. Reserve broader test suites and extensive browser testing for high-risk or cross-cutting changes.
+
 When something is genuinely ambiguous:
 1. Pick the option that most closely matches existing patterns in this repo.
 2. If still ambiguous, pick the option closest to the recommendations in `docs/superpowers/specs/2026-04-24-fill-coming-soon-tabs-design.md`.
