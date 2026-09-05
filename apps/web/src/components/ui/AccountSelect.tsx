@@ -49,6 +49,9 @@ export function AccountSelect({
   const listRef = React.useRef<HTMLUListElement>(null);
 
   const selected = accounts.find((a) => a.id === value) ?? null;
+  const accessibleLabel = ariaLabel && selected
+    ? `${ariaLabel}: ${selected.code} ${selected.name}`
+    : ariaLabel;
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -122,7 +125,7 @@ export function AccountSelect({
       {open ? (
         <input
           ref={inputRef}
-          aria-label={ariaLabel}
+          aria-label={accessibleLabel}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKey}
@@ -136,7 +139,7 @@ export function AccountSelect({
       ) : (
         <button
           id={id}
-          aria-label={ariaLabel}
+          aria-label={accessibleLabel}
           type="button"
           disabled={disabled}
           onClick={() => setOpen(true)}

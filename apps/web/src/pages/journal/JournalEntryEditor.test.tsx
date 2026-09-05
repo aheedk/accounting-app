@@ -7,6 +7,8 @@ import { MemoryRouter } from 'react-router-dom';
 import JournalEntryEditor from './JournalEntryEditor';
 import type { JournalEntryDetail } from './journalEntryTypes';
 
+const CASH_ID = '11111111-1111-4111-8111-111111111111';
+
 vi.mock('@/lib/business', () => ({
   useActiveBusinessId: () => ['44444444-4444-4444-8444-444444444444'],
 }));
@@ -15,7 +17,16 @@ vi.mock('@/lib/apiClient', () => ({
   api: {
     get: vi.fn((url: string) => Promise.resolve({
       data: url.endsWith('/coa')
-        ? { accounts: [] }
+        ? {
+            accounts: [{
+              id: CASH_ID,
+              code: '1010',
+              name: 'Cash',
+              account_type: 'asset',
+              is_active: true,
+              is_locked: false,
+            }],
+          }
         : { journal_number: '84' },
     })),
     post: vi.fn(),
@@ -46,7 +57,19 @@ const readOnlyEntry = {
     created_by_user_id: '66666666-6666-4666-8666-666666666666',
     updated_at: '2026-09-05T13:00:00.000Z',
   },
-  lines: [],
+  lines: [{
+    id: '77777777-7777-4777-8777-777777777777',
+    journal_entry_id: '33333333-3333-4333-8333-333333333333',
+    line_number: 1,
+    account_id: CASH_ID,
+    account_code: '1010',
+    account_name: 'Cash',
+    debit: '10.0000',
+    credit: '0.0000',
+    memo: null,
+    name: null,
+    class_name: null,
+  }],
   can_correct: false,
   correction_block_reason: 'This entry is read-only.',
   can_reverse: false,
@@ -125,6 +148,8 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     await renderEditor(readOnlyEntry);
     const finalClass = classField(dataRows()[7]!);
 
+    expect(container.querySelector('#journal-account-0')?.getAttribute('aria-label'))
+      .toBe('Account, line 1: 1010 Cash');
     expect(finalClass.disabled).toBe(true);
     expect((await pressTab(finalClass)).defaultPrevented).toBe(false);
     expect(dataRows()).toHaveLength(8);
