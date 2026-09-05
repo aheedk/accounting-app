@@ -193,20 +193,50 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     expect(addAccount).toBeDefined();
     await click(addAccount!);
 
-    const code = document.querySelector<HTMLInputElement>('#new-journal-account-code')!;
-    const name = document.querySelector<HTMLInputElement>('#new-journal-account-name')!;
-    const type = document.querySelector<HTMLSelectElement>('#new-journal-account-type')!;
+    const drawer = document.querySelector('[role="dialog"][aria-label="New account"]');
+    expect(drawer).not.toBeNull();
+    expect(drawer?.textContent).toContain('Detail type');
+    expect(drawer?.textContent).toContain('Make this a subaccount');
+    expect(drawer?.textContent).toContain('Opening balance');
+    expect(drawer?.textContent).toContain('Lock account');
+
+    const code = document.querySelector<HTMLInputElement>('#new-account-code')!;
+    const name = document.querySelector<HTMLInputElement>('#new-account-name')!;
+    const type = document.querySelector<HTMLButtonElement>('#new-account-type')!;
+    await click(type);
+    const typeMenu = document.querySelector('[role="menu"][aria-label="Account type choices"]');
+    expect(typeMenu).not.toBeNull();
+    expect(Array.from(typeMenu!.querySelectorAll('[data-account-type-group]')).map(item => item.textContent))
+      .toEqual(['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE']);
+    expect(Array.from(typeMenu!.querySelectorAll<HTMLButtonElement>('button')).map(button => button.textContent?.trim()))
+      .toEqual([
+        'Bank', 'Accounts receivable (A/R)', 'Other Current Assets', 'Fixed Assets', 'Other Assets',
+        'Credit Card', 'Accounts payable (A/P)', 'Other Current Liabilities', 'Long Term Liabilities',
+        'Equity', 'Income', 'Other Income', 'Cost of Goods Sold', 'Expenses', 'Other Expense',
+      ]);
+    const expensesType = Array.from(typeMenu!.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.trim() === 'Expenses');
+    await click(expensesType!);
     await act(async () => {
       setFieldValue(code, '6990');
       setFieldValue(name, 'Miscellaneous Expense');
-      setFieldValue(type, 'expense');
     });
-    await act(async () => document.querySelector<HTMLFormElement>('#new-journal-account-form')!
+    await act(async () => document.querySelector<HTMLFormElement>('#coa-create-form')!
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
 
     expect(apiPost).toHaveBeenCalledWith(
       '/businesses/44444444-4444-4444-8444-444444444444/coa',
-      { code: '6990', name: 'Miscellaneous Expense', account_type: 'expense' },
+      {
+        code: '6990',
+        name: 'Miscellaneous Expense',
+        account_type: 'expense',
+        detail_type: 'Expenses',
+        description: null,
+        parent_id: null,
+        opening_balance: null,
+        opening_balance_as_of: null,
+        is_locked: false,
+      },
     );
     expect(container.querySelector('#journal-account-0')?.getAttribute('aria-label'))
       .toBe('Account, line 1: 6990 Miscellaneous Expense');

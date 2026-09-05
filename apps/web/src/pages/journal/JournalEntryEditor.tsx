@@ -29,7 +29,7 @@ import {
 import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
 import JournalRecurringDialog from './JournalRecurringDialog';
-import JournalAccountDialog from './JournalAccountDialog';
+import AccountCreateDrawer from '@/pages/coa/AccountCreateDrawer';
 import { JournalNumberRequestGate } from './journalNumberPreview';
 import {
   JOURNAL_CLOSE_PATH,
@@ -611,14 +611,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         onOpenChange={setRecurringOpen}
         onCreated={() => setNotice('Recurring journal template created.')}
       />
-      <JournalAccountDialog
-        businessId={businessId}
-        open={newAccountLineIndex !== null}
-        onOpenChange={open => {
-          if (!open) setNewAccountLineIndex(null);
-        }}
-        onCreated={handleAccountCreated}
-      />
+      {newAccountLineIndex !== null && (
+        <AccountCreateDrawer
+          businessId={businessId}
+          accounts={accounts}
+          onClose={() => setNewAccountLineIndex(null)}
+          onCreated={handleAccountCreated}
+        />
+      )}
     </div>
   );
 }

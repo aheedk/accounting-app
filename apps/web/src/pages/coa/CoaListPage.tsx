@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, FileDown, Info, Landmark, Lock, Pencil, Printer, Search, Settings2, Unlock, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, FileDown, Landmark, Lock, Pencil, Printer, Search, Settings2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { downloadAsExcel } from '@/lib/download';
-import { todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import AccountCreateDrawer from './AccountCreateDrawer';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -171,12 +171,7 @@ export default function CoaListPage() {
   // Create drawer (QBO New-account field set)
   const [showCreate, setShowCreate] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
-  const [createIsSub, setCreateIsSub] = useState(false);
-  const [createLocked, setCreateLocked] = useState(false);
-  const [showSaveMenu, setShowSaveMenu] = useState(false);
-  const saveAndNewRef = useRef(false);
-  const [form, setForm] = useState({ code: '', name: '', account_type: 'asset', detail_type: '', description: '', opening_balance: '', opening_balance_as_of: todayLocal() });
-  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [createAccountType, setCreateAccountType] = useState('asset');
 
   // Edit slide-over
   const [editAccount, setEditAccount] = useState<Account | null>(null);
@@ -382,58 +377,6 @@ export default function CoaListPage() {
     }
   }
 
-  // --- Create ---
-  const isBalanceSheetType = ['asset', 'liability', 'equity'].includes(form.account_type);
-
-  function blankCreateForm(keepType = false) {
-    return {
-      code: '', name: '',
-      account_type: keepType ? form.account_type : 'asset',
-      detail_type: keepType ? form.detail_type : '',
-      description: '', opening_balance: '', opening_balance_as_of: todayLocal(),
-    };
-  }
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    const andNew = saveAndNewRef.current;
-    saveAndNewRef.current = false;
-    setCreateErr(null);
-    if (createIsSub && !createParentId) { setCreateErr('Choose a parent account.'); return; }
-    const ob = form.opening_balance.trim();
-    if (ob && Number.isNaN(Number(ob))) { setCreateErr('Opening balance must be a number.'); return; }
-    try {
-      const r = await api.post(`/businesses/${bizId}/coa`, {
-        code: form.code,
-        name: form.name,
-        account_type: form.account_type,
-        detail_type: form.detail_type || null,
-        description: form.description || null,
-        parent_id: createIsSub ? createParentId : null,
-        // Balance-sheet accounts only; the API posts the JE against Opening Balance Equity.
-        opening_balance: ob && isBalanceSheetType ? ob : null,
-        opening_balance_as_of: ob && isBalanceSheetType ? form.opening_balance_as_of : null,
-        // Locked accounts reject edits and new postings until unlocked.
-        is_locked: createLocked,
-      });
-      void r;
-      if (andNew) {
-        setForm(blankCreateForm(true));
-        setCreateLocked(false);
-      } else {
-        setForm(blankCreateForm());
-        setCreateParentId(null);
-        setCreateIsSub(false);
-        setCreateLocked(false);
-        setShowCreate(false);
-      }
-      await reload();
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
-      setCreateErr(msg ?? 'Failed');
-    }
-  }
-
   // --- Edit ---
   function openEdit(acct: Account) {
     setEditAccount(acct);
@@ -601,7 +544,7 @@ export default function CoaListPage() {
           <div className="flex items-center" ref={newDropdownRef}>
             <Button
               className="rounded-r-none border-r border-primary-foreground/20"
-              onClick={() => { setCreateErr(null); setCreateParentId(null); setCreateIsSub(false); setCreateLocked(false); setForm(blankCreateForm()); setShowCreate(true); }}
+              onClick={() => { setCreateParentId(null); setCreateAccountType('asset'); setShowCreate(true); }}
             >
               New account
             </Button>
@@ -1026,10 +969,7 @@ export default function CoaListPage() {
                             onClick={() => {
                               setOpenRowMenu(null);
                               setCreateParentId(acct.id);
-                              setCreateIsSub(true);
-                              setCreateLocked(false);
-                              setForm({ code: '', name: '', account_type: acct.account_type, detail_type: '', description: '', opening_balance: '', opening_balance_as_of: todayLocal() });
-                              setCreateErr(null);
+                              setCreateAccountType(acct.account_type);
                               setShowCreate(true);
                             }}
                           >
@@ -1235,220 +1175,15 @@ export default function CoaListPage() {
         </div>
       )}
 
-      {/* ── New account drawer ── */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/20" onClick={() => setShowCreate(false)} />
-          <div className="w-[420px] bg-background shadow-xl flex flex-col border-l" role="dialog" aria-modal="true" aria-label="New account">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">New account</h2>
-              <button type="button" className="text-muted-foreground hover:text-foreground text-lg leading-none" onClick={() => setShowCreate(false)}>✕</button>
-            </div>
-            <form id="coa-create-form" className="flex flex-col flex-1 overflow-hidden" onSubmit={e => void create(e)}>
-              <div className="flex-1 overflow-auto p-6 space-y-4">
-                {/* Name + number */}
-                <div className="grid grid-cols-[1fr_130px] gap-3">
-                  <div>
-                    <Label>Account name <span className="text-destructive">*</span></Label>
-                    <Input className="mt-1" placeholder="e.g. Cash" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required autoFocus />
-                  </div>
-                  <div>
-                    <Label>Account number <span className="text-destructive">*</span></Label>
-                    <Input className="mt-1" placeholder="e.g. 1000" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required />
-                  </div>
-                </div>
-
-                {/* Type + detail type */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="inline-flex items-center gap-1">Account type <span className="text-destructive">*</span>
-                      <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                    </Label>
-                    <select
-                      className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
-                      value={form.account_type}
-                      // Subaccounts inherit the parent's type.
-                      disabled={createIsSub && createParentId !== null}
-                      onChange={e => setForm(f => ({ ...f, account_type: e.target.value, detail_type: '' }))}
-                    >
-                      {ACCOUNT_TYPES.map(t => (
-                        <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Detail type</Label>
-                    <select
-                      className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-                      value={form.detail_type}
-                      onChange={e => setForm(f => ({ ...f, detail_type: e.target.value }))}
-                    >
-                      <option value="">— select —</option>
-                      {(DETAIL_TYPES[form.account_type] ?? []).map(dt => (
-                        <option key={dt} value={dt}>{dt}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Subaccount */}
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-input accent-emerald-600 cursor-pointer"
-                    checked={createIsSub}
-                    onChange={e => { setCreateIsSub(e.target.checked); if (!e.target.checked) setCreateParentId(null); }}
-                  />
-                  Make this a subaccount
-                </label>
-                {createIsSub && (
-                  <div>
-                    <Label>Parent account <span className="text-destructive">*</span></Label>
-                    <select
-                      className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-                      value={createParentId ?? ''}
-                      onChange={e => {
-                        const id = e.target.value || null;
-                        setCreateParentId(id);
-                        const parent = accounts.find(a => a.id === id);
-                        if (parent) setForm(f => ({ ...f, account_type: parent.account_type, detail_type: f.account_type === parent.account_type ? f.detail_type : '' }));
-                      }}
-                    >
-                      <option value="">— select parent —</option>
-                      {accounts
-                        .filter(a => a.is_active && a.account_type === form.account_type)
-                        .map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-                    </select>
-                  </div>
-                )}
-
-                {/* Opening balance (balance-sheet accounts only) */}
-                {isBalanceSheetType && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="inline-flex items-center gap-1">Opening balance
-                        <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                      </Label>
-                      <Input
-                        className="mt-1"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={form.opening_balance}
-                        onChange={e => setForm(f => ({ ...f, opening_balance: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label>As of</Label>
-                      <Input
-                        type="date"
-                        className="mt-1"
-                        value={form.opening_balance_as_of}
-                        onChange={e => setForm(f => ({ ...f, opening_balance_as_of: e.target.value }))}
-                      />
-                    </div>
-                    <p className="col-span-2 -mt-2 text-xs text-muted-foreground">
-                      Posts a journal entry against Opening Balance Equity as of this date.
-                    </p>
-                  </div>
-                )}
-
-                {/* Description */}
-                <div>
-                  <Label>Description</Label>
-                  <textarea
-                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-                    rows={3}
-                    value={form.description}
-                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                    placeholder="Optional description"
-                  />
-                </div>
-
-                {/* Lock account */}
-                <div className="flex items-center gap-3 border-t pt-4">
-                  <span className="text-sm font-medium underline underline-offset-2">Lock account</span>
-                  <div className="inline-flex rounded-md border overflow-hidden">
-                    <button
-                      type="button"
-                      className={`inline-flex h-8 w-9 items-center justify-center ${!createLocked ? 'bg-background' : 'bg-muted/40 text-muted-foreground'}`}
-                      aria-pressed={!createLocked}
-                      title="Unlocked — account is active"
-                      onClick={() => setCreateLocked(false)}
-                    >
-                      <Unlock className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`inline-flex h-8 w-9 items-center justify-center border-l ${createLocked ? 'bg-muted text-foreground' : 'bg-background text-muted-foreground'}`}
-                      aria-pressed={createLocked}
-                      title="Locked — account rejects edits and new postings until unlocked"
-                      onClick={() => setCreateLocked(true)}
-                    >
-                      <Lock className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {createLocked && <span className="text-xs text-muted-foreground">Created locked — no edits or postings until unlocked</span>}
-                </div>
-
-                {/* New-account preview: where it lands among active same-type accounts */}
-                <div className="rounded-md border overflow-hidden">
-                  <div className="flex items-center justify-between border-b bg-muted/20 px-3 py-2">
-                    <div>
-                      <div className="text-sm font-semibold">{isBalanceSheetType ? 'Balance Sheet' : 'Income Statement'}</div>
-                      <div className="text-xs text-muted-foreground">Active accounts as of {todayLocal()}</div>
-                    </div>
-                    <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New account preview</span>
-                  </div>
-                  <div className="max-h-40 overflow-y-auto py-1">
-                    {(() => {
-                      const siblings = accounts
-                        .filter(a => a.is_active && a.account_type === form.account_type)
-                        .map(a => ({ id: a.id, code: a.code, name: a.name, pending: false }));
-                      if (form.code || form.name) {
-                        siblings.push({ id: '__new__', code: form.code || '—', name: form.name || 'New account', pending: true });
-                      }
-                      siblings.sort((x, y) => x.code.localeCompare(y.code, undefined, { numeric: true }));
-                      if (siblings.length === 0) return <p className="px-3 py-2 text-sm text-muted-foreground">No active accounts of this type yet.</p>;
-                      return siblings.map(s => (
-                        <div key={s.id} className={`px-3 py-1.5 text-sm ${s.pending ? 'bg-blue-50 font-medium dark:bg-blue-950/40' : ''}`}>
-                          <span className="font-mono text-muted-foreground">{s.code}</span> {s.name}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-
-                {createErr && <p className="text-sm text-destructive">{createErr}</p>}
-              </div>
-              <div className="border-t px-6 py-4 flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-                <div className="flex items-center">
-                  <Button type="submit" className="rounded-r-none border-r border-primary-foreground/20">Save</Button>
-                  <div className="relative">
-                    <Button type="button" className="rounded-l-none px-2" onClick={() => setShowSaveMenu(m => !m)}>
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                    {showSaveMenu && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setShowSaveMenu(false)} />
-                        <div className="absolute bottom-full right-0 z-50 mb-1 w-40 rounded-md border bg-background py-1 shadow-lg">
-                          <button
-                            type="submit"
-                            form="coa-create-form"
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
-                            onClick={() => { saveAndNewRef.current = true; setShowSaveMenu(false); }}
-                          >
-                            Save and new
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AccountCreateDrawer
+          businessId={bizId}
+          accounts={accounts}
+          initialParentId={createParentId}
+          initialAccountType={createAccountType}
+          onClose={() => setShowCreate(false)}
+          onCreated={async () => { await reload(); }}
+        />
       )}
 
       {/* ── Import modal ── */}
