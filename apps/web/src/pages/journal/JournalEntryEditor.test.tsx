@@ -10,28 +10,23 @@ import type { JournalEntryDetail } from './journalEntryTypes';
 const CASH_ID = '11111111-1111-4111-8111-111111111111';
 const NEW_ACCOUNT_ID = '99999999-9999-4999-8999-999999999999';
 
-const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
+const { apiGet, apiPost, periodState } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  periodState: { include2024: false },
+}));
 
 vi.mock('@/lib/business', () => ({
   useActiveBusinessId: () => ['44444444-4444-4444-8444-444444444444'],
 }));
 
+vi.mock('@/auth/useAuth', () => ({
+  useAuth: () => ({ user: { role: 'firm_admin' } }),
+}));
+
 vi.mock('@/lib/apiClient', () => ({
   api: {
-    get: vi.fn((url: string) => Promise.resolve({
-      data: url.endsWith('/coa')
-        ? {
-            accounts: [{
-              id: CASH_ID,
-              code: '1010',
-              name: 'Cash',
-              account_type: 'asset',
-              is_active: true,
-              is_locked: false,
-            }],
-          }
-        : { journal_number: '84' },
-    })),
+    get: apiGet,
     post: apiPost,
   },
 }));
@@ -90,6 +85,46 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
+    periodState.include2024 = false;
+    apiGet.mockReset();
+    apiPost.mockReset();
+    apiGet.mockImplementation((url: string) => {
+      if (url.endsWith('/coa')) {
+        return Promise.resolve({
+          data: {
+            accounts: [{
+              id: CASH_ID,
+              code: '1010',
+              name: 'Cash',
+              account_type: 'asset',
+              is_active: true,
+              is_locked: false,
+            }],
+          },
+        });
+      }
+      if (url.endsWith('/periods')) {
+        return Promise.resolve({
+          data: {
+            periods: [
+              {
+                id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                starts_on: '2026-01-01',
+                ends_on: '2026-12-31',
+                status: 'open',
+              },
+              ...(periodState.include2024 ? [{
+                id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                starts_on: '2024-12-01',
+                ends_on: '2024-12-31',
+                status: 'open',
+              }] : []),
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { journal_number: '84' } });
+    });
   });
 
   afterEach(async () => {
@@ -168,6 +203,45 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     expect(finalClass.disabled).toBe(true);
     expect((await pressTab(finalClass)).defaultPrevented).toBe(false);
     expect(dataRows()).toHaveLength(8);
+  });
+
+  it('lets a firm admin create periods for an uncovered journal date', async () => {
+    apiPost.mockImplementation((url: string) => {
+      if (url.endsWith('/periods/seed-year')) {
+        periodState.include2024 = true;
+        return Promise.resolve({
+          data: {
+            periods: [{
+              id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              starts_on: '2024-12-01',
+              ends_on: '2024-12-31',
+              status: 'open',
+            }],
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    await renderEditor();
+
+    const date = container.querySelector<HTMLInputElement>('input[type="date"]')!;
+    await act(async () => {
+      date.focus();
+      setFieldValue(date, '2024-12-31');
+      date.blur();
+    });
+
+    expect(container.textContent).toContain('No fiscal period covers 12/31/2024.');
+    const createPeriods = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent?.trim() === 'Create 2024 periods');
+    expect(createPeriods).toBeDefined();
+    await click(createPeriods!);
+
+    expect(apiPost).toHaveBeenCalledWith(
+      '/businesses/44444444-4444-4444-8444-444444444444/periods/seed-year',
+      { year: 2024 },
+    );
+    expect(container.textContent).not.toContain('No fiscal period covers 12/31/2024.');
   });
 
   it('creates and selects a new account from the Account dropdown', async () => {

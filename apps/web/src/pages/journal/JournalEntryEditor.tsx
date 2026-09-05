@@ -3,6 +3,7 @@ import { ChevronDown, Copy, Paperclip, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
@@ -42,9 +43,26 @@ type JournalEntryEditorProps = {
   copySource?: JournalEntryDetail;
 };
 
+type FiscalPeriod = {
+  id: string;
+  starts_on: string;
+  ends_on: string;
+  status: 'open' | 'closed';
+};
+
+function fmtJournalDate(iso: string) {
+  const [year, month, day] = iso.split('-');
+  if (!year || !month || !day) return iso;
+  return `${Number(month)}/${Number(day)}/${year}`;
+}
+
 export default function JournalEntryEditor({ existing, copySource }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<JournalAccount[]>([]);
+  const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
+  const [periodsLoaded, setPeriodsLoaded] = useState(false);
+  const [periodBusy, setPeriodBusy] = useState(false);
   const [form, setForm] = useState<JournalEntryFormValues>(() => (
     existing
       ? journalEntryToForm(existing)
@@ -72,13 +90,31 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const supportsManualActions = journalSupportsManualActions(existing);
   const totals = journalEntryTotals(form.lines);
   const filledLineCount = form.lines.filter(line => line.account_id).length;
-  const canSave = !readOnly && totals.balanced && filledLineCount >= 2 && !busy;
+  const selectedPeriod = periods.find(period => (
+    period.starts_on <= form.date && period.ends_on >= form.date
+  ));
+  const hasCompleteDate = /^\d{4}-\d{2}-\d{2}$/.test(form.date);
+  const missingPeriod = periodsLoaded && hasCompleteDate && !selectedPeriod;
+  const closedPeriod = selectedPeriod?.status === 'closed';
+  const canSave = !readOnly && totals.balanced && filledLineCount >= 2
+    && !busy && !periodBusy && !missingPeriod && !closedPeriod;
 
   useEffect(() => {
     if (!businessId) return;
     api.get<{ accounts: JournalAccount[] }>(`/businesses/${businessId}/coa`, {
       params: { include_inactive: 'true' },
     }).then(response => setAccounts(response.data.accounts));
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    setPeriodsLoaded(false);
+    api.get<{ periods: FiscalPeriod[] }>(`/businesses/${businessId}/periods`)
+      .then(response => {
+        setPeriods(response.data.periods);
+        setPeriodsLoaded(true);
+      })
+      .catch(() => setPeriodsLoaded(false));
   }, [businessId]);
 
   useEffect(() => {
@@ -223,6 +259,29 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }
   }
 
+  async function createMissingPeriods() {
+    if (!businessId || !missingPeriod || user?.role !== 'firm_admin') return;
+    const year = Number(form.date.slice(0, 4));
+    if (!Number.isInteger(year)) return;
+    setPeriodBusy(true);
+    setError(null);
+    try {
+      const response = await api.post<{ periods: FiscalPeriod[] }>(
+        `/businesses/${businessId}/periods/seed-year`,
+        { year },
+      );
+      setPeriods(current => [
+        ...current.filter(period => !response.data.periods.some(created => created.id === period.id)),
+        ...response.data.periods,
+      ]);
+      setNotice(`${year} fiscal periods created. You can save this journal entry now.`);
+    } catch (requestError: unknown) {
+      setError(pickErr(requestError));
+    } finally {
+      setPeriodBusy(false);
+    }
+  }
+
   async function reverseEntry() {
     if (!businessId || !existing?.can_reverse) return;
     const confirmed = window.confirm(
@@ -317,6 +376,24 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           {readOnly
             ? existing.correction_block_reason
             : 'Saving creates a reversing entry and posts the corrected replacement so your audit history stays intact.'}
+        </div>
+      )}
+
+      {missingPeriod && (
+        <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span>No fiscal period covers {fmtJournalDate(form.date)}.</span>
+          {user?.role === 'firm_admin' ? (
+            <Button type="button" size="sm" variant="outline" disabled={periodBusy} onClick={() => { void createMissingPeriods(); }}>
+              {periodBusy ? 'Creating...' : `Create ${form.date.slice(0, 4)} periods`}
+            </Button>
+          ) : (
+            <Link className="font-medium underline" to="/settings/periods">Open Fiscal Periods</Link>
+          )}
+        </div>
+      )}
+      {closedPeriod && (
+        <div className="mx-6 mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          The fiscal period covering {fmtJournalDate(form.date)} is closed. Reopen it before posting this entry.
         </div>
       )}
 
