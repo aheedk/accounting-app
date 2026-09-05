@@ -25,6 +25,7 @@ export interface AccountSelectProps {
   disabled?: boolean;
   className?: string;
   id?: string;
+  ariaLabel?: string;
   emptyText?: string;
 }
 
@@ -37,6 +38,7 @@ export function AccountSelect({
   disabled,
   className,
   id,
+  ariaLabel,
   emptyText = 'No matching accounts',
 }: AccountSelectProps) {
   const [open, setOpen] = React.useState(false);
@@ -120,6 +122,7 @@ export function AccountSelect({
       {open ? (
         <input
           ref={inputRef}
+          aria-label={ariaLabel}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKey}
@@ -133,6 +136,7 @@ export function AccountSelect({
       ) : (
         <button
           id={id}
+          aria-label={ariaLabel}
           type="button"
           disabled={disabled}
           onClick={() => setOpen(true)}

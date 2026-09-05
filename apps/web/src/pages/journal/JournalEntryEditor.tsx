@@ -148,6 +148,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   }
 
   function handleLastLineTab(event: React.KeyboardEvent<HTMLInputElement>, rowIndex: number) {
+    if (readOnly) return;
     if (!shouldAppendJournalLines({
       key: event.key,
       shiftKey: event.shiftKey,
@@ -373,6 +374,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                   <td className="px-2 py-1.5">
                     <AccountSelect
                       id={`journal-account-${index}`}
+                      ariaLabel={`Account, line ${index + 1}`}
                       accounts={journalAccountsForLine(accounts, line.account_id)}
                       value={line.account_id}
                       onChange={accountId => updateLine(index, { account_id: accountId })}

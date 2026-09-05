@@ -1,0 +1,132 @@
+// @vitest-environment jsdom
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
+import JournalEntryEditor from './JournalEntryEditor';
+import type { JournalEntryDetail } from './journalEntryTypes';
+
+vi.mock('@/lib/business', () => ({
+  useActiveBusinessId: () => ['44444444-4444-4444-8444-444444444444'],
+}));
+
+vi.mock('@/lib/apiClient', () => ({
+  api: {
+    get: vi.fn((url: string) => Promise.resolve({
+      data: url.endsWith('/coa')
+        ? { accounts: [] }
+        : { journal_number: '84' },
+    })),
+    post: vi.fn(),
+  },
+}));
+
+const readOnlyEntry = {
+  entry: {
+    id: '33333333-3333-4333-8333-333333333333',
+    business_id: '44444444-4444-4444-8444-444444444444',
+    period_id: '55555555-5555-4555-8555-555555555555',
+    period_status: 'open',
+    entry_date: '2026-09-05',
+    journal_number: '83',
+    reference: null,
+    memo: null,
+    source_type: 'manual',
+    source_id: null,
+    status: 'voided',
+    corrected_from_entry_id: null,
+    reversed_entry_id: null,
+    posted_at: '2026-09-05T12:00:00.000Z',
+    posted_by_user_id: '66666666-6666-4666-8666-666666666666',
+    voided_at: '2026-09-05T13:00:00.000Z',
+    voided_by_user_id: '66666666-6666-4666-8666-666666666666',
+    void_reason: 'Test fixture',
+    created_at: '2026-09-05T12:00:00.000Z',
+    created_by_user_id: '66666666-6666-4666-8666-666666666666',
+    updated_at: '2026-09-05T13:00:00.000Z',
+  },
+  lines: [],
+  can_correct: false,
+  correction_block_reason: 'This entry is read-only.',
+  can_reverse: false,
+  reversal_block_reason: 'This entry is read-only.',
+  is_standalone_manual: true,
+} satisfies JournalEntryDetail;
+
+describe('JournalEntryEditor line keyboard navigation', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+      .IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.clearAllMocks();
+  });
+
+  async function renderEditor(existing?: JournalEntryDetail) {
+    await act(async () => {
+      root.render(
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <JournalEntryEditor {...(existing ? { existing } : {})} />
+        </MemoryRouter>,
+      );
+    });
+  }
+
+  function dataRows() {
+    return Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody tr.group'));
+  }
+
+  function classField(row: HTMLTableRowElement) {
+    const fields = row.querySelectorAll<HTMLInputElement>('input');
+    return fields[fields.length - 1]!;
+  }
+
+  async function pressTab(field: HTMLInputElement, shiftKey = false) {
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey,
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => field.dispatchEvent(event));
+    return event;
+  }
+
+  it('adds three rows and focuses the labelled Account field after forward Tab on the final Class field', async () => {
+    await renderEditor();
+    const event = await pressTab(classField(dataRows()[7]!));
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(dataRows()).toHaveLength(11);
+    const firstNewAccount = container.querySelector<HTMLButtonElement>('#journal-account-8');
+    expect(firstNewAccount?.getAttribute('aria-label')).toBe('Account, line 9');
+    expect(document.activeElement).toBe(firstNewAccount);
+  });
+
+  it('does not add rows on Shift+Tab or from a non-final Class field', async () => {
+    await renderEditor();
+
+    expect((await pressTab(classField(dataRows()[7]!), true)).defaultPrevented).toBe(false);
+    expect((await pressTab(classField(dataRows()[6]!))).defaultPrevented).toBe(false);
+    expect(dataRows()).toHaveLength(8);
+  });
+
+  it('does not add rows to a read-only journal entry', async () => {
+    await renderEditor(readOnlyEntry);
+    const finalClass = classField(dataRows()[7]!);
+
+    expect(finalClass.disabled).toBe(true);
+    expect((await pressTab(finalClass)).defaultPrevented).toBe(false);
+    expect(dataRows()).toHaveLength(8);
+  });
+});
