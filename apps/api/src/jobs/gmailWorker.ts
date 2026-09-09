@@ -312,6 +312,44 @@ async function processAnyMessage(
       console.log(`[gmail-worker] message ${messageId} → invoice auto-rejected: ${reason}`);
       return;
     }
+    // Duplicate check: same vendor + same invoice number already exists (pending or approved)
+    const vendor = result.vendor_customer?.trim() ?? null;
+    const invoiceNum = result.invoice_number?.trim() ?? null;
+    if (vendor && invoiceNum) {
+      const duplicate = await db
+        .selectFrom('invoice_import_staging')
+        .select('id')
+        .where('vendor_customer', 'ilike', vendor)
+        .where('invoice_number', '=', invoiceNum)
+        .where('status', 'in', ['pending', 'approved'])
+        .executeTakeFirst();
+      if (duplicate) {
+        const dupReason = `Duplicate invoice: #${invoiceNum} from "${vendor}" already exists`;
+        await db.insertInto('invoice_import_staging').values({
+          gmail_message_id: messageId,
+          email_from: from,
+          email_subject: subject,
+          received_at: receivedAt,
+          invoice_type: result.invoice_type ?? 'ap',
+          vendor_customer: vendor,
+          invoice_number: invoiceNum,
+          invoice_date: result.invoice_date ?? null,
+          due_date: result.due_date ?? null,
+          line_items: JSON.stringify(result.line_items ?? []),
+          subtotal: result.subtotal ?? null,
+          tax_amount: result.tax_amount ?? null,
+          total: result.total ?? null,
+          addressed_to: result.addressed_to ?? null,
+          status: 'rejected',
+          rejection_reason: dupReason,
+          pdf_data: pdfBuffer,
+          business_id: businessId,
+        }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
+        console.log(`[gmail-worker] message ${messageId} → duplicate invoice rejected: ${dupReason}`);
+        return;
+      }
+    }
+
     const coa = await fetchCoa(db, businessId);
     const enrichedLines = (result.line_items ?? []).map(li => ({
       ...li,
@@ -323,8 +361,8 @@ async function processAnyMessage(
       email_subject: subject,
       received_at: receivedAt,
       invoice_type: result.invoice_type ?? 'ap',
-      vendor_customer: result.vendor_customer ?? null,
-      invoice_number: result.invoice_number ?? null,
+      vendor_customer: vendor,
+      invoice_number: invoiceNum,
       invoice_date: result.invoice_date ?? null,
       due_date: result.due_date ?? null,
       line_items: JSON.stringify(enrichedLines),
@@ -336,7 +374,7 @@ async function processAnyMessage(
       business_id: businessId,
       status: 'pending',
     }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
-    console.log(`[gmail-worker] message ${messageId} → ${(result.invoice_type ?? 'ap').toUpperCase()} invoice for business ${businessId}: ${result.vendor_customer ?? '(unknown)'} $${result.total ?? '?'}`);
+    console.log(`[gmail-worker] message ${messageId} → ${(result.invoice_type ?? 'ap').toUpperCase()} invoice for business ${businessId}: ${vendor ?? '(unknown)'} $${result.total ?? '?'}`);
   } else {
     console.log(`[gmail-worker] message ${messageId} → not a financial document, skipping`);
   }
