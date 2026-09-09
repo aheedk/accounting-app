@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -109,6 +109,7 @@ export default function EmailImportReviewPage() {
   const [included, setIncluded] = useState<Record<number, boolean>>({});
   const [bankPosting, setBankPosting] = useState(false);
   const [bankError, setBankError] = useState<string | null>(null);
+  const bankPostingRef = useRef(false);
 
   // Invoice state
   const [invoiceImports, setInvoiceImports] = useState<InvoiceImport[]>([]);
@@ -122,6 +123,7 @@ export default function EmailImportReviewPage() {
   const [includeTax, setIncludeTax] = useState(false);
   const [invPosting, setInvPosting] = useState(false);
   const [invError, setInvError] = useState<string | null>(null);
+  const invPostingRef = useRef(false);
 
   const loadPending = useCallback(() => {
     if (!bizId) return;
@@ -212,9 +214,11 @@ export default function EmailImportReviewPage() {
 
   async function handleBankApprove() {
     if (!bizId || !selectedBank) return;
+    if (bankPostingRef.current) return;
     if (!bankAccountId) { setBankError('Select a bank account first.'); return; }
     const missing = selectedBank.extracted_transactions.findIndex((_, i) => included[i] && !offsets[i]);
     if (missing !== -1) { setBankError(`Select an offset account for row ${missing + 1}.`); return; }
+    bankPostingRef.current = true;
     setBankPosting(true);
     setBankError(null);
     try {
@@ -229,8 +233,18 @@ export default function EmailImportReviewPage() {
       setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
       setSelectedBank(null);
     } catch (e: unknown) {
-      setBankError(e instanceof Error ? e.message : 'Failed to post journal entries');
-    } finally { setBankPosting(false); }
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setBankError('This import was already processed — check the History tab.');
+        setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
+        setSelectedBank(null);
+      } else {
+        setBankError(e instanceof Error ? e.message : 'Failed to post journal entries');
+      }
+    } finally {
+      bankPostingRef.current = false;
+      setBankPosting(false);
+    }
   }
 
   async function handleBankReject(imp: StagedImport) {
@@ -268,12 +282,14 @@ export default function EmailImportReviewPage() {
 
   async function handleInvoiceApprove() {
     if (!bizId || !selectedInvoice) return;
+    if (invPostingRef.current) return;
     const isAp = selectedInvoice.invoice_type === 'ap';
     if (isAp && !selectedVendorId) { setInvError('Select a vendor to create the bill.'); return; }
     if (!isAp && !selectedCustomerId) { setInvError('Select a customer to create the invoice.'); return; }
     if (includeTax && !taxAccountId) { setInvError('Select an account for the tax line.'); return; }
     const missing = selectedInvoice.line_items.findIndex((_, i) => lineIncluded[i] && !lineAccountIds[i]);
     if (missing !== -1) { setInvError(`Select an account for line item ${missing + 1}.`); return; }
+    invPostingRef.current = true;
     setInvPosting(true);
     setInvError(null);
     try {
@@ -290,9 +306,19 @@ export default function EmailImportReviewPage() {
       setInvoiceImports(prev => prev.filter(im => im.id !== selectedInvoice.id));
       setSelectedInvoice(null);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setInvError(msg ?? (e instanceof Error ? e.message : 'Failed to post'));
-    } finally { setInvPosting(false); }
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setInvError('This import was already processed — check the History tab.');
+        setInvoiceImports(prev => prev.filter(im => im.id !== selectedInvoice.id));
+        setSelectedInvoice(null);
+      } else {
+        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        setInvError(msg ?? (e instanceof Error ? e.message : 'Failed to post'));
+      }
+    } finally {
+      invPostingRef.current = false;
+      setInvPosting(false);
+    }
   }
 
   async function handleInvoiceReject(imp: InvoiceImport) {

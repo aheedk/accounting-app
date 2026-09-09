@@ -79,7 +79,7 @@ const groups: NavGroup[] = [
       { to: '/settings/coa', label: 'Chart of Accounts' },
       { to: '/accounting/recurring', label: 'Recurring Transactions' },
       { to: '/accounting/fixed-assets', label: 'Fixed Assets' },
-      { to: JOURNAL_NAV_ITEM.path, label: JOURNAL_NAV_ITEM.label },
+      { to: JOURNAL_NAV_ITEM.path, label: 'Journal Entries' },
     ],
   },
   {
