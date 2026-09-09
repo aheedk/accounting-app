@@ -1,0 +1,176 @@
+import { Decimal } from 'decimal.js';
+import { parseMoneyInput } from '@/lib/money';
+import type { JournalEntryDetail } from './journalEntryTypes';
+
+export type JournalEntryFormLine = {
+  account_id: string;
+  debit: string;
+  credit: string;
+  description: string;
+  name: string;
+  class_name: string;
+};
+
+export type JournalEntryFormValues = {
+  date: string;
+  journalNo: string;
+  reference: string;
+  isAdjusting: boolean;
+  memo: string;
+  lines: JournalEntryFormLine[];
+};
+
+export type JournalAccount = {
+  id: string;
+  code: string;
+  name: string;
+  account_type: string;
+  is_active: boolean;
+  is_locked: boolean;
+};
+
+export type JournalEntryPayload = {
+  entry_date: string;
+  journal_number: string | null;
+  reference: string | null;
+  memo: string | null;
+  is_adjusting: boolean;
+  lines: Array<{
+    account_id: string;
+    debit: string;
+    credit: string;
+    memo: string | null;
+    name: string | null;
+    class_name: string | null;
+  }>;
+};
+
+const DEFAULT_ROWS = 8;
+
+export function blankJournalLine(): JournalEntryFormLine {
+  return { account_id: '', debit: '', credit: '', description: '', name: '', class_name: '' };
+}
+
+export function shouldAppendJournalLines(input: {
+  key: string;
+  shiftKey: boolean;
+  rowIndex: number;
+  rowCount: number;
+}): boolean {
+  return input.key === 'Tab'
+    && !input.shiftKey
+    && input.rowIndex === input.rowCount - 1;
+}
+
+export function newJournalEntryForm(date: string): JournalEntryFormValues {
+  return {
+    date,
+    journalNo: '',
+    reference: '',
+    isAdjusting: false,
+    memo: '',
+    lines: Array.from({ length: DEFAULT_ROWS }, blankJournalLine),
+  };
+}
+
+export function applyJournalNumberSuggestion(
+  form: JournalEntryFormValues,
+  suggestion: string,
+  numberEdited: boolean,
+): JournalEntryFormValues {
+  if (numberEdited || form.journalNo) return form;
+  return { ...form, journalNo: suggestion };
+}
+
+export function journalSupportsManualActions(existing?: JournalEntryDetail): boolean {
+  return existing === undefined || existing.is_standalone_manual;
+}
+
+export function journalEntryToForm(detail: JournalEntryDetail): JournalEntryFormValues {
+  const lines = detail.lines.map(line => ({
+    account_id: line.account_id,
+    debit: line.debit,
+    credit: line.credit,
+    description: line.memo ?? '',
+    name: line.name ?? '',
+    class_name: line.class_name ?? '',
+  }));
+  while (lines.length < DEFAULT_ROWS) lines.push(blankJournalLine());
+  return {
+    date: detail.entry.entry_date,
+    journalNo: detail.entry.journal_number,
+    reference: detail.entry.reference ?? '',
+    isAdjusting: detail.entry.source_type === 'adjustment',
+    memo: detail.entry.memo ?? '',
+    lines,
+  };
+}
+
+export function copyJournalEntryToForm(
+  detail: JournalEntryDetail,
+  journalNumber: string,
+): JournalEntryFormValues {
+  return { ...journalEntryToForm(detail), journalNo: journalNumber };
+}
+
+export function copyUnsavedJournalEntry(
+  form: JournalEntryFormValues,
+): JournalEntryFormValues {
+  return {
+    ...form,
+    journalNo: '',
+    lines: form.lines.map(line => ({ ...line })),
+  };
+}
+
+export function journalEntryPayload(
+  form: JournalEntryFormValues,
+  options: { automaticNumber?: boolean } = {},
+): JournalEntryPayload {
+  return {
+    entry_date: form.date,
+    journal_number: options.automaticNumber ? null : form.journalNo || null,
+    reference: form.reference || null,
+    memo: form.memo || null,
+    is_adjusting: form.isAdjusting,
+    lines: form.lines.filter(line => line.account_id).map(line => ({
+      account_id: line.account_id,
+      debit: parseMoneyInput(line.debit || '0'),
+      credit: parseMoneyInput(line.credit || '0'),
+      memo: line.description || null,
+      name: line.name || null,
+      class_name: line.class_name || null,
+    })),
+  };
+}
+
+export function journalEntryTotals(lines: JournalEntryFormLine[]): {
+  debit: string;
+  credit: string;
+  balanced: boolean;
+} {
+  const filledLines = lines.filter(line => line.account_id);
+  const debit = filledLines.reduce(
+    (sum, line) => sum.plus(line.debit || 0),
+    new Decimal(0),
+  );
+  const credit = filledLines.reduce(
+    (sum, line) => sum.plus(line.credit || 0),
+    new Decimal(0),
+  );
+  return {
+    debit: debit.toFixed(4),
+    credit: credit.toFixed(4),
+    balanced: debit.greaterThan(0) && debit.equals(credit),
+  };
+}
+
+export function journalAccountsForLine(
+  accounts: JournalAccount[],
+  selectedAccountId: string,
+): JournalAccount[] {
+  return accounts.filter(account => (
+    (account.is_active && !account.is_locked)
+    || account.id === selectedAccountId
+  ));
+}

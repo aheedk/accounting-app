@@ -174,7 +174,7 @@ async function materializeOnce(
     await postJournalEntry(trx, ctx, {
       business_id: t.business_id,
       entry_date: runDate,
-      source_type: 'manual',
+      source_type: payload.is_adjusting ? 'adjustment' : 'manual',
       memo: payload.memo ?? `Recurring: ${t.name}`,
       reference: payload.reference ?? null,
       lines: payload.lines.map(l => ({
@@ -182,6 +182,8 @@ async function materializeOnce(
         debit: l.debit,
         credit: l.credit,
         memo: l.memo ?? null,
+        name: l.name ?? null,
+        class_name: l.class_name ?? null,
       })),
     });
   } else if (t.template_type === 'invoice') {
@@ -234,24 +236,36 @@ async function materializeOnce(
 export async function materializeDueTemplate(
   trx: Transaction<DB>, ctx: ServiceCtx, t: RecurringTemplateRow, today: string,
 ): Promise<{ template_id: string; runs_created: number }> {
+  if (ctx.business_id !== t.business_id) {
+    throw new BusinessRuleError(ERR.NOT_FOUND, 'Recurring template not found');
+  }
+  const locked = await trx.selectFrom('recurring_templates').selectAll()
+    .where('id', '=', t.id)
+    .where('business_id', '=', t.business_id)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!locked || !locked.is_active || locked.next_run_date > today) {
+    return { template_id: t.id, runs_created: 0 };
+  }
+
   let runs = 0;
-  let nextDate = t.next_run_date;
-  while (nextDate <= today && (t.end_date == null || nextDate <= t.end_date)) {
-    await materializeOnce(trx, ctx, t, nextDate);
+  let nextDate = locked.next_run_date;
+  while (nextDate <= today && (locked.end_date == null || nextDate <= locked.end_date)) {
+    await materializeOnce(trx, ctx, locked, nextDate);
     runs++;
-    nextDate = advanceDate(nextDate, t.recurrence);
+    nextDate = advanceDate(nextDate, locked.recurrence);
   }
   await trx.updateTable('recurring_templates')
     .set({ next_run_date: nextDate, last_run_at: sql`now()` })
-    .where('id', '=', t.id).execute();
+    .where('id', '=', locked.id).execute();
   await auditRecord(trx, ctx, {
     action: AUDIT.RECURRING_TEMPLATE_RUN,
     entity_type: 'recurring_template',
-    entity_id: t.id,
-    before: t,
+    entity_id: locked.id,
+    before: locked,
     after: { runs_created: runs, advanced_to: nextDate },
   });
-  return { template_id: t.id, runs_created: runs };
+  return { template_id: locked.id, runs_created: runs };
 }
 
 export type RunDueResult = { template_id: string; runs_created: number; error?: string };

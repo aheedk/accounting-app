@@ -195,7 +195,8 @@ export async function finalize(
   const je = await postJournalEntry(trx, ctx, {
     business_id: run.business_id,
     entry_date: run.pay_date,
-    source_type: 'manual',
+    source_type: 'adjustment',
+    source_id: run.id,
     memo: run.memo ?? `Pay run ${run.pay_period_start}-${run.pay_period_end}`,
     reference: null,
     lines: jeLines,
@@ -232,6 +233,11 @@ export async function voidPayRun(
     await voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: input.void_reason ?? 'pay run voided',
+      source_guard: {
+        source_type: 'adjustment',
+        source_id: before.id,
+        allow_legacy_manual: true,
+      },
     });
   }
 

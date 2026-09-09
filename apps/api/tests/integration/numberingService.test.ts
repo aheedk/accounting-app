@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
 import { makeFirm, makeBusiness } from '../helpers/factories.js';
-import { nextNumber } from '../../src/services/core/numberingService.js';
+import { nextCounter, nextNumber, peekNextCounter } from '../../src/services/core/numberingService.js';
 
 let t: TestDb;
 beforeAll(async () => { t = await startTestDb(); });
@@ -48,5 +48,17 @@ describe('numberingService.nextNumber', () => {
     ));
     expect(new Set(results).size).toBe(5);
     expect([...results].sort().at(-1)).toBe('PO-0005');
+  });
+
+  it('previews the next journal number without consuming it', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id);
+
+    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe('1');
+    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe('1');
+
+    const claimed = await t.db.transaction().execute(trx => nextCounter(trx, biz.id, 'journal_entry'));
+    expect(claimed).toBe('1');
+    expect(await peekNextCounter(t.db, biz.id, 'journal_entry')).toBe('2');
   });
 });

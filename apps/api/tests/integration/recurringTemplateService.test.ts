@@ -56,8 +56,8 @@ describe('recurringTemplateService', () => {
         name: 'Monthly rent',
         template_type: 'journal_entry',
         payload: { lines: [
-          { account_id: expense.id, debit: '500', credit: '0' },
-          { account_id: cash.id, debit: '0', credit: '500' },
+          { account_id: expense.id, debit: '500', credit: '0', memo: 'Rent', name: 'Main clinic', class_name: 'Dental' },
+          { account_id: cash.id, debit: '0', credit: '500', name: 'Main clinic', class_name: 'Dental' },
         ] },
         recurrence: 'monthly',
         next_run_date: today,
@@ -70,6 +70,38 @@ describe('recurringTemplateService', () => {
     const jes = await t.db.selectFrom('journal_entries').selectAll()
       .where('business_id', '=', biz.id).execute();
     expect(jes).toHaveLength(1);
+    const materializedLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', jes[0]!.id).orderBy('line_number').execute();
+    expect(materializedLines[0]).toMatchObject({
+      memo: 'Rent',
+      name: 'Main clinic',
+      class_name: 'Dental',
+    });
+  });
+
+  it('materializes a due occurrence only once when two workers race', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const today = new Date().toISOString().slice(0, 10);
+    await t.db.transaction().execute(trx => rt.create(trx, ctx, {
+      business_id: biz.id,
+      name: 'Concurrent rent',
+      template_type: 'journal_entry',
+      payload: { lines: [
+        { account_id: expense.id, debit: '75', credit: '0' },
+        { account_id: cash.id, debit: '0', credit: '75' },
+      ] },
+      recurrence: 'monthly',
+      next_run_date: today,
+    }));
+
+    await Promise.all([
+      rt.runDueForBusiness(t.db, ctx, biz.id),
+      rt.runDueForBusiness(t.db, ctx, biz.id),
+    ]);
+
+    const entries = await t.db.selectFrom('journal_entries').select('id')
+      .where('business_id', '=', biz.id).execute();
+    expect(entries).toHaveLength(1);
   });
 
   it('runDue catches up multiple cycles when next_run_date is in the past', async () => {

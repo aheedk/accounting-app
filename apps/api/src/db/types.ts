@@ -122,12 +122,14 @@ export interface JournalEntriesTable {
   business_id: string;
   period_id: string;
   entry_date: ColumnType<string, string, string>;
+  journal_number: Generated<string>;
   memo: string | null;
   reference: string | null;
   status: Generated<JournalEntryStatus>;
   source_type: Generated<JournalEntrySourceType>;
   source_id: string | null;
   reversed_entry_id: string | null;
+  corrected_from_entry_id: string | null;
   posted_at: Timestamp | null;
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;
@@ -148,6 +150,8 @@ export interface JournalEntryLinesTable {
   debit: ColumnType<string, string | number, string | number>;
   credit: ColumnType<string, string | number, string | number>;
   memo: string | null;
+  name: string | null;
+  class_name: string | null;
 }
 
 export type InvoiceStatus = 'draft' | 'posted' | 'voided' | 'paid';
