@@ -97,6 +97,11 @@ async function classifyAndExtract(pdfBuffer: Buffer): Promise<UnifiedResult> {
           type: 'text',
           text: `Analyze this document and extract its financial data. Return ONLY a single JSON object, no explanation.
 
+CAPITALIZATION RULE (apply to every line item and transaction):
+- If the amount is $2,500 or more AND the item is a long-lived tangible asset (equipment, machinery, computers/servers, furniture, vehicles, leasehold improvements, HVAC, major renovations), use a FIXED ASSET account from the list below instead of an expense account.
+- Fixed asset accounts: Equipment, Computer Equipment, Furniture and Fixtures, Vehicles, Leasehold Improvements
+- Expense accounts (for items under $2,500 OR consumable/recurring costs): Sales Revenue, Service Revenue, Cost of Goods Sold, Salaries and Wages, Rent, Utilities, Office Supplies, Software Subscriptions, Bank Fees, Professional Fees, Travel and Meals, Insurance, Depreciation Expense, Miscellaneous Expense, Accounts Receivable, Accounts Payable, Notes Payable, Owner Draws
+
 If this is a BANK STATEMENT return:
 {
   "document_type": "bank_statement",
@@ -108,7 +113,7 @@ If this is a BANK STATEMENT return:
       "amount": "positive number e.g. 1250.00",
       "type": "debit or credit",
       "balance": "running balance e.g. 42500.00",
-      "suggested_offset": "one of: Sales Revenue, Service Revenue, Cost of Goods Sold, Salaries and Wages, Rent, Utilities, Office Supplies, Software Subscriptions, Bank Fees, Professional Fees, Travel and Meals, Insurance, Depreciation Expense, Miscellaneous Expense, Accounts Receivable, Accounts Payable, Notes Payable, Owner Draws"
+      "suggested_offset": "one account name from the lists above — use a fixed asset account if amount >= $2,500 and it is a tangible long-lived asset"
     }
   ]
 }
@@ -131,7 +136,7 @@ If this is an INVOICE or BILL return:
       "quantity": "e.g. 2",
       "unit_price": "e.g. 500.00",
       "amount": "e.g. 1000.00",
-      "suggested_account": "one of: Sales Revenue, Service Revenue, Cost of Goods Sold, Salaries and Wages, Rent, Utilities, Office Supplies, Software Subscriptions, Bank Fees, Professional Fees, Travel and Meals, Insurance, Depreciation Expense, Miscellaneous Expense"
+      "suggested_account": "one account name from the lists above — use a fixed asset account if amount >= $2,500 and it is a tangible long-lived asset"
     }
   ]
 }
