@@ -41,18 +41,20 @@ router.get('/businesses/:businessId/invoice-imports', async (req, res, next) => 
     const history = req.query['history'] === '1';
     const typeFilter = req.query['type'] as string | undefined;
     const bizId = req.tenancy!.business_id;
-    let q = db
+    const baseQ = db
       .selectFrom('invoice_import_staging')
       .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
                'received_at', 'invoice_type', 'vendor_customer', 'invoice_number',
                'invoice_date', 'due_date', 'line_items', 'subtotal', 'tax_amount',
                'total', 'status', 'addressed_to', 'rejection_reason',
                'approved_by_user_id', 'approved_at', 'created_at'])
-      .where('business_id', '=', bizId)
       .orderBy('received_at', 'desc');
-    q = history
-      ? q.where('status', 'in', ['approved', 'rejected']).limit(100)
-      : q.where('status', '=', 'pending');
+    const q = history
+      ? baseQ.where(eb => eb.or([
+          eb('business_id', '=', bizId),
+          eb.and([eb('business_id', 'is', null), eb('status', '=', 'rejected')]),
+        ])).where('status', 'in', ['approved', 'rejected']).limit(100)
+      : baseQ.where('business_id', '=', bizId).where('status', '=', 'pending');
 
     const rows = await q.execute();
     res.json({

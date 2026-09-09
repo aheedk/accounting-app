@@ -29,16 +29,20 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
   try {
     const history = req.query['history'] === '1';
     const bizId = req.tenancy!.business_id;
-    let q = db
+    const baseQ = db
       .selectFrom('email_import_staging')
       .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
                'received_at', 'extracted_transactions', 'status', 'addressed_to',
                'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at'])
-      .where('business_id', '=', bizId)
       .orderBy('received_at', 'desc');
-    q = history
-      ? q.where('status', 'in', ['approved', 'rejected']).limit(100)
-      : q.where('status', '=', 'pending');
+    // History: this business's own records + any auto-rejected records (no business match)
+    // Pending: only this business's own records
+    const q = history
+      ? baseQ.where(eb => eb.or([
+          eb('business_id', '=', bizId),
+          eb.and([eb('business_id', 'is', null), eb('status', '=', 'rejected')]),
+        ])).where('status', 'in', ['approved', 'rejected']).limit(100)
+      : baseQ.where('business_id', '=', bizId).where('status', '=', 'pending');
     const rows = await q.execute();
     res.json({ imports: rows.map(r => ({
       ...r,
