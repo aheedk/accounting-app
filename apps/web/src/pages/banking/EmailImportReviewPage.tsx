@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
@@ -13,6 +13,7 @@ type ExtractedTx = {
   type: 'debit' | 'credit';
   balance: string;
   suggested_offset?: string;
+  suggested_account_id?: string;
 };
 
 type StagedImport = {
@@ -31,6 +32,7 @@ type LineItem = {
   unit_price: string;
   amount: string;
   suggested_account?: string;
+  suggested_account_id?: string;
 };
 
 type InvoiceImport = {
@@ -92,6 +94,7 @@ export default function EmailImportReviewPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
 
   // History state
   const [historyBank, setHistoryBank] = useState<StagedImport[]>([]);
@@ -154,10 +157,31 @@ export default function EmailImportReviewPage() {
 
   useEffect(() => { if (topTab === 'history') loadHistory(); }, [topTab, loadHistory]);
 
+  async function openPdf(type: 'bank' | 'invoice', id: string) {
+    if (pdfLoading) return;
+    setPdfLoading(id);
+    try {
+      const url = type === 'bank'
+        ? `/businesses/${bizId}/email-imports/${id}/pdf`
+        : `/businesses/${bizId}/invoice-imports/${id}/pdf`;
+      const res = await api.get(url, { responseType: 'blob' });
+      const blob = new Blob([res.data as BlobPart], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } catch {
+      alert('PDF not available for this record. Only emails received after the latest update have a stored PDF.');
+    } finally {
+      setPdfLoading(null);
+    }
+  }
+
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      await api.post('/email-imports/poll', {});
+      await Promise.all([
+        api.post('/email-imports/poll', {}),
+        new Promise(res => setTimeout(res, 2000)),
+      ]);
       loadPending();
     } catch (e: unknown) { console.error('poll failed', e); }
     finally { setRefreshing(false); }
@@ -172,7 +196,9 @@ export default function EmailImportReviewPage() {
     const initOffsets: Record<number, string> = {};
     imp.extracted_transactions.forEach((tx, i) => {
       initIncluded[i] = true;
-      if (tx.suggested_offset) {
+      if (tx.suggested_account_id) {
+        initOffsets[i] = tx.suggested_account_id;
+      } else if (tx.suggested_offset) {
         const hint = tx.suggested_offset.toLowerCase();
         const match = accounts.find(a =>
           a.name.toLowerCase().includes(hint) || hint.includes(a.name.toLowerCase()),
@@ -226,7 +252,9 @@ export default function EmailImportReviewPage() {
     const initAccounts: Record<number, string> = {};
     imp.line_items.forEach((li, i) => {
       initIncluded[i] = true;
-      if (li.suggested_account) {
+      if (li.suggested_account_id) {
+        initAccounts[i] = li.suggested_account_id;
+      } else if (li.suggested_account) {
         const hint = li.suggested_account.toLowerCase();
         const match = accounts.find(a =>
           a.name.toLowerCase().includes(hint) || hint.includes(a.name.toLowerCase()),
@@ -333,7 +361,7 @@ export default function EmailImportReviewPage() {
             </button>
           </div>
           <button type="button" onClick={handleRefresh} disabled={refreshing}
-            className="inline-flex items-center gap-2 h-9 rounded-md border px-4 text-sm font-medium hover:bg-muted/30 disabled:opacity-50">
+            className="inline-flex items-center gap-2 h-9 rounded-md border px-4 text-sm font-medium transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Checking Gmail…' : 'Refresh'}
           </button>
@@ -367,6 +395,15 @@ export default function EmailImportReviewPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <button type="button" onClick={() => openPdf('bank', imp.id)}
+                      disabled={pdfLoading === imp.id}
+                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="View original PDF">
+                      {pdfLoading === imp.id
+                        ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        : <ExternalLink className="h-3.5 w-3.5" />}
+                      PDF
+                    </button>
                     <button type="button" onClick={() => openBank(imp)}
                       className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
                       Review
@@ -388,7 +425,17 @@ export default function EmailImportReviewPage() {
                   <p className="font-semibold">{deriveBankTitle(selectedBank)}</p>
                   <p className="text-xs text-muted-foreground">{deriveBankSubtitle(selectedBank)} · received {fmtDate(selectedBank.received_at)}</p>
                 </div>
-                <button type="button" onClick={() => setSelectedBank(null)} className="text-sm text-muted-foreground hover:underline">← Back to list</button>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => openPdf('bank', selectedBank.id)}
+                    disabled={pdfLoading === selectedBank.id}
+                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                    {pdfLoading === selectedBank.id
+                      ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      : <ExternalLink className="h-3.5 w-3.5" />}
+                    View PDF
+                  </button>
+                  <button type="button" onClick={() => setSelectedBank(null)} className="text-sm text-muted-foreground hover:underline">← Back to list</button>
+                </div>
               </div>
 
               <div className="flex items-center gap-3 rounded-lg border p-4 bg-muted/10">
@@ -493,9 +540,19 @@ export default function EmailImportReviewPage() {
                             <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDate(imp.received_at)}</p>
                           </div>
                         </div>
-                        <span className={`shrink-0 ml-4 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${imp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {imp.status.toUpperCase()}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0 ml-4">
+                          <button type="button" onClick={() => openPdf('bank', imp.id)}
+                            disabled={pdfLoading === imp.id}
+                            className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                            {pdfLoading === imp.id
+                              ? <RefreshCw className="h-3 w-3 animate-spin" />
+                              : <ExternalLink className="h-3 w-3" />}
+                            PDF
+                          </button>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${imp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {imp.status.toUpperCase()}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -516,9 +573,19 @@ export default function EmailImportReviewPage() {
                             <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'}</p>
                           </div>
                         </div>
-                        <span className={`shrink-0 ml-4 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${imp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {imp.status.toUpperCase()}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0 ml-4">
+                          <button type="button" onClick={() => openPdf('invoice', imp.id)}
+                            disabled={pdfLoading === imp.id}
+                            className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                            {pdfLoading === imp.id
+                              ? <RefreshCw className="h-3 w-3 animate-spin" />
+                              : <ExternalLink className="h-3 w-3" />}
+                            PDF
+                          </button>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${imp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {imp.status.toUpperCase()}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -568,6 +635,15 @@ export default function EmailImportReviewPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <button type="button" onClick={() => openPdf('invoice', imp.id)}
+                      disabled={pdfLoading === imp.id}
+                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="View original PDF">
+                      {pdfLoading === imp.id
+                        ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        : <ExternalLink className="h-3.5 w-3.5" />}
+                      PDF
+                    </button>
                     <button type="button" onClick={() => openInvoice(imp)}
                       className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
                       Review
@@ -594,7 +670,17 @@ export default function EmailImportReviewPage() {
                     <p className="text-xs text-muted-foreground">Date: {selectedInvoice.invoice_date ?? '—'} · Due: {selectedInvoice.due_date ?? '—'} · Received {fmtDate(selectedInvoice.received_at)}</p>
                   </div>
                 </div>
-                <button type="button" onClick={() => setSelectedInvoice(null)} className="text-sm text-muted-foreground hover:underline">← Back</button>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => openPdf('invoice', selectedInvoice.id)}
+                    disabled={pdfLoading === selectedInvoice.id}
+                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                    {pdfLoading === selectedInvoice.id
+                      ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      : <ExternalLink className="h-3.5 w-3.5" />}
+                    View PDF
+                  </button>
+                  <button type="button" onClick={() => setSelectedInvoice(null)} className="text-sm text-muted-foreground hover:underline">← Back</button>
+                </div>
               </div>
 
               <div className="rounded-lg border p-4 bg-muted/10 space-y-3">

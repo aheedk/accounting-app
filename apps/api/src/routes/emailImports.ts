@@ -28,9 +28,13 @@ function ctx(req: Request): ServiceCtx {
 router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
   try {
     const history = req.query['history'] === '1';
+    const bizId = req.tenancy!.business_id;
     let q = db
       .selectFrom('email_import_staging')
-      .selectAll()
+      .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
+               'received_at', 'extracted_transactions', 'status', 'addressed_to',
+               'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at'])
+      .where('business_id', '=', bizId)
       .orderBy('received_at', 'desc');
     q = history
       ? q.where('status', 'in', ['approved', 'rejected']).limit(100)
@@ -44,6 +48,27 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
     })) });
   } catch (e) { next(e); }
 });
+
+// Serve the original PDF attachment
+router.get(
+  '/businesses/:businessId/email-imports/:importId/pdf',
+  requireMinRole('staff'),
+  async (req, res, next) => {
+    try {
+      const bizId = req.tenancy!.business_id;
+      const row = await db
+        .selectFrom('email_import_staging')
+        .select(['pdf_data', 'gmail_message_id'])
+        .where('id', '=', req.params['importId']!)
+        .where('business_id', '=', bizId)
+        .executeTakeFirst();
+      if (!row?.pdf_data) { res.status(404).json({ error: 'PDF not available' }); return; }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="bank-statement-${row.gmail_message_id}.pdf"`);
+      res.send(row.pdf_data);
+    } catch (e) { next(e); }
+  },
+);
 
 const approveSchema = z.object({
   bank_account_id: z.string().uuid(),

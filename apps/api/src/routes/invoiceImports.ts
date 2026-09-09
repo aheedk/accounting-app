@@ -40,9 +40,15 @@ router.get('/businesses/:businessId/invoice-imports', async (req, res, next) => 
   try {
     const history = req.query['history'] === '1';
     const typeFilter = req.query['type'] as string | undefined;
+    const bizId = req.tenancy!.business_id;
     let q = db
       .selectFrom('invoice_import_staging')
-      .selectAll()
+      .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
+               'received_at', 'invoice_type', 'vendor_customer', 'invoice_number',
+               'invoice_date', 'due_date', 'line_items', 'subtotal', 'tax_amount',
+               'total', 'status', 'addressed_to', 'rejection_reason',
+               'approved_by_user_id', 'approved_at', 'created_at'])
+      .where('business_id', '=', bizId)
       .orderBy('received_at', 'desc');
     q = history
       ? q.where('status', 'in', ['approved', 'rejected']).limit(100)
@@ -67,6 +73,28 @@ type LineItem = {
   amount: string;
   suggested_account?: string;
 };
+
+// Serve the original PDF attachment
+router.get(
+  '/businesses/:businessId/invoice-imports/:importId/pdf',
+  requireMinRole('staff'),
+  async (req, res, next) => {
+    try {
+      const bizId = req.tenancy!.business_id;
+      const row = await db
+        .selectFrom('invoice_import_staging')
+        .select(['pdf_data', 'invoice_number', 'gmail_message_id'])
+        .where('id', '=', req.params['importId']!)
+        .where('business_id', '=', bizId)
+        .executeTakeFirst();
+      if (!row?.pdf_data) { res.status(404).json({ error: 'PDF not available' }); return; }
+      const filename = row.invoice_number ? `invoice-${row.invoice_number}.pdf` : `invoice-${row.gmail_message_id}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.send(row.pdf_data);
+    } catch (e) { next(e); }
+  },
+);
 
 const approveSchema = z.object({
   vendor_id: z.string().uuid().optional(),   // required for AP

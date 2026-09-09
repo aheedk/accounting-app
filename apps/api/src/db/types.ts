@@ -982,6 +982,9 @@ export interface InvoiceImportStagingTable {
   tax_amount: string | null;
   total: string | null;
   status: string;
+  addressed_to: string | null;
+  rejection_reason: string | null;
+  pdf_data: Buffer | null;
   approved_by_user_id: string | null;
   approved_at: string | null;
   created_at: Generated<string>;
@@ -996,6 +999,9 @@ export interface EmailImportStagingTable {
   received_at: string;
   extracted_transactions: string;
   status: string;
+  addressed_to: string | null;
+  rejection_reason: string | null;
+  pdf_data: Buffer | null;
   approved_by_user_id: string | null;
   approved_at: string | null;
   created_at: Generated<string>;

@@ -61,6 +61,8 @@ type InvoiceLineItem = {
 
 type UnifiedResult = {
   document_type: 'bank_statement' | 'invoice' | 'unknown';
+  // which client business this document belongs to (BILL TO / account holder)
+  addressed_to?: string;
   // bank_statement
   transactions?: ExtractedTransaction[];
   // invoice
@@ -98,6 +100,7 @@ async function classifyAndExtract(pdfBuffer: Buffer): Promise<UnifiedResult> {
 If this is a BANK STATEMENT return:
 {
   "document_type": "bank_statement",
+  "addressed_to": "exact name of the account holder / company this statement belongs to",
   "transactions": [
     {
       "date": "MM/DD/YYYY",
@@ -113,6 +116,7 @@ If this is a BANK STATEMENT return:
 If this is an INVOICE or BILL return:
 {
   "document_type": "invoice",
+  "addressed_to": "exact name from the BILL TO / SOLD TO / Ship To field — the company receiving / paying this document",
   "invoice_type": "ap (we are paying this bill) or ar (customer owes us)",
   "vendor_customer": "vendor name for AP, customer name for AR",
   "invoice_number": "string",
@@ -150,7 +154,46 @@ If the document is neither a bank statement nor an invoice/bill return:
   }
 }
 
-// Process a single message: download PDF → classify → insert to correct staging table
+type CoaAccount = { id: string; name: string; account_type: string };
+
+// Fetch the CoA for a business and match a suggestion string to the best account id.
+async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaAccount[]> {
+  return db.selectFrom('chart_of_accounts')
+    .select(['id', 'name', 'account_type'])
+    .where('business_id', '=', businessId)
+    .where('is_active', '=', true)
+    .execute();
+}
+
+function matchAccount(suggestion: string | undefined, accounts: CoaAccount[]): string | null {
+  if (!suggestion?.trim()) return null;
+  const hint = suggestion.trim().toLowerCase();
+  const match = accounts.find(a =>
+    a.name.toLowerCase().includes(hint) || hint.includes(a.name.toLowerCase()),
+  );
+  return match?.id ?? null;
+}
+
+// Resolve business_id by matching the extracted "addressed_to" name against businesses.
+// Uses case-insensitive substring match so "Green Gadgets" matches "Green Gadgets Inc."
+async function resolveBusinessId(
+  db: Kysely<DB>,
+  addressedTo: string | undefined,
+): Promise<string | null> {
+  if (!addressedTo?.trim()) return null;
+  const needle = addressedTo.trim().toLowerCase();
+  const businesses = await db
+    .selectFrom('businesses')
+    .select(['id', 'name'])
+    .where('deleted_at', 'is', null)
+    .execute();
+  const match = businesses.find(b =>
+    b.name.toLowerCase().includes(needle) || needle.includes(b.name.toLowerCase()),
+  );
+  return match?.id ?? null;
+}
+
+// Process a single message: download PDF → classify → match business → insert to correct staging table
 async function processAnyMessage(
   db: Kysely<DB>,
   auth: GAuthClient,
@@ -181,16 +224,75 @@ async function processAnyMessage(
   const receivedAt = new Date(dateHeader).toISOString();
 
   if (result.document_type === 'bank_statement') {
+    const businessId = await resolveBusinessId(db, result.addressed_to);
+    if (!businessId) {
+      const reason = result.addressed_to
+        ? `No business found matching "${result.addressed_to}"`
+        : 'Document has no identifiable company name';
+      await db.insertInto('email_import_staging').values({
+        gmail_message_id: messageId,
+        email_from: from,
+        email_subject: subject,
+        received_at: receivedAt,
+        extracted_transactions: JSON.stringify(result.transactions ?? []),
+        addressed_to: result.addressed_to ?? null,
+        pdf_data: pdfBuffer,
+        status: 'rejected',
+        rejection_reason: reason,
+      }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
+      console.log(`[gmail-worker] message ${messageId} → bank statement auto-rejected: ${reason}`);
+      return;
+    }
+    const coa = await fetchCoa(db, businessId);
+    const enrichedTxs = (result.transactions ?? []).map(tx => ({
+      ...tx,
+      suggested_account_id: matchAccount(tx.suggested_offset, coa),
+    }));
     await db.insertInto('email_import_staging').values({
       gmail_message_id: messageId,
       email_from: from,
       email_subject: subject,
       received_at: receivedAt,
-      extracted_transactions: JSON.stringify(result.transactions ?? []),
+      extracted_transactions: JSON.stringify(enrichedTxs),
+      addressed_to: result.addressed_to ?? null,
+      pdf_data: pdfBuffer,
+      business_id: businessId,
       status: 'pending',
-    }).execute();
-    console.log(`[gmail-worker] message ${messageId} → bank statement: ${(result.transactions ?? []).length} transactions`);
+    }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
+    console.log(`[gmail-worker] message ${messageId} → bank statement for business ${businessId}: ${enrichedTxs.length} transactions`);
   } else if (result.document_type === 'invoice') {
+    const businessId = await resolveBusinessId(db, result.addressed_to);
+    if (!businessId) {
+      const reason = result.addressed_to
+        ? `No business found matching "${result.addressed_to}"`
+        : 'Document has no identifiable company name';
+      await db.insertInto('invoice_import_staging').values({
+        gmail_message_id: messageId,
+        email_from: from,
+        email_subject: subject,
+        received_at: receivedAt,
+        invoice_type: result.invoice_type ?? 'ap',
+        vendor_customer: result.vendor_customer ?? null,
+        invoice_number: result.invoice_number ?? null,
+        invoice_date: result.invoice_date ?? null,
+        due_date: result.due_date ?? null,
+        line_items: JSON.stringify(result.line_items ?? []),
+        subtotal: result.subtotal ?? null,
+        tax_amount: result.tax_amount ?? null,
+        total: result.total ?? null,
+        addressed_to: result.addressed_to ?? null,
+        status: 'rejected',
+        rejection_reason: reason,
+        pdf_data: pdfBuffer,
+      }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
+      console.log(`[gmail-worker] message ${messageId} → invoice auto-rejected: ${reason}`);
+      return;
+    }
+    const coa = await fetchCoa(db, businessId);
+    const enrichedLines = (result.line_items ?? []).map(li => ({
+      ...li,
+      suggested_account_id: matchAccount(li.suggested_account, coa),
+    }));
     await db.insertInto('invoice_import_staging').values({
       gmail_message_id: messageId,
       email_from: from,
@@ -201,13 +303,16 @@ async function processAnyMessage(
       invoice_number: result.invoice_number ?? null,
       invoice_date: result.invoice_date ?? null,
       due_date: result.due_date ?? null,
-      line_items: JSON.stringify(result.line_items ?? []),
+      line_items: JSON.stringify(enrichedLines),
       subtotal: result.subtotal ?? null,
       tax_amount: result.tax_amount ?? null,
       total: result.total ?? null,
+      addressed_to: result.addressed_to ?? null,
+      pdf_data: pdfBuffer,
+      business_id: businessId,
       status: 'pending',
-    }).execute();
-    console.log(`[gmail-worker] message ${messageId} → ${(result.invoice_type ?? 'ap').toUpperCase()} invoice: ${result.vendor_customer ?? '(unknown)'} $${result.total ?? '?'}`);
+    }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
+    console.log(`[gmail-worker] message ${messageId} → ${(result.invoice_type ?? 'ap').toUpperCase()} invoice for business ${businessId}: ${result.vendor_customer ?? '(unknown)'} $${result.total ?? '?'}`);
   } else {
     console.log(`[gmail-worker] message ${messageId} → not a financial document, skipping`);
   }
