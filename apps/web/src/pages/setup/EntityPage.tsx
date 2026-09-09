@@ -24,6 +24,7 @@ type Business = {
   tax_id: string | null;
   fiscal_year_start_month: number;
   address: BusinessAddress | null;
+  import_email: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,6 +40,7 @@ type FormState = {
   address_state: string;
   address_postal_code: string;
   address_country: string;
+  import_email: string;
 };
 
 const MONTHS = [
@@ -58,6 +60,7 @@ function toFormState(b: Business): FormState {
     address_state: b.address?.state ?? '',
     address_postal_code: b.address?.postal_code ?? '',
     address_country: b.address?.country ?? '',
+    import_email: b.import_email ?? '',
   };
 }
 
@@ -124,6 +127,7 @@ export default function EntityPage() {
         tax_id: form.tax_id || null,
         fiscal_year_start_month: form.fiscal_year_start_month,
         address,
+        import_email: form.import_email || null,
       };
       const r = await api.patch<Business>(`/businesses/${bizId}`, payload);
       setBusiness(r.data);
@@ -251,6 +255,30 @@ export default function EntityPage() {
               <Input id="country" value={form.address_country}
                 onChange={e => updateField('address_country', e.target.value)}
                 disabled={!canEdit} placeholder="United States" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email import</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              When emails are sent to this address, documents are automatically routed to this
+              client — no AI name-matching needed. Leave blank to use AI matching instead
+              (works fine for a shared inbox).
+            </p>
+            <div>
+              <Label htmlFor="import_email">Dedicated import email</Label>
+              <Input
+                id="import_email"
+                type="email"
+                value={form.import_email}
+                onChange={e => updateField('import_email', e.target.value)}
+                disabled={!canEdit}
+                placeholder="greengadgets@yourfirm.com"
+              />
             </div>
           </CardContent>
         </Card>

@@ -28,6 +28,7 @@ export interface BusinessesTable {
   tax_id: string | null;
   fiscal_year_start_month: Generated<number>;
   address: ColumnType<BusinessAddress | null, string | null, string | null>;
+  import_email: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;

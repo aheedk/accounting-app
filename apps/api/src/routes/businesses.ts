@@ -66,6 +66,7 @@ router.patch('/businesses/:businessId', requireMinRole('firm_admin'), async (req
     if (body.tax_id !== undefined) patch.tax_id = body.tax_id ?? null;
     if (body.fiscal_year_start_month !== undefined) patch.fiscal_year_start_month = body.fiscal_year_start_month;
     if (body.address !== undefined) patch.address = body.address ?? null;
+    if (body.import_email !== undefined) patch.import_email = body.import_email ?? null;
 
     const updated = await db.transaction().execute(trx =>
       bizSvc.updateBusiness(trx, ctxFromReq(req), {

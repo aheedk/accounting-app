@@ -11,6 +11,7 @@ export type BusinessPatch = {
   tax_id?: string | null;
   fiscal_year_start_month?: number;
   address?: BusinessAddress | null;
+  import_email?: string | null;
 };
 
 export type BusinessCreateInput = {
@@ -23,7 +24,7 @@ export type BusinessCreateInput = {
 
 const BUSINESS_COLUMNS = [
   'id', 'firm_id', 'name', 'legal_name', 'tax_id',
-  'fiscal_year_start_month', 'address', 'created_at', 'updated_at',
+  'fiscal_year_start_month', 'address', 'import_email', 'created_at', 'updated_at',
 ] as const;
 
 // Creates a new client business under the caller's firm, seeds it with the
@@ -116,6 +117,7 @@ export async function updateBusiness(
     tax_id?: string | null;
     fiscal_year_start_month?: number;
     address?: string | null;
+    import_email?: string | null;
   } = {};
   if (input.patch.name !== undefined) updateSet.name = input.patch.name;
   if (input.patch.legal_name !== undefined) updateSet.legal_name = input.patch.legal_name;
@@ -126,13 +128,14 @@ export async function updateBusiness(
   if (input.patch.address !== undefined) {
     updateSet.address = input.patch.address === null ? null : JSON.stringify(input.patch.address);
   }
+  if (input.patch.import_email !== undefined) updateSet.import_email = input.patch.import_email;
 
   const updated = await trx.updateTable('businesses')
     .set(updateSet)
     .where('id', '=', input.business_id)
     .returning([
       'id', 'firm_id', 'name', 'legal_name', 'tax_id',
-      'fiscal_year_start_month', 'address', 'created_at', 'updated_at',
+      'fiscal_year_start_month', 'address', 'import_email', 'created_at', 'updated_at',
     ])
     .executeTakeFirstOrThrow();
 

@@ -16,6 +16,7 @@ export const businessUpdateSchema = z.object({
   tax_id: z.string().min(1).max(50).nullable().optional(),
   fiscal_year_start_month: z.number().int().min(1).max(12).optional(),
   address: businessAddressSchema.nullable().optional(),
+  import_email: z.string().email().max(254).nullable().optional(),
 });
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
 

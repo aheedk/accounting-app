@@ -179,12 +179,30 @@ function matchAccount(suggestion: string | undefined, accounts: CoaAccount[]): s
   return match?.id ?? null;
 }
 
-// Resolve business_id by matching the extracted "addressed_to" name against businesses.
-// Uses case-insensitive substring match so "Green Gadgets" matches "Green Gadgets Inc."
+// Resolve business_id: check the email's To: address first (exact match against
+// businesses.import_email), then fall back to AI-extracted addressed_to name matching.
+// This supports both per-client email aliases (accounting firm) and a shared inbox (single company).
 async function resolveBusinessId(
   db: Kysely<DB>,
   addressedTo: string | undefined,
+  toHeader?: string,
 ): Promise<string | null> {
+  // 1. Try exact match on import_email (faster, more reliable)
+  if (toHeader) {
+    const emailMatch = toHeader.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
+    const toAddress = emailMatch?.[0]?.toLowerCase();
+    if (toAddress) {
+      const byEmail = await db
+        .selectFrom('businesses')
+        .select('id')
+        .where('import_email', '=', toAddress)
+        .where('deleted_at', 'is', null)
+        .executeTakeFirst();
+      if (byEmail) return byEmail.id;
+    }
+  }
+
+  // 2. Fall back to AI-extracted name matching
   if (!addressedTo?.trim()) return null;
   const needle = addressedTo.trim().toLowerCase();
   const businesses = await db
@@ -210,6 +228,7 @@ async function processAnyMessage(
   const headers = msg.data.payload?.headers ?? [];
   const subject = headers.find(h => h.name === 'Subject')?.value ?? '';
   const from = headers.find(h => h.name === 'From')?.value ?? '';
+  const toHeader = headers.find(h => h.name === 'To')?.value ?? '';
   const dateHeader = headers.find(h => h.name === 'Date')?.value ?? new Date().toISOString();
 
   const pdfPart = findPdfPart(msg.data.payload);
@@ -229,7 +248,7 @@ async function processAnyMessage(
   const receivedAt = new Date(dateHeader).toISOString();
 
   if (result.document_type === 'bank_statement') {
-    const businessId = await resolveBusinessId(db, result.addressed_to);
+    const businessId = await resolveBusinessId(db, result.addressed_to, toHeader);
     if (!businessId) {
       const reason = result.addressed_to
         ? `No business found matching "${result.addressed_to}"`
@@ -266,7 +285,7 @@ async function processAnyMessage(
     }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
     console.log(`[gmail-worker] message ${messageId} → bank statement for business ${businessId}: ${enrichedTxs.length} transactions`);
   } else if (result.document_type === 'invoice') {
-    const businessId = await resolveBusinessId(db, result.addressed_to);
+    const businessId = await resolveBusinessId(db, result.addressed_to, toHeader);
     if (!businessId) {
       const reason = result.addressed_to
         ? `No business found matching "${result.addressed_to}"`
