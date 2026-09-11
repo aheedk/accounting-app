@@ -13,6 +13,9 @@ Admin credentials are stored in 1Password. If lost, open a Railway shell and re-
 
 ## Quickstart
 
+For the exact Windows startup and login troubleshooting steps used on this
+project, see [`LOCALHOST.md`](./LOCALHOST.md).
+
 ```bash
 nvm use
 npm install
