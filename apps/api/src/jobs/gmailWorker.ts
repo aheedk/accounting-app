@@ -82,10 +82,12 @@ function buildAnthropicClient(): Anthropic {
   return new Anthropic(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {});
 }
 
-// Single Claude call: classify + extract in one pass
-async function classifyAndExtract(pdfBuffer: Buffer): Promise<UnifiedResult> {
+// Single Claude call: classify + extract in one pass.
+// If clientContext is provided the AI uses the real chart of accounts instead of a generic fallback list.
+async function classifyAndExtract(pdfBuffer: Buffer, clientContext?: ClientContext): Promise<UnifiedResult> {
   const client = buildAnthropicClient();
   const base64Pdf = pdfBuffer.toString('base64');
+  const accountSection = buildCoaPromptSection(clientContext);
   const response = await client.messages.create({
     model: 'claude-opus-4-5',
     max_tokens: 4096,
@@ -97,10 +99,17 @@ async function classifyAndExtract(pdfBuffer: Buffer): Promise<UnifiedResult> {
           type: 'text',
           text: `Analyze this document and extract its financial data. Return ONLY a single JSON object, no explanation.
 
-CAPITALIZATION RULE (apply to every line item and transaction):
-- If the amount is $2,500 or more AND the item is a long-lived tangible asset (equipment, machinery, computers/servers, furniture, vehicles, leasehold improvements, HVAC, major renovations), use a FIXED ASSET account from the list below instead of an expense account.
-- Fixed asset accounts: Equipment, Computer Equipment, Furniture and Fixtures, Vehicles, Leasehold Improvements
-- Expense accounts (for items under $2,500 OR consumable/recurring costs): Sales Revenue, Service Revenue, Cost of Goods Sold, Salaries and Wages, Rent, Utilities, Office Supplies, Software Subscriptions, Bank Fees, Professional Fees, Travel and Meals, Insurance, Depreciation Expense, Miscellaneous Expense, Accounts Receivable, Accounts Payable, Notes Payable, Owner Draws
+ACCOUNT SELECTION RULES — follow in this order:
+1. CLIENT CODING HISTORY: If the vendor/description matches an entry in the history below, use that same account.
+2. ACCOUNTING RULES (override AI for these transaction types):
+   - "transfer", "xfer", "wire to", "wire from": use the most appropriate bank/cash account (e.g. Savings Account, Checking Account).
+   - Credit card payment (e.g. "Visa payment", "Chase Card", "Amex payment"): use the matching credit card liability account.
+   - Payroll / "ADP" / "Gusto" / "Paychex": use Salaries and Wages or Payroll Clearing if available.
+   - Loan / mortgage payment: split principal to the loan liability account, interest to Interest Expense if possible; otherwise use Notes Payable.
+3. CAPITALIZATION RULE: If the amount is $2,500 or more AND the item is a long-lived tangible asset (equipment, computers/servers, furniture, vehicles, leasehold improvements, HVAC, major renovation) → use a fixed asset account (Equipment, Computer Equipment, Furniture and Fixtures, Vehicles, or Leasehold Improvements).
+4. Otherwise: choose the best-matching expense, revenue, or liability account from the list below.
+
+${accountSection}
 
 If this is a BANK STATEMENT return:
 {
@@ -113,7 +122,7 @@ If this is a BANK STATEMENT return:
       "amount": "positive number e.g. 1250.00",
       "type": "debit or credit",
       "balance": "running balance e.g. 42500.00",
-      "suggested_offset": "one account name from the lists above — use a fixed asset account if amount >= $2,500 and it is a tangible long-lived asset"
+      "suggested_offset": "one account name from the chart of accounts above"
     }
   ]
 }
@@ -136,7 +145,7 @@ If this is an INVOICE or BILL return:
       "quantity": "e.g. 2",
       "unit_price": "e.g. 500.00",
       "amount": "e.g. 1000.00",
-      "suggested_account": "one account name from the lists above — use a fixed asset account if amount >= $2,500 and it is a tangible long-lived asset"
+      "suggested_account": "one account name from the chart of accounts above"
     }
   ]
 }
@@ -160,49 +169,83 @@ If the document is neither a bank statement nor an invoice/bill return:
 }
 
 type CoaAccount = { id: string; name: string; account_type: string };
+type VendorMapping = { description: string; account_name: string };
 
-// Fetch the CoA for a business and match a suggestion string to the best account id.
+type ClientContext = {
+  coa: CoaAccount[];
+  vendorHistory: VendorMapping[];
+};
+
 async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaAccount[]> {
   return db.selectFrom('chart_of_accounts')
     .select(['id', 'name', 'account_type'])
     .where('business_id', '=', businessId)
     .where('is_active', '=', true)
+    .orderBy('account_type')
+    .orderBy('name')
     .execute();
 }
 
+// Pull the last 60 approved bank-statement transactions for this business and build a
+// vendor→account mapping so the AI can reuse what the accountant previously accepted.
+async function fetchVendorHistory(db: Kysely<DB>, businessId: string, coa: CoaAccount[]): Promise<VendorMapping[]> {
+  const coaMap = new Map(coa.map(a => [a.id, a.name]));
+  const rows = await db
+    .selectFrom('email_import_staging')
+    .select(['extracted_transactions'])
+    .where('business_id', '=', businessId)
+    .where('status', '=', 'approved')
+    .orderBy('created_at', 'desc')
+    .limit(10)
+    .execute();
+
+  const seen = new Map<string, string>(); // description → account_name
+  for (const row of rows) {
+    let txs: Array<{ description?: string; suggested_account_id?: string }> = [];
+    try { txs = JSON.parse(row.extracted_transactions as unknown as string) as typeof txs; } catch { continue; }
+    for (const tx of txs) {
+      if (!tx.description || !tx.suggested_account_id) continue;
+      const accountName = coaMap.get(tx.suggested_account_id);
+      if (!accountName) continue;
+      // Normalize: strip leading digits/dates, lowercase, trim
+      const key = tx.description.toLowerCase().replace(/^\d[\d/\s-]*/, '').trim().slice(0, 40);
+      if (key && !seen.has(key)) seen.set(key, accountName);
+    }
+  }
+  return Array.from(seen.entries()).slice(0, 20).map(([description, account_name]) => ({ description, account_name }));
+}
+
+// Exact match first, then substring fuzzy fallback.
 function matchAccount(suggestion: string | undefined, accounts: CoaAccount[]): string | null {
   if (!suggestion?.trim()) return null;
   const hint = suggestion.trim().toLowerCase();
-  const match = accounts.find(a =>
+  const exact = accounts.find(a => a.name.toLowerCase() === hint);
+  if (exact) return exact.id;
+  const partial = accounts.find(a =>
     a.name.toLowerCase().includes(hint) || hint.includes(a.name.toLowerCase()),
   );
-  return match?.id ?? null;
+  return partial?.id ?? null;
 }
 
-// Resolve business_id: check the email's To: address first (exact match against
-// businesses.import_email), then fall back to AI-extracted addressed_to name matching.
-// This supports both per-client email aliases (accounting firm) and a shared inbox (single company).
-async function resolveBusinessId(
-  db: Kysely<DB>,
-  addressedTo: string | undefined,
-  toHeader?: string,
-): Promise<string | null> {
-  // 1. Try exact match on import_email (faster, more reliable)
-  if (toHeader) {
-    const emailMatch = toHeader.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
-    const toAddress = emailMatch?.[0]?.toLowerCase();
-    if (toAddress) {
-      const byEmail = await db
-        .selectFrom('businesses')
-        .select('id')
-        .where('import_email', '=', toAddress)
-        .where('deleted_at', 'is', null)
-        .executeTakeFirst();
-      if (byEmail) return byEmail.id;
-    }
-  }
+// Try the To: header address against businesses.import_email; return the business id + context if found.
+async function resolveByEmail(db: Kysely<DB>, toHeader: string): Promise<{ businessId: string; ctx: ClientContext } | null> {
+  const emailMatch = toHeader.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
+  const toAddress = emailMatch?.[0]?.toLowerCase();
+  if (!toAddress) return null;
+  const byEmail = await db
+    .selectFrom('businesses')
+    .select('id')
+    .where('import_email', '=', toAddress)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  if (!byEmail) return null;
+  const coa = await fetchCoa(db, byEmail.id);
+  const vendorHistory = await fetchVendorHistory(db, byEmail.id, coa);
+  return { businessId: byEmail.id, ctx: { coa, vendorHistory } };
+}
 
-  // 2. Fall back to AI-extracted name matching
+// Fall back to AI-extracted name matching when no import_email matched.
+async function resolveByName(db: Kysely<DB>, addressedTo: string | undefined): Promise<string | null> {
   if (!addressedTo?.trim()) return null;
   const needle = addressedTo.trim().toLowerCase();
   const businesses = await db
@@ -214,6 +257,36 @@ async function resolveBusinessId(
     b.name.toLowerCase().includes(needle) || needle.includes(b.name.toLowerCase()),
   );
   return match?.id ?? null;
+}
+
+function buildCoaPromptSection(ctx: ClientContext | undefined): string {
+  if (!ctx || ctx.coa.length === 0) {
+    // Fallback generic list when no client context is available
+    return `Use one of these account names (choose the best fit):
+Fixed assets (for tangible items >= $2,500): Equipment, Computer Equipment, Furniture and Fixtures, Vehicles, Leasehold Improvements
+Expenses: Salaries and Wages, Rent, Utilities, Office Supplies, Software Subscriptions, Bank Fees, Professional Fees, Travel and Meals, Insurance, Depreciation Expense, Miscellaneous Expense
+Revenue: Sales Revenue, Service Revenue
+Other: Accounts Receivable, Accounts Payable, Notes Payable, Owner Draws`;
+  }
+
+  // Group real accounts by type for a readable prompt
+  const byType = new Map<string, string[]>();
+  for (const a of ctx.coa) {
+    const list = byType.get(a.account_type) ?? [];
+    list.push(a.name);
+    byType.set(a.account_type, list);
+  }
+  const sections = Array.from(byType.entries())
+    .map(([type, names]) => `${type}: ${names.join(', ')}`)
+    .join('\n');
+
+  let history = '';
+  if (ctx.vendorHistory.length > 0) {
+    history = `\n\nCLIENT CODING HISTORY — how this client previously coded similar transactions (use these first):\n` +
+      ctx.vendorHistory.map(v => `"${v.description}" → ${v.account_name}`).join('\n');
+  }
+
+  return `Use ONLY account names from the client's chart of accounts below. Do NOT invent names.\n\n${sections}${history}`;
 }
 
 // Process a single message: download PDF → classify → match business → insert to correct staging table
@@ -244,11 +317,15 @@ async function processAnyMessage(
   const base64 = (attachment.data.data ?? '').replace(/-/g, '+').replace(/_/g, '/');
   const pdfBuffer = Buffer.from(base64, 'base64');
 
-  const result = await classifyAndExtract(pdfBuffer);
+  // Pre-resolve business from To: header so we can pass the real CoA to the AI.
+  // If the email is addressed to a per-client import alias, we know who it belongs to
+  // before running AI — this makes account suggestions much more accurate.
+  const earlyResolution = await resolveByEmail(db, toHeader);
+  const result = await classifyAndExtract(pdfBuffer, earlyResolution?.ctx);
   const receivedAt = new Date(dateHeader).toISOString();
 
   if (result.document_type === 'bank_statement') {
-    const businessId = await resolveBusinessId(db, result.addressed_to, toHeader);
+    const businessId = earlyResolution?.businessId ?? await resolveByName(db, result.addressed_to);
     if (!businessId) {
       const reason = result.addressed_to
         ? `No business found matching "${result.addressed_to}"`
@@ -267,7 +344,8 @@ async function processAnyMessage(
       console.log(`[gmail-worker] message ${messageId} → bank statement auto-rejected: ${reason}`);
       return;
     }
-    const coa = await fetchCoa(db, businessId);
+    // Reuse CoA already fetched during email routing; only fetch if needed (AI-name fallback path).
+    const coa = earlyResolution?.ctx.coa ?? await fetchCoa(db, businessId);
     const enrichedTxs = (result.transactions ?? []).map(tx => ({
       ...tx,
       suggested_account_id: matchAccount(tx.suggested_offset, coa),
@@ -285,7 +363,7 @@ async function processAnyMessage(
     }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
     console.log(`[gmail-worker] message ${messageId} → bank statement for business ${businessId}: ${enrichedTxs.length} transactions`);
   } else if (result.document_type === 'invoice') {
-    const businessId = await resolveBusinessId(db, result.addressed_to, toHeader);
+    const businessId = earlyResolution?.businessId ?? await resolveByName(db, result.addressed_to);
     if (!businessId) {
       const reason = result.addressed_to
         ? `No business found matching "${result.addressed_to}"`
@@ -350,7 +428,7 @@ async function processAnyMessage(
       }
     }
 
-    const coa = await fetchCoa(db, businessId);
+    const coa = earlyResolution?.ctx.coa ?? await fetchCoa(db, businessId);
     const enrichedLines = (result.line_items ?? []).map(li => ({
       ...li,
       suggested_account_id: matchAccount(li.suggested_account, coa),
