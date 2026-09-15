@@ -109,7 +109,7 @@ export default function AccountRegisterPage() {
       <div className="border-b px-6 py-3 bg-background">
         <button
           type="button"
-          onClick={() => nav(-1)}
+          onClick={() => nav('/settings/coa')}
           className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
         >
           <ChevronLeft className="h-4 w-4" />

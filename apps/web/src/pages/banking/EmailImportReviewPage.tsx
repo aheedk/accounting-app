@@ -342,11 +342,19 @@ export default function EmailImportReviewPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => nav(-1)} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <button
+          type="button"
+          onClick={() => {
+            if (selectedBank) { setSelectedBank(null); return; }
+            if (selectedInvoice) { setSelectedInvoice(null); return; }
+            nav(-1);
+          }}
+          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+        >
           <ChevronLeft className="h-4 w-4" />Back
         </button>
         <div>
-          <h1 className="text-xl font-semibold">Email Import Review</h1>
+          <h1 className="text-xl font-semibold">Email Imports</h1>
           <p className="text-sm text-muted-foreground">
             AI-extracted documents pending accountant review before posting to the ledger.
             {totalPending > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">{totalPending} pending</span>}
