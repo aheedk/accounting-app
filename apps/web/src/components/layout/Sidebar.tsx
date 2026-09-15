@@ -18,6 +18,7 @@ import { MyMenu } from './MyMenu';
 import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
+import { usePendingImportCount } from '@/lib/usePendingImportCount';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -71,7 +72,7 @@ const groups: NavGroup[] = [
       { to: '/accounting/books-review', label: 'Books Review' },
       { to: '/accounting/bank-accounts', label: 'Bank Accounts' },
       { to: '/accounting/bank-transactions', label: 'Bank Transactions' },
-      { to: '/accounting/email-imports', label: 'Email Import Review' },
+      { to: '/accounting/email-imports', label: 'Email Imports' },
       { to: '/accounting/integrations', label: 'Integration Transactions' },
       { to: '/accounting/receipts', label: 'Receipts' },
       { to: '/accounting/reconcile', label: 'Reconcile' },
@@ -165,10 +166,13 @@ type SidebarNavProps = {
   onNavigate?: () => void;
 };
 
+const EMAIL_IMPORTS_PATH = '/accounting/email-imports';
+
 // Portal keeps flyouts outside the sidebar's scroll clipping without moving its rows.
 function DesktopSidebarNav() {
   const { pathname } = useLocation();
   const [openId, setOpenId] = useState<string | null>(null);
+  const pendingImports = usePendingImportCount();
   const [position, setPosition] = useState({ left: 256, top: 8 });
   const navRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -250,7 +254,14 @@ function DesktopSidebarNav() {
           onBlur={event => { if (!pinnedRef.current && !event.currentTarget.contains(event.relatedTarget)) closeGroup(); }}>
           <div className="shrink-0 border-b border-white/10 px-3 pb-3 text-sm font-semibold text-white">{group.label}</div>
           <div className="mt-2 flex min-h-0 flex-col gap-0.5 overflow-y-auto">
-            {group.children.map(child => <NavLink key={child.to} to={child.to} onClick={closeGroup} className={cn('shrink-0 rounded-md border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', pathMatchesChild(pathname, child) ? 'border-gold bg-sidebar-active font-medium text-white' : 'border-transparent text-sidebar-muted hover:bg-sidebar-hover hover:text-white')}>{child.label}</NavLink>)}
+            {group.children.map(child => (
+              <NavLink key={child.to} to={child.to} onClick={closeGroup} className={cn('shrink-0 flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', pathMatchesChild(pathname, child) ? 'border-gold bg-sidebar-active font-medium text-white' : 'border-transparent text-sidebar-muted hover:bg-sidebar-hover hover:text-white')}>
+                <span className="flex-1">{child.label}</span>
+                {child.to === EMAIL_IMPORTS_PATH && pendingImports > 0 && (
+                  <span className="flex h-2 w-2 shrink-0 rounded-full bg-blue-400" title={`${pendingImports} pending`} />
+                )}
+              </NavLink>
+            ))}
           </div>
         </div>, document.body,
       )}
@@ -263,6 +274,7 @@ function DesktopSidebarNav() {
 export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps) {
   const location = useLocation();
   const pathname = location.pathname;
+  const pendingImports = usePendingImportCount();
 
   const activeGroupId = useMemo(() => {
     for (const g of groups) {
@@ -400,14 +412,17 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                           transitionDelay: isOpen ? `${idx * 20}ms` : '0ms',
                         }}
                         className={cn(
-                          'flex items-center rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
+                          'flex items-center gap-2 rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
                           isOpen ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
                           childActive
                             ? 'border-gold bg-sidebar-active font-medium text-white'
                             : 'border-white/10 text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
                         )}
                       >
-                        {child.label}
+                        <span className="flex-1">{child.label}</span>
+                        {child.to === EMAIL_IMPORTS_PATH && pendingImports > 0 && (
+                          <span className="flex h-2 w-2 shrink-0 rounded-full bg-blue-400" title={`${pendingImports} pending`} />
+                        )}
                       </NavLink>
                     );
                   })}

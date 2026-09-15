@@ -53,6 +53,26 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Combined pending count for both bank statements + invoices — used by the sidebar badge
+router.get('/businesses/:businessId/email-imports/pending-count', async (req, res, next) => {
+  try {
+    const bizId = req.tenancy!.business_id;
+    const bankRow = await db
+      .selectFrom('email_import_staging')
+      .select(eb => eb.fn.countAll<number>().as('count'))
+      .where('business_id', '=', bizId)
+      .where('status', '=', 'pending')
+      .executeTakeFirst();
+    const invRow = await db
+      .selectFrom('invoice_import_staging')
+      .select(eb => eb.fn.countAll<number>().as('count'))
+      .where('business_id', '=', bizId)
+      .where('status', '=', 'pending')
+      .executeTakeFirst();
+    res.json({ count: Number(bankRow?.count ?? 0) + Number(invRow?.count ?? 0) });
+  } catch (e) { next(e); }
+});
+
 // Serve the original PDF attachment
 router.get(
   '/businesses/:businessId/email-imports/:importId/pdf',
