@@ -166,6 +166,26 @@ export default function EmailImportReviewPage() {
 
   useEffect(() => { loadPending(); }, [loadPending]);
 
+  // Reset all selection/detail state when the active business changes
+  useEffect(() => {
+    setSelectedBank(null);
+    setSelectedInvoice(null);
+    setBankAccountId('');
+    setOffsets({});
+    setIncluded({});
+    setLineAccountIds({});
+    setLineIncluded({});
+    setSelectedVendorId('');
+    setSelectedCustomerId('');
+    setTaxAccountId('');
+    setIncludeTax(false);
+    setBankError(null);
+    setInvError(null);
+    setHistoryBank([]);
+    setHistoryInvoices([]);
+    setTopTab('bank');
+  }, [bizId]);
+
   const loadHistory = useCallback(() => {
     if (!bizId) return;
     setHistoryLoading(true);
