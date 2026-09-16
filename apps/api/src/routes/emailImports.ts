@@ -4,7 +4,7 @@ import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
-import { postJournalEntry } from '../services/core/ledgerService.js';
+import { postJournalEntryBatch } from '../services/core/ledgerService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
 
@@ -128,47 +128,47 @@ router.post(
         : staged.extracted_transactions) as RawTx[];
 
       const included = body.transactions.filter(t => t.include);
-      let posted = 0;
 
+      // Build all journal entry inputs up-front, then post as a single batch.
+      // This reduces DB round-trips from ~8N to ~8 for N transactions.
+      type RawTxWithItem = { tx: RawTx; item: typeof included[0] };
+      const pairs: RawTxWithItem[] = [];
+      for (const item of included) {
+        const tx = transactions[item.index];
+        if (tx) pairs.push({ tx, item });
+      }
+
+      const jeInputs = pairs.map(({ tx, item }) => {
+        const amt = parseFloat(tx.amount).toFixed(2);
+        const isDeposit = tx.type === 'credit';
+        const [m, d, y] = tx.date.split('/');
+        const entryDate = `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`;
+        return {
+          business_id: bizId,
+          entry_date: entryDate,
+          source_type: 'bank_import' as const,
+          source_id: staged.id,
+          memo: tx.description,
+          lines: [
+            {
+              account_id: body.bank_account_id,
+              debit: isDeposit ? amt : '0.00',
+              credit: isDeposit ? '0.00' : amt,
+              memo: tx.description,
+            },
+            {
+              account_id: item.offset_account_id,
+              debit: isDeposit ? '0.00' : amt,
+              credit: isDeposit ? amt : '0.00',
+              memo: tx.description,
+            },
+          ],
+        };
+      });
+
+      const posted = jeInputs.length;
       await db.transaction().execute(async trx => {
-        for (const item of included) {
-          const tx = transactions[item.index];
-          if (!tx) continue;
-
-          const amt = parseFloat(tx.amount).toFixed(2);
-          // For a bank account (asset, debit-normal):
-          //   deposit (credit type = money in) → debit bank, credit offset
-          //   withdrawal (debit type = money out) → credit bank, debit offset
-          const isDeposit = tx.type === 'credit';
-
-          const entryDate = (() => {
-            const [m, d, y] = tx.date.split('/');
-            return `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`;
-          })();
-
-          await postJournalEntry(trx, serviceCtx, {
-            business_id: bizId,
-            entry_date: entryDate,
-            source_type: 'bank_import',
-            source_id: staged.id,
-            memo: tx.description,
-            lines: [
-              {
-                account_id: body.bank_account_id,
-                debit: isDeposit ? amt : '0.00',
-                credit: isDeposit ? '0.00' : amt,
-                memo: tx.description,
-              },
-              {
-                account_id: item.offset_account_id,
-                debit: isDeposit ? '0.00' : amt,
-                credit: isDeposit ? amt : '0.00',
-                memo: tx.description,
-              },
-            ],
-          });
-          posted++;
-        }
+        await postJournalEntryBatch(trx, serviceCtx, jeInputs);
 
         await trx
           .updateTable('email_import_staging')

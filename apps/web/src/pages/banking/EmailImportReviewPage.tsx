@@ -129,6 +129,11 @@ export default function EmailImportReviewPage() {
   const [invError, setInvError] = useState<string | null>(null);
   const invPostingRef = useRef(false);
 
+  // Shared reject loading state — tracks which item id is currently being rejected
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const rejectRef = useRef<string | null>(null);
+
+  // Initial load: fetch imports + static reference data (CoA, vendors, customers)
   const loadPending = useCallback(() => {
     if (!bizId) return;
     setLoading(true);
@@ -145,6 +150,18 @@ export default function EmailImportReviewPage() {
       setVendors((vendRes.data.vendors as Vendor[]) ?? []);
       setCustomers((custRes.data.customers as Customer[]) ?? []);
     }).catch((e: unknown) => { console.error('email-imports load failed', e); }).finally(() => setLoading(false));
+  }, [bizId]);
+
+  // Refresh-only: re-fetch just the two dynamic import lists (CoA/vendors/customers don't change on poll)
+  const refreshImports = useCallback(() => {
+    if (!bizId) return Promise.resolve();
+    return Promise.all([
+      api.get(`/businesses/${bizId}/email-imports`),
+      api.get(`/businesses/${bizId}/invoice-imports`),
+    ]).then(([bankRes, invRes]) => {
+      setBankImports((bankRes.data.imports as StagedImport[]) ?? []);
+      setInvoiceImports((invRes.data.imports as InvoiceImport[]) ?? []);
+    }).catch((e: unknown) => { console.error('refresh failed', e); });
   }, [bizId]);
 
   useEffect(() => { loadPending(); }, [loadPending]);
@@ -164,7 +181,7 @@ export default function EmailImportReviewPage() {
   useEffect(() => { if (topTab === 'history') loadHistory(); }, [topTab, loadHistory]);
 
   async function openPdf(type: 'bank' | 'invoice', id: string) {
-    if (pdfLoading) return;
+    if (pdfLoading === id) return;
     setPdfLoading(id);
     try {
       const url = type === 'bank'
@@ -184,13 +201,12 @@ export default function EmailImportReviewPage() {
   async function handleRefresh() {
     setRefreshing(true);
     try {
+      // Poll fires in background (returns immediately), then reload imports in parallel
       await Promise.all([
-        api.post('/email-imports/poll', {}),
-        new Promise(res => setTimeout(res, 2000)),
+        api.post('/email-imports/poll', {}).catch(() => {}),
+        refreshImports(),
       ]);
-      loadPending();
-    } catch (e: unknown) { console.error('poll failed', e); }
-    finally { setRefreshing(false); }
+    } finally { setRefreshing(false); }
   }
 
   // ── Bank helpers ─────────────────────────────────────────────────────────────
@@ -252,10 +268,24 @@ export default function EmailImportReviewPage() {
   }
 
   async function handleBankReject(imp: StagedImport) {
-    if (!bizId) return;
-    await api.post(`/businesses/${bizId}/email-imports/${imp.id}/reject`, {});
-    setBankImports(prev => prev.filter(im => im.id !== imp.id));
-    if (selectedBank?.id === imp.id) setSelectedBank(null);
+    if (!bizId || rejectRef.current) return;
+    rejectRef.current = imp.id;
+    setRejectingId(imp.id);
+    try {
+      await api.post(`/businesses/${bizId}/email-imports/${imp.id}/reject`, {});
+      setBankImports(prev => prev.filter(im => im.id !== imp.id));
+      if (selectedBank?.id === imp.id) setSelectedBank(null);
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      // 404 = already processed; remove from list anyway
+      if (status === 404) {
+        setBankImports(prev => prev.filter(im => im.id !== imp.id));
+        if (selectedBank?.id === imp.id) setSelectedBank(null);
+      }
+    } finally {
+      rejectRef.current = null;
+      setRejectingId(null);
+    }
   }
 
   // ── Invoice helpers ───────────────────────────────────────────────────────────
@@ -326,10 +356,23 @@ export default function EmailImportReviewPage() {
   }
 
   async function handleInvoiceReject(imp: InvoiceImport) {
-    if (!bizId) return;
-    await api.post(`/businesses/${bizId}/invoice-imports/${imp.id}/reject`, {});
-    setInvoiceImports(prev => prev.filter(im => im.id !== imp.id));
-    if (selectedInvoice?.id === imp.id) setSelectedInvoice(null);
+    if (!bizId || rejectRef.current) return;
+    rejectRef.current = imp.id;
+    setRejectingId(imp.id);
+    try {
+      await api.post(`/businesses/${bizId}/invoice-imports/${imp.id}/reject`, {});
+      setInvoiceImports(prev => prev.filter(im => im.id !== imp.id));
+      if (selectedInvoice?.id === imp.id) setSelectedInvoice(null);
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        setInvoiceImports(prev => prev.filter(im => im.id !== imp.id));
+        if (selectedInvoice?.id === imp.id) setSelectedInvoice(null);
+      }
+    } finally {
+      rejectRef.current = null;
+      setRejectingId(null);
+    }
   }
 
   const bankAccounts = accounts.filter(a => a.account_type === 'asset');
@@ -447,8 +490,9 @@ export default function EmailImportReviewPage() {
                       Review
                     </button>
                     <button type="button" onClick={() => handleBankReject(imp)}
-                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10">
-                      Reject
+                      disabled={rejectingId === imp.id || bankPosting}
+                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                      {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
                     </button>
                   </div>
                 </div>
@@ -536,8 +580,10 @@ export default function EmailImportReviewPage() {
 
               <div className="flex items-center justify-between pt-2">
                 <button type="button" onClick={() => handleBankReject(selectedBank)}
-                  className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10">
-                  <XCircle className="h-4 w-4" />Reject all
+                  disabled={!!rejectingId || bankPosting}
+                  className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                  <XCircle className="h-4 w-4" />
+                  {rejectingId === selectedBank.id ? 'Rejecting…' : 'Reject all'}
                 </button>
                 <button type="button" onClick={handleBankApprove} disabled={bankPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
@@ -716,8 +762,9 @@ export default function EmailImportReviewPage() {
                       Review
                     </button>
                     <button type="button" onClick={() => handleInvoiceReject(imp)}
-                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10">
-                      Reject
+                      disabled={rejectingId === imp.id || invPosting}
+                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                      {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
                     </button>
                   </div>
                 </div>
@@ -853,8 +900,10 @@ export default function EmailImportReviewPage() {
 
               <div className="flex items-center justify-between pt-2">
                 <button type="button" onClick={() => handleInvoiceReject(selectedInvoice)}
-                  className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10">
-                  <XCircle className="h-4 w-4" />Reject
+                  disabled={!!rejectingId || invPosting}
+                  className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                  <XCircle className="h-4 w-4" />
+                  {rejectingId === selectedInvoice.id ? 'Rejecting…' : 'Reject'}
                 </button>
                 <button type="button" onClick={handleInvoiceApprove} disabled={invPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">

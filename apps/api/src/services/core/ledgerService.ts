@@ -546,6 +546,128 @@ export async function computeTrialBalance(
   return { rows: out, totals: { total_debit: totalD, total_credit: totalC } };
 }
 
+// Batch variant of postJournalEntry — validates accounts and resolves periods once
+// across the whole set, then inserts all JEs + lines in bulk.
+// Reduces DB round-trips from ~8N to ~8 for N transactions (e.g. a bank statement).
+export async function postJournalEntryBatch(
+  trx: Transaction<DB>,
+  ctx: ServiceCtx,
+  inputs: PostJournalEntryInput[],
+): Promise<void> {
+  if (inputs.length === 0) return;
+  for (const input of inputs) assertBalanced(input.lines);
+
+  const business_id = inputs[0]!.business_id;
+
+  // 1. Validate all unique accounts in one query
+  const allAccountIds = [...new Set(inputs.flatMap(i => i.lines.map(l => l.account_id)))];
+  const postingAccounts = await trx.selectFrom('chart_of_accounts')
+    .select(['id', 'code', 'name', 'is_locked'])
+    .where('business_id', '=', business_id)
+    .where('id', 'in', allAccountIds)
+    .where('is_active', '=', true)
+    .execute();
+  if (postingAccounts.length !== allAccountIds.length) {
+    throw new PreconditionError('Every journal line must use an active account from this business');
+  }
+  const lockedAccounts = postingAccounts.filter(a => a.is_locked);
+  if (lockedAccounts.length > 0) {
+    throw new PreconditionError(
+      `Account ${lockedAccounts[0]!.code} ${lockedAccounts[0]!.name} is locked and cannot accept new postings`,
+      { accounts: lockedAccounts.map(a => a.code) },
+    );
+  }
+
+  // 2. Resolve fiscal periods for all dates in one range query
+  const uniqueDates = [...new Set(inputs.map(i => i.entry_date))];
+  const minDate = uniqueDates.reduce((a, b) => a < b ? a : b);
+  const maxDate = uniqueDates.reduce((a, b) => a > b ? a : b);
+  const allPeriods = await trx.selectFrom('fiscal_periods')
+    .selectAll()
+    .where('business_id', '=', business_id)
+    .where('starts_on', '<=', maxDate)
+    .where('ends_on', '>=', minDate)
+    .execute();
+  const adminOverride = await currentSetting(trx, 'app.admin_override');
+  const getPeriod = (date: string) => {
+    const p = allPeriods.find(fp => fp.starts_on <= date && fp.ends_on >= date);
+    if (!p) throw new PreconditionError(`No fiscal period covers ${date}; create periods first`);
+    if (p.status === 'closed' && adminOverride !== 'on') throw new ClosedPeriodError(p.id, p.closed_at?.toString());
+    return p;
+  };
+
+  // 3. Allocate N journal numbers in one atomic counter increment
+  const N = inputs.length;
+  const counterResult = await sql<{ last_value: string }>`
+    INSERT INTO numbering_counters (business_id, entity_type, last_value)
+    VALUES (${business_id}, 'journal_entry', ${N})
+    ON CONFLICT (business_id, entity_type) DO UPDATE
+      SET last_value = numbering_counters.last_value + ${N}
+    RETURNING last_value
+  `.execute(trx);
+  const lastNumber = parseInt(counterResult.rows[0]!.last_value, 10);
+  const firstNumber = lastNumber - N + 1;
+
+  // 4. Batch insert all journal entries
+  const createdJEs = await trx.insertInto('journal_entries')
+    .values(inputs.map((input, i) => ({
+      business_id,
+      period_id: getPeriod(input.entry_date).id,
+      entry_date: input.entry_date,
+      journal_number: String(firstNumber + i),
+      memo: input.memo,
+      reference: input.reference ?? null,
+      status: 'draft' as const,
+      source_type: input.source_type,
+      source_id: input.source_id ?? null,
+      corrected_from_entry_id: input.corrected_from_entry_id ?? null,
+      created_by_user_id: ctx.user_id,
+    })))
+    .returningAll()
+    .execute();
+
+  // 5. Batch insert all journal entry lines
+  await trx.insertInto('journal_entry_lines')
+    .values(createdJEs.flatMap((je, i) =>
+      inputs[i]!.lines.map((l, n) => ({
+        journal_entry_id: je.id,
+        line_number: n + 1,
+        account_id: l.account_id,
+        debit: l.debit,
+        credit: l.credit,
+        memo: l.memo,
+        name: l.name ?? null,
+        class_name: l.class_name ?? null,
+      })),
+    ))
+    .execute();
+
+  // 6. Mark all as posted in one update
+  const jeIds = createdJEs.map(je => je.id);
+  const postedJEs = await trx.updateTable('journal_entries')
+    .set({ status: 'posted', posted_at: sql`now()`, posted_by_user_id: ctx.user_id })
+    .where('id', 'in', jeIds)
+    .returningAll()
+    .execute();
+
+  // 7. Batch audit records in one insert
+  await trx.insertInto('audit_logs')
+    .values(postedJEs.map(je => ({
+      firm_id: ctx.firm_id,
+      business_id: ctx.business_id,
+      user_id: ctx.user_id === '00000000-0000-0000-0000-000000000000' ? null : ctx.user_id,
+      request_id: ctx.request_id,
+      action: AUDIT.JOURNAL_ENTRY_POST,
+      entity_type: 'journal_entry' as const,
+      entity_id: je.id,
+      before_state: null,
+      after_state: JSON.stringify(je),
+      ip_address: ctx.ip_address,
+      user_agent: ctx.user_agent,
+    })))
+    .execute();
+}
+
 async function currentSetting(trx: Transaction<DB>, key: string): Promise<string | null> {
   const r = await sql<{ v: string | null }>`SELECT current_setting(${key}, true) AS v`.execute(trx);
   return r.rows[0]?.v ?? null;
