@@ -285,5 +285,6 @@ export async function getSystemAccount(db: Kysely<DB>, business_id: string, code
     .where('is_system', '=', true)
     .executeTakeFirst();
   if (!row) throw new BusinessRuleError(ERR.NOT_FOUND, `System account ${code} not found for business ${business_id}`);
+  if (!row.is_active) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `Account ${code} — ${row.name} is inactive. Reactivate it from Chart of Accounts before posting.`);
   return row;
 }
