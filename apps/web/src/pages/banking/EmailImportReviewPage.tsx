@@ -123,8 +123,6 @@ export default function EmailImportReviewPage() {
   const [lineIncluded, setLineIncluded] = useState<Record<number, boolean>>({});
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [taxAccountId, setTaxAccountId] = useState('');
-  const [includeTax, setIncludeTax] = useState(false);
   const [invPosting, setInvPosting] = useState(false);
   const [invError, setInvError] = useState<string | null>(null);
   const invPostingRef = useRef(false);
@@ -177,8 +175,6 @@ export default function EmailImportReviewPage() {
     setLineIncluded({});
     setSelectedVendorId('');
     setSelectedCustomerId('');
-    setTaxAccountId('');
-    setIncludeTax(false);
     setBankError(null);
     setInvError(null);
     setHistoryBank([]);
@@ -314,8 +310,6 @@ export default function EmailImportReviewPage() {
     setInvError(null);
     setSelectedVendorId('');
     setSelectedCustomerId('');
-    setTaxAccountId('');
-    setIncludeTax(!!imp.tax_amount && parseFloat(imp.tax_amount) > 0);
     const initIncluded: Record<number, boolean> = {};
     const initAccounts: Record<number, string> = {};
     imp.line_items.forEach((li, i) => {
@@ -340,22 +334,19 @@ export default function EmailImportReviewPage() {
     const isAp = selectedInvoice.invoice_type === 'ap';
     if (isAp && !selectedVendorId) { setInvError('Select a vendor to create the bill.'); return; }
     if (!isAp && !selectedCustomerId) { setInvError('Select a customer to create the invoice.'); return; }
-    if (includeTax && !taxAccountId) { setInvError('Select an account for the tax line.'); return; }
     const missing = selectedInvoice.line_items.findIndex((_, i) => lineIncluded[i] && !lineAccountIds[i]);
     if (missing !== -1) { setInvError(`Select an account for line item ${missing + 1}.`); return; }
     invPostingRef.current = true;
     setInvPosting(true);
     setInvError(null);
     try {
+      // Only send included lines; excluded lines without account_id would fail UUID validation
+      const linePayload = selectedInvoice.line_items
+        .map((_, i) => ({ index: i, account_id: lineAccountIds[i] ?? '', include: lineIncluded[i] ?? true }))
+        .filter(l => l.include && l.account_id);
       await api.post(`/businesses/${bizId}/invoice-imports/${selectedInvoice.id}/approve`, {
         ...(isAp ? { vendor_id: selectedVendorId } : { customer_id: selectedCustomerId }),
-        include_tax: includeTax,
-        ...(includeTax && taxAccountId ? { tax_account_id: taxAccountId } : {}),
-        line_items: selectedInvoice.line_items.map((_, i) => ({
-          index: i,
-          account_id: lineAccountIds[i] ?? '',
-          include: lineIncluded[i] ?? true,
-        })),
+        line_items: linePayload,
       });
       setInvoiceImports(prev => prev.filter(im => im.id !== selectedInvoice.id));
       setSelectedInvoice(null);
@@ -366,7 +357,10 @@ export default function EmailImportReviewPage() {
         setInvoiceImports(prev => prev.filter(im => im.id !== selectedInvoice.id));
         setSelectedInvoice(null);
       } else {
-        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        // Server error shape: { error: { code, message, ... } } or { error: "string" }
+        const errData = (e as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+        const msg = typeof errData === 'string' ? errData
+          : (errData as { message?: string } | null)?.message ?? null;
         setInvError(msg ?? (e instanceof Error ? e.message : 'Failed to post'));
       }
     } finally {
@@ -398,6 +392,14 @@ export default function EmailImportReviewPage() {
   const bankAccounts = accounts.filter(a => a.account_type === 'asset');
   const filteredInvoices = invoiceTab === 'all' ? invoiceImports : invoiceImports.filter(im => im.invoice_type === invoiceTab);
   const totalPending = bankImports.length + invoiceImports.length;
+
+  // Per-line tax helpers (only defined when an invoice is open)
+  const invTotalTax = selectedInvoice ? parseFloat(selectedInvoice.tax_amount ?? '0') : 0;
+  const invSubtotal = selectedInvoice
+    ? (selectedInvoice.subtotal ? parseFloat(selectedInvoice.subtotal)
+      : selectedInvoice.line_items.reduce((s, li) => s + parseFloat(li.amount ?? '0'), 0))
+    : 0;
+  const hasTaxCol = invTotalTax > 0;
 
   if (!bizId) return <div className="p-6">Select a business first.</div>;
 
@@ -837,21 +839,6 @@ export default function EmailImportReviewPage() {
                     </select>
                   </div>
                 )}
-                {selectedInvoice.tax_amount && parseFloat(selectedInvoice.tax_amount) > 0 && (
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium whitespace-nowrap w-52 flex items-center gap-2">
-                      <input type="checkbox" checked={includeTax} onChange={e => setIncludeTax(e.target.checked)} />
-                      Tax ({fmtMoney(selectedInvoice.tax_amount)})
-                    </label>
-                    {includeTax && (
-                      <select value={taxAccountId} onChange={e => setTaxAccountId(e.target.value)}
-                        className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
-                        <option value="">— tax account —</option>
-                        {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                      </select>
-                    )}
-                  </div>
-                )}
               </div>
 
               {invError && <p className="text-sm text-destructive">{invError}</p>}
@@ -868,6 +855,7 @@ export default function EmailImportReviewPage() {
                       <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Qty</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Unit Price</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Amount</th>
+                      {hasTaxCol && <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tax Amount</th>}
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[200px]">
                         {selectedInvoice.invoice_type === 'ap' ? 'Expense account' : 'Revenue account'}
                       </th>
@@ -884,6 +872,11 @@ export default function EmailImportReviewPage() {
                         <td className="px-3 py-2 text-right font-mono text-xs">{li.quantity}</td>
                         <td className="px-3 py-2 text-right font-mono text-xs">{fmtMoney(li.unit_price)}</td>
                         <td className="px-3 py-2 text-right font-mono font-medium">{fmtMoney(li.amount)}</td>
+                        {hasTaxCol && (
+                          <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                            {fmtMoney((invSubtotal > 0 ? (parseFloat(li.amount ?? '0') / invSubtotal) * invTotalTax : 0).toFixed(2))}
+                          </td>
+                        )}
                         <td className="px-3 py-2">
                           <select disabled={!lineIncluded[i]} value={lineAccountIds[i] ?? ''}
                             onChange={e => setLineAccountIds(prev => ({ ...prev, [i]: e.target.value }))}
@@ -900,18 +893,21 @@ export default function EmailImportReviewPage() {
                     <tr className="bg-muted/20 font-medium">
                       <td colSpan={4} className="px-3 py-2 text-right text-sm">Subtotal</td>
                       <td className="px-3 py-2 text-right font-mono">{selectedInvoice.subtotal ? fmtMoney(selectedInvoice.subtotal) : '—'}</td>
+                      {hasTaxCol && <td />}
                       <td />
                     </tr>
-                    {selectedInvoice.tax_amount && parseFloat(selectedInvoice.tax_amount) > 0 && (
+                    {hasTaxCol && (
                       <tr className="bg-muted/10">
                         <td colSpan={4} className="px-3 py-2 text-right text-sm text-muted-foreground">Tax</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtMoney(selectedInvoice.tax_amount)}</td>
+                        <td />
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtMoney(selectedInvoice.tax_amount ?? '0')}</td>
                         <td />
                       </tr>
                     )}
                     <tr className="bg-muted/30 font-semibold border-t-2">
                       <td colSpan={4} className="px-3 py-2 text-right">Total</td>
                       <td className="px-3 py-2 text-right font-mono">{selectedInvoice.total ? fmtMoney(selectedInvoice.total) : '—'}</td>
+                      {hasTaxCol && <td />}
                       <td />
                     </tr>
                   </tfoot>

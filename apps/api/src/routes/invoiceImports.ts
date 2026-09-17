@@ -105,9 +105,7 @@ const approveSchema = z.object({
     index: z.number().int().min(0),
     account_id: z.string().uuid(),
     include: z.boolean().default(true),
-  })),
-  include_tax: z.boolean().default(false),
-  tax_account_id: z.string().uuid().optional(),
+  })).transform(items => items.filter(l => l.include)),
 });
 
 // Approve: create Bill (AP) or Invoice (AR)
@@ -136,7 +134,10 @@ router.post(
       const isAp = staged.invoice_type === 'ap';
 
       await db.transaction().execute(async trx => {
-        const hasTax = body.include_tax && body.tax_account_id && staged.tax_amount && parseFloat(staged.tax_amount) > 0;
+        const totalTax = staged.tax_amount ? parseFloat(staged.tax_amount) : 0;
+        // Use staged subtotal; fall back to summing included line amounts
+        const subtotalBase = staged.subtotal ? parseFloat(staged.subtotal)
+          : included.reduce((s, item) => s + parseFloat(lineItems[item.index]?.amount ?? '0'), 0);
 
         const importIdSuffix = staged.id.slice(0, 6);
 
@@ -156,21 +157,15 @@ router.post(
           if (!body.vendor_id) throw new Error('vendor_id required for AP invoices');
           const billLines = included.map(item => {
             const li = lineItems[item.index];
+            const lineAmt = parseFloat(li?.amount ?? '0');
+            const lineTax = subtotalBase > 0 && totalTax > 0 ? (lineAmt / subtotalBase) * totalTax : 0;
             return {
               description: li?.description ?? '',
-              quantity: li?.quantity && parseFloat(li.quantity) > 0 ? li.quantity : '1',
-              unit_price: li?.unit_price && parseFloat(li.unit_price) > 0 ? li.unit_price : (li?.amount ?? '0'),
+              quantity: '1',
+              unit_price: (lineAmt + lineTax).toFixed(2),
               expense_account_id: item.account_id,
             };
           });
-          if (hasTax) {
-            billLines.push({
-              description: 'Sales Tax',
-              quantity: '1',
-              unit_price: staged.tax_amount!,
-              expense_account_id: body.tax_account_id!,
-            });
-          }
           const billNumber = await resolveBillNumber(staged.invoice_number ?? `IMP-${staged.id.slice(0, 8)}`);
           const { bill } = await createDraftBill(trx, serviceCtx, {
             business_id: bizId,
@@ -187,23 +182,16 @@ router.post(
           if (!body.customer_id) throw new Error('customer_id required for AR invoices');
           const invLines = included.map(item => {
             const li = lineItems[item.index];
+            const lineAmt = parseFloat(li?.amount ?? '0');
+            const lineTax = subtotalBase > 0 && totalTax > 0 ? (lineAmt / subtotalBase) * totalTax : 0;
             return {
               description: li?.description ?? '',
-              quantity: li?.quantity && parseFloat(li.quantity) > 0 ? li.quantity : '1',
-              unit_price: li?.unit_price && parseFloat(li.unit_price) > 0 ? li.unit_price : (li?.amount ?? '0'),
+              quantity: '1',
+              unit_price: (lineAmt + lineTax).toFixed(2),
               revenue_account_id: item.account_id,
               tax_code_id: null,
             };
           });
-          if (hasTax) {
-            invLines.push({
-              description: 'Sales Tax',
-              quantity: '1',
-              unit_price: staged.tax_amount!,
-              revenue_account_id: body.tax_account_id!,
-              tax_code_id: null,
-            });
-          }
           const invoiceNumber = await resolveInvoiceNumber(staged.invoice_number ?? `IMP-${staged.id.slice(0, 8)}`);
           const { invoice } = await createDraftInvoice(trx, serviceCtx, {
             business_id: bizId,
