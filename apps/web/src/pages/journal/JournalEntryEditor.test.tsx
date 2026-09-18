@@ -175,12 +175,12 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
   }
 
-  it('adds three rows and focuses the labelled Account field after forward Tab on the final Class field', async () => {
+  it('adds one row and focuses the labelled Account field after forward Tab on the final Class field', async () => {
     await renderEditor();
     const event = await pressTab(classField(dataRows()[7]!));
 
     expect(event.defaultPrevented).toBe(true);
-    expect(dataRows()).toHaveLength(11);
+    expect(dataRows()).toHaveLength(9);
     const firstNewAccount = container.querySelector<HTMLButtonElement>('#journal-account-8');
     expect(firstNewAccount?.getAttribute('aria-label')).toBe('Account, line 9');
     expect(document.activeElement).toBe(firstNewAccount);
@@ -271,7 +271,6 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     expect(drawer).not.toBeNull();
     expect(drawer?.textContent).toContain('Detail type');
     expect(drawer?.textContent).toContain('Make this a subaccount');
-    expect(drawer?.textContent).toContain('Opening balance');
     expect(drawer?.textContent).toContain('Lock account');
 
     const code = document.querySelector<HTMLInputElement>('#new-account-code')!;
@@ -291,9 +290,11 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     const expensesType = Array.from(typeMenu!.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent?.trim() === 'Expenses');
     await click(expensesType!);
+    const detailType = document.querySelector<HTMLSelectElement>('#new-account-detail-type')!;
     await act(async () => {
       setFieldValue(code, '6990');
       setFieldValue(name, 'Miscellaneous Expense');
+      setFieldValue(detailType, 'Other Business Expenses');
     });
     await act(async () => document.querySelector<HTMLFormElement>('#coa-create-form')!
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
@@ -304,7 +305,7 @@ describe('JournalEntryEditor line keyboard navigation', () => {
         code: '6990',
         name: 'Miscellaneous Expense',
         account_type: 'expense',
-        detail_type: 'Expenses',
+        detail_type: 'Other Business Expenses',
         description: null,
         parent_id: null,
         opening_balance: null,
@@ -314,5 +315,48 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     );
     expect(container.querySelector('#journal-account-0')?.getAttribute('aria-label'))
       .toBe('Account, line 1: 6990 Miscellaneous Expense');
+  });
+
+  it('disables Detail type until Account type is selected and shows only its mapped details', async () => {
+    const expectedDetails: Record<string, string[]> = {
+      'Bank': ['Cash on hand', 'Checking', 'Money Market', 'Rents Held in Trust', 'Savings', 'Trust account'],
+      'Accounts receivable (A/R)': ['Accounts receivable (A/R)'],
+      'Other Current Assets': ['Allowance for Bad Debts', 'Development Costs', 'Employee Cash Advances', 'Inventory', 'Investment - Mortgage/Real Estate Loans', 'Investment - Tax-Exempt Securities', 'Investment - U.S. Government Obligations', 'Investments - Other', 'Loans To Officers', 'Loans to Others', 'Loans to Stockholders', 'Other Current Assets', 'Prepaid Expenses', 'Retainage', 'Undeposited Funds'],
+      'Fixed Assets': ['Accumulated Amortization', 'Accumulated Depletion', 'Accumulated Depreciation', 'Buildings', 'Depletable Assets', 'Fixed Asset Computers', 'Fixed Asset Copiers', 'Fixed Asset Furniture', 'Fixed Asset Other Tools Equipment', 'Fixed Asset Phone', 'Fixed Asset Photo Video', 'Fixed Asset Software', 'Furniture & Fixtures', 'Intangible Assets', 'Land', 'Leasehold Improvements', 'Machinery & Equipment', 'Other fixed assets', 'Vehicles'],
+      'Other Assets': ['Accumulated Amortization of Other Assets', 'Goodwill', 'Lease Buyout', 'Licenses', 'Organizational Costs', 'Other Long-term Assets', 'Security Deposits'],
+      'Credit Card': ['Credit Card'],
+      'Accounts payable (A/P)': ['AP'],
+      'Other Current Liabilities': ['Deferred Revenue', 'Federal Income Tax Payable', 'Insurance Payable', 'Line of Credit', 'Loan Payable', 'Other Current Liabilities', 'Payroll Clearing', 'Payroll Tax Payable', 'Prepaid Expenses Payable', 'Rents in trust - Liability', 'Sales Tax Payable', 'State/Local Income Tax Payable', 'Trust Accounts - Liabilities', 'Undistributed Tips'],
+      'Long Term Liabilities': ['Notes Payable', 'Other Long Term Liabilities', 'Shareholder Notes Payable'],
+      'Equity': ['Accumulated Adjustment', 'Common Stock', 'Estimated Taxes', 'Health Insurance Premium', 'Health Savings Account Contribution', 'Opening Balance Equity', "Owner's Equity", 'Paid-In Capital or Surplus', 'Partner Contributions', 'Partner Distributions', "Partner's Equity", 'Personal Expense', 'Personal Income', 'Preferred Stock', 'Retained Earnings', 'Treasury Stock'],
+      'Income': ['Discounts/Refunds Given', 'Non-Profit Income', 'Other Primary Income', 'Sales of Product Income', 'Service/Fee Income', 'Unapplied Cash Payment Income'],
+      'Other Income': ['Dividend Income', 'Interest Earned', 'Other Investment Income', 'Other Miscellaneous Income', 'Tax-Exempt Interest'],
+      'Cost of Goods Sold': ['Cost of labor - COS', 'Equipment Rental - COS', 'Other Costs of Services - COS', 'Shipping, Freight & Delivery - COS', 'Supplies & Materials - COGS'],
+      'Expenses': ['Advertising/Promotional', 'Auto', 'Bad Debts', 'Bank Charges', 'Charitable Contributions', 'Communication', 'Cost of Labor', 'Dues & subscriptions', 'Entertainment', 'Entertainment Meals', 'Equipment Rental', 'Finance costs', 'Insurance', 'Interest Paid', 'Legal & Professional Fees', 'Office/General Administrative Expenses', 'Other Business Expenses', 'Other Miscellaneous Service Cost', 'Payroll Expenses', 'Payroll Tax Expenses', 'Payroll Wage Expenses', 'Promotional Meals', 'Rent or Lease of Buildings', 'Repair & Maintenance', 'Shipping, Freight & Delivery', 'Supplies & Materials', 'Taxes Paid', 'Travel', 'Travel Meals', 'Unapplied Cash Bill Payment Expense', 'Utilities'],
+      'Other Expense': ['Amortization', 'Depreciation', 'Exchange Gain or Loss', 'Gas And Fuel', 'Home Office', 'Homeowner Rental Insurance', 'Mortgage Interest Home Office', 'Other Home Office Expenses', 'Other Miscellaneous Expense', 'Other Vehicle Expenses', 'Parking and Tolls', 'Penalties & Settlements', 'Property Tax Home Office', 'Rent and Lease Home Office', 'Repairs and Maintenance Home Office', 'Utilities Home Office', 'Vehicle', 'Vehicle Insurance', 'Vehicle Lease', 'Vehicle Loan', 'Vehicle Loan Interest', 'Vehicle Registration', 'Vehicle Repairs', 'Wash and Road Services'],
+    };
+
+    await renderEditor();
+    await click(container.querySelector('#journal-account-0')!);
+    const addAccount = Array.from(document.querySelectorAll('button'))
+      .find(button => button.textContent?.trim() === 'Add new account');
+    await click(addAccount!);
+
+    const accountType = document.querySelector<HTMLButtonElement>('#new-account-type')!;
+    const detailType = document.querySelector<HTMLSelectElement>('#new-account-detail-type')!;
+    expect(accountType.textContent?.trim()).toBe('Select account type');
+    expect(detailType.disabled).toBe(true);
+
+    for (const [typeLabel, details] of Object.entries(expectedDetails)) {
+      await click(accountType);
+      const choice = Array.from(document.querySelectorAll<HTMLButtonElement>(
+        '[role="menu"][aria-label="Account type choices"] button',
+      )).find(button => button.textContent?.trim() === typeLabel);
+      await click(choice!);
+
+      expect(detailType.disabled).toBe(false);
+      expect(detailType.value).toBe('');
+      expect(Array.from(detailType.options).slice(1).map(option => option.textContent)).toEqual(details);
+    }
   });
 });

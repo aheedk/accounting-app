@@ -24,11 +24,21 @@ const ACCOUNT_TYPE_GROUPS = [
 ] as const;
 
 const DETAIL_TYPES: Record<string, string[]> = {
-  asset: ['Checking', 'Savings', 'Money Market', 'Cash on Hand', 'Accounts Receivable', 'Prepaid Expenses', 'Inventory', 'Fixed Assets', 'Buildings', 'Vehicles', 'Equipment', 'Accumulated Depreciation', 'Other Assets'],
-  liability: ['Accounts Payable', 'Credit Card', 'Line of Credit', 'Loan Payable', 'Sales Tax Payable', 'Accrued Liabilities', 'Customer Deposits', 'Notes Payable', 'Mortgage', 'Other Liabilities'],
-  equity: ['Opening Balance Equity', 'Retained Earnings', 'Common Stock', 'Partner Contributions', 'Partner Distributions', 'Paid-In Capital', 'Other Equity'],
-  revenue: ['Sales Income', 'Service Income', 'Interest Earned', 'Dividend Income', 'Other Income', 'Discounts Given'],
-  expense: ['Advertising', 'Auto', 'Bank Charges', 'Cost of Labor', 'Dues & Subscriptions', 'Equipment Rental', 'Insurance', 'Legal & Professional Fees', 'Meals & Entertainment', 'Office Expenses', 'Payroll Expenses', 'Rent', 'Repairs & Maintenance', 'Taxes & Licenses', 'Travel', 'Utilities', 'Other Expenses'],
+  'Bank': ['Cash on hand', 'Checking', 'Money Market', 'Rents Held in Trust', 'Savings', 'Trust account'],
+  'Accounts receivable (A/R)': ['Accounts receivable (A/R)'],
+  'Other Current Assets': ['Allowance for Bad Debts', 'Development Costs', 'Employee Cash Advances', 'Inventory', 'Investment - Mortgage/Real Estate Loans', 'Investment - Tax-Exempt Securities', 'Investment - U.S. Government Obligations', 'Investments - Other', 'Loans To Officers', 'Loans to Others', 'Loans to Stockholders', 'Other Current Assets', 'Prepaid Expenses', 'Retainage', 'Undeposited Funds'],
+  'Fixed Assets': ['Accumulated Amortization', 'Accumulated Depletion', 'Accumulated Depreciation', 'Buildings', 'Depletable Assets', 'Fixed Asset Computers', 'Fixed Asset Copiers', 'Fixed Asset Furniture', 'Fixed Asset Other Tools Equipment', 'Fixed Asset Phone', 'Fixed Asset Photo Video', 'Fixed Asset Software', 'Furniture & Fixtures', 'Intangible Assets', 'Land', 'Leasehold Improvements', 'Machinery & Equipment', 'Other fixed assets', 'Vehicles'],
+  'Other Assets': ['Accumulated Amortization of Other Assets', 'Goodwill', 'Lease Buyout', 'Licenses', 'Organizational Costs', 'Other Long-term Assets', 'Security Deposits'],
+  'Credit Card': ['Credit Card'],
+  'Accounts payable (A/P)': ['AP'],
+  'Other Current Liabilities': ['Deferred Revenue', 'Federal Income Tax Payable', 'Insurance Payable', 'Line of Credit', 'Loan Payable', 'Other Current Liabilities', 'Payroll Clearing', 'Payroll Tax Payable', 'Prepaid Expenses Payable', 'Rents in trust - Liability', 'Sales Tax Payable', 'State/Local Income Tax Payable', 'Trust Accounts - Liabilities', 'Undistributed Tips'],
+  'Long Term Liabilities': ['Notes Payable', 'Other Long Term Liabilities', 'Shareholder Notes Payable'],
+  'Equity': ['Accumulated Adjustment', 'Common Stock', 'Estimated Taxes', 'Health Insurance Premium', 'Health Savings Account Contribution', 'Opening Balance Equity', "Owner's Equity", 'Paid-In Capital or Surplus', 'Partner Contributions', 'Partner Distributions', "Partner's Equity", 'Personal Expense', 'Personal Income', 'Preferred Stock', 'Retained Earnings', 'Treasury Stock'],
+  'Income': ['Discounts/Refunds Given', 'Non-Profit Income', 'Other Primary Income', 'Sales of Product Income', 'Service/Fee Income', 'Unapplied Cash Payment Income'],
+  'Other Income': ['Dividend Income', 'Interest Earned', 'Other Investment Income', 'Other Miscellaneous Income', 'Tax-Exempt Interest'],
+  'Cost of Goods Sold': ['Cost of labor - COS', 'Equipment Rental - COS', 'Other Costs of Services - COS', 'Shipping, Freight & Delivery - COS', 'Supplies & Materials - COGS'],
+  'Expenses': ['Advertising/Promotional', 'Auto', 'Bad Debts', 'Bank Charges', 'Charitable Contributions', 'Communication', 'Cost of Labor', 'Dues & subscriptions', 'Entertainment', 'Entertainment Meals', 'Equipment Rental', 'Finance costs', 'Insurance', 'Interest Paid', 'Legal & Professional Fees', 'Office/General Administrative Expenses', 'Other Business Expenses', 'Other Miscellaneous Service Cost', 'Payroll Expenses', 'Payroll Tax Expenses', 'Payroll Wage Expenses', 'Promotional Meals', 'Rent or Lease of Buildings', 'Repair & Maintenance', 'Shipping, Freight & Delivery', 'Supplies & Materials', 'Taxes Paid', 'Travel', 'Travel Meals', 'Unapplied Cash Bill Payment Expense', 'Utilities'],
+  'Other Expense': ['Amortization', 'Depreciation', 'Exchange Gain or Loss', 'Gas And Fuel', 'Home Office', 'Homeowner Rental Insurance', 'Mortgage Interest Home Office', 'Other Home Office Expenses', 'Other Miscellaneous Expense', 'Other Vehicle Expenses', 'Parking and Tolls', 'Penalties & Settlements', 'Property Tax Home Office', 'Rent and Lease Home Office', 'Repairs and Maintenance Home Office', 'Utilities Home Office', 'Vehicle', 'Vehicle Insurance', 'Vehicle Lease', 'Vehicle Loan', 'Vehicle Loan Interest', 'Vehicle Registration', 'Vehicle Repairs', 'Wash and Road Services'],
 };
 
 type AccountOption = {
@@ -68,7 +78,7 @@ type CreateForm = {
   opening_balance_as_of: string;
 };
 
-function blankForm(accountType = 'asset', detailType = ''): CreateForm {
+function blankForm(accountType = '', detailType = ''): CreateForm {
   return {
     code: '',
     name: '',
@@ -85,26 +95,36 @@ function firstTypeChoice(accountType: string) {
   return { accountType: group.accountType, label: group.items[0] };
 }
 
+function typeChoiceForDetail(accountType: string, detailType: string | null | undefined) {
+  const group = ACCOUNT_TYPE_GROUPS.find(item => item.accountType === accountType) ?? ACCOUNT_TYPE_GROUPS[0];
+  const label = group.items.find(item => detailType && DETAIL_TYPES[item]?.includes(detailType));
+  return { accountType: group.accountType, label: label ?? group.items[0] };
+}
+
 export default function AccountCreateDrawer({
   businessId,
   accounts,
   initialParentId = null,
-  initialAccountType = 'asset',
+  initialAccountType = '',
   onClose,
   onCreated,
 }: Props) {
   const initialParent = accounts.find(account => account.id === initialParentId);
-  const initialChoice = firstTypeChoice(initialParent?.account_type ?? initialAccountType);
+  const initialChoice = initialParent
+    ? typeChoiceForDetail(initialParent.account_type, initialParent.detail_type)
+    : initialAccountType
+      ? firstTypeChoice(initialAccountType)
+      : null;
   const [parentId, setParentId] = useState<string | null>(initialParentId);
   const [isSubaccount, setIsSubaccount] = useState(initialParentId !== null);
   const [locked, setLocked] = useState(false);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
-  const [selectedTypeLabel, setSelectedTypeLabel] = useState(initialParent?.detail_type || initialChoice.label);
+  const [selectedTypeLabel, setSelectedTypeLabel] = useState(initialChoice?.label ?? '');
   const saveAndNewRef = useRef(false);
   const [form, setForm] = useState(() => blankForm(
-    initialParent?.account_type ?? initialChoice.accountType,
-    initialParent?.detail_type || initialChoice.label,
+    initialParent?.account_type ?? initialChoice?.accountType ?? '',
+    initialParent?.detail_type ?? '',
   ));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -115,6 +135,10 @@ export default function AccountCreateDrawer({
     const andNew = saveAndNewRef.current;
     saveAndNewRef.current = false;
     setError(null);
+    if (!form.account_type) {
+      setError('Choose an account type.');
+      return;
+    }
     if (isSubaccount && !parentId) {
       setError('Choose a parent account.');
       return;
@@ -140,7 +164,7 @@ export default function AccountCreateDrawer({
       });
       await onCreated(response.data);
       if (andNew) {
-        setForm(blankForm(form.account_type, form.detail_type));
+        setForm(blankForm(form.account_type));
         setLocked(false);
       } else {
         onClose();
@@ -186,7 +210,7 @@ export default function AccountCreateDrawer({
                     onClick={() => setShowTypeMenu(current => !current)}
                     className="flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-left text-sm disabled:opacity-60"
                   >
-                    <span>{selectedTypeLabel}</span>
+                    <span>{selectedTypeLabel || 'Select account type'}</span>
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   </button>
                   {showTypeMenu && (
@@ -202,7 +226,7 @@ export default function AccountCreateDrawer({
                               className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
                               onClick={() => {
                                 setSelectedTypeLabel(item);
-                                setForm(current => ({ ...current, account_type: group.accountType, detail_type: item }));
+                                setForm(current => ({ ...current, account_type: group.accountType, detail_type: '' }));
                                 setShowTypeMenu(false);
                               }}
                             >
@@ -217,12 +241,12 @@ export default function AccountCreateDrawer({
               </div>
               <div>
                 <Label htmlFor="new-account-detail-type">Detail type</Label>
-                <select id="new-account-detail-type" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.detail_type} onChange={event => setForm(current => ({ ...current, detail_type: event.target.value }))}>
+                <select id="new-account-detail-type" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={form.detail_type} disabled={!selectedTypeLabel} onChange={event => setForm(current => ({ ...current, detail_type: event.target.value }))}>
                   <option value="">— select —</option>
-                  {form.detail_type && !(DETAIL_TYPES[form.account_type] ?? []).includes(form.detail_type) && (
+                  {form.detail_type && !(DETAIL_TYPES[selectedTypeLabel] ?? []).includes(form.detail_type) && (
                     <option value={form.detail_type}>{form.detail_type}</option>
                   )}
-                  {(DETAIL_TYPES[form.account_type] ?? []).map(detail => <option key={detail} value={detail}>{detail}</option>)}
+                  {(DETAIL_TYPES[selectedTypeLabel] ?? []).map(detail => <option key={detail} value={detail}>{detail}</option>)}
                 </select>
               </div>
             </div>
@@ -239,9 +263,9 @@ export default function AccountCreateDrawer({
                   setParentId(nextParentId);
                   const parent = accounts.find(account => account.id === nextParentId);
                   if (parent) {
-                    const parentChoice = firstTypeChoice(parent.account_type);
-                    const nextDetailType = parent.detail_type || parentChoice.label;
-                    setSelectedTypeLabel(nextDetailType);
+                    const parentChoice = typeChoiceForDetail(parent.account_type, parent.detail_type);
+                    const nextDetailType = parent.detail_type || '';
+                    setSelectedTypeLabel(parentChoice.label);
                     setForm(current => ({ ...current, account_type: parent.account_type, detail_type: nextDetailType }));
                   }
                 }}>

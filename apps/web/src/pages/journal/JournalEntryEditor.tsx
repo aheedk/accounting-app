@@ -206,7 +206,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     pendingAccountFocusRef.current = form.lines.length;
     setForm(current => ({
       ...current,
-      lines: [...current.lines, blankJournalLine(), blankJournalLine(), blankJournalLine()],
+      lines: [...current.lines, blankJournalLine()],
     }));
   }
 

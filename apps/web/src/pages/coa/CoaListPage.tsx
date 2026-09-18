@@ -171,7 +171,7 @@ export default function CoaListPage() {
   // Create drawer (QBO New-account field set)
   const [showCreate, setShowCreate] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
-  const [createAccountType, setCreateAccountType] = useState('asset');
+  const [createAccountType, setCreateAccountType] = useState('');
 
   // Edit slide-over
   const [editAccount, setEditAccount] = useState<Account | null>(null);
@@ -544,7 +544,7 @@ export default function CoaListPage() {
           <div className="flex items-center" ref={newDropdownRef}>
             <Button
               className="rounded-r-none border-r border-primary-foreground/20"
-              onClick={() => { setCreateParentId(null); setCreateAccountType('asset'); setShowCreate(true); }}
+              onClick={() => { setCreateParentId(null); setCreateAccountType(''); setShowCreate(true); }}
             >
               New account
             </Button>
