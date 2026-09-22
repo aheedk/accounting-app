@@ -64,6 +64,13 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function fmtDateTime(iso: string) {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${date} at ${time}`;
+}
+
 function deriveBankTitle(imp: StagedImport): string {
   const txs = imp.extracted_transactions;
   if (txs.length === 0) return imp.email_subject ?? 'Bank Statement';
@@ -494,7 +501,7 @@ export default function EmailImportReviewPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
-                      <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDate(imp.received_at)}</p>
+                      <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDateTime(imp.received_at)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -527,7 +534,7 @@ export default function EmailImportReviewPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold">{deriveBankTitle(selectedBank)}</p>
-                  <p className="text-xs text-muted-foreground">{deriveBankSubtitle(selectedBank)} · received {fmtDate(selectedBank.received_at)}</p>
+                  <p className="text-xs text-muted-foreground">{deriveBankSubtitle(selectedBank)} · received {fmtDateTime(selectedBank.received_at)}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => openPdf('bank', selectedBank.id)}
@@ -644,7 +651,7 @@ export default function EmailImportReviewPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
-                              <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDate(imp.received_at)}</p>
+                              <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDateTime(imp.received_at)}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -803,7 +810,7 @@ export default function EmailImportReviewPage() {
                   </span>
                   <div>
                     <p className="font-medium">{selectedInvoice.vendor_customer ?? '(unknown)'} — Invoice #{selectedInvoice.invoice_number ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">Date: {selectedInvoice.invoice_date ?? '—'} · Due: {selectedInvoice.due_date ?? '—'} · Received {fmtDate(selectedInvoice.received_at)}</p>
+                    <p className="text-xs text-muted-foreground">Date: {selectedInvoice.invoice_date ?? '—'} · Due: {selectedInvoice.due_date ?? '—'} · Received {fmtDateTime(selectedInvoice.received_at)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
