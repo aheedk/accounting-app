@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink, Info } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
@@ -137,6 +137,9 @@ export default function EmailImportReviewPage() {
   // Shared reject loading state — tracks which item id is currently being rejected
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const rejectRef = useRef<string | null>(null);
+
+  // Info popover — tracks which list row has its detail panel open
+  const [infoOpen, setInfoOpen] = useState<string | null>(null);
 
   // Initial load: fetch imports + static reference data (CoA, vendors, customers)
   const loadPending = useCallback(() => {
@@ -494,36 +497,52 @@ export default function EmailImportReviewPage() {
           {!selectedBank && bankImports.length > 0 && (
             <div className="rounded-lg border divide-y">
               {bankImports.map(imp => (
-                <div key={imp.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/20">
-                  <div className="min-w-0 flex items-center gap-3">
-                    <div className="shrink-0 h-9 w-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
-                      <CreditCard className="h-4 w-4" />
+                <div key={imp.id} className="px-4 py-3 hover:bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="shrink-0 h-9 w-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+                        <CreditCard className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
+                        <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDateTime(imp.received_at)}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
-                      <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDateTime(imp.received_at)}</p>
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                      <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                        title="View details">
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => openPdf('bank', imp.id)}
+                        disabled={pdfLoading === imp.id}
+                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="View original PDF">
+                        {pdfLoading === imp.id
+                          ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          : <ExternalLink className="h-3.5 w-3.5" />}
+                        PDF
+                      </button>
+                      <button type="button" onClick={() => openBank(imp)}
+                        className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
+                        Review
+                      </button>
+                      <button type="button" onClick={() => handleBankReject(imp)}
+                        disabled={rejectingId === imp.id || bankPosting}
+                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                        {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <button type="button" onClick={() => openPdf('bank', imp.id)}
-                      disabled={pdfLoading === imp.id}
-                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="View original PDF">
-                      {pdfLoading === imp.id
-                        ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        : <ExternalLink className="h-3.5 w-3.5" />}
-                      PDF
-                    </button>
-                    <button type="button" onClick={() => openBank(imp)}
-                      className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
-                      Review
-                    </button>
-                    <button type="button" onClick={() => handleBankReject(imp)}
-                      disabled={rejectingId === imp.id || bankPosting}
-                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
-                      {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
-                    </button>
-                  </div>
+                  {infoOpen === imp.id && (
+                    <div className="mt-2.5 ml-12 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+                      <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                      {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
+                      {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
+                      {imp.addressed_to && <><span className="text-muted-foreground font-medium">Addressed to</span><span>{imp.addressed_to}</span></>}
+                      <span className="text-muted-foreground font-medium">Transactions</span><span>{imp.extracted_transactions.length}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -655,6 +674,11 @@ export default function EmailImportReviewPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
+                            <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                              title="View details">
+                              <Info className="h-3 w-3" />
+                            </button>
                             <button type="button" onClick={() => openPdf('bank', imp.id)}
                               disabled={pdfLoading === imp.id}
                               className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
@@ -680,6 +704,17 @@ export default function EmailImportReviewPage() {
                             ✕ {imp.rejection_reason}
                           </p>
                         )}
+                        {infoOpen === imp.id && (
+                          <div className="mt-2.5 ml-12 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+                            <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                            {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
+                            {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
+                            {imp.addressed_to && <><span className="text-muted-foreground font-medium">Addressed to</span><span>{imp.addressed_to}</span></>}
+                            <span className="text-muted-foreground font-medium">Transactions</span><span>{imp.extracted_transactions.length}</span>
+                            <span className="text-muted-foreground font-medium">Status</span>
+                            <span className={imp.status === 'approved' ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>{imp.status.toUpperCase()}</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -698,10 +733,15 @@ export default function EmailImportReviewPage() {
                             </span>
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate">{imp.vendor_customer ?? imp.email_subject ?? '(unknown)'}</p>
-                              <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'}</p>
+                              <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · received {fmtDateTime(imp.received_at)}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
+                            <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                              title="View details">
+                              <Info className="h-3 w-3" />
+                            </button>
                             <button type="button" onClick={() => openPdf('invoice', imp.id)}
                               disabled={pdfLoading === imp.id}
                               className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
@@ -727,6 +767,20 @@ export default function EmailImportReviewPage() {
                           <p className="mt-1.5 ml-8 text-xs text-red-600 font-medium">
                             ✕ {imp.rejection_reason}
                           </p>
+                        )}
+                        {infoOpen === imp.id && (
+                          <div className="mt-2.5 ml-8 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+                            <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                            {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
+                            {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
+                            {imp.vendor_customer && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'ap' ? 'Vendor' : 'Customer'}</span><span>{imp.vendor_customer}</span></>}
+                            {imp.invoice_number && <><span className="text-muted-foreground font-medium">Invoice #</span><span>{imp.invoice_number}</span></>}
+                            {imp.invoice_date && <><span className="text-muted-foreground font-medium">Invoice date</span><span>{imp.invoice_date}</span></>}
+                            {imp.due_date && <><span className="text-muted-foreground font-medium">Due date</span><span className="font-medium text-amber-600">{imp.due_date}</span></>}
+                            {imp.total && <><span className="text-muted-foreground font-medium">Total</span><span className="font-semibold">{fmtMoney(imp.total)}</span></>}
+                            <span className="text-muted-foreground font-medium">Status</span>
+                            <span className={imp.status === 'approved' ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>{imp.status.toUpperCase()}</span>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -766,36 +820,56 @@ export default function EmailImportReviewPage() {
           {!selectedInvoice && filteredInvoices.length > 0 && (
             <div className="rounded-lg border divide-y">
               {filteredInvoices.map(imp => (
-                <div key={imp.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/20">
-                  <div className="min-w-0 flex items-center gap-3">
-                    <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${imp.invoice_type === 'ap' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {imp.invoice_type.toUpperCase()}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{imp.vendor_customer ?? imp.email_subject ?? '(unknown)'}</p>
-                      <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · {imp.line_items.length} lines</p>
+                <div key={imp.id} className="px-4 py-3 hover:bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${imp.invoice_type === 'ap' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {imp.invoice_type.toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{imp.vendor_customer ?? imp.email_subject ?? '(unknown)'}</p>
+                        <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · {imp.line_items.length} lines · received {fmtDateTime(imp.received_at)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                      <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                        title="View details">
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => openPdf('invoice', imp.id)}
+                        disabled={pdfLoading === imp.id}
+                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="View original PDF">
+                        {pdfLoading === imp.id
+                          ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          : <ExternalLink className="h-3.5 w-3.5" />}
+                        PDF
+                      </button>
+                      <button type="button" onClick={() => openInvoice(imp)}
+                        className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
+                        Review
+                      </button>
+                      <button type="button" onClick={() => handleInvoiceReject(imp)}
+                        disabled={rejectingId === imp.id || invPosting}
+                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                        {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <button type="button" onClick={() => openPdf('invoice', imp.id)}
-                      disabled={pdfLoading === imp.id}
-                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="View original PDF">
-                      {pdfLoading === imp.id
-                        ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        : <ExternalLink className="h-3.5 w-3.5" />}
-                      PDF
-                    </button>
-                    <button type="button" onClick={() => openInvoice(imp)}
-                      className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
-                      Review
-                    </button>
-                    <button type="button" onClick={() => handleInvoiceReject(imp)}
-                      disabled={rejectingId === imp.id || invPosting}
-                      className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
-                      {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
-                    </button>
-                  </div>
+                  {infoOpen === imp.id && (
+                    <div className="mt-2.5 ml-8 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+                      <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                      {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
+                      {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
+                      {imp.vendor_customer && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'ap' ? 'Vendor' : 'Customer'}</span><span>{imp.vendor_customer}</span></>}
+                      {imp.invoice_number && <><span className="text-muted-foreground font-medium">Invoice #</span><span>{imp.invoice_number}</span></>}
+                      {imp.invoice_date && <><span className="text-muted-foreground font-medium">Invoice date</span><span>{imp.invoice_date}</span></>}
+                      {imp.due_date && <><span className="text-muted-foreground font-medium">Due date</span><span className="font-medium text-amber-600">{imp.due_date}</span></>}
+                      {imp.total && <><span className="text-muted-foreground font-medium">Total</span><span className="font-semibold">{fmtMoney(imp.total)}</span></>}
+                      <span className="text-muted-foreground font-medium">Lines</span><span>{imp.line_items.length}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
