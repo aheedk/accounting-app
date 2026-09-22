@@ -134,6 +134,9 @@ export async function updateAccount(
     if (input.patch.name !== undefined || input.patch.parent_id !== undefined || input.patch.code !== undefined) {
       throw new PreconditionError('System accounts cannot have code, name, or parent changed', { code: row.code });
     }
+    if (input.patch.is_active === false) {
+      throw new PreconditionError(`System account ${row.code} — ${row.name} cannot be deactivated`, { code: row.code });
+    }
   }
 
   if (input.patch.parent_id === input.account_id) {
