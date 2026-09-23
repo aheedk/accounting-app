@@ -309,11 +309,16 @@ export default function CoaListPage() {
 
   // --- Batch actions ---
   const [batchBusy, setBatchBusy] = useState(false);
-  async function batchPatch(patch: { is_active?: boolean; is_locked?: boolean }) {
+  const checkedAccounts = accounts.filter(a => checkedIds.has(a.id));
+  const checkedActiveIds = checkedAccounts.filter(a => a.is_active).map(a => a.id);
+  const checkedInactiveIds = checkedAccounts.filter(a => !a.is_active).map(a => a.id);
+  // Only patch the checked rows the action actually changes (e.g. "Make active"
+  // skips rows that are already active) so counts and requests stay honest.
+  async function batchPatch(patch: { is_active?: boolean; is_locked?: boolean }, targetIds?: string[]) {
     if (batchBusy) return;
     setBatchBusy(true);
     try {
-      const ids = [...checkedIds];
+      const ids = targetIds ?? [...checkedIds];
       for (const id of ids) {
         // eslint-disable-next-line no-await-in-loop
         try { await api.patch(`/businesses/${bizId}/coa/${id}`, patch); } catch { /* skip (e.g. locked rows) */ }
@@ -583,10 +588,17 @@ export default function CoaListPage() {
               <div className="absolute left-0 top-full mt-1 w-56 rounded-md border bg-background shadow-lg z-50 py-1">
                 <button
                   className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
-                  disabled={batchBusy}
-                  onClick={() => void batchPatch({ is_active: false })}
+                  disabled={batchBusy || checkedActiveIds.length === 0}
+                  onClick={() => void batchPatch({ is_active: false }, checkedActiveIds)}
                 >
-                  Make inactive ({checkedIds.size})
+                  Make inactive ({checkedActiveIds.length})
+                </button>
+                <button
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+                  disabled={batchBusy || checkedInactiveIds.length === 0}
+                  onClick={() => void batchPatch({ is_active: true }, checkedInactiveIds)}
+                >
+                  Make active ({checkedInactiveIds.length})
                 </button>
                 <button
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
