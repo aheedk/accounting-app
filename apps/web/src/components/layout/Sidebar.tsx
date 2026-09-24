@@ -4,6 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   BookOpen,
   Briefcase,
+  Sparkles,
   ChevronRight,
   FileBarChart,
   LayoutDashboard,
@@ -64,6 +65,15 @@ const groups: NavGroup[] = [
     ],
   },
   {
+    id: 'ai',
+    label: 'AI',
+    icon: Sparkles,
+    children: [
+      { to: '/ai/inbox', label: 'Document Inbox' },
+      { to: '/ai/coding-rules', label: 'Coding Rules' },
+    ],
+  },
+  {
     id: 'accounting',
     label: 'Accounting',
     icon: BookOpen,
@@ -72,7 +82,6 @@ const groups: NavGroup[] = [
       { to: '/accounting/books-review', label: 'Books Review' },
       { to: '/accounting/bank-accounts', label: 'Bank Accounts' },
       { to: '/accounting/bank-transactions', label: 'Bank Transactions' },
-      { to: '/accounting/email-imports', label: 'Email Imports' },
       { to: '/accounting/integrations', label: 'Integration Transactions' },
       { to: '/accounting/receipts', label: 'Receipts' },
       { to: '/accounting/reconcile', label: 'Reconcile' },
@@ -166,7 +175,7 @@ type SidebarNavProps = {
   onNavigate?: () => void;
 };
 
-const EMAIL_IMPORTS_PATH = '/accounting/email-imports';
+const AI_INBOX_PATH = '/ai/inbox';
 
 // Portal keeps flyouts outside the sidebar's scroll clipping without moving its rows.
 function DesktopSidebarNav() {
@@ -257,7 +266,7 @@ function DesktopSidebarNav() {
             {group.children.map(child => (
               <NavLink key={child.to} to={child.to} onClick={closeGroup} className={cn('shrink-0 flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', pathMatchesChild(pathname, child) ? 'border-gold bg-sidebar-active font-medium text-white' : 'border-transparent text-sidebar-muted hover:bg-sidebar-hover hover:text-white')}>
                 <span className="flex-1">{child.label}</span>
-                {child.to === EMAIL_IMPORTS_PATH && pendingImports > 0 && (
+                {child.to === AI_INBOX_PATH && pendingImports > 0 && (
                   <span className="flex h-2 w-2 shrink-0 rounded-full bg-blue-400" title={`${pendingImports} pending`} />
                 )}
               </NavLink>
@@ -420,7 +429,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                         )}
                       >
                         <span className="flex-1">{child.label}</span>
-                        {child.to === EMAIL_IMPORTS_PATH && pendingImports > 0 && (
+                        {child.to === AI_INBOX_PATH && pendingImports > 0 && (
                           <span className="flex h-2 w-2 shrink-0 rounded-full bg-blue-400" title={`${pendingImports} pending`} />
                         )}
                       </NavLink>

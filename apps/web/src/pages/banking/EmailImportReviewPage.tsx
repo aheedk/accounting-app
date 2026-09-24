@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink, Sparkles } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
+import DocumentUpload from '@/pages/ai/DocumentUpload';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -419,13 +420,21 @@ export default function EmailImportReviewPage() {
           <ChevronLeft className="h-4 w-4" />Back
         </button>
         <div>
-          <h1 className="text-xl font-semibold">Email Imports</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Document Inbox
+          </h1>
           <p className="text-sm text-muted-foreground">
             AI-extracted documents pending accountant review before posting to the ledger.
             {totalPending > 0 && <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">{totalPending} pending</span>}
           </p>
         </div>
       </div>
+
+      {/* Direct upload: same queue as the email route, no mailbox needed. */}
+      {!selectedBank && !selectedInvoice && (
+        <DocumentUpload onUploaded={loadPending} />
+      )}
 
       {/* Top tabs + refresh */}
       {!selectedBank && !selectedInvoice && (

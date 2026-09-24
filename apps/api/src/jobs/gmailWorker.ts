@@ -59,7 +59,7 @@ type InvoiceLineItem = {
   suggested_account?: string;
 };
 
-type UnifiedResult = {
+export type UnifiedResult = {
   document_type: 'bank_statement' | 'invoice' | 'unknown';
   // which client business this document belongs to (BILL TO / account holder)
   addressed_to?: string;
@@ -84,7 +84,7 @@ function buildAnthropicClient(): Anthropic {
 
 // Single Claude call: classify + extract in one pass.
 // If clientContext is provided the AI uses the real chart of accounts instead of a generic fallback list.
-async function classifyAndExtract(pdfBuffer: Buffer, clientContext?: ClientContext): Promise<UnifiedResult> {
+export async function classifyAndExtract(pdfBuffer: Buffer, clientContext?: ClientContext): Promise<UnifiedResult> {
   const client = buildAnthropicClient();
   const base64Pdf = pdfBuffer.toString('base64');
   const accountSection = buildCoaPromptSection(clientContext);
@@ -168,15 +168,15 @@ If the document is neither a bank statement nor an invoice/bill return:
   }
 }
 
-type CoaAccount = { id: string; name: string; account_type: string };
+export type CoaAccount = { id: string; name: string; account_type: string };
 type VendorMapping = { description: string; account_name: string };
 
-type ClientContext = {
+export type ClientContext = {
   coa: CoaAccount[];
   vendorHistory: VendorMapping[];
 };
 
-async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaAccount[]> {
+export async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaAccount[]> {
   return db.selectFrom('chart_of_accounts')
     .select(['id', 'name', 'account_type'])
     .where('business_id', '=', businessId)
@@ -188,7 +188,7 @@ async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaAccount[
 
 // Pull the last 60 approved bank-statement transactions for this business and build a
 // vendor→account mapping so the AI can reuse what the accountant previously accepted.
-async function fetchVendorHistory(db: Kysely<DB>, businessId: string, coa: CoaAccount[]): Promise<VendorMapping[]> {
+export async function fetchVendorHistory(db: Kysely<DB>, businessId: string, coa: CoaAccount[]): Promise<VendorMapping[]> {
   const coaMap = new Map(coa.map(a => [a.id, a.name]));
   const rows = await db
     .selectFrom('email_import_staging')
@@ -216,7 +216,7 @@ async function fetchVendorHistory(db: Kysely<DB>, businessId: string, coa: CoaAc
 }
 
 // Exact match first, then substring fuzzy fallback.
-function matchAccount(suggestion: string | undefined, accounts: CoaAccount[]): string | null {
+export function matchAccount(suggestion: string | undefined, accounts: CoaAccount[]): string | null {
   if (!suggestion?.trim()) return null;
   const hint = suggestion.trim().toLowerCase();
   const exact = accounts.find(a => a.name.toLowerCase() === hint);
@@ -245,7 +245,7 @@ async function resolveByEmail(db: Kysely<DB>, toHeader: string): Promise<{ busin
 }
 
 // Fall back to AI-extracted name matching when no import_email matched.
-async function resolveByName(db: Kysely<DB>, addressedTo: string | undefined): Promise<string | null> {
+export async function resolveByName(db: Kysely<DB>, addressedTo: string | undefined): Promise<string | null> {
   if (!addressedTo?.trim()) return null;
   const needle = addressedTo.trim().toLowerCase();
   const businesses = await db

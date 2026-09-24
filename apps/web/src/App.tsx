@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/auth/AuthContext';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
@@ -52,6 +52,7 @@ import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 import BankAccountListPage from '@/pages/banking/BankAccountListPage';
 import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
 import EmailImportReviewPage from '@/pages/banking/EmailImportReviewPage';
+import CodingRulesPage from '@/pages/ai/CodingRulesPage';
 import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage';
 import ReconcilePage from '@/pages/banking/ReconcilePage';
 import RulesPage from '@/pages/accounting/RulesPage';
@@ -170,8 +171,11 @@ export default function App() {
             <Route path="/accounting/books-review" element={<BooksReviewPage />} />
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
-            <Route path="/accounting/email-imports" element={<EmailImportReviewPage />} />
-            <Route path="/accounting/invoice-imports" element={<EmailImportReviewPage />} />
+            {/* AI is a top-level area now; the old paths redirect so existing links keep working. */}
+            <Route path="/ai/inbox" element={<EmailImportReviewPage />} />
+            <Route path="/ai/coding-rules" element={<CodingRulesPage />} />
+            <Route path="/accounting/email-imports" element={<Navigate to="/ai/inbox" replace />} />
+            <Route path="/accounting/invoice-imports" element={<Navigate to="/ai/inbox" replace />} />
             <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />
             <Route path="/accounting/integrations" element={<IntegrationInboxPage />} />
             <Route path="/accounting/receipts" element={<ReceiptsPage />} />
