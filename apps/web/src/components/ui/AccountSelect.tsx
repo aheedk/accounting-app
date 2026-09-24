@@ -9,6 +9,15 @@ export type AccountLike = {
   account_type: string;
 };
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
 const NORMAL_BALANCE: Record<string, 'DR' | 'CR'> = {
   asset: 'DR',
   expense: 'DR',
@@ -52,6 +61,11 @@ export function AccountSelect({
   const menuRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLUListElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  // Closing swaps the focused search input out of the DOM for the trigger button.
+  // Unless we move focus ourselves the browser drops focus to <body>, so the next
+  // Tab restarts from the top of the document (landing in the sidebar).
+  const focusAfterCloseRef = React.useRef<'trigger' | HTMLElement | null>(null);
 
   const selected = accounts.find((a) => a.id === value) ?? null;
   const accessibleLabel = ariaLabel && selected
@@ -89,7 +103,12 @@ export function AccountSelect({
     if (open) {
       inputRef.current?.focus();
       setActiveIdx(0);
+      return;
     }
+    const target = focusAfterCloseRef.current;
+    focusAfterCloseRef.current = null;
+    if (target === 'trigger') triggerRef.current?.focus();
+    else target?.focus();
   }, [open]);
 
   React.useEffect(() => {
@@ -102,8 +121,32 @@ export function AccountSelect({
     item?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIdx, open]);
 
+  // The focusable element immediately before/after this control in DOM order,
+  // skipping our own wrapper and the portalled menu (which renders at the end of
+  // <body> and would otherwise look like the "next" field).
+  function adjacentFocusable(backwards: boolean): HTMLElement | 'trigger' {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return 'trigger';
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter(el =>
+      !wrapper.contains(el) &&
+      !menuRef.current?.contains(el) &&
+      el.tabIndex !== -1,
+    );
+    const following = backwards
+      ? Node.DOCUMENT_POSITION_PRECEDING
+      : Node.DOCUMENT_POSITION_FOLLOWING;
+    const matches = candidates.filter(
+      el => (wrapper.compareDocumentPosition(el) & following) !== 0,
+    );
+    const next = backwards ? matches[matches.length - 1] : matches[0];
+    return next ?? 'trigger';
+  }
+
   function pick(a: AccountLike) {
     onChange(a.id);
+    focusAfterCloseRef.current = 'trigger';
     setOpen(false);
     setQuery('');
   }
@@ -135,9 +178,13 @@ export function AccountSelect({
       if (a) pick(a);
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      focusAfterCloseRef.current = 'trigger';
       setOpen(false);
       setQuery('');
     } else if (e.key === 'Tab') {
+      // Drive the focus move ourselves — see focusAfterCloseRef.
+      e.preventDefault();
+      focusAfterCloseRef.current = adjacentFocusable(e.shiftKey);
       setOpen(false);
       setQuery('');
     }
@@ -218,6 +265,7 @@ export function AccountSelect({
         />
       ) : (
         <button
+          ref={triggerRef}
           id={id}
           aria-label={accessibleLabel}
           type="button"

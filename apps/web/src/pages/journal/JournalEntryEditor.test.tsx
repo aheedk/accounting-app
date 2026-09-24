@@ -186,6 +186,35 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     expect(document.activeElement).toBe(firstNewAccount);
   });
 
+  it('moves focus to the Debits box in the same row when tabbing out of an open Account search', async () => {
+    await renderEditor();
+    const row = dataRows()[0]!;
+    await click(container.querySelector('#journal-account-0')!);
+
+    // Open state swaps the trigger button for a search input.
+    const search = row.querySelector<HTMLInputElement>('input[aria-label="Account, line 1"]')!;
+    expect(document.activeElement).toBe(search);
+
+    const event = await pressTab(search);
+
+    expect(event.defaultPrevented).toBe(true);
+    const debits = row.querySelectorAll<HTMLInputElement>('input[type="number"]')[0]!;
+    expect(document.activeElement).toBe(debits);
+  });
+
+  it('returns focus to the Account trigger after picking an account with Enter', async () => {
+    await renderEditor();
+    const row = dataRows()[0]!;
+    await click(container.querySelector('#journal-account-0')!);
+    const search = row.querySelector<HTMLInputElement>('input[aria-label="Account, line 1"]')!;
+
+    await act(async () => search.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', bubbles: true, cancelable: true,
+    })));
+
+    expect(document.activeElement).toBe(container.querySelector('#journal-account-0'));
+  });
+
   it('does not add rows on Shift+Tab or from a non-final Class field', async () => {
     await renderEditor();
 
