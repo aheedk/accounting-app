@@ -57,17 +57,21 @@ describe('chartOfAccountsService', () => {
     ).rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
   });
 
-  it('updateAccount on a system account: forbids name change but allows is_active toggle', async () => {
+  it('updateAccount on a system account: forbids renaming and deactivating', async () => {
     const { biz, ctx } = await setup(t);
     await t.db.transaction().execute(trx => coa.seedDefaultCoa(trx, ctx, { business_id: biz.id }));
     const ar = await t.db.selectFrom('chart_of_accounts').selectAll().where('code', '=', '1100').executeTakeFirstOrThrow();
     await expect(
       t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { name: 'NEW NAME' } })),
     ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
-    const after = await t.db.transaction().execute(trx =>
-      coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { is_active: false } }),
-    );
-    expect(after.is_active).toBe(false);
+    // The ledger needs AP/AR to post bills and invoices, so deactivating a
+    // system account is blocked rather than breaking posting later.
+    await expect(
+      t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { is_active: false } })),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+    const unchanged = await t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('id', '=', ar.id).executeTakeFirstOrThrow();
+    expect(unchanged.is_active).toBe(true);
   });
 
   it('listAccounts respects business scoping', async () => {
