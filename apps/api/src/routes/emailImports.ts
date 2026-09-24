@@ -67,6 +67,8 @@ type StagedTransaction = {
   suggested_offset?: string;
   suggested_account_id?: string;
   suggestion?: { confidence: number; band: string; source_layer: string } | null;
+  /** Already posted by the auto-post pass; not reviewable again. */
+  auto_posted?: boolean;
 };
 
 /**
@@ -173,7 +175,10 @@ router.post(
 
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
-      type RawTx = { date: string; description: string; amount: string; type: 'debit' | 'credit'; balance: string };
+      type RawTx = {
+        date: string; description: string; amount: string;
+        type: 'debit' | 'credit'; balance: string; auto_posted?: boolean;
+      };
       const transactions: RawTx[] = (typeof staged.extracted_transactions === 'string'
         ? JSON.parse(staged.extracted_transactions)
         : staged.extracted_transactions) as RawTx[];
@@ -186,7 +191,8 @@ router.post(
       const pairs: RawTxWithItem[] = [];
       for (const item of included) {
         const tx = transactions[item.index];
-        if (tx) pairs.push({ tx, item });
+        // Rows the auto-post pass already committed must not post twice.
+        if (tx && !tx.auto_posted) pairs.push({ tx, item });
       }
 
       const jeInputs = pairs.map(({ tx, item }) => {
@@ -272,6 +278,125 @@ router.post(
       });
 
       res.json({ ok: true, posted, learned });
+    } catch (e) { next(e); }
+  },
+);
+
+const autoPostSchema = z.object({ bank_account_id: z.string().uuid() });
+
+/**
+ * Post only the rows the engine is confident about (band "auto_post"), leaving
+ * everything else pending for review.
+ *
+ * Requires the business to have opted in: posting to the ledger without a human
+ * reviewing each line is a firm policy decision, so it is off by default. A
+ * human still identifies the document and chooses the bank account -- the cash
+ * side of the entry cannot be inferred from the statement.
+ */
+router.post(
+  '/businesses/:businessId/email-imports/:importId/auto-post',
+  requireMinRole('accountant'),
+  async (req, res, next) => {
+    try {
+      const body = autoPostSchema.parse(req.body);
+      const bizId = req.tenancy!.business_id;
+      const serviceCtx = ctx(req);
+
+      const business = await db.selectFrom('businesses')
+        .select(['ai_auto_post_enabled'])
+        .where('id', '=', bizId)
+        .executeTakeFirst();
+      if (!business?.ai_auto_post_enabled) {
+        res.status(400).json({
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: 'Auto-post is turned off for this client.',
+          },
+        });
+        return;
+      }
+
+      const staged = await db.selectFrom('email_import_staging').selectAll()
+        .where('id', '=', req.params['importId']!)
+        .where('business_id', '=', bizId)
+        .where('status', '=', 'pending')
+        .executeTakeFirst();
+      if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
+
+      type AutoTx = {
+        date: string; description: string; amount: string;
+        type: 'debit' | 'credit'; balance: string; auto_posted?: boolean;
+      };
+      const transactions: AutoTx[] = (typeof staged.extracted_transactions === 'string'
+        ? JSON.parse(staged.extracted_transactions)
+        : staged.extracted_transactions) as AutoTx[];
+
+      const suggestions = await suggestCodingBatch(db, serviceCtx, transactions.map(tx => ({
+        description: tx.description ?? '',
+        amount: `${Math.abs(Number(tx.amount ?? 0))}`,
+        direction: tx.type === 'credit' ? 'credit' as const : 'debit' as const,
+      })));
+
+      const confident = transactions.flatMap((tx, index) => {
+        if (tx.auto_posted) return [];
+        const suggestion = suggestions[index];
+        if (!suggestion || suggestion.band !== 'auto_post') return [];
+        const accountId = suggestion.lines[0]?.account_id;
+        return accountId ? [{ tx, index, accountId }] : [];
+      });
+
+      if (confident.length === 0) {
+        res.json({ ok: true, posted: 0, remaining: transactions.filter(t => !t.auto_posted).length });
+        return;
+      }
+
+      const jeInputs = confident.map(({ tx, accountId }) => {
+        const amt = parseFloat(tx.amount).toFixed(2);
+        const isDeposit = tx.type === 'credit';
+        const [m, d, y] = tx.date.split('/');
+        return {
+          business_id: bizId,
+          entry_date: `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`,
+          source_type: 'bank_import' as const,
+          source_id: staged.id,
+          memo: tx.description,
+          lines: [
+            {
+              account_id: body.bank_account_id,
+              debit: isDeposit ? amt : '0.00',
+              credit: isDeposit ? '0.00' : amt,
+              memo: tx.description,
+            },
+            {
+              account_id: accountId,
+              debit: isDeposit ? '0.00' : amt,
+              credit: isDeposit ? amt : '0.00',
+              memo: tx.description,
+            },
+          ],
+        };
+      });
+
+      for (const { index } of confident) transactions[index]!.auto_posted = true;
+      const remaining = transactions.filter(t => !t.auto_posted).length;
+
+      await db.transaction().execute(async trx => {
+        await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+        await trx.updateTable('email_import_staging')
+          .set({
+            extracted_transactions: JSON.stringify(transactions),
+            // Nothing left to review means the document is done.
+            ...(remaining === 0 ? {
+              status: 'approved',
+              approved_by_user_id: serviceCtx.user_id,
+              approved_at: new Date().toISOString(),
+            } : {}),
+          })
+          .where('id', '=', staged.id)
+          .execute();
+      });
+
+      res.json({ ok: true, posted: confident.length, remaining });
     } catch (e) { next(e); }
   },
 );

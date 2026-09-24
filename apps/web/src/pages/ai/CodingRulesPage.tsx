@@ -3,6 +3,7 @@ import { Sparkles, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
+import AiSettingsCard from './AiSettingsCard';
 import { Input } from '@/components/ui/input';
 
 type RuleLine = {
@@ -27,7 +28,7 @@ type CodingRule = {
 type Account = { id: string; code: string; name: string };
 
 export default function CodingRulesPage() {
-  const bizId = useActiveBusinessId();
+  const [bizId] = useActiveBusinessId();
   const [rules, setRules] = useState<CodingRule[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [filter, setFilter] = useState('');
@@ -94,6 +95,8 @@ export default function CodingRulesPage() {
           className="w-64"
         />
       </div>
+
+      <AiSettingsCard />
 
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">

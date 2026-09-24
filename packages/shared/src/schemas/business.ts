@@ -17,6 +17,8 @@ export const businessUpdateSchema = z.object({
   fiscal_year_start_month: z.number().int().min(1).max(12).optional(),
   address: businessAddressSchema.nullable().optional(),
   import_email: z.string().email().max(254).nullable().optional(),
+  /** Opt in to posting high-confidence AI suggestions without review. */
+  ai_auto_post_enabled: z.boolean().optional(),
 });
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
 

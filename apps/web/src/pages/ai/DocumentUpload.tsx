@@ -16,7 +16,7 @@ type UploadState = { busy: boolean; error: string | null; done: string | null };
  * review queue.
  */
 export default function DocumentUpload({ onUploaded }: Props) {
-  const bizId = useActiveBusinessId();
+  const [bizId] = useActiveBusinessId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [state, setState] = useState<UploadState>({ busy: false, error: null, done: null });

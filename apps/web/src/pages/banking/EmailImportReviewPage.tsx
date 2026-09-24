@@ -17,6 +17,7 @@ type ExtractedTx = {
   suggested_offset?: string;
   suggested_account_id?: string;
   suggestion?: SuggestionMeta | null;
+  auto_posted?: boolean;
 };
 
 type StagedImport = {
@@ -116,6 +117,8 @@ export default function EmailImportReviewPage() {
   const [included, setIncluded] = useState<Record<number, boolean>>({});
   // Rows where the accountant ticked "use this account next time".
   const [remember, setRemember] = useState<Record<number, boolean>>({});
+  const [autoPostEnabled, setAutoPostEnabled] = useState(false);
+  const [autoPostNote, setAutoPostNote] = useState<string | null>(null);
   const [bankPosting, setBankPosting] = useState(false);
   const [bankError, setBankError] = useState<string | null>(null);
   const bankPostingRef = useRef(false);
@@ -146,7 +149,9 @@ export default function EmailImportReviewPage() {
       api.get(`/businesses/${bizId}/coa`),
       api.get(`/businesses/${bizId}/vendors`),
       api.get(`/businesses/${bizId}/customers`),
-    ]).then(([bankRes, invRes, coaRes, vendRes, custRes]) => {
+      api.get(`/businesses/${bizId}`),
+    ]).then(([bankRes, invRes, coaRes, vendRes, custRes, bizRes]) => {
+      setAutoPostEnabled(bizRes.data?.ai_auto_post_enabled === true);
       setBankImports((bankRes.data.imports as StagedImport[]) ?? []);
       setInvoiceImports((invRes.data.imports as InvoiceImport[]) ?? []);
       setAccounts((coaRes.data.accounts as CoaAccount[]) ?? []);
@@ -177,6 +182,7 @@ export default function EmailImportReviewPage() {
     setOffsets({});
     setIncluded({});
     setRemember({});
+    setAutoPostNote(null);
     setLineAccountIds({});
     setLineIncluded({});
     setSelectedVendorId('');
@@ -253,6 +259,42 @@ export default function EmailImportReviewPage() {
     setIncluded(initIncluded);
     setOffsets(initOffsets);
     setRemember({});
+  }
+
+  // Auto-post is opt-in per client. Choosing the bank account is the human step
+  // that makes posting possible -- the cash side cannot be inferred from the PDF.
+  async function handleBankAccountChange(nextId: string) {
+    setBankAccountId(nextId);
+    setAutoPostNote(null);
+    if (!nextId || !autoPostEnabled || !bizId || !selectedBank) return;
+    try {
+      const res = await api.post<{ posted: number; remaining: number }>(
+        `/businesses/${bizId}/email-imports/${selectedBank.id}/auto-post`,
+        { bank_account_id: nextId },
+      );
+      if (res.data.posted === 0) return;
+      setAutoPostNote(`${res.data.posted} high-confidence ${res.data.posted === 1 ? 'row' : 'rows'} posted automatically. ${res.data.remaining} left to review.`);
+      if (res.data.remaining === 0) {
+        setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
+        setSelectedBank(null);
+        return;
+      }
+      // Reflect the posted rows without a full reload.
+      setSelectedBank(prev => prev && ({
+        ...prev,
+        extracted_transactions: prev.extracted_transactions.map(tx =>
+          tx.suggestion?.band === 'auto_post' ? { ...tx, auto_posted: true } : tx),
+      }));
+      setIncluded(prev => {
+        const next = { ...prev };
+        selectedBank.extracted_transactions.forEach((tx, i) => {
+          if (tx.suggestion?.band === 'auto_post') next[i] = false;
+        });
+        return next;
+      });
+    } catch {
+      setAutoPostNote('Auto-post could not run; review these rows manually.');
+    }
   }
 
   async function handleBankApprove() {
@@ -558,9 +600,15 @@ export default function EmailImportReviewPage() {
                 </div>
               </div>
 
+              {autoPostNote && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">
+                  {autoPostNote}
+                </div>
+              )}
+
               <div className="flex items-center gap-3 rounded-lg border p-4 bg-muted/10">
                 <label className="text-sm font-medium whitespace-nowrap">Bank account (this statement)</label>
-                <select value={bankAccountId} onChange={e => setBankAccountId(e.target.value)}
+                <select value={bankAccountId} onChange={e => void handleBankAccountChange(e.target.value)}
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— select —</option>
                   {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
@@ -589,6 +637,7 @@ export default function EmailImportReviewPage() {
                       <tr key={i} className={`border-b ${!included[i] ? 'opacity-40' : ''}`}>
                         <td className="px-3 py-2">
                           <input type="checkbox" checked={included[i] ?? true}
+                            disabled={tx.auto_posted}
                             onChange={e => setIncluded(prev => ({ ...prev, [i]: e.target.checked }))} />
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{tx.date}</td>
@@ -602,7 +651,7 @@ export default function EmailImportReviewPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <select disabled={!included[i]} value={offsets[i] ?? ''}
+                          <select disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
                             onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
                             title={tx.suggested_offset ? `AI suggested: ${tx.suggested_offset}` : undefined}
                             className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${offsets[i] ? 'border-emerald-400' : ''}`}>
@@ -610,11 +659,15 @@ export default function EmailImportReviewPage() {
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                           </select>
                           <div className="mt-1 space-y-1">
-                            <ConfidenceBadge suggestion={tx.suggestion} />
+                            {tx.auto_posted
+                              ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+                                  <CheckCircle className="h-3 w-3" />Auto-posted
+                                </span>
+                              : <ConfidenceBadge suggestion={tx.suggestion} />}
                             {/* Only offer to learn when the accountant overrode
                                 the engine -- accepting a suggestion is not a
                                 signal worth turning into a rule. */}
-                            {included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
+                            {!tx.auto_posted && included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
                               <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
                                 <input
                                   type="checkbox"

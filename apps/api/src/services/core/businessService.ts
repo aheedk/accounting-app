@@ -12,6 +12,7 @@ export type BusinessPatch = {
   fiscal_year_start_month?: number;
   address?: BusinessAddress | null;
   import_email?: string | null;
+  ai_auto_post_enabled?: boolean;
 };
 
 export type BusinessCreateInput = {
