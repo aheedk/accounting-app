@@ -231,11 +231,11 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       });
       let savedId: string;
       if (existing) {
-        const response = await api.post<{ corrected_entry: { id: string } }>(
-          `/businesses/${businessId}/journal-entries/${existing.entry.id}/correct`,
+        const response = await api.put<{ entry: { id: string } }>(
+          `/businesses/${businessId}/journal-entries/${existing.entry.id}`,
           body,
         );
-        savedId = response.data.corrected_entry.id;
+        savedId = response.data.entry.id;
       } else {
         const response = await api.post<{ id: string }>(`/businesses/${businessId}/journal-entries`, body);
         savedId = response.data.id;
@@ -375,7 +375,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         }`}>
           {readOnly
             ? existing.correction_block_reason
-            : 'Saving creates a reversing entry and posts the corrected replacement so your audit history stays intact.'}
+            : 'Saving updates this entry in place. The change is recorded in the audit history.'}
         </div>
       )}
 

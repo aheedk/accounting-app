@@ -34,7 +34,7 @@ export type PostJournalEntryInput = {
   lines: LineInput[];
 };
 
-export type CorrectJournalEntryInput = {
+export type UpdateJournalEntryInput = {
   journal_entry_id: string;
   replacement: PostJournalEntryInput;
 };
@@ -74,17 +74,15 @@ function assertBalanced(lines: LineInput[]) {
   }
 }
 
-export async function postJournalEntry(
-  trx: Transaction<DB>, ctx: ServiceCtx, input: PostJournalEntryInput,
+// Validate account tenancy and posting eligibility at the ledger choke point
+// so every source flow receives the same protection.
+async function assertPostableAccounts(
+  trx: Transaction<DB>, businessId: string, lines: LineInput[],
 ) {
-  assertBalanced(input.lines);
-
-  // Validate account tenancy and posting eligibility at the ledger choke point
-  // so every source flow receives the same protection.
-  const accountIds = [...new Set(input.lines.map(line => line.account_id))];
+  const accountIds = [...new Set(lines.map(line => line.account_id))];
   const postingAccounts = await trx.selectFrom('chart_of_accounts')
     .select(['id', 'code', 'name', 'is_locked'])
-    .where('business_id', '=', input.business_id)
+    .where('business_id', '=', businessId)
     .where('id', 'in', accountIds)
     .where('is_active', '=', true)
     .execute();
@@ -98,6 +96,13 @@ export async function postJournalEntry(
       { accounts: lockedAccounts.map(a => a.code) },
     );
   }
+}
+
+export async function postJournalEntry(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: PostJournalEntryInput,
+) {
+  assertBalanced(input.lines);
+  await assertPostableAccounts(trx, input.business_id, input.lines);
 
   const period = await findPeriodForDate(trx as unknown as Kysely<DB>, input.business_id, input.entry_date);
   if (!period) {
@@ -405,11 +410,19 @@ export async function reverseJournalEntry(
   return posted;
 }
 
-export async function correctJournalEntry(
-  trx: Transaction<DB>, ctx: ServiceCtx, input: CorrectJournalEntryInput,
+/**
+ * Edit a posted manual journal entry in place (QBO parity).
+ *
+ * The row keeps its id, number, and ledger identity; only the accounting
+ * content the user changed in the grid moves. History lives in the audit log
+ * (before/after), not in a visible reversal pair -- an explicit reversal is
+ * still available through `reverseJournalEntry`.
+ */
+export async function updateJournalEntry(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateJournalEntryInput,
 ) {
   if (!hasMinRole(ctx.effective_role, 'accountant')) {
-    throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to correct journal entries');
+    throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to edit journal entries');
   }
   if (input.replacement.business_id !== ctx.business_id) {
     throw new BusinessRuleError(ERR.NOT_FOUND, 'Journal entry not found');
@@ -439,7 +452,10 @@ export async function correctJournalEntry(
     );
   }
   if (input.replacement.source_type !== 'manual' && input.replacement.source_type !== 'adjustment') {
-    throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'A corrected journal entry must be manual or adjusting');
+    throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'An edited journal entry must be manual or adjusting');
+  }
+  if (await hasPostedReversal(trx as unknown as Kysely<DB>, ctx.business_id, originalBefore.id)) {
+    throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'This journal entry has already been reversed');
   }
 
   const originalLines = await trx.selectFrom('journal_entry_lines').selectAll()
@@ -447,32 +463,107 @@ export async function correctJournalEntry(
     .orderBy('line_number')
     .execute();
 
-  const reversal = await voidJournalEntry(trx, ctx, {
-    journal_entry_id: originalBefore.id,
-    void_reason: 'Corrected through journal entry editor',
-    reversal_date: originalBefore.entry_date,
-  });
-  const correctedEntry = await postJournalEntry(trx, ctx, {
-    ...input.replacement,
-    corrected_from_entry_id: originalBefore.id,
-  });
-  const original = await trx.selectFrom('journal_entries').selectAll()
-    .where('id', '=', originalBefore.id)
+  assertBalanced(input.replacement.lines);
+  await assertPostableAccounts(trx, ctx.business_id, input.replacement.lines);
+
+  // The period the entry currently sits in must be open, and so must the
+  // period it is moving to -- editing into or out of a closed period is not
+  // allowed without the existing firm-admin override.
+  const adminOverride = (await currentSetting(trx, 'app.admin_override')) === 'on';
+  const originalPeriod = await trx.selectFrom('fiscal_periods').selectAll()
+    .where('id', '=', originalBefore.period_id)
     .executeTakeFirstOrThrow();
+  if (originalPeriod.status === 'closed' && !adminOverride) {
+    throw new ClosedPeriodError(originalPeriod.id, originalPeriod.closed_at?.toString());
+  }
+  const targetPeriod = await findPeriodForDate(
+    trx as unknown as Kysely<DB>, ctx.business_id, input.replacement.entry_date,
+  );
+  if (!targetPeriod) {
+    throw new PreconditionError(
+      `No fiscal period covers ${input.replacement.entry_date}; create periods first`,
+    );
+  }
+  if (targetPeriod.status === 'closed' && !adminOverride) {
+    throw new ClosedPeriodError(targetPeriod.id, targetPeriod.closed_at?.toString());
+  }
+
+  const requestedNumber = input.replacement.journal_number?.trim() || null;
+  let journalNumber = originalBefore.journal_number;
+  if (requestedNumber && requestedNumber !== originalBefore.journal_number) {
+    if (requestedNumber.length > 99 || requestedNumber.endsWith('R')) {
+      throw new PreconditionError(
+        requestedNumber.endsWith('R')
+          ? 'Journal numbers ending in R are reserved for reversal entries'
+          : 'Journal numbers must be 99 characters or fewer so they can be reversed',
+      );
+    }
+    if (/^[1-9]\d{0,17}$/.test(requestedNumber)) {
+      await reserveCounterAtLeast(trx, ctx.business_id, 'journal_entry', requestedNumber);
+    }
+    const duplicate = await trx.selectFrom('journal_entries').select('id')
+      .where('business_id', '=', ctx.business_id)
+      .where('journal_number', '=', requestedNumber)
+      .where('status', '<>', 'voided')
+      .where('id', '<>', originalBefore.id)
+      .executeTakeFirst();
+    if (duplicate) {
+      throw new BusinessRuleError(
+        ERR.DUPLICATE_RESOURCE,
+        `Journal number ${requestedNumber} already exists`,
+      );
+    }
+    journalNumber = requestedNumber;
+  }
+
+  // Controlled escape hatch for the posted-immutability triggers; scoped to
+  // this transaction only (see 0065_journal_entry_in_place_edit.sql).
+  await sql`SELECT set_config('app.allow_edit', 'on', true)`.execute(trx);
+
+  const updated = await trx.updateTable('journal_entries')
+    .set({
+      entry_date: input.replacement.entry_date,
+      period_id: targetPeriod.id,
+      journal_number: journalNumber,
+      memo: input.replacement.memo,
+      reference: input.replacement.reference ?? null,
+      updated_at: sql`now()`,
+    })
+    .where('id', '=', originalBefore.id)
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  await trx.deleteFrom('journal_entry_lines')
+    .where('journal_entry_id', '=', originalBefore.id)
+    .execute();
+  let n = 1;
+  for (const l of input.replacement.lines) {
+    await trx.insertInto('journal_entry_lines').values({
+      journal_entry_id: originalBefore.id,
+      line_number: n++,
+      account_id: l.account_id,
+      debit: l.debit,
+      credit: l.credit,
+      memo: l.memo,
+      name: l.name ?? null,
+      class_name: l.class_name ?? null,
+    }).execute();
+  }
+
+  const updatedLines = await trx.selectFrom('journal_entry_lines').selectAll()
+    .where('journal_entry_id', '=', originalBefore.id)
+    .orderBy('line_number')
+    .execute();
 
   await auditRecord(trx, ctx, {
     action: AUDIT.JOURNAL_ENTRY_UPDATE,
     entity_type: 'journal_entry',
     entity_id: originalBefore.id,
     before: { entry: originalBefore, lines: originalLines },
-    after: {
-      original_id: originalBefore.id,
-      reversal_id: reversal.id,
-      corrected_entry_id: correctedEntry.id,
-    },
+    after: { entry: updated, lines: updatedLines },
   });
 
-  return { original, reversal, corrected_entry: correctedEntry };
+  return { entry: updated, lines: updatedLines };
 }
 
 export async function computeAccountBalance(

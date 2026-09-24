@@ -600,7 +600,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(reversals).toHaveLength(1);
   });
 
-  it('atomically corrects a posted manual entry with a same-date reversal and linked replacement', async () => {
+  it('edits a posted manual entry in place without creating a reversal', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const original = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -629,7 +629,7 @@ describe('ledgerService.postJournalEntry', () => {
     );
 
     const result = await t.db.transaction().execute(trx =>
-      ledger.correctJournalEntry(trx, ctx, {
+      ledger.updateJournalEntry(trx, ctx, {
         journal_entry_id: original.id,
         replacement: {
           business_id: biz.id,
@@ -657,34 +657,27 @@ describe('ledgerService.postJournalEntry', () => {
       }),
     );
 
-    expect(result.original).toMatchObject({ id: original.id, status: 'voided' });
-    expect(result.reversal).toMatchObject({
-      entry_date: '2026-04-15',
-      reversed_entry_id: original.id,
-      source_type: 'reversal',
-      status: 'posted',
-    });
-    expect(result.corrected_entry).toMatchObject({
+    // Same row, same id and number: the entry is mutated, not replaced.
+    expect(result.entry).toMatchObject({
+      id: original.id,
+      journal_number: original.journal_number,
       entry_date: '2026-05-02',
-      source_type: 'adjustment',
-      corrected_from_entry_id: original.id,
-      status: 'posted',
+      memo: 'Corrected cash sale',
       reference: 'AJE-22',
+      status: 'posted',
+      corrected_from_entry_id: null,
     });
 
-    const reversalLines = await t.db.selectFrom('journal_entry_lines').selectAll()
-      .where('journal_entry_id', '=', result.reversal.id).orderBy('line_number').execute();
-    expect(reversalLines[0]).toMatchObject({
-      account_id: cash.id,
-      debit: '0.0000',
-      credit: '100.0000',
-      name: 'Patient A',
-      class_name: 'Clinic',
-    });
+    // No reversal and no replacement entry exist for this business.
+    const allEntries = await t.db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', biz.id).execute();
+    expect(allEntries).toHaveLength(1);
+    expect(allEntries[0]!.id).toBe(original.id);
 
-    const correctedLines = await t.db.selectFrom('journal_entry_lines').selectAll()
-      .where('journal_entry_id', '=', result.corrected_entry.id).orderBy('line_number').execute();
-    expect(correctedLines[0]).toMatchObject({
+    const updatedLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', original.id).orderBy('line_number').execute();
+    expect(updatedLines).toHaveLength(2);
+    expect(updatedLines[0]).toMatchObject({
       account_id: cash.id,
       debit: '125.0000',
       credit: '0.0000',
@@ -693,17 +686,19 @@ describe('ledgerService.postJournalEntry', () => {
       class_name: 'Clinic',
     });
 
+    // History lives in the audit log instead of a visible reversal pair.
     const updateAudit = await t.db.selectFrom('audit_logs').selectAll()
       .where('action', '=', 'journal_entry.update').executeTakeFirstOrThrow();
     expect(updateAudit.entity_id).toBe(original.id);
+    expect(updateAudit.before_state).toMatchObject({
+      entry: { id: original.id, entry_date: '2026-04-15', memo: 'Original cash sale' },
+    });
     expect(updateAudit.after_state).toMatchObject({
-      original_id: original.id,
-      reversal_id: result.reversal.id,
-      corrected_entry_id: result.corrected_entry.id,
+      entry: { id: original.id, entry_date: '2026-05-02', memo: 'Corrected cash sale' },
     });
   });
 
-  it('rejects correction of a generated reversal entry and leaves it posted', async () => {
+  it('rejects an in-place edit of a generated reversal entry and leaves it posted', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const original = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -726,7 +721,7 @@ describe('ledgerService.postJournalEntry', () => {
     );
 
     await expect(t.db.transaction().execute(trx =>
-      ledger.correctJournalEntry(trx, ctx, {
+      ledger.updateJournalEntry(trx, ctx, {
         journal_entry_id: generated.id,
         replacement: {
           business_id: biz.id,
@@ -746,7 +741,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(after.status).toBe('posted');
   });
 
-  it('rejects correction of a source-linked adjustment', async () => {
+  it('rejects an in-place edit of a source-linked adjustment', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const generated = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -762,7 +757,7 @@ describe('ledgerService.postJournalEntry', () => {
       }),
     );
 
-    await expect(t.db.transaction().execute(trx => ledger.correctJournalEntry(trx, ctx, {
+    await expect(t.db.transaction().execute(trx => ledger.updateJournalEntry(trx, ctx, {
       journal_entry_id: generated.id,
       replacement: {
         business_id: biz.id,
@@ -781,7 +776,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(unchanged.status).toBe('posted');
   });
 
-  it('rejects correction when the caller lacks accountant access', async () => {
+  it('rejects an in-place edit when the caller lacks accountant access', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const original = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -797,7 +792,7 @@ describe('ledgerService.postJournalEntry', () => {
     );
 
     await expect(t.db.transaction().execute(trx =>
-      ledger.correctJournalEntry(trx, { ...ctx, effective_role: 'staff' }, {
+      ledger.updateJournalEntry(trx, { ...ctx, effective_role: 'staff' }, {
         journal_entry_id: original.id,
         replacement: {
           business_id: biz.id,
@@ -817,7 +812,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(after.status).toBe('posted');
   });
 
-  it('hides a correction target belonging to another business', async () => {
+  it('hides an edit target belonging to another business', async () => {
     const { firm, biz, ctx, cash, revenue } = await setup(t);
     const otherBusiness = await makeBusiness(t.db, firm.id, 'Other Biz');
     await seedYearPeriods(t.db, otherBusiness.id, 2026);
@@ -838,7 +833,7 @@ describe('ledgerService.postJournalEntry', () => {
     );
 
     await expect(t.db.transaction().execute(trx =>
-      ledger.correctJournalEntry(trx, ctx, {
+      ledger.updateJournalEntry(trx, ctx, {
         journal_entry_id: otherEntry.id,
         replacement: {
           business_id: biz.id,
@@ -858,7 +853,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(after.status).toBe('posted');
   });
 
-  it('rejects correction in a closed original period without changing the ledger', async () => {
+  it('rejects an in-place edit in a closed original period without changing the ledger', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const original = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -878,7 +873,7 @@ describe('ledgerService.postJournalEntry', () => {
     );
 
     await expect(t.db.transaction().execute(trx =>
-      ledger.correctJournalEntry(trx, ctx, {
+      ledger.updateJournalEntry(trx, ctx, {
         journal_entry_id: original.id,
         replacement: {
           business_id: biz.id,
@@ -899,7 +894,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(entries[0]!.status).toBe('posted');
   });
 
-  it('rolls back the void when replacement data is unbalanced', async () => {
+  it('rolls back the whole edit when the new lines are unbalanced', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const original = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -915,7 +910,7 @@ describe('ledgerService.postJournalEntry', () => {
     );
 
     await expect(t.db.transaction().execute(trx =>
-      ledger.correctJournalEntry(trx, ctx, {
+      ledger.updateJournalEntry(trx, ctx, {
         journal_entry_id: original.id,
         replacement: {
           business_id: biz.id,
@@ -933,10 +928,14 @@ describe('ledgerService.postJournalEntry', () => {
     const entries = await t.db.selectFrom('journal_entries').selectAll()
       .where('business_id', '=', biz.id).execute();
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ id: original.id, status: 'posted' });
+    expect(entries[0]).toMatchObject({ id: original.id, status: 'posted', entry_date: '2026-04-15' });
+    const lines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', original.id).orderBy('line_number').execute();
+    expect(lines).toHaveLength(2);
+    expect(lines[0]!.debit).toBe('80.0000');
   });
 
-  it('rejects a second correction of the same original', async () => {
+  it('allows repeated in-place edits of the same entry', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const original = await t.db.transaction().execute(trx =>
       ledger.postJournalEntry(trx, ctx, {
@@ -961,18 +960,52 @@ describe('ledgerService.postJournalEntry', () => {
       ],
     };
 
-    await t.db.transaction().execute(trx => ledger.correctJournalEntry(trx, ctx, {
+    await t.db.transaction().execute(trx => ledger.updateJournalEntry(trx, ctx, {
       journal_entry_id: original.id,
       replacement,
     }));
-    await expect(t.db.transaction().execute(trx => ledger.correctJournalEntry(trx, ctx, {
+    const second = await t.db.transaction().execute(trx => ledger.updateJournalEntry(trx, ctx, {
       journal_entry_id: original.id,
-      replacement,
-    }))).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
+      replacement: { ...replacement, memo: 'Second edit' },
+    }));
 
+    expect(second.entry).toMatchObject({ id: original.id, memo: 'Second edit', status: 'posted' });
     const entries = await t.db.selectFrom('journal_entries').selectAll()
       .where('business_id', '=', biz.id).execute();
-    expect(entries).toHaveLength(3);
+    expect(entries).toHaveLength(1);
+  });
+
+  it('rejects an in-place edit of an entry that already has a reversal', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: null,
+        lines: [
+          { account_id: cash.id, debit: '60.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '60.0000', memo: null },
+        ],
+      }),
+    );
+    await t.db.transaction().execute(trx => ledger.reverseJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+    }));
+
+    await expect(t.db.transaction().execute(trx => ledger.updateJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+      replacement: {
+        business_id: biz.id,
+        entry_date: '2026-04-15',
+        source_type: 'manual',
+        memo: 'Should not apply',
+        lines: [
+          { account_id: cash.id, debit: '65.0000', credit: '0.0000', memo: null },
+          { account_id: revenue.id, debit: '0.0000', credit: '65.0000', memo: null },
+        ],
+      },
+    }))).rejects.toMatchObject({ code: ERR.IMMUTABLE_RECORD });
   });
 
   it('computeAccountBalance sums debits minus credits across posted lines only', async () => {

@@ -90,14 +90,14 @@ router.post('/businesses/:businessId/journal-entries', requireMinRole('accountan
   } catch (e) { next(e); }
 });
 
-router.post('/businesses/:businessId/journal-entries/:id/correct', requireMinRole('accountant'), async (req, res, next) => {
+router.put('/businesses/:businessId/journal-entries/:id', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const body = schemas.journalEntryCorrectionSchema.parse(req.body);
     const ctx = ctxFromReq(req);
     const force = req.query['admin_override'] === 'true';
     const reason = (req.body?.admin_override_reason as string | undefined) ?? '';
     const work = (trx: Transaction<DB>) =>
-      ledger.correctJournalEntry(trx, ctx, {
+      ledger.updateJournalEntry(trx, ctx, {
         journal_entry_id: req.params['id']!,
         replacement: {
           business_id: req.tenancy!.business_id,
