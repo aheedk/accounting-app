@@ -255,6 +255,79 @@ describe('autoCodingService.suggestCoding', () => {
   });
 });
 
+// Real charts of accounts frequently carry no detail_type at all (the seeded
+// demo CoA has none), so the accounting rules have to work off account names.
+describe('autoCodingService accounting rules without detail types', () => {
+  let t: TestDb;
+  beforeAll(async () => { t = await startTestDb(); });
+  afterAll(async () => { await stopTestDb(); });
+  beforeEach(async () => { await truncateAll(t.db); });
+
+  async function plainSetup() {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'No Detail Types');
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = {
+      user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta,
+    };
+    const cash = await makeAccount(t.db, biz.id, { code: '1010', name: 'Operating Cash', account_type: 'asset' });
+    const savings = await makeAccount(t.db, biz.id, { code: '1021', name: 'Business Savings Account', account_type: 'asset' });
+    const notes = await makeAccount(t.db, biz.id, { code: '2500', name: 'Notes Payable', account_type: 'liability' });
+    const card = await makeAccount(t.db, biz.id, { code: '2400', name: 'Company Credit Cards', account_type: 'liability' });
+    const bank = await makeBankAccount(t.db, biz.id, cash.id, { name: 'Operating' });
+    return { ctx, bank, savings, notes, card };
+  }
+
+  it('matches a plural "Notes Payable" for a loan payment', async () => {
+    const { ctx, bank, notes } = await plainSetup();
+    const result = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'SBA LOAN PAYMENT',
+      amount: '12000.0000',
+      bank_account_id: bank.id,
+    }));
+    expect(result).toMatchObject({ source_layer: 'accounting_rule' });
+    expect(result!.lines[0]!.account_id).toBe(notes.id);
+  });
+
+  it('matches a plural "Company Credit Cards" for a card payment', async () => {
+    const { ctx, bank, card } = await plainSetup();
+    const result = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'CHASE CARD PAYMENT',
+      bank_account_id: bank.id,
+    }));
+    expect(result).toMatchObject({ source_layer: 'accounting_rule' });
+    expect(result!.lines[0]!.account_id).toBe(card.id);
+  });
+
+  it('routes a transfer to a cash account found by name', async () => {
+    const { ctx, bank, savings } = await plainSetup();
+    const result = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'TRANSFER TO SAVINGS',
+      amount: '10000.0000',
+      bank_account_id: bank.id,
+    }));
+    expect(result).toMatchObject({ source_layer: 'accounting_rule' });
+    expect(result!.lines[0]!.account_id).toBe(savings.id);
+  });
+
+  it('still refuses to treat an asset clearing account as a card liability', async () => {
+    const { ctx, bank } = await plainSetup();
+    // Drop the liability card; only an asset "clearing" account remains.
+    await t.db.deleteFrom('chart_of_accounts').where('code', '=', '2400')
+      .where('business_id', '=', ctx.business_id!).execute();
+    await makeAccount(t.db, ctx.business_id!, {
+      code: '1024', name: 'Business Credit Card Clearing', account_type: 'asset',
+    });
+
+    const result = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'CHASE CARD PAYMENT',
+      bank_account_id: bank.id,
+    }));
+    // No liability to post to, so the rule declines rather than guessing at an asset.
+    expect(result).toBeNull();
+  });
+});
+
 describe('autoCodingService.rememberCoding', () => {
   let t: TestDb;
   beforeAll(async () => { t = await startTestDb(); });

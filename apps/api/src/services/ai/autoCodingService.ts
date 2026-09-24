@@ -168,7 +168,8 @@ function accountingRuleSuggestion(
       // auto-post so this never posts unattended.
       const loan = findAccount(accounts, {
         detailTypes: ['Notes Payable', 'Loan Payable'],
-        nameLike: /loan|mortgage|note\s?payable/i,
+        // Plurals matter: real charts say "Notes Payable", not "Note Payable".
+        nameLike: /loans?\b|mortgages?\b|notes?\s*payable/i,
         accountType: 'liability',
       });
       return loan
@@ -176,12 +177,23 @@ function accountingRuleSuggestion(
         : null;
     }
     case 'transfer': {
-      // A transfer offsets another cash account, never an expense. Without
-      // knowing which one, keep it in the review band.
-      const other = accounts.find(a =>
-        a.account_type === 'asset'
-        && ['Checking', 'Savings', 'Money Market', 'Cash on hand'].includes(a.detail_type ?? '')
-      );
+      // A transfer offsets another cash account, never an expense. The
+      // description usually names the far side ("TRANSFER TO SAVINGS"), so
+      // prefer that; otherwise fall back to any non-operating cash account.
+      // Most charts carry no detail_type, so name matching does the work.
+      const description = input.description.toLowerCase();
+      const named = /savings/.test(description) ? /savings/i
+        : /money\s?market/.test(description) ? /money\s?market/i
+        : /checking/.test(description) ? /checking/i
+        : null;
+      const other = (named && findAccount(accounts, { nameLike: named, accountType: 'asset' }))
+        || findAccount(accounts, {
+          detailTypes: ['Checking', 'Savings', 'Money Market', 'Cash on hand'],
+          // Deliberately not a bare /cash/: that would grab the operating
+          // account the money is leaving.
+          nameLike: /savings|money\s?market|checking/i,
+          accountType: 'asset',
+        });
       return other ? build(other.id, input, 80, 'accounting_rule', 'Transfer between accounts') : null;
     }
   }
