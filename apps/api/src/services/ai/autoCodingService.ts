@@ -38,7 +38,8 @@ export type CodingInput = {
   /** Always positive; `direction` carries the sign. */
   amount: string;
   direction: 'debit' | 'credit';
-  bank_account_id: string;
+  /** Optional: the review queue resolves suggestions before a bank account is chosen. */
+  bank_account_id?: string | null;
   /**
    * Account name the extraction model proposed for this row, if any. The AI
    * layer resolves this against the client's CoA rather than making a second
@@ -200,43 +201,122 @@ function accountingRuleSuggestion(
 }
 
 /**
+ * Everything the layers need for one client, loaded once.
+ *
+ * A statement has dozens of rows; re-querying the chart of accounts and
+ * rescanning two years of history per row would make listing an import
+ * quadratic. Load this once, then resolve every row against it in memory.
+ */
+export type CodingContext = {
+  accounts: AccountRow[];
+  accountIds: Set<string>;
+  /** `${vendor}|${direction}|${bank_account_id ?? '*'}` -> split template. */
+  learned: Map<string, SuggestionLine[]>;
+  /** lower(vendor name) -> default expense account. */
+  vendorDefaults: Map<string, string>;
+  /** normalized vendor -> account id -> times coded that way. */
+  history: Map<string, Map<string, number>>;
+};
+
+function learnedKey(vendor: string, direction: string, bankAccountId: string | null): string {
+  return `${vendor}|${direction}|${bankAccountId ?? '*'}`;
+}
+
+export async function loadCodingContext(
+  db: Kysely<DB> | Transaction<DB>,
+  ctx: ServiceCtx,
+): Promise<CodingContext> {
+  const businessId = requireBusiness(ctx);
+  const accounts = await activeAccounts(db, businessId);
+  const accountIds = new Set(accounts.map(a => a.id));
+
+  const memoryRows = await db.selectFrom('account_coding_memory')
+    .select(['normalized_vendor', 'direction', 'bank_account_id', 'lines'])
+    .where('business_id', '=', businessId)
+    .execute();
+  const learned = new Map<string, SuggestionLine[]>();
+  for (const row of memoryRows) {
+    learned.set(
+      learnedKey(row.normalized_vendor, row.direction, row.bank_account_id),
+      row.lines as unknown as SuggestionLine[],
+    );
+  }
+
+  const vendorRows = await db.selectFrom('vendors')
+    .select(['name', 'default_expense_account_id'])
+    .where('business_id', '=', businessId)
+    .where('deleted_at', 'is', null)
+    .where('default_expense_account_id', 'is not', null)
+    .execute();
+  const vendorDefaults = new Map<string, string>();
+  for (const row of vendorRows) {
+    if (!row.default_expense_account_id) continue;
+    // Key on both the raw name and its normalized form so a vendor recorded as
+    // "Duke Energy Corp." still matches a "DUKE ENERGY" descriptor.
+    vendorDefaults.set(row.name.trim().toLowerCase(), row.default_expense_account_id);
+    const normalized = normalizeVendor(row.name);
+    if (normalized) vendorDefaults.set(normalized, row.default_expense_account_id);
+  }
+
+  // Vendor normalization is JS, so it cannot run inside SQL. Pull this client's
+  // recently coded transactions and tally them here, bounded by
+  // HISTORY_SCAN_LIMIT so a long-lived client cannot slow the import down.
+  const prior = await db.selectFrom('bank_transactions as bt')
+    .innerJoin('journal_entries as je', 'je.id', 'bt.matched_journal_entry_id')
+    .innerJoin('journal_entry_lines as jel', 'jel.journal_entry_id', 'je.id')
+    .innerJoin('chart_of_accounts as coa', 'coa.id', 'jel.account_id')
+    .select(['bt.description', 'jel.account_id'])
+    .where('bt.business_id', '=', businessId)
+    .where('je.status', '=', 'posted')
+    // The bank side of the entry is the cash account; the offset is what we are
+    // trying to learn, so skip asset rows.
+    .where('coa.account_type', '!=', 'asset')
+    .where('bt.transaction_date', '>=', sql<string>`(CURRENT_DATE - INTERVAL '24 months')`)
+    .orderBy('bt.transaction_date', 'desc')
+    .limit(HISTORY_SCAN_LIMIT)
+    .execute();
+
+  const history = new Map<string, Map<string, number>>();
+  for (const row of prior) {
+    if (!accountIds.has(row.account_id)) continue;
+    const vendor = normalizeVendor(row.description);
+    if (!vendor) continue;
+    let tally = history.get(vendor);
+    if (!tally) { tally = new Map(); history.set(vendor, tally); }
+    tally.set(row.account_id, (tally.get(row.account_id) ?? 0) + 1);
+  }
+
+  return { accounts, accountIds, learned, vendorDefaults, history };
+}
+
+/**
  * Resolve the offsetting account(s) for one bank transaction.
  *
  * Layers run in priority order and the first hit wins. Returns null when
  * nothing reached the "suggested" threshold -- the caller leaves the
  * transaction unclassified rather than guessing.
  */
-export async function suggestCoding(
-  db: Kysely<DB> | Transaction<DB>,
-  ctx: ServiceCtx,
+export function suggestFromContext(
+  context: CodingContext,
   input: CodingInput,
-): Promise<Suggestion | null> {
-  const businessId = requireBusiness(ctx);
+): Suggestion | null {
+  const { accounts, accountIds } = context;
   const vendor = normalizeVendor(input.description);
-  const accounts = await activeAccounts(db, businessId);
-  const accountIds = new Set(accounts.map(a => a.id));
 
   // --- Layer 1: learned rule for this client -------------------------------
   if (vendor) {
-    const learned = await db.selectFrom('account_coding_memory')
-      .selectAll()
-      .where('business_id', '=', businessId)
-      .where('normalized_vendor', '=', vendor)
-      .where('direction', '=', input.direction)
-      .where(eb => eb.or([
-        eb('bank_account_id', '=', input.bank_account_id),
-        eb('bank_account_id', 'is', null),
-      ]))
-      // Account-scoped rules are more specific than client-wide ones.
-      .orderBy(sql`bank_account_id is null`)
-      .executeTakeFirst();
-
-    if (learned) {
-      const lines = learned.lines as unknown as SuggestionLine[];
-      // A learned rule can reference an account that was later deactivated.
-      if (lines.length > 0 && lines.every(l => accountIds.has(l.account_id))) {
-        return { confidence: 99, source_layer: 'learned_rule', band: confidenceBand(99), lines };
-      }
+    // An account-scoped rule is more specific than a client-wide one.
+    const scoped = input.bank_account_id
+      ? context.learned.get(learnedKey(vendor, input.direction, input.bank_account_id))
+      : undefined;
+    const lines = scoped ?? context.learned.get(learnedKey(vendor, input.direction, null));
+    // A learned rule can reference an account that was later deactivated.
+    if (lines && lines.length > 0 && lines.every(l => accountIds.has(l.account_id))) {
+      // Re-state the amount: the stored template carries the shape, not the value.
+      const applied = lines.length === 1
+        ? [line(lines[0]!.account_id, input.direction, input.amount, lines[0]!.memo)]
+        : lines;
+      return { confidence: 99, source_layer: 'learned_rule', band: confidenceBand(99), lines: applied };
     }
   }
 
@@ -249,13 +329,7 @@ export async function suggestCoding(
 
   // --- Layer 3: vendor default account -------------------------------------
   if (vendor) {
-    const vendorRow = await db.selectFrom('vendors')
-      .select(['default_expense_account_id'])
-      .where('business_id', '=', businessId)
-      .where('deleted_at', 'is', null)
-      .where(sql<boolean>`lower(name) = ${vendor}`)
-      .executeTakeFirst();
-    const defaultAccount = vendorRow?.default_expense_account_id;
+    const defaultAccount = context.vendorDefaults.get(vendor);
     if (defaultAccount && accountIds.has(defaultAccount)) {
       return build(defaultAccount, input, 90, 'vendor_default');
     }
@@ -263,34 +337,10 @@ export async function suggestCoding(
 
   // --- Layer 4: how this client coded the same vendor before ---------------
   if (vendor) {
-    // Vendor normalization is JS, so it cannot run inside SQL. Pull this
-    // client's recently coded transactions and tally them here. Bounded by
-    // HISTORY_SCAN_LIMIT so a long-lived client cannot slow the import down.
-    const prior = await db.selectFrom('bank_transactions as bt')
-      .innerJoin('journal_entries as je', 'je.id', 'bt.matched_journal_entry_id')
-      .innerJoin('journal_entry_lines as jel', 'jel.journal_entry_id', 'je.id')
-      .innerJoin('chart_of_accounts as coa', 'coa.id', 'jel.account_id')
-      .select(['bt.description', 'jel.account_id'])
-      .where('bt.business_id', '=', businessId)
-      .where('je.status', '=', 'posted')
-      // The bank side of the entry is the cash account; the offset is what we
-      // are trying to learn, so skip asset rows.
-      .where('coa.account_type', '!=', 'asset')
-      .where('bt.transaction_date', '>=', sql<string>`(CURRENT_DATE - INTERVAL '24 months')`)
-      .orderBy('bt.transaction_date', 'desc')
-      .limit(HISTORY_SCAN_LIMIT)
-      .execute();
-
-    const tally = new Map<string, number>();
-    let total = 0;
-    for (const row of prior) {
-      if (normalizeVendor(row.description) !== vendor) continue;
-      if (!accountIds.has(row.account_id)) continue;
-      tally.set(row.account_id, (tally.get(row.account_id) ?? 0) + 1);
-      total += 1;
-    }
-
-    if (total > 0) {
+    const tally = context.history.get(vendor);
+    if (tally && tally.size > 0) {
+      let total = 0;
+      for (const count of tally.values()) total += count;
       const [topAccount, hits] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]!;
       // Scale 70..92 by how consistently this client codes the vendor.
       const confidence = Math.round(70 + (hits / total) * 22);
@@ -311,6 +361,26 @@ export async function suggestCoding(
   }
 
   return null;
+}
+
+/** Single-transaction convenience wrapper; loads its own context. */
+export async function suggestCoding(
+  db: Kysely<DB> | Transaction<DB>,
+  ctx: ServiceCtx,
+  input: CodingInput,
+): Promise<Suggestion | null> {
+  return suggestFromContext(await loadCodingContext(db, ctx), input);
+}
+
+/** Resolve a whole statement against one loaded context. */
+export async function suggestCodingBatch(
+  db: Kysely<DB> | Transaction<DB>,
+  ctx: ServiceCtx,
+  inputs: CodingInput[],
+): Promise<Array<Suggestion | null>> {
+  if (inputs.length === 0) return [];
+  const context = await loadCodingContext(db, ctx);
+  return inputs.map(input => suggestFromContext(context, input));
 }
 
 /**

@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { postJournalEntryBatch } from '../services/core/ledgerService.js';
+import { suggestCodingBatch } from '../services/ai/autoCodingService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
 
@@ -44,14 +45,62 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
         ])).where('status', 'in', ['approved', 'rejected']).limit(100)
       : baseQ.where('business_id', '=', bizId).where('status', '=', 'pending');
     const rows = await q.execute();
-    res.json({ imports: rows.map(r => ({
+    const imports = rows.map(r => ({
       ...r,
-      extracted_transactions: typeof r.extracted_transactions === 'string'
+      extracted_transactions: (typeof r.extracted_transactions === 'string'
         ? JSON.parse(r.extracted_transactions) as unknown
-        : r.extracted_transactions,
-    })) });
+        : r.extracted_transactions) as StagedTransaction[],
+    }));
+
+    // Resolve auto-coding suggestions for everything still awaiting review.
+    // History rows are already decided, so there is nothing to suggest.
+    if (!history) await attachSuggestions(ctx(req), imports);
+
+    res.json({ imports });
   } catch (e) { next(e); }
 });
+
+type StagedTransaction = {
+  description?: string;
+  amount?: string;
+  type?: 'debit' | 'credit';
+  suggested_offset?: string;
+  suggested_account_id?: string;
+  suggestion?: { confidence: number; band: string; source_layer: string } | null;
+};
+
+/**
+ * Run the auto-coding engine over every pending transaction and attach the
+ * result in place. One engine context is loaded for the whole page rather than
+ * one per transaction.
+ */
+async function attachSuggestions(
+  serviceCtx: ServiceCtx,
+  imports: Array<{ extracted_transactions: StagedTransaction[] }>,
+): Promise<void> {
+  const flat = imports.flatMap(row => row.extracted_transactions ?? []);
+  if (flat.length === 0) return;
+
+  const suggestions = await suggestCodingBatch(db, serviceCtx, flat.map(tx => ({
+    description: tx.description ?? '',
+    amount: `${Math.abs(Number(tx.amount ?? 0))}`,
+    direction: tx.type === 'credit' ? 'credit' as const : 'debit' as const,
+    ai_suggested_account: tx.suggested_offset ?? null,
+  })));
+
+  flat.forEach((tx, i) => {
+    const suggestion = suggestions[i];
+    if (!suggestion) { tx.suggestion = null; return; }
+    // The UI already preselects from suggested_account_id.
+    const accountId = suggestion.lines[0]?.account_id;
+    if (accountId) tx.suggested_account_id = accountId;
+    tx.suggestion = {
+      confidence: suggestion.confidence,
+      band: suggestion.band,
+      source_layer: suggestion.source_layer,
+    };
+  });
+}
 
 // Combined pending count for both bank statements + invoices — used by the sidebar badge
 router.get('/businesses/:businessId/email-imports/pending-count', async (req, res, next) => {

@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import DocumentUpload from '@/pages/ai/DocumentUpload';
+import ConfidenceBadge, { type SuggestionMeta } from '@/pages/ai/ConfidenceBadge';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -15,6 +16,7 @@ type ExtractedTx = {
   balance: string;
   suggested_offset?: string;
   suggested_account_id?: string;
+  suggestion?: SuggestionMeta | null;
 };
 
 type StagedImport = {
@@ -602,6 +604,9 @@ export default function EmailImportReviewPage() {
                             <option value="">— select account —</option>
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                           </select>
+                          <div className="mt-1">
+                            <ConfidenceBadge suggestion={tx.suggestion} />
+                          </div>
                         </td>
                       </tr>
                     ))}
