@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { postJournalEntryBatch } from '../services/core/ledgerService.js';
-import { suggestCodingBatch } from '../services/ai/autoCodingService.js';
+import { suggestCodingBatch, rememberCoding, learningDecision } from '../services/ai/autoCodingService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
 
@@ -149,6 +149,8 @@ const approveSchema = z.object({
     index: z.number().int().min(0),
     offset_account_id: z.string().uuid(),
     include: z.boolean().default(true),
+    /** "Use this account for future <vendor> transactions" was ticked. */
+    remember: z.boolean().optional(),
   })),
 });
 
@@ -215,9 +217,47 @@ router.post(
         };
       });
 
+      // Recompute the suggestions server-side rather than trusting what the
+      // client says was suggested -- this decides what gets learned.
+      const suggestions = await suggestCodingBatch(db, serviceCtx, transactions.map(tx => ({
+        description: tx.description ?? '',
+        amount: `${Math.abs(Number(tx.amount ?? 0))}`,
+        direction: tx.type === 'credit' ? 'credit' as const : 'debit' as const,
+      })));
+
       const posted = jeInputs.length;
+      let learned = 0;
       await db.transaction().execute(async trx => {
         await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+
+        for (const { tx, item } of pairs) {
+          const suggestion = suggestions[item.index] ?? null;
+          const decision = learningDecision({
+            suggestedAccountId: suggestion?.lines[0]?.account_id ?? null,
+            chosenAccountId: item.offset_account_id,
+            sourceLayer: suggestion?.source_layer ?? null,
+            userAskedToRemember: item.remember === true,
+          });
+          if (!decision) continue;
+
+          const amt = parseFloat(tx.amount).toFixed(4);
+          const isDeposit = tx.type === 'credit';
+          await rememberCoding(trx, serviceCtx, {
+            description: tx.description,
+            direction: isDeposit ? 'credit' : 'debit',
+            // Client-wide: the prompt says "future <vendor> transactions",
+            // not "future transactions on this bank account".
+            bank_account_id: null,
+            lines: [{
+              account_id: item.offset_account_id,
+              debit: isDeposit ? '0.0000' : amt,
+              credit: isDeposit ? amt : '0.0000',
+              memo: null,
+            }],
+            was_correction: decision.wasCorrection,
+          });
+          learned += 1;
+        }
 
         await trx
           .updateTable('email_import_staging')
@@ -231,7 +271,7 @@ router.post(
           .execute();
       });
 
-      res.json({ ok: true, posted });
+      res.json({ ok: true, posted, learned });
     } catch (e) { next(e); }
   },
 );

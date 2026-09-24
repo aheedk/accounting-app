@@ -384,6 +384,26 @@ export async function suggestCodingBatch(
 }
 
 /**
+ * Decide whether an approved transaction should teach the system anything.
+ *
+ * Two cases write to memory: the accountant explicitly asked for a rule, or an
+ * existing learned rule was accepted unchanged (which reinforces it). Silently
+ * accepting a one-off AI guess deliberately does NOT create a rule -- otherwise
+ * a single unreviewed approval would harden into a 99-confidence rule.
+ */
+export function learningDecision(input: {
+  suggestedAccountId: string | null;
+  chosenAccountId: string;
+  sourceLayer: CodingLayerId | null;
+  userAskedToRemember: boolean;
+}): { wasCorrection: boolean } | null {
+  const changed = input.suggestedAccountId !== input.chosenAccountId;
+  if (input.userAskedToRemember) return { wasCorrection: changed };
+  if (!changed && input.sourceLayer === 'learned_rule') return { wasCorrection: false };
+  return null;
+}
+
+/**
  * Record what an accountant actually chose so the next identical transaction
  * is a layer-1 hit. Called when a suggestion is accepted or corrected.
  */

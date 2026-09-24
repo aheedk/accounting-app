@@ -328,6 +328,51 @@ describe('autoCodingService accounting rules without detail types', () => {
   });
 });
 
+describe('autoCodingService.learningDecision', () => {
+  it('learns when the accountant explicitly asks, and marks an override as a correction', () => {
+    expect(autoCoding.learningDecision({
+      suggestedAccountId: 'a', chosenAccountId: 'b',
+      sourceLayer: 'ai', userAskedToRemember: true,
+    })).toEqual({ wasCorrection: true });
+
+    expect(autoCoding.learningDecision({
+      suggestedAccountId: 'a', chosenAccountId: 'a',
+      sourceLayer: 'ai', userAskedToRemember: true,
+    })).toEqual({ wasCorrection: false });
+  });
+
+  it('reinforces an existing learned rule accepted unchanged', () => {
+    expect(autoCoding.learningDecision({
+      suggestedAccountId: 'a', chosenAccountId: 'a',
+      sourceLayer: 'learned_rule', userAskedToRemember: false,
+    })).toEqual({ wasCorrection: false });
+  });
+
+  it('does NOT turn a silently accepted AI guess into a rule', () => {
+    // Otherwise one unreviewed approval hardens into a 99-confidence rule.
+    for (const layer of ['ai', 'history', 'vendor_default', 'accounting_rule'] as const) {
+      expect(autoCoding.learningDecision({
+        suggestedAccountId: 'a', chosenAccountId: 'a',
+        sourceLayer: layer, userAskedToRemember: false,
+      })).toBeNull();
+    }
+  });
+
+  it('does not learn from a silent override either', () => {
+    expect(autoCoding.learningDecision({
+      suggestedAccountId: 'a', chosenAccountId: 'b',
+      sourceLayer: 'ai', userAskedToRemember: false,
+    })).toBeNull();
+  });
+
+  it('does not learn when nothing was suggested and the user did not ask', () => {
+    expect(autoCoding.learningDecision({
+      suggestedAccountId: null, chosenAccountId: 'b',
+      sourceLayer: null, userAskedToRemember: false,
+    })).toBeNull();
+  });
+});
+
 describe('autoCodingService.rememberCoding', () => {
   let t: TestDb;
   beforeAll(async () => { t = await startTestDb(); });
@@ -383,6 +428,49 @@ describe('autoCodingService.rememberCoding', () => {
     expect(rows[0]).toMatchObject({ times_applied: 2, times_corrected: 2 });
     // The most recent correction wins.
     expect((rows[0]!.lines as Array<{ account_id: string }>)[0]!.account_id).toBe(software.id);
+  });
+
+  it('closes the correction loop: AI guess -> override -> learned rule wins', async () => {
+    const { ctx, bank, utilities, software } = await setup(t);
+
+    // 1. With nothing learned, the model's proposal is all we have.
+    const before = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'MICROSOFT*SUBSCRIPTION 8812',
+      bank_account_id: bank.id,
+      ai_suggested_account: 'Utilities',
+    }));
+    expect(before).toMatchObject({ source_layer: 'ai', confidence: 85 });
+    expect(before!.lines[0]!.account_id).toBe(utilities.id);
+
+    // 2. The accountant picks a different account and asks to remember it.
+    const decision = autoCoding.learningDecision({
+      suggestedAccountId: before!.lines[0]!.account_id,
+      chosenAccountId: software.id,
+      sourceLayer: before!.source_layer,
+      userAskedToRemember: true,
+    });
+    expect(decision).toEqual({ wasCorrection: true });
+
+    await t.db.transaction().execute(trx => autoCoding.rememberCoding(trx, ctx, {
+      description: 'MICROSOFT*SUBSCRIPTION 8812',
+      direction: 'debit',
+      bank_account_id: null,
+      lines: [{ account_id: software.id, debit: '89.0000', credit: '0.0000', memo: null }],
+      was_correction: decision!.wasCorrection,
+    }));
+
+    // 3. A different Microsoft descriptor now resolves from the learned rule,
+    //    and the model's contrary opinion no longer matters.
+    const after = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'MICROSOFT*OFFICE365 9903',
+      amount: '120.0000',
+      bank_account_id: bank.id,
+      ai_suggested_account: 'Utilities',
+    }));
+    expect(after).toMatchObject({ source_layer: 'learned_rule', confidence: 99, band: 'auto_post' });
+    expect(after!.lines[0]!.account_id).toBe(software.id);
+    // The stored template carries the shape; the amount comes from this row.
+    expect(after!.lines[0]!.debit).toBe('120.0000');
   });
 
   it('ignores a description with no usable vendor token', async () => {

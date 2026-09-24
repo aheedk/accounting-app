@@ -114,6 +114,8 @@ export default function EmailImportReviewPage() {
   const [bankAccountId, setBankAccountId] = useState('');
   const [offsets, setOffsets] = useState<Record<number, string>>({});
   const [included, setIncluded] = useState<Record<number, boolean>>({});
+  // Rows where the accountant ticked "use this account next time".
+  const [remember, setRemember] = useState<Record<number, boolean>>({});
   const [bankPosting, setBankPosting] = useState(false);
   const [bankError, setBankError] = useState<string | null>(null);
   const bankPostingRef = useRef(false);
@@ -174,6 +176,7 @@ export default function EmailImportReviewPage() {
     setBankAccountId('');
     setOffsets({});
     setIncluded({});
+    setRemember({});
     setLineAccountIds({});
     setLineIncluded({});
     setSelectedVendorId('');
@@ -249,6 +252,7 @@ export default function EmailImportReviewPage() {
     });
     setIncluded(initIncluded);
     setOffsets(initOffsets);
+    setRemember({});
   }
 
   async function handleBankApprove() {
@@ -267,6 +271,7 @@ export default function EmailImportReviewPage() {
           index: i,
           offset_account_id: offsets[i] ?? '',
           include: included[i] ?? true,
+          remember: remember[i] === true,
         })),
       });
       setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
@@ -604,8 +609,28 @@ export default function EmailImportReviewPage() {
                             <option value="">— select account —</option>
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                           </select>
-                          <div className="mt-1">
+                          <div className="mt-1 space-y-1">
                             <ConfidenceBadge suggestion={tx.suggestion} />
+                            {/* Only offer to learn when the accountant overrode
+                                the engine -- accepting a suggestion is not a
+                                signal worth turning into a rule. */}
+                            {included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
+                              <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3 w-3 shrink-0"
+                                  checked={remember[i] === true}
+                                  onChange={e => setRemember(prev => ({ ...prev, [i]: e.target.checked }))}
+                                />
+                                <span>
+                                  Use <span className="font-medium text-foreground">
+                                    {accounts.find(a => a.id === offsets[i])?.name ?? 'this account'}
+                                  </span> for future <span className="font-medium text-foreground">
+                                    {tx.description.split(/[*#]/)[0]?.trim().slice(0, 24) || 'similar'}
+                                  </span> transactions?
+                                </span>
+                              </label>
+                            )}
                           </div>
                         </td>
                       </tr>
