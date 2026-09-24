@@ -42,7 +42,7 @@ export async function grantAccess(db: Kysely<DB>, user_id: string, business_id: 
 export async function makeAccount(
   db: Kysely<DB>,
   business_id: string,
-  opts: Partial<{ code: string; name: string; account_type: AccountType; is_system: boolean }> = {},
+  opts: Partial<{ code: string; name: string; account_type: AccountType; is_system: boolean; detail_type: string }> = {},
 ) {
   const code = opts.code ?? `ACC${Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0')}`;
   return db.insertInto('chart_of_accounts').values({
@@ -50,6 +50,7 @@ export async function makeAccount(
     code,
     name: opts.name ?? `Account ${code}`,
     account_type: opts.account_type ?? 'asset',
+    detail_type: opts.detail_type ?? null,
     is_system: opts.is_system ?? false,
   }).returningAll().executeTakeFirstOrThrow();
 }

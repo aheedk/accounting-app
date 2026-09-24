@@ -29,6 +29,8 @@ export interface BusinessesTable {
   fiscal_year_start_month: Generated<number>;
   address: ColumnType<BusinessAddress | null, string | null, string | null>;
   import_email: string | null;
+  /** Firm policy: auto-post high-confidence AI suggestions without review. */
+  ai_auto_post_enabled: Generated<boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;
@@ -780,6 +782,24 @@ export interface BankTransactionsTable {
   reviewed_at: Timestamp | null;
   reviewed_by_user_id: string | null;
   import_batch_id: string | null;
+  /** { confidence, source_layer, band, lines: [...] }; null = unclassified. */
+  suggestion: ColumnType<unknown, string | null, string | null>;
+}
+
+/** Learned per-client coding rules for the AI auto-coding engine. */
+export interface AccountCodingMemoryTable {
+  id: Generated<string>;
+  business_id: string;
+  normalized_vendor: string;
+  direction: 'debit' | 'credit';
+  bank_account_id: string | null;
+  lines: ColumnType<unknown, string, string>;
+  times_applied: Generated<number>;
+  times_corrected: Generated<number>;
+  last_applied_at: ColumnType<Timestamp | null, string | null, string | null>;
+  created_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface BankImportBatchesTable {
@@ -936,6 +956,7 @@ export interface DB {
   bill_payment_applications: BillPaymentApplicationsTable;
   vendor_credits: VendorCreditsTable;
   bank_accounts: BankAccountsTable;
+  account_coding_memory: AccountCodingMemoryTable;
   bank_transactions: BankTransactionsTable;
   bank_reconciliations: BankReconciliationsTable;
   bank_transaction_rules: BankTransactionRulesTable;
@@ -973,7 +994,7 @@ export interface DB {
 export interface InvoiceImportStagingTable {
   id: Generated<string>;
   business_id: string | null;
-  gmail_message_id: string;
+  gmail_message_id: string | null;
   email_from: string | null;
   email_subject: string | null;
   received_at: string;
@@ -992,13 +1013,16 @@ export interface InvoiceImportStagingTable {
   pdf_data: Buffer | null;
   approved_by_user_id: string | null;
   approved_at: string | null;
+  source: Generated<'email' | 'upload'>;
+  uploaded_by_user_id: string | null;
+  original_filename: string | null;
   created_at: Generated<string>;
 }
 
 export interface EmailImportStagingTable {
   id: Generated<string>;
   business_id: string | null;
-  gmail_message_id: string;
+  gmail_message_id: string | null;
   email_from: string | null;
   email_subject: string | null;
   received_at: string;
@@ -1009,5 +1033,8 @@ export interface EmailImportStagingTable {
   pdf_data: Buffer | null;
   approved_by_user_id: string | null;
   approved_at: string | null;
+  source: Generated<'email' | 'upload'>;
+  uploaded_by_user_id: string | null;
+  original_filename: string | null;
   created_at: Generated<string>;
 }
