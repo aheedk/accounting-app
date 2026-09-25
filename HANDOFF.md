@@ -7,12 +7,12 @@ environment reference for future sessions.
 
 ## Still open (not code)
 
-1. **Push + deploy**: everything is committed to local `main`, unpushed. Prod needs migrations 0051–0053 applied (`npm run migrate:prod` runs on deploy) — user handles pushes/deploys.
+1. **Deploy**: this batch is pushed to `origin/main`. Prod still needs migrations 0051–0053 applied (`npm run migrate:prod` runs on deploy) — user handles deploys.
 2. Railway volume mount OR R2 env vars (`S3_BUCKET`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) — the S3 adapter code is in and dormant until set.
 3. Prod "QBO Style Test Co" test-vendor deletion (needs explicit user go-ahead).
 4. Remaining polish is listed in `docs/follow-ups.md` (Setup/admin settings section, banking match suggestions, sticky save bars, broader a11y sweep, tax engine / Plaid / OCR).
 
-## Completed this session (all committed to local `main`, not pushed)
+## Completed this session (pushed to `origin/main`)
 
 | Commit | What |
 |---|---|

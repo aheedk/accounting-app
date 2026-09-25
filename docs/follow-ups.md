@@ -10,10 +10,10 @@ of what closed and where.
 
 ## Still open — ops (user-side, no code needed)
 
-### Push + deploy the batch
-Everything below in "Completed" is on local `main`, unpushed. Deploying the API
-applies migrations `0051`–`0053` (numbering counters, pay-run void CHECK, bank
-import batches) via `npm run migrate:prod`.
+### Deploy the batch
+Pushed to `origin/main`. Deploying the API applies migrations `0051`–`0053`
+(numbering counters, pay-run void CHECK, bank import batches) via
+`npm run migrate:prod`.
 
 ### File storage in prod: Railway volume OR R2 env vars
 Uploads still land in ephemeral container storage until one of:

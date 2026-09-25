@@ -18,8 +18,8 @@ validation surfacing, S3 adapter) is documented in
 - **First wave** (`qbo-style-revamp`) is **merged to `main` and pushed**
   (`origin/main` @ `b39ed76`): AR, AP, financial reports, the Journal Entry
   form, and the "ink & ledger" theme. See [`qbo-style-revamp-changes.md`](./qbo-style-revamp-changes.md).
-- **Second wave** is on branch **`accounting-qbo-revamp`** (cut from `main`,
-  16 commits, **not yet merged**). It finishes the QBO treatment across the
+- **Second wave** (`accounting-qbo-revamp`, 16 commits) is **merged to `main`
+  and pushed**. It finishes the QBO treatment across the
   **Accounting, Reports, Payroll, Inventory, and Setup** groups, adds a
   **QBO-style company switcher**, and adds an **Add-client (create business)
   flow**. See [`accounting-qbo-revamp-changes.md`](./accounting-qbo-revamp-changes.md).
