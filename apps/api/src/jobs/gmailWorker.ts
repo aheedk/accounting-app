@@ -13,15 +13,20 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 type GmailPart = gmail_v1.Schema$MessagePart;
 
-// Walk the full MIME tree recursively — handles bare attachments, multipart/related, etc.
+// An email is secretly a TREE of nested parts (boxes inside boxes), and a PDF can be buried at any depth depending on how
+// the email was built or forwarded. This function walks the whole tree, recursively opens every box at ever level until 
+// it finds the PDF - so the agent reliably grabs teh attachment no matter how the email is structured.
 function findPdfPart(node: GmailPart | null | undefined): GmailPart | undefined {
-  if (!node) return undefined;
-  if ((node.mimeType === 'application/pdf' || (node.filename ?? '').endsWith('.pdf')) && node.body?.attachmentId) {
+  // empty box, nothing here
+  if (!node) return undefined;  
+  // If this box is PDF, then return it
+  if ((node.mimeType === 'application/pdf' || (node.filename ?? '').endsWith('.pdf')) && node.body?.attachmentId) { 
     return node;
   }
-  for (const child of node.parts ?? []) {
-    const found = findPdfPart(child);
-    if (found) return found;
+  // Not a PDF? Then open this box and check ever box inside it
+  for (const child of node.parts ?? []) { 
+    const found = findPdfPart(child); // calls itself on each inner box
+    if (found) return found; // found it somewhere deeper? pass it up
   }
   return undefined;
 }
@@ -97,6 +102,8 @@ export async function classifyAndExtract(pdfBuffer: Buffer, clientContext?: Clie
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf } },
         {
           type: 'text',
+          // Deterministic overrides: some things have a right answer (payroll, transfers, capitalizatoin threshold). We hard-code
+          // those rules so the LLM can't get them wrong - LLM handles judgement calls, fixed rules handle what must be exact.
           text: `Analyze this document and extract its financial data. Return ONLY a single JSON object, no explanation.
 
 ACCOUNT SELECTION RULES — follow in this order:
@@ -157,14 +164,16 @@ If the document is neither a bank statement nor an invoice/bill return:
     }],
   });
 
+  // Defensive parsing: never trust a raw model output. Regex pulls the JSON block out, try/catch, guards against malformed output,
+  // and if anything fails we fall back to 'unknown' instead of crashing. "fail safely, not silently", critical for production agents.
   const content = response.content[0];
   if (!content || content.type !== 'text') return { document_type: 'unknown' };
-  const match = content.text.match(/\{[\s\S]*\}/);
-  if (!match) return { document_type: 'unknown' };
+  const match = content.text.match(/\{[\s\S]*\}/);  // pull out the {...} block
+  if (!match) return { document_type: 'unknown' };  // no JSON found -> fail safely
   try {
-    return JSON.parse(match[0]) as UnifiedResult;
+    return JSON.parse(match[0]) as UnifiedResult;   // try to parse it
   } catch {
-    return { document_type: 'unknown' };
+    return { document_type: 'unknown' };    // parse failed, fail safely
   }
 }
 
@@ -228,6 +237,8 @@ export function matchAccount(suggestion: string | undefined, accounts: CoaAccoun
 }
 
 // Try the To: header address against businesses.import_email; return the business id + context if found.
+// Multi-tenant routing: figures out which client business this document belongs to. Tries the email alias first (exact), 
+// falls back to matching the AI-extracted name. Everything downstream is scoped to this business - tenant isolation.
 async function resolveByEmail(db: Kysely<DB>, toHeader: string): Promise<{ businessId: string; ctx: ClientContext } | null> {
   const emailMatch = toHeader.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
   const toAddress = emailMatch?.[0]?.toLowerCase();
@@ -259,6 +270,8 @@ export async function resolveByName(db: Kysely<DB>, addressedTo: string | undefi
   return match?.id ?? null;
 }
 
+// Context injection (RAG-style grounding): instead of asking Clauded to guess account names blindly, we inject the client's REAL chart
+// of accounts + their past coding decisions into the prompt. This grounds the model in read data so it doesnt hallucinate fake accounts.
 function buildCoaPromptSection(ctx: ClientContext | undefined): string {
   if (!ctx || ctx.coa.length === 0) {
     // Fallback generic list when no client context is available
@@ -330,7 +343,8 @@ async function processAnyMessage(
       const reason = result.addressed_to
         ? `No business found matching "${result.addressed_to}"`
         : 'Document has no identifiable company name';
-      await db.insertInto('email_import_staging').values({
+      await db.insertInto('email_import_staging').values({    // Guardrails: catches problems before a human ever sees them - no matching 
+                                                              // business -> auto-reject.
         gmail_message_id: messageId,
         email_from: from,
         email_subject: subject,
@@ -350,7 +364,7 @@ async function processAnyMessage(
       ...tx,
       suggested_account_id: matchAccount(tx.suggested_offset, coa),
     }));
-    await db.insertInto('email_import_staging').values({
+    await db.insertInto('email_import_staging').values({    // Human-in-the-loop: the agent never writes to the ledger directly.
       gmail_message_id: messageId,
       email_from: from,
       email_subject: subject,
@@ -359,7 +373,8 @@ async function processAnyMessage(
       addressed_to: result.addressed_to ?? null,
       pdf_data: pdfBuffer,
       business_id: businessId,
-      status: 'pending',
+      status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI 
+                            // before anything is commited. This is the guardrail that makes it safe to point AI to financial records.
     }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
     console.log(`[gmail-worker] message ${messageId} → bank statement for business ${businessId}: ${enrichedTxs.length} transactions`);
   } else if (result.document_type === 'invoice') {
@@ -368,7 +383,8 @@ async function processAnyMessage(
       const reason = result.addressed_to
         ? `No business found matching "${result.addressed_to}"`
         : 'Document has no identifiable company name';
-      await db.insertInto('invoice_import_staging').values({
+      await db.insertInto('invoice_import_staging').values({  // Guardrails: catches problems before a human ever sees them - no identifiable 
+                                                              // business name -> auto-reject
         gmail_message_id: messageId,
         email_from: from,
         email_subject: subject,
@@ -403,7 +419,8 @@ async function processAnyMessage(
         .executeTakeFirst();
       if (duplicate) {
         const dupReason = `Duplicate invoice: #${invoiceNum} from "${vendor}" already exists`;
-        await db.insertInto('invoice_import_staging').values({
+        await db.insertInto('invoice_import_staging').values({    // Guardrails: catches problems before a human ever sees them -  
+                                                                  // same vendor + invoice number -> duplicate reject
           gmail_message_id: messageId,
           email_from: from,
           email_subject: subject,
@@ -433,7 +450,7 @@ async function processAnyMessage(
       ...li,
       suggested_account_id: matchAccount(li.suggested_account, coa),
     }));
-    await db.insertInto('invoice_import_staging').values({
+    await db.insertInto('invoice_import_staging').values({ // Human-in-the-loop: the agent never writes to the ledger directly.
       gmail_message_id: messageId,
       email_from: from,
       email_subject: subject,
@@ -450,7 +467,8 @@ async function processAnyMessage(
       addressed_to: result.addressed_to ?? null,
       pdf_data: pdfBuffer,
       business_id: businessId,
-      status: 'pending',
+      status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI
+                            // before anything is committed. This is the guardrail that makes it safe to point AI at financial records.
     }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
     console.log(`[gmail-worker] message ${messageId} → ${(result.invoice_type ?? 'ap').toUpperCase()} invoice for business ${businessId}: ${vendor ?? '(unknown)'} $${result.total ?? '?'}`);
   } else {
@@ -459,6 +477,8 @@ async function processAnyMessage(
 }
 
 // Query Gmail for all emails with PDF attachments, skip already-processed ones
+// Idempotency: checks both staging tables before processing so the same email is 
+// never handled twice even though we poll every 5 minutes.
 async function pollAllPdfEmails(db: Kysely<DB>, auth: GAuthClient): Promise<void> {
   const gmail = google.gmail({ version: 'v1', auth });
   const listRes = await gmail.users.messages.list({
@@ -496,6 +516,8 @@ export async function triggerPoll(db: Kysely<DB>): Promise<void> {
   await poll(db);
 }
 
+// The trigger: run once on startup, then every 5 min via setInterval.
+// This makes it autonomous - no human kicks it off, it polls on its own.
 export function startGmailWorker(db: Kysely<DB>): void {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log('[gmail-worker] ANTHROPIC_API_KEY not set, worker disabled');
