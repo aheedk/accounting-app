@@ -2,6 +2,7 @@ export type GeneralLedgerColumnKey =
   | 'date'
   | 'transaction'
   | 'reference'
+  | 'name'
   | 'memo'
   | 'debit'
   | 'credit'
@@ -25,15 +26,16 @@ export type GeneralLedgerPreferences = {
 export const GENERAL_LEDGER_COLUMNS: ReadonlyArray<{ key: GeneralLedgerColumnKey; label: string; numeric?: boolean }> = [
   { key: 'date', label: 'Date' },
   { key: 'transaction', label: 'Transaction' },
-  { key: 'reference', label: 'Reference' },
-  { key: 'memo', label: 'Memo' },
+  { key: 'reference', label: 'Num' },
+  { key: 'name', label: 'Name / Split' },
+  { key: 'memo', label: 'Memo / Description' },
   { key: 'debit', label: 'Debit', numeric: true },
   { key: 'credit', label: 'Credit', numeric: true },
   { key: 'balance', label: 'Balance', numeric: true },
 ];
 
 const COLUMN_KEYS = GENERAL_LEDGER_COLUMNS.map(column => column.key);
-const STORAGE_KEY = 'accounting.general-ledger.preferences.v1';
+const STORAGE_KEY = 'accounting.general-ledger.preferences.v2';
 
 export function defaultGeneralLedgerPreferences(): GeneralLedgerPreferences {
   return {

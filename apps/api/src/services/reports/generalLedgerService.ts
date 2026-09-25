@@ -10,6 +10,7 @@ export type GeneralLedgerLine = {
   source_type: JournalEntrySourceType;
   reference: string | null;
   memo: string | null;
+  split_account: string | null;
   status: JournalEntryStatus;
   debit: string;
   credit: string;
@@ -117,6 +118,29 @@ export async function generalLedger(
     activityByAccount.set(line.account_id, lines);
   }
 
+  // Build the SPLIT column: for each line, find the counter account(s) in the same JE.
+  // Two-sided entry → show the counter account name. Multi-way split → show "–Split–".
+  const splitMap = new Map<string, string | null>(); // line_id → counter account name
+  const jeIds = [...new Set(activity.map(l => l.journal_entry_id))];
+  if (jeIds.length > 0) {
+    const allJeLines = await db.selectFrom('journal_entry_lines as jel')
+      .innerJoin('chart_of_accounts as ca', 'ca.id', 'jel.account_id')
+      .select(['jel.journal_entry_id', 'jel.id as line_id', 'ca.name as account_name'])
+      .where('jel.journal_entry_id', 'in', jeIds)
+      .execute();
+    const byJe = new Map<string, Array<{ line_id: string; account_name: string }>>();
+    for (const l of allJeLines) {
+      const arr = byJe.get(l.journal_entry_id) ?? [];
+      arr.push({ line_id: l.line_id, account_name: l.account_name });
+      byJe.set(l.journal_entry_id, arr);
+    }
+    for (const line of activity) {
+      const jeLines = byJe.get(line.journal_entry_id) ?? [];
+      const others = [...new Set(jeLines.filter(l => l.line_id !== line.line_id).map(l => l.account_name))];
+      splitMap.set(line.line_id, others.length === 0 ? null : others.length === 1 ? others[0]! : '–Split–');
+    }
+  }
+
   let reportDebit = '0.0000';
   let reportCredit = '0.0000';
   const accounts: GeneralLedgerAccount[] = [];
@@ -144,6 +168,7 @@ export async function generalLedger(
         source_type: line.source_type,
         reference: line.reference,
         memo: line.line_memo ?? line.entry_memo,
+        split_account: splitMap.get(line.line_id) ?? null,
         status: line.status,
         debit,
         credit,

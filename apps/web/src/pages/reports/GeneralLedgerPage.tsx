@@ -46,6 +46,7 @@ type GeneralLedgerLine = {
   source_type: string;
   reference: string | null;
   memo: string | null;
+  split_account: string | null;
   status: 'posted' | 'voided';
   debit: string;
   credit: string;
@@ -82,7 +83,7 @@ type AccountTypeFilter = 'all' | 'asset' | 'liability' | 'equity' | 'revenue' | 
 type StatusFilter = 'all' | GeneralLedgerLine['status'];
 
 const DEFAULT_PREFERENCES = defaultGeneralLedgerPreferences();
-const NON_NUMERIC_COLUMNS: GeneralLedgerColumnKey[] = ['date', 'transaction', 'reference', 'memo'];
+const NON_NUMERIC_COLUMNS: GeneralLedgerColumnKey[] = ['date', 'transaction', 'reference', 'name', 'memo'];
 
 function currentMonthRange(): { start: string; end: string } {
   const today = new Date();
@@ -148,6 +149,7 @@ function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey
     case 'date': return line.entry_date;
     case 'transaction': return `${fmtSource(line.source_type)}${line.status === 'voided' ? ' (Voided)' : ''}`;
     case 'reference': return line.reference ?? '';
+    case 'name': return line.split_account ?? '';
     case 'memo': return line.memo ?? '';
     case 'debit': return line.debit === '0.0000' ? '' : line.debit;
     case 'credit': return line.credit === '0.0000' ? '' : line.credit;
@@ -834,6 +836,10 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
     case 'reference':
       content = line.reference ?? '—';
       className += ' font-mono text-xs';
+      break;
+    case 'name':
+      content = line.split_account ?? '—';
+      className += ' max-w-[18rem] truncate text-xs text-muted-foreground';
       break;
     case 'memo':
       content = line.memo ?? '—';
