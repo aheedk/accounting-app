@@ -681,40 +681,40 @@ export default function EmailImportReviewPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <select disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
-                              onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
-                              title={tx.suggested_offset ? `AI suggested: ${tx.suggested_offset}` : undefined}
-                              className={`flex-1 rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${offsets[i] ? 'border-emerald-400' : ''}`}>
-                              <option value="">— select account —</option>
-                              {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                            </select>
+                          <select disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
+                            onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
+                            title={tx.suggested_offset ? `AI suggested: ${tx.suggested_offset}` : undefined}
+                            className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${offsets[i] ? 'border-emerald-400' : ''}`}>
+                            <option value="">— select account —</option>
+                            {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                          </select>
+                          <div className="mt-1 space-y-1">
                             {tx.auto_posted
-                              ? <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+                              ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
                                   <CheckCircle className="h-3 w-3" />Auto-posted
                                 </span>
                               : <ConfidenceBadge suggestion={tx.suggestion} />}
+                            {/* Only offer to learn when the accountant overrode
+                                the engine -- accepting a suggestion is not a
+                                signal worth turning into a rule. */}
+                            {!tx.auto_posted && included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
+                              <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3 w-3 shrink-0"
+                                  checked={remember[i] === true}
+                                  onChange={e => setRemember(prev => ({ ...prev, [i]: e.target.checked }))}
+                                />
+                                <span>
+                                  Use <span className="font-medium text-foreground">
+                                    {accounts.find(a => a.id === offsets[i])?.name ?? 'this account'}
+                                  </span> for future <span className="font-medium text-foreground">
+                                    {tx.description.split(/[*#]/)[0]?.trim().slice(0, 24) || 'similar'}
+                                  </span> transactions?
+                                </span>
+                              </label>
+                            )}
                           </div>
-                          {/* Only offer to learn when the accountant overrode
-                              the engine — accepting a suggestion is not a
-                              signal worth turning into a rule. */}
-                          {!tx.auto_posted && included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
-                            <label className="mt-1.5 flex items-start gap-1.5 rounded-md bg-blue-50 dark:bg-blue-950/30 px-2 py-1.5 text-[10px] leading-tight text-blue-700 dark:text-blue-300 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
-                              <input
-                                type="checkbox"
-                                className="mt-0.5 h-3 w-3 shrink-0 accent-blue-600"
-                                checked={remember[i] === true}
-                                onChange={e => setRemember(prev => ({ ...prev, [i]: e.target.checked }))}
-                              />
-                              <span>
-                                Use <span className="font-semibold">
-                                  {accounts.find(a => a.id === offsets[i])?.name ?? 'this account'}
-                                </span> for future <span className="font-semibold">
-                                  {tx.description.split(/[*#]/)[0]?.trim().slice(0, 24) || 'similar'}
-                                </span> transactions?
-                              </span>
-                            </label>
-                          )}
                         </td>
                       </tr>
                     ))}
@@ -1055,34 +1055,34 @@ export default function EmailImportReviewPage() {
                           </td>
                         )}
                         <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <select disabled={!lineIncluded[i]} value={lineAccountIds[i] ?? ''}
-                              onChange={e => setLineAccountIds(prev => ({ ...prev, [i]: e.target.value }))}
-                              title={li.suggested_account ? `AI suggested: ${li.suggested_account}` : undefined}
-                              className={`flex-1 rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${lineAccountIds[i] ? 'border-emerald-400' : ''}`}>
-                              <option value="">— select account —</option>
-                              {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                            </select>
+                          <select disabled={!lineIncluded[i]} value={lineAccountIds[i] ?? ''}
+                            onChange={e => setLineAccountIds(prev => ({ ...prev, [i]: e.target.value }))}
+                            title={li.suggested_account ? `AI suggested: ${li.suggested_account}` : undefined}
+                            className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${lineAccountIds[i] ? 'border-emerald-400' : ''}`}>
+                            <option value="">— select account —</option>
+                            {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                          </select>
+                          <div className="mt-1 space-y-1">
                             <ConfidenceBadge suggestion={li.suggestion} />
+                            {lineIncluded[i] && lineAccountIds[i] && lineAccountIds[i] !== li.suggested_account_id && (
+                              <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3 w-3 shrink-0"
+                                  checked={lineRemember[i] === true}
+                                  onChange={e => setLineRemember(prev => ({ ...prev, [i]: e.target.checked }))}
+                                />
+                                <span>
+                                  Use <span className="font-medium text-foreground">
+                                    {accounts.find(a => a.id === lineAccountIds[i])?.name ?? 'this account'}
+                                  </span> for future{' '}
+                                  <span className="font-medium text-foreground">
+                                    {li.description.slice(0, 24)}
+                                  </span> lines from this vendor?
+                                </span>
+                              </label>
+                            )}
                           </div>
-                          {lineIncluded[i] && lineAccountIds[i] && lineAccountIds[i] !== li.suggested_account_id && (
-                            <label className="mt-1.5 flex items-start gap-1.5 rounded-md bg-blue-50 dark:bg-blue-950/30 px-2 py-1.5 text-[10px] leading-tight text-blue-700 dark:text-blue-300 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
-                              <input
-                                type="checkbox"
-                                className="mt-0.5 h-3 w-3 shrink-0 accent-blue-600"
-                                checked={lineRemember[i] === true}
-                                onChange={e => setLineRemember(prev => ({ ...prev, [i]: e.target.checked }))}
-                              />
-                              <span>
-                                Use <span className="font-semibold">
-                                  {accounts.find(a => a.id === lineAccountIds[i])?.name ?? 'this account'}
-                                </span> for future{' '}
-                                <span className="font-semibold">
-                                  {li.description.slice(0, 24)}
-                                </span> lines from this vendor?
-                              </span>
-                            </label>
-                          )}
                         </td>
                       </tr>
                     ))}

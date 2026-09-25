@@ -83,10 +83,10 @@ export type CodingLayer = {
  * preference the model should be guessing at.
  */
 export const CODING_LAYERS: readonly CodingLayer[] = [
-  { id: 'learned_rule', label: 'Learned rule' },
+  { id: 'learned_rule', label: 'Learned from this client' },
   { id: 'accounting_rule', label: 'Accounting rule' },
-  { id: 'vendor_default', label: 'Vendor default' },
-  { id: 'history', label: 'History' },
+  { id: 'vendor_default', label: 'Vendor default account' },
+  { id: 'history', label: 'Prior coding history' },
   { id: 'ai', label: 'AI confidence' },
 ] as const;
 
