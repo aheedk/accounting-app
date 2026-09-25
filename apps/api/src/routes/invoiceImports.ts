@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { suggestInvoiceLines, rememberInvoiceLineCoding } from '../services/ai/invoiceCodingService.js';
 import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
@@ -57,16 +58,49 @@ router.get('/businesses/:businessId/invoice-imports', async (req, res, next) => 
       : baseQ.where('business_id', '=', bizId).where('status', '=', 'pending');
 
     const rows = await q.execute();
-    res.json({
-      imports: rows
-        .filter(r => !typeFilter || r.invoice_type === typeFilter)
-        .map(r => ({
-          ...r,
-          line_items: safeJson(r.line_items),
-        })),
-    });
+    const imports = rows
+      .filter(r => !typeFilter || r.invoice_type === typeFilter)
+      .map(r => ({ ...r, line_items: safeJson(r.line_items) as StagedLine[] }));
+
+    // Resolve per-line suggestions for anything still awaiting review. History
+    // rows are already decided. One context is loaded per invoice, since the
+    // learned rules and prior-bill history are vendor-specific.
+    if (!history) {
+      const serviceCtx = ctx(req);
+      for (const imp of imports) {
+        const lines = imp.line_items ?? [];
+        if (lines.length === 0) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const suggestions = await suggestInvoiceLines(db, serviceCtx, imp.vendor_customer, lines.map(li => ({
+          description: li.description ?? '',
+          amount: `${Math.abs(Number(li.amount ?? 0))}`,
+          ai_suggested_account: li.suggested_account ?? null,
+        })));
+        lines.forEach((li, i) => {
+          const suggestion = suggestions[i];
+          if (!suggestion) { li.suggestion = null; return; }
+          const accountId = suggestion.lines[0]?.account_id;
+          if (accountId) li.suggested_account_id = accountId;
+          li.suggestion = {
+            confidence: suggestion.confidence,
+            band: suggestion.band,
+            source_layer: suggestion.source_layer,
+          };
+        });
+      }
+    }
+
+    res.json({ imports });
   } catch (e) { next(e); }
 });
+
+type StagedLine = {
+  description?: string;
+  amount?: string;
+  suggested_account?: string;
+  suggested_account_id?: string;
+  suggestion?: { confidence: number; band: string; source_layer: string } | null;
+};
 
 type LineItem = {
   description: string;
@@ -105,6 +139,8 @@ const approveSchema = z.object({
     index: z.number().int().min(0),
     account_id: z.string().uuid(),
     include: z.boolean().default(true),
+    /** "Use this account for future <line> from this vendor" was ticked. */
+    remember: z.boolean().optional(),
   })).transform(items => items.filter(l => l.include)),
 });
 
@@ -132,6 +168,13 @@ router.post(
       const entryDate = staged.invoice_date ? toIsoDate(staged.invoice_date) : new Date().toISOString().slice(0, 10);
       const dueDate = staged.due_date ? toIsoDate(staged.due_date) : entryDate;
       const isAp = staged.invoice_type === 'ap';
+
+      // Recomputed server-side: this comparison decides what gets learned, so
+      // it must not be client-controlled.
+      const lineSuggestions = await suggestInvoiceLines(db, serviceCtx, staged.vendor_customer, lineItems.map(li => ({
+        description: li.description ?? '',
+        amount: `${Math.abs(Number(li.amount ?? 0))}`,
+      })));
 
       await db.transaction().execute(async trx => {
         const totalTax = staged.tax_amount ? parseFloat(staged.tax_amount) : 0;
@@ -178,6 +221,28 @@ router.post(
             lines: billLines,
           });
           await postBill(trx, serviceCtx, { bill_id: bill.id });
+
+          // Learn only for AP. An AR line maps customer + line -> revenue,
+          // which is a different key space than vendor + line -> expense.
+          for (const item of included) {
+            const li = lineItems[item.index];
+            if (!li) continue;
+            const suggested = lineSuggestions[item.index]?.lines[0]?.account_id ?? null;
+            const changed = suggested !== item.account_id;
+            const layer = lineSuggestions[item.index]?.source_layer ?? null;
+            // Same policy as the bank side: an explicit request always writes a
+            // rule; an existing learned rule accepted unchanged is reinforced;
+            // a silently accepted guess writes nothing.
+            if (item.remember !== true && !(!changed && layer === 'learned_rule')) continue;
+            // eslint-disable-next-line no-await-in-loop
+            await rememberInvoiceLineCoding(trx, serviceCtx, {
+              vendor_name: staged.vendor_customer,
+              description: li.description ?? '',
+              account_id: item.account_id,
+              amount: parseFloat(li.amount ?? '0').toFixed(4),
+              was_correction: changed,
+            });
+          }
         } else {
           if (!body.customer_id) throw new Error('customer_id required for AR invoices');
           const invLines = included.map(item => {

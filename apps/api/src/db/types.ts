@@ -31,6 +31,8 @@ export interface BusinessesTable {
   import_email: string | null;
   /** Firm policy: auto-post high-confidence AI suggestions without review. */
   ai_auto_post_enabled: Generated<boolean>;
+  /** Amount at or above which a long-lived tangible item is capitalized. */
+  capitalization_threshold: ColumnType<string, string | number | undefined, string | number>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;
@@ -794,6 +796,8 @@ export interface AccountCodingMemoryTable {
   direction: 'debit' | 'credit';
   bank_account_id: string | null;
   lines: ColumnType<unknown, string, string>;
+  /** '' for a whole-transaction rule; a normalized line key for invoice lines. */
+  line_key: Generated<string>;
   times_applied: Generated<number>;
   times_corrected: Generated<number>;
   last_applied_at: ColumnType<Timestamp | null, string | null, string | null>;

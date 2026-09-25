@@ -428,6 +428,8 @@ export async function rememberCoding(
       normalized_vendor: vendor,
       direction: input.direction,
       bank_account_id: input.bank_account_id,
+      // '' marks a whole-transaction rule, as opposed to an invoice line rule.
+      line_key: '',
       lines: JSON.stringify(input.lines),
       times_applied: 1,
       times_corrected: input.was_correction ? 1 : 0,
@@ -435,7 +437,7 @@ export async function rememberCoding(
       created_by_user_id: ctx.user_id,
     })
     .onConflict(oc => oc
-      .columns(['business_id', 'normalized_vendor', 'direction'])
+      .columns(['business_id', 'normalized_vendor', 'direction', 'line_key'])
       .where('bank_account_id', 'is', null)
       .doUpdateSet({
         lines: JSON.stringify(input.lines),

@@ -63,6 +63,47 @@ Claude is given the client's existing chart of accounts and asked to **rank cand
 - **Prompt caching** on the chart-of-accounts + rules block, which is identical across every transaction in a statement and every document for a client.
 - Classification is a single call per document, not per transaction: the whole statement is classified in one request so the model sees sibling transactions as context.
 
+## Invoice and bill line items
+
+Invoice lines are a **sibling** resolver, not a reuse of the bank one. A bank
+transaction has one vendor and one account, so the vendor is the whole signal.
+An invoice has one known vendor and many lines belonging in different accounts
+-- copy paper to Office Supplies, a standing desk to Furniture and Fixtures,
+delivery to Shipping -- so the line is the signal and rules are keyed on
+**vendor + normalized line description**.
+
+| # | Layer | Confidence |
+|---|-------|-----------|
+| 1 | Learned rule for this vendor + line | 99 |
+| 2 | Capitalization rule | 96 |
+| 3 | Vendor default account | 90 |
+| 4 | How prior posted bills from this vendor were coded (`bill_lines`) | 70-92 |
+| 5 | The extraction model's proposal | 85 |
+
+The bank-side accounting rules (transfer, card payment, payroll, loan) do not
+apply to invoice lines. Capitalization takes their place.
+
+### Capitalization
+
+At or above the business's threshold AND a long-lived tangible item -> a fixed
+asset account instead of an expense. Both conditions are required: a $4,000
+legal bill clears the threshold but is not an asset, and a repair or rental is
+an expense however large.
+
+This was previously prose inside the extraction prompt, which left it to the
+model's discretion with no test coverage. It is now a deterministic layer,
+because expensing a capital asset misstates both the P&L and the balance sheet.
+
+`businesses.capitalization_threshold` defaults to 2500 -- the IRS de minimis
+safe harbor for taxpayers without an applicable financial statement. Firms with
+audited statements may elect 5000; smaller firms often set it lower.
+
+### Learning scope
+
+Corrections are learned for **AP only**. An AR line maps customer + line ->
+revenue, which is a different key space from vendor + line -> expense, and is
+out of scope here.
+
 ## Data model
 
 Migration `0066_ai_auto_coding.sql`:
@@ -70,6 +111,11 @@ Migration `0066_ai_auto_coding.sql`:
 - `account_coding_memory` - `business_id`, `normalized_vendor`, `direction` (`debit`/`credit`), nullable `bank_account_id`, `lines jsonb`, `times_applied`, `times_corrected`, `last_applied_at`, audit columns. Unique on `(business_id, normalized_vendor, direction, bank_account_id)`.
 - `bank_transactions.suggestion jsonb` - the current suggestion (lines + confidence + source layer), null when unclassified.
 - `businesses.ai_auto_post_enabled boolean NOT NULL DEFAULT false`.
+- `businesses.capitalization_threshold numeric(19,4) NOT NULL DEFAULT 2500`.
+- `account_coding_memory.line_key text NOT NULL DEFAULT ''` -- `''` for a
+  whole-transaction (bank) rule, a normalized line description for an invoice
+  line rule. Included in both partial unique indexes so the two kinds of rule
+  for one vendor cannot collide.
 - `email_import_staging.source` / `invoice_import_staging.source` - `'email' | 'upload'`, default `'email'`; `uploaded_by_user_id`.
 - `gmail_message_id` becomes nullable on both staging tables (uploads have no Gmail id), with the existing uniqueness enforced by a partial unique index that ignores nulls.
 

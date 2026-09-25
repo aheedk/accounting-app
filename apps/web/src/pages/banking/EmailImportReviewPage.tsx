@@ -39,6 +39,7 @@ type LineItem = {
   amount: string;
   suggested_account?: string;
   suggested_account_id?: string;
+  suggestion?: SuggestionMeta | null;
 };
 
 type InvoiceImport = {
@@ -136,6 +137,7 @@ export default function EmailImportReviewPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceImport | null>(null);
   const [lineAccountIds, setLineAccountIds] = useState<Record<number, string>>({});
   const [lineIncluded, setLineIncluded] = useState<Record<number, boolean>>({});
+  const [lineRemember, setLineRemember] = useState<Record<number, boolean>>({});
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [invPosting, setInvPosting] = useState(false);
@@ -195,6 +197,7 @@ export default function EmailImportReviewPage() {
     setAutoPostNote(null);
     setLineAccountIds({});
     setLineIncluded({});
+    setLineRemember({});
     setSelectedVendorId('');
     setSelectedCustomerId('');
     setBankError(null);
@@ -386,6 +389,7 @@ export default function EmailImportReviewPage() {
     });
     setLineIncluded(initIncluded);
     setLineAccountIds(initAccounts);
+    setLineRemember({});
   }
 
   async function handleInvoiceApprove() {
@@ -402,7 +406,7 @@ export default function EmailImportReviewPage() {
     try {
       // Only send included lines; excluded lines without account_id would fail UUID validation
       const linePayload = selectedInvoice.line_items
-        .map((_, i) => ({ index: i, account_id: lineAccountIds[i] ?? '', include: lineIncluded[i] ?? true }))
+        .map((_, i) => ({ index: i, account_id: lineAccountIds[i] ?? '', include: lineIncluded[i] ?? true, remember: lineRemember[i] === true }))
         .filter(l => l.include && l.account_id);
       await api.post(`/businesses/${bizId}/invoice-imports/${selectedInvoice.id}/approve`, {
         ...(isAp ? { vendor_id: selectedVendorId } : { customer_id: selectedCustomerId }),
@@ -1058,6 +1062,27 @@ export default function EmailImportReviewPage() {
                             <option value="">— select account —</option>
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                           </select>
+                          <div className="mt-1 space-y-1">
+                            <ConfidenceBadge suggestion={li.suggestion} />
+                            {lineIncluded[i] && lineAccountIds[i] && lineAccountIds[i] !== li.suggested_account_id && (
+                              <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3 w-3 shrink-0"
+                                  checked={lineRemember[i] === true}
+                                  onChange={e => setLineRemember(prev => ({ ...prev, [i]: e.target.checked }))}
+                                />
+                                <span>
+                                  Use <span className="font-medium text-foreground">
+                                    {accounts.find(a => a.id === lineAccountIds[i])?.name ?? 'this account'}
+                                  </span> for future{' '}
+                                  <span className="font-medium text-foreground">
+                                    {li.description.slice(0, 24)}
+                                  </span> lines from this vendor?
+                                </span>
+                              </label>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

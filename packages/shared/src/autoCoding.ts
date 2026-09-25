@@ -12,6 +12,64 @@ export type CodingLayerId =
   | 'history'
   | 'ai';
 
+/** Default capitalization threshold; overridden per business. */
+export const DEFAULT_CAPITALIZATION_THRESHOLD = 2500;
+
+// Long-lived tangible things. Deliberately narrow: a false positive
+// capitalizes something that should have been expensed, which is the more
+// annoying error to unwind.
+const CAPITAL_ASSET_TERMS = [
+  'desk', 'chair', 'table', 'furniture', 'cabinet', 'shelving', 'workstation',
+  'server', 'computer', 'laptop', 'monitor', 'printer', 'copier', 'scanner',
+  'equipment', 'machine', 'machinery', 'tool', 'forklift', 'generator',
+  'vehicle', 'truck', 'van', 'trailer',
+  'hvac', 'air conditioner', 'furnace', 'boiler', 'roof',
+  'leasehold', 'renovation', 'remodel', 'build-out', 'buildout',
+  'fixture', 'signage', 'camera', 'projector', 'phone system',
+];
+
+// Wording that means a service on an asset, not the asset itself -- a repair
+// or a subscription is an expense however large.
+const NOT_CAPITAL_TERMS = [
+  'repair', 'maintenance', 'service', 'cleaning', 'rental', 'rent', 'lease payment',
+  'subscription', 'license', 'support', 'warranty', 'insurance', 'training',
+  'delivery', 'shipping', 'freight', 'installation labor', 'consulting',
+];
+
+/**
+ * Should this line be capitalized as a fixed asset rather than expensed?
+ *
+ * Both conditions must hold: at or above the threshold, AND a long-lived
+ * tangible item. A $4,000 legal bill clears the threshold but is not an asset.
+ */
+export function isCapitalizable(
+  description: string,
+  amount: number,
+  threshold: number = DEFAULT_CAPITALIZATION_THRESHOLD,
+): boolean {
+  if (!Number.isFinite(amount) || Math.abs(amount) < threshold) return false;
+  const text = (description ?? '').toLowerCase();
+  if (NOT_CAPITAL_TERMS.some(term => text.includes(term))) return false;
+  return CAPITAL_ASSET_TERMS.some(term => text.includes(term));
+}
+
+/**
+ * Stable key for an invoice line's description, used to learn per-line rules.
+ *
+ * Strips quantities and packaging noise so "Copy paper, 10 cases" and
+ * "Copy paper - 4 cases" collapse to the same key.
+ */
+export function normalizeLineKey(description: string): string {
+  return (description ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    // Drop bare numbers and unit words that only describe quantity.
+    .replace(/\b\d+(?:\.\d+)?\b/g, ' ')
+    .replace(/\b(?:each|ea|pcs?|pieces?|cases?|boxes?|box|packs?|units?|qty|hrs?|hours?)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export type CodingLayer = {
   id: CodingLayerId;
   /** Shown in the review queue so a suggestion can explain itself. */
