@@ -59,4 +59,18 @@
     background-clip: content-box;
     border: 2px solid transparent;
   }
+  /* No spinner arrows on number fields. They are useless for amounts -- nobody
+     nudges 18,450.00 one unit at a time -- and they eat horizontal room in the
+     journal grid. Applies app-wide; type="number" keeps the numeric keypad on
+     mobile and the browser's numeric validation. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
