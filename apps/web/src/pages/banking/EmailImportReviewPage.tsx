@@ -29,6 +29,7 @@ type StagedImport = {
   status: string;
   addressed_to: string | null;
   rejection_reason: string | null;
+  source: string | null;
 };
 
 // ── Invoice types ─────────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ type InvoiceImport = {
   email_from: string | null;
   email_subject: string | null;
   received_at: string;
+  source: string | null;
   invoice_type: 'ap' | 'ar';
   vendor_customer: string | null;
   invoice_number: string | null;
@@ -567,7 +569,7 @@ export default function EmailImportReviewPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
-                        <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDateTime(imp.received_at)}</p>
+                        <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · {imp.source === 'upload' ? 'uploaded' : 'received'} {fmtDateTime(imp.received_at)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -598,7 +600,7 @@ export default function EmailImportReviewPage() {
                   </div>
                   {infoOpen === imp.id && (
                     <div className="mt-2.5 ml-12 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
-                      <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                      <span className="text-muted-foreground font-medium">{imp.source === 'upload' ? 'Uploaded' : 'Received'}</span><span>{fmtDateTime(imp.received_at)}</span>
                       {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
                       {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
                       {imp.addressed_to && <><span className="text-muted-foreground font-medium">Addressed to</span><span>{imp.addressed_to}</span></>}
@@ -615,7 +617,7 @@ export default function EmailImportReviewPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold">{deriveBankTitle(selectedBank)}</p>
-                  <p className="text-xs text-muted-foreground">{deriveBankSubtitle(selectedBank)} · received {fmtDateTime(selectedBank.received_at)}</p>
+                  <p className="text-xs text-muted-foreground">{deriveBankSubtitle(selectedBank)} · {selectedBank.source === 'upload' ? 'uploaded' : 'received'} {fmtDateTime(selectedBank.received_at)}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => openPdf('bank', selectedBank.id)}
@@ -766,7 +768,7 @@ export default function EmailImportReviewPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
-                              <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · received {fmtDateTime(imp.received_at)}</p>
+                              <p className="text-xs text-muted-foreground">{deriveBankSubtitle(imp)} · {imp.source === 'upload' ? 'uploaded' : 'received'} {fmtDateTime(imp.received_at)}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -802,7 +804,7 @@ export default function EmailImportReviewPage() {
                         )}
                         {infoOpen === imp.id && (
                           <div className="mt-2.5 ml-12 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
-                            <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                            <span className="text-muted-foreground font-medium">{imp.source === 'upload' ? 'Uploaded' : 'Received'}</span><span>{fmtDateTime(imp.received_at)}</span>
                             {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
                             {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
                             {imp.addressed_to && <><span className="text-muted-foreground font-medium">Addressed to</span><span>{imp.addressed_to}</span></>}
@@ -829,7 +831,7 @@ export default function EmailImportReviewPage() {
                             </span>
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate">{imp.vendor_customer ?? imp.email_subject ?? '(unknown)'}</p>
-                              <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · received {fmtDateTime(imp.received_at)}</p>
+                              <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · {imp.source === 'upload' ? 'uploaded' : 'received'} {fmtDateTime(imp.received_at)}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -866,7 +868,7 @@ export default function EmailImportReviewPage() {
                         )}
                         {infoOpen === imp.id && (
                           <div className="mt-2.5 ml-8 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
-                            <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                            <span className="text-muted-foreground font-medium">{imp.source === 'upload' ? 'Uploaded' : 'Received'}</span><span>{fmtDateTime(imp.received_at)}</span>
                             {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
                             {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
                             {imp.vendor_customer && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'ap' ? 'Vendor' : 'Customer'}</span><span>{imp.vendor_customer}</span></>}
@@ -924,7 +926,7 @@ export default function EmailImportReviewPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{imp.vendor_customer ?? imp.email_subject ?? '(unknown)'}</p>
-                        <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · {imp.line_items.length} lines · received {fmtDateTime(imp.received_at)}</p>
+                        <p className="text-xs text-muted-foreground">#{imp.invoice_number ?? '—'} · {imp.invoice_date ?? '—'} · {imp.total ? fmtMoney(imp.total) : '—'} · {imp.line_items.length} lines · {imp.source === 'upload' ? 'uploaded' : 'received'} {fmtDateTime(imp.received_at)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -955,7 +957,7 @@ export default function EmailImportReviewPage() {
                   </div>
                   {infoOpen === imp.id && (
                     <div className="mt-2.5 ml-8 rounded-md border bg-muted/30 p-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
-                      <span className="text-muted-foreground font-medium">Received</span><span>{fmtDateTime(imp.received_at)}</span>
+                      <span className="text-muted-foreground font-medium">{imp.source === 'upload' ? 'Uploaded' : 'Received'}</span><span>{fmtDateTime(imp.received_at)}</span>
                       {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
                       {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
                       {imp.vendor_customer && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'ap' ? 'Vendor' : 'Customer'}</span><span>{imp.vendor_customer}</span></>}
@@ -980,7 +982,7 @@ export default function EmailImportReviewPage() {
                   </span>
                   <div>
                     <p className="font-medium">{selectedInvoice.vendor_customer ?? '(unknown)'} — Invoice #{selectedInvoice.invoice_number ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">Date: {selectedInvoice.invoice_date ?? '—'} · Due: {selectedInvoice.due_date ?? '—'} · Received {fmtDateTime(selectedInvoice.received_at)}</p>
+                    <p className="text-xs text-muted-foreground">Date: {selectedInvoice.invoice_date ?? '—'} · Due: {selectedInvoice.due_date ?? '—'} · {selectedInvoice.source === 'upload' ? 'Uploaded' : 'Received'} {fmtDateTime(selectedInvoice.received_at)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

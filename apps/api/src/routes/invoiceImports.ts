@@ -48,7 +48,7 @@ router.get('/businesses/:businessId/invoice-imports', async (req, res, next) => 
                'received_at', 'invoice_type', 'vendor_customer', 'invoice_number',
                'invoice_date', 'due_date', 'line_items', 'subtotal', 'tax_amount',
                'total', 'status', 'addressed_to', 'rejection_reason',
-               'approved_by_user_id', 'approved_at', 'created_at'])
+               'approved_by_user_id', 'approved_at', 'created_at', 'source'])
       .orderBy('received_at', 'desc');
     const q = history
       ? baseQ.where(eb => eb.or([

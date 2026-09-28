@@ -34,7 +34,7 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
       .selectFrom('email_import_staging')
       .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
                'received_at', 'extracted_transactions', 'status', 'addressed_to',
-               'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at'])
+               'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at', 'source'])
       .orderBy('received_at', 'desc');
     // History: this business's own records + any auto-rejected records (no business match)
     // Pending: only this business's own records
