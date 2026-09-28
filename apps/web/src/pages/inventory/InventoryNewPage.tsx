@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -152,7 +153,7 @@ export default function InventoryNewPage() {
           </div>
           <div>
             <Label>Income account (revenue)</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.income_account_id}
               onChange={(e) => setForm((f) => ({ ...f, income_account_id: e.target.value }))}
@@ -163,11 +164,11 @@ export default function InventoryNewPage() {
                   {a.code} — {a.name}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <div>
             <Label>Expense account</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.expense_account_id}
               onChange={(e) => setForm((f) => ({ ...f, expense_account_id: e.target.value }))}
@@ -178,11 +179,11 @@ export default function InventoryNewPage() {
                   {a.code} — {a.name}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <div className="col-span-2">
             <Label>Inventory asset account</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.inventory_asset_account_id}
               onChange={(e) => setForm((f) => ({ ...f, inventory_asset_account_id: e.target.value }))}
@@ -193,7 +194,7 @@ export default function InventoryNewPage() {
                   {a.code} — {a.name}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
         </CardContent>
       </Card>

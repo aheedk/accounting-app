@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { addDaysLocal, todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Line = { description: string; quantity: string; unit_price: string; expense_account_id: string };
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
@@ -116,9 +117,9 @@ export default function BillNewPage() {
       <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-4">
         <div>
           <Label className="text-xs text-muted-foreground">Vendor</Label>
-          <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.vendor_id} onChange={e => pickVendor(e.target.value)} required>
+          <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.vendor_id} onChange={e => pickVendor(e.target.value)} required>
             <option value="">Choose a vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+          </AppSelect>
           <div className="mt-3">
             <Label className="text-xs text-muted-foreground">Mailing address</Label>
             <div className="min-h-[5rem] whitespace-pre-line rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
@@ -128,9 +129,9 @@ export default function BillNewPage() {
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Terms</Label>
-          <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms_days} onChange={e => pickTerms(Number(e.target.value))}>
+          <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms_days} onChange={e => pickTerms(Number(e.target.value))}>
             {TERMS_OPTIONS.map(t => <option key={t.days} value={t.days}>{t.label}</option>)}
-          </select>
+          </AppSelect>
           <div className="mt-3">
             <Label className="text-xs text-muted-foreground">Bill no.</Label>
             <Input value={hdr.bill_number} onChange={e => setHdr(h => ({ ...h, bill_number: e.target.value }))} placeholder="Vendor's bill number" required />

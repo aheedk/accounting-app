@@ -18,6 +18,7 @@ import {
   type JournalRecurrence,
   type JournalRecurringSchedule,
 } from './journalRecurring';
+import { AppSelect } from '../../components/ui/select';
 
 type JournalRecurringDialogProps = {
   businessId: string;
@@ -101,7 +102,7 @@ export default function JournalRecurringDialog({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium" htmlFor="recurring-je-frequency">Repeat</label>
-              <select
+              <AppSelect
                 id="recurring-je-frequency"
                 value={schedule.recurrence}
                 onChange={event => patch({ recurrence: event.target.value as JournalRecurrence })}
@@ -111,7 +112,7 @@ export default function JournalRecurringDialog({
                 <option value="monthly">Every month</option>
                 <option value="quarterly">Every quarter</option>
                 <option value="yearly">Every year</option>
-              </select>
+              </AppSelect>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>

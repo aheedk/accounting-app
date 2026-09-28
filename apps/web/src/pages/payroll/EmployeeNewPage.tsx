@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
@@ -154,7 +155,7 @@ export default function EmployeeNewPage() {
           </div>
           <div>
             <Label>Pay frequency</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.default_pay_frequency}
               onChange={(e) => setForm((f) => ({ ...f, default_pay_frequency: e.target.value as PayFrequency }))}
@@ -162,11 +163,11 @@ export default function EmployeeNewPage() {
               {PAY_FREQUENCIES.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <div className="col-span-2">
             <Label>W-4 filing status</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.w4_filing_status}
               onChange={(e) => setForm((f) => ({ ...f, w4_filing_status: e.target.value as W4FilingStatus }))}
@@ -174,7 +175,7 @@ export default function EmployeeNewPage() {
               {W4_STATUSES.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
-            </select>
+            </AppSelect>
           </div>
         </CardContent>
       </Card>

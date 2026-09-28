@@ -12,6 +12,7 @@ import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type Period = 'monthly' | 'quarterly' | 'annual';
 type Status = 'accrued' | 'paid';
@@ -232,7 +233,7 @@ export default function PayrollTaxesPage() {
           <form className="grid grid-cols-1 sm:grid-cols-2 gap-3" onSubmit={submitCreate}>
             <div>
               <Label>Period</Label>
-              <select
+              <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={form.period}
                 onChange={e => setForm(f => ({ ...f, period: e.target.value as Period }))}
@@ -240,11 +241,11 @@ export default function PayrollTaxesPage() {
                 <option value="monthly">monthly</option>
                 <option value="quarterly">quarterly</option>
                 <option value="annual">annual</option>
-              </select>
+              </AppSelect>
             </div>
             <div>
               <Label>Liability account</Label>
-              <select
+              <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={form.liability_account_id}
                 onChange={e => setForm(f => ({ ...f, liability_account_id: e.target.value }))}
@@ -254,7 +255,7 @@ export default function PayrollTaxesPage() {
                 {liabilityAccounts.map(a => (
                   <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             <div>
               <Label>Period start</Label>
@@ -303,7 +304,7 @@ export default function PayrollTaxesPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Liabilities</CardTitle>
-            <select
+            <AppSelect
               className="h-9 rounded-md border bg-background px-3 text-sm"
               value={filter}
               onChange={e => setFilter(e.target.value as Status | 'all')}
@@ -311,7 +312,7 @@ export default function PayrollTaxesPage() {
               <option value="all">All</option>
               <option value="accrued">Accrued</option>
               <option value="paid">Paid</option>
-            </select>
+            </AppSelect>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -369,7 +370,7 @@ export default function PayrollTaxesPage() {
                 </p>
                 <div>
                   <Label htmlFor="pay-cash-account">Cash account</Label>
-                  <select
+                  <AppSelect
                     id="pay-cash-account"
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={payCashAccountId}
@@ -380,7 +381,7 @@ export default function PayrollTaxesPage() {
                     {cashAccounts.map(a => (
                       <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </div>
                 <div>
                   <Label htmlFor="pay-date">Payment date</Label>

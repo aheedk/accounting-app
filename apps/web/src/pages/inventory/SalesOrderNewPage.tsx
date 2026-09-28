@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Customer = {
   id: string;
@@ -251,7 +252,7 @@ export default function SalesOrderNewPage() {
             <div className="space-y-4">
               <div>
                 <Label>Customer name</Label>
-                <select
+                <AppSelect
                   className="mt-1 h-10 w-full rounded-md border bg-white px-3 text-sm shadow-sm"
                   value={customerId}
                   onChange={(e) => pickCustomer(e.target.value)}
@@ -261,7 +262,7 @@ export default function SalesOrderNewPage() {
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
               {showBillTo && (
                 <div>
@@ -334,7 +335,7 @@ export default function SalesOrderNewPage() {
                       <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{i + 1}</td>
                     )}
                     <td className="px-3 py-2">
-                      <select
+                      <AppSelect
                         className="h-9 w-full rounded-md border bg-background px-2 text-sm"
                         value={l.inventory_item_id}
                         onChange={(e) => pickItem(i, e.target.value)}
@@ -343,7 +344,7 @@ export default function SalesOrderNewPage() {
                         {items.map((it) => (
                           <option key={it.id} value={it.id}>{it.sku} — {it.name}</option>
                         ))}
-                      </select>
+                      </AppSelect>
                     </td>
                     {showDescription && (
                       <td className="px-3 py-2">
@@ -589,12 +590,12 @@ export default function SalesOrderNewPage() {
                 {/* Font */}
                 <div className="border-t pt-3 space-y-2">
                   <p className="text-xs font-semibold">Font</p>
-                  <select className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+                  <AppSelect className="h-9 w-full rounded-md border bg-background px-3 text-sm">
                     <option>Helvetica Neue</option>
                     <option>Arial</option>
                     <option>Times New Roman</option>
                     <option>Georgia</option>
-                  </select>
+                  </AppSelect>
                 </div>
               </div>
             )}

@@ -10,6 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { daysAgoLocal, todayLocal } from '@/lib/dates';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { AppSelect } from '../../components/ui/select';
 
 type BillSummary = { id: string; bill_number: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
 type Vendor = { id: string; name: string };
@@ -150,15 +151,15 @@ export default function BillListPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Vendor</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}>
+          <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}>
             <option value="">All</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+          </AppSelect>
         </div>
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Bill date</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
+          <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
             {DATE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
+          </AppSelect>
         </div>
         {bounds && (
           <span className="inline-flex h-9 items-center gap-2 rounded-full border bg-muted/40 px-3 text-sm">

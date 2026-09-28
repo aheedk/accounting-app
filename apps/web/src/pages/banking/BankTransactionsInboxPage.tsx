@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
 type StatusFilter = BankTransactionStatus | 'all';
@@ -516,7 +517,7 @@ export default function BankTransactionsInboxPage() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <select
+                <AppSelect
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm mb-3"
                   value={datePreset}
                   onChange={e => {
@@ -532,7 +533,7 @@ export default function BankTransactionsInboxPage() {
                   {DATE_PRESETS.map(p => (
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
-                </select>
+                </AppSelect>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">From (MM/DD/YYYY)</label>
@@ -588,7 +589,7 @@ export default function BankTransactionsInboxPage() {
 
           {/* All transactions type filter */}
           <div className="relative">
-            <select
+            <AppSelect
               className="h-9 appearance-none rounded-md border bg-background pl-3 pr-8 text-sm text-muted-foreground"
               value={txnTypeFilter}
               onChange={e => setTxnTypeFilter(e.target.value)}
@@ -596,7 +597,7 @@ export default function BankTransactionsInboxPage() {
               {TXN_TYPE_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
-            </select>
+            </AppSelect>
             <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-muted-foreground" />
           </div>
 
@@ -788,7 +789,7 @@ export default function BankTransactionsInboxPage() {
                           <form className="grid grid-cols-12 gap-2 items-end" onSubmit={submitMatch}>
                             <div className="col-span-9">
                               <Label>Match to journal entry</Label>
-                              <select
+                              <AppSelect
                                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                 value={action.journal_entry_id}
                                 onChange={e => setAction(a => (a ? { ...a, journal_entry_id: e.target.value } : a))}
@@ -800,7 +801,7 @@ export default function BankTransactionsInboxPage() {
                                     {je.entry_date} — {je.status} — {je.memo ?? je.reference ?? je.id.slice(0, 8)}
                                   </option>
                                 ))}
-                              </select>
+                              </AppSelect>
                             </div>
                             <div className="col-span-3 flex gap-2">
                               <Button type="submit" size="sm" disabled={busy || !action.journal_entry_id}>Submit</Button>
@@ -812,7 +813,7 @@ export default function BankTransactionsInboxPage() {
                           <form className="grid grid-cols-12 gap-2 items-end" onSubmit={submitCategorize}>
                             <div className="col-span-6">
                               <Label>Offset account</Label>
-                              <select
+                              <AppSelect
                                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                 value={action.offset_account_id}
                                 onChange={e => setAction(a => (a ? { ...a, offset_account_id: e.target.value } : a))}
@@ -829,7 +830,7 @@ export default function BankTransactionsInboxPage() {
                                     </optgroup>
                                   );
                                 })}
-                              </select>
+                              </AppSelect>
                             </div>
                             <div className="col-span-4">
                               <Label>Memo (optional)</Label>

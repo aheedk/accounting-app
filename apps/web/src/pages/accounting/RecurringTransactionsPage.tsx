@@ -10,6 +10,7 @@ import { api } from '@/lib/apiClient';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
+import { AppSelect } from '../../components/ui/select';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 
@@ -418,7 +419,7 @@ export default function RecurringTransactionsPage() {
                 </div>
                 <div>
                   <Label>Transaction type</Label>
-                  <select
+                  <AppSelect
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={form.template_type}
                     onChange={(e) => setForm((f) => ({ ...f, template_type: e.target.value as TemplateType }))}
@@ -427,11 +428,11 @@ export default function RecurringTransactionsPage() {
                     {TXN_TYPE_OPTIONS.map(o => (
                       <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>{o.label}</option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </div>
                 <div>
                   <Label>Recurrence</Label>
-                  <select
+                  <AppSelect
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={form.recurrence}
                     onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value as Recurrence }))}
@@ -441,7 +442,7 @@ export default function RecurringTransactionsPage() {
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
                     <option value="yearly">Yearly</option>
-                  </select>
+                  </AppSelect>
                 </div>
                 <div>
                   <Label>Next run date</Label>
@@ -470,7 +471,7 @@ export default function RecurringTransactionsPage() {
                   <div key={i} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-4">
                       <Label className="sr-only">Account</Label>
-                      <select
+                      <AppSelect
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         value={l.account_id}
                         onChange={(e) => updateLine(i, { account_id: e.target.value })}
@@ -478,7 +479,7 @@ export default function RecurringTransactionsPage() {
                       >
                         <option value="">Select account…</option>
                         {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                      </select>
+                      </AppSelect>
                     </div>
                     <div className="col-span-2">
                       <Label className="sr-only">Debit</Label>
@@ -568,7 +569,7 @@ export default function RecurringTransactionsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <Label>Template Type</Label>
-                <select
+                <AppSelect
                   className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={pendingTemplateType}
                   onChange={e => setPendingTemplateType(e.target.value)}
@@ -578,11 +579,11 @@ export default function RecurringTransactionsPage() {
                   <option value="monthly">Monthly</option>
                   <option value="quarterly">Quarterly</option>
                   <option value="yearly">Yearly</option>
-                </select>
+                </AppSelect>
               </div>
               <div>
                 <Label>Transaction Type</Label>
-                <select
+                <AppSelect
                   className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={pendingTxnType}
                   onChange={e => setPendingTxnType(e.target.value)}
@@ -591,7 +592,7 @@ export default function RecurringTransactionsPage() {
                   {TXN_TYPE_OPTIONS.map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
             </div>
             <div className="border-t px-6 py-4 flex items-center justify-between gap-2">

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Customer = { id: string; name: string; billing_address: Address | null };
@@ -68,14 +69,14 @@ export default function CreditMemoNewPage() {
       <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-3">
         <div>
           <Label className="text-xs text-muted-foreground">Customer</Label>
-          <select
+          <AppSelect
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
             value={form.customer_id}
             onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))}
             required
           >
             <option value="">Choose a customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </AppSelect>
           <div className="mt-3">
             <Label className="text-xs text-muted-foreground">Billing address</Label>
             <div className="min-h-[5rem] whitespace-pre-line rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">

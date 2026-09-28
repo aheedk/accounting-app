@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type CreditMemo = {
   id: string;
@@ -96,9 +97,9 @@ export default function CreditMemoDetailPage() {
           <CardContent>
             <form className="grid grid-cols-12 gap-2 items-end" onSubmit={apply}>
               <div className="col-span-7"><label className="text-sm">Invoice</label>
-                <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.invoice_id} onChange={e => setApplyForm(f => ({ ...f, invoice_id: e.target.value }))} required>
+                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.invoice_id} onChange={e => setApplyForm(f => ({ ...f, invoice_id: e.target.value }))} required>
                   <option value="">Select…</option>{openInvoices.map(i => <option key={i.id} value={i.id}>{i.invoice_number} — {fmtMoney(i.total)}</option>)}
-                </select>
+                </AppSelect>
               </div>
               <div className="col-span-3"><label className="text-sm">Apply amount</label><Input type="number" step="0.01" value={applyForm.applied_amount} onChange={e => setApplyForm(f => ({ ...f, applied_amount: e.target.value }))} /></div>
               <div className="col-span-2"><Button type="submit" disabled={busy}>Apply</Button></div>

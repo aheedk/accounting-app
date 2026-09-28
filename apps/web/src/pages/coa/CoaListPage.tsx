@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AccountCreateDrawer from './AccountCreateDrawer';
+import { AppSelect } from '../../components/ui/select';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -624,17 +625,17 @@ export default function CoaListPage() {
           </div>
 
           {/* Type filter */}
-          <select
+          <AppSelect
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
           >
             <option value="">All</option>
             {ACCOUNT_TYPES.map(t => <option key={t} value={t} className="capitalize">{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-          </select>
+          </AppSelect>
 
           {/* Status filter */}
-          <select
+          <AppSelect
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
@@ -642,7 +643,7 @@ export default function CoaListPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="all">All</option>
-          </select>
+          </AppSelect>
         </div>
 
         {/* Right side: Batch edit + icons + settings, then pagination below */}
@@ -1055,7 +1056,7 @@ export default function CoaListPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Account type <span className="text-destructive">*</span></Label>
-                    <select
+                    <AppSelect
                       className="mt-1 h-10 w-full rounded-md border bg-muted/30 px-3 text-sm cursor-not-allowed opacity-70"
                       value={editAccount.account_type}
                       disabled
@@ -1063,11 +1064,11 @@ export default function CoaListPage() {
                       {ACCOUNT_TYPES.map(t => (
                         <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                   <div>
                     <Label>Detail type</Label>
-                    <select
+                    <AppSelect
                       className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={editForm.detail_type}
                       onChange={e => setEditForm(f => ({ ...f, detail_type: e.target.value }))}
@@ -1076,7 +1077,7 @@ export default function CoaListPage() {
                       {(DETAIL_TYPES[editAccount.account_type] ?? []).map(dt => (
                         <option key={dt} value={dt}>{dt}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 </div>
 
@@ -1094,7 +1095,7 @@ export default function CoaListPage() {
                   {editForm.is_subaccount && (
                     <div className="pl-6">
                       <Label className="text-xs">Parent account</Label>
-                      <select
+                      <AppSelect
                         className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
                         value={editForm.parent_id ?? ''}
                         onChange={e => setEditForm(f => ({ ...f, parent_id: e.target.value || null }))}
@@ -1103,7 +1104,7 @@ export default function CoaListPage() {
                         {parentChoices.map(a => (
                           <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
                         ))}
-                      </select>
+                      </AppSelect>
                     </div>
                   )}
                 </div>

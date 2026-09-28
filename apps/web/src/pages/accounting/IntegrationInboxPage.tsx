@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
 type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
@@ -379,13 +380,13 @@ export default function IntegrationInboxPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Source</div>
-          <select
+          <AppSelect
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={sourceFilter}
             onChange={e => setSourceFilter(e.target.value as SourceFilter)}
           >
             {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          </AppSelect>
         </div>
       </div>
 
@@ -420,13 +421,13 @@ export default function IntegrationInboxPage() {
           <form className="grid grid-cols-1 gap-3 md:grid-cols-12" onSubmit={submitImport}>
             <div className="md:col-span-3">
               <Label>Source</Label>
-              <select
+              <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={importSource}
                 onChange={e => setImportSource(e.target.value as IntegrationSource)}
               >
                 {IMPORT_SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              </AppSelect>
             </div>
             <div className="md:col-span-9">
               <Label>CSV rows</Label>
@@ -530,7 +531,7 @@ export default function IntegrationInboxPage() {
                           <form className="grid grid-cols-12 gap-2 items-end" onSubmit={submitCategorize}>
                             <div className="col-span-4">
                               <Label>Cash account</Label>
-                              <select
+                              <AppSelect
                                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                 value={action.cash_account_id}
                                 onChange={e => setAction(a => (a ? { ...a, cash_account_id: e.target.value } : a))}
@@ -540,11 +541,11 @@ export default function IntegrationInboxPage() {
                                 {cashAccounts.map(a => (
                                   <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                                 ))}
-                              </select>
+                              </AppSelect>
                             </div>
                             <div className="col-span-4">
                               <Label>Offset account</Label>
-                              <select
+                              <AppSelect
                                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                 value={action.offset_account_id}
                                 onChange={e => setAction(a => (a ? { ...a, offset_account_id: e.target.value } : a))}
@@ -561,7 +562,7 @@ export default function IntegrationInboxPage() {
                                     </optgroup>
                                   );
                                 })}
-                              </select>
+                              </AppSelect>
                             </div>
                             <div className="col-span-2">
                               <Label>Memo (optional)</Label>

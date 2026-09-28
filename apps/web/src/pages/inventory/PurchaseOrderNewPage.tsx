@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Vendor = { id: string; name: string };
 type InventoryItem = { id: string; sku: string; name: string; purchase_cost: string | null };
@@ -98,7 +99,7 @@ export default function PurchaseOrderNewPage() {
         <CardContent className="grid grid-cols-3 gap-3">
           <div>
             <Label>Vendor</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={hdr.vendor_id}
               onChange={(e) => setHdr((h) => ({ ...h, vendor_id: e.target.value }))}
@@ -110,7 +111,7 @@ export default function PurchaseOrderNewPage() {
                   {v.name}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <div>
             <Label>Order date</Label>
@@ -146,7 +147,7 @@ export default function PurchaseOrderNewPage() {
             <div key={i} className="grid grid-cols-12 gap-2 items-end">
               <div className="col-span-4">
                 <Label className="sr-only">Item</Label>
-                <select
+                <AppSelect
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={l.inventory_item_id}
                   onChange={(e) => pickItem(i, e.target.value)}
@@ -158,7 +159,7 @@ export default function PurchaseOrderNewPage() {
                       {it.sku} — {it.name}
                     </option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
               <div className="col-span-4">
                 <Label className="sr-only">Description</Label>

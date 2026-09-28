@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { currentYearLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Budget = {
   id: string;
@@ -282,7 +283,7 @@ export default function FinancialPlanningPage() {
                           onClick={() => setMode('variance')}
                         >Variance</button>
                       </div>
-                      <select
+                      <AppSelect
                         className="h-9 rounded-md border bg-background px-2 text-sm"
                         value={budget.status}
                         onChange={e => updateStatus(e.target.value as 'draft' | 'active' | 'archived')}
@@ -290,7 +291,7 @@ export default function FinancialPlanningPage() {
                         <option value="draft">draft</option>
                         <option value="active">active</option>
                         <option value="archived">archived</option>
-                      </select>
+                      </AppSelect>
                       <Button variant="outline" onClick={deleteBudget}>Delete</Button>
                     </div>
                   </div>

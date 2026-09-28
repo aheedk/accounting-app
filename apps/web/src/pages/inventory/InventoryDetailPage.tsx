@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type StockMovementReason = 'adjustment' | 'opening_balance' | 'manual_in' | 'manual_out' | 'write_off';
 
@@ -267,7 +268,7 @@ export default function InventoryDetailPage() {
             </div>
             <div>
               <Label>Reason</Label>
-              <select
+              <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={adjForm.reason}
                 onChange={(e) =>
@@ -279,7 +280,7 @@ export default function InventoryDetailPage() {
                     {r.label}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             <div>
               <Label>Memo</Label>

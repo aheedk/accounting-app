@@ -10,6 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type FixedAssetStatus = 'active' | 'disposed';
 
@@ -139,11 +140,11 @@ export default function FixedAssetListPage() {
       <div className="flex flex-wrap items-end gap-4">
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Status</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="disposed">Disposed</option>
-          </select>
+          </AppSelect>
         </div>
       </div>
 

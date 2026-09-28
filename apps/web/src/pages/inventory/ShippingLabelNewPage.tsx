@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type LinkTarget = 'invoice' | 'sales_order';
 
@@ -158,7 +159,7 @@ export default function ShippingLabelNewPage() {
           {linkTarget === 'invoice' && (
             <div>
               <Label>Posted invoice</Label>
-              <select
+              <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={invoiceId}
                 onChange={(e) => setInvoiceId(e.target.value)}
@@ -170,7 +171,7 @@ export default function ShippingLabelNewPage() {
                     {inv.invoice_number} · {inv.issue_date} · {inv.total}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
               {invoices.length === 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">No posted invoices available.</p>
               )}
@@ -180,7 +181,7 @@ export default function ShippingLabelNewPage() {
           {linkTarget === 'sales_order' && (
             <div>
               <Label>Fulfilled sales order</Label>
-              <select
+              <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={salesOrderId}
                 onChange={(e) => setSalesOrderId(e.target.value)}
@@ -192,7 +193,7 @@ export default function ShippingLabelNewPage() {
                     {so.so_number} · {so.order_date}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
               {salesOrders.length === 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">No fulfilled sales orders available.</p>
               )}

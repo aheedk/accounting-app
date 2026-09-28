@@ -7,6 +7,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { AppSelect } from '../../components/ui/select';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -241,7 +242,7 @@ export default function SalesOrderListPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Status</div>
-              <select
+              <AppSelect
                 className="h-9 rounded-md border bg-background px-3 text-sm"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -250,7 +251,7 @@ export default function SalesOrderListPage() {
                 {STATUSES.map((s) => (
                   <option key={s} value={s} className="capitalize">{s}</option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
           </div>
           {err && <p className="text-sm text-destructive">{err}</p>}

@@ -11,6 +11,7 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type CreditMemoSummary = {
   id: string;
@@ -141,9 +142,9 @@ export default function CreditMemoListPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Date</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
+          <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
             {DATE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
+          </AppSelect>
         </div>
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Customer</div>
@@ -156,9 +157,9 @@ export default function CreditMemoListPage() {
         </div>
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Status</div>
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          </AppSelect>
         </div>
         <div className="ml-auto">
           <Button asChild><Link to="/credit-memos/new">New credit memo</Link></Button>

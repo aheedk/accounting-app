@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { daysAgoLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { PAYMENT_METHOD_OPTIONS, paymentMethodLabel, type PaymentMethod } from '@/lib/paymentMethods';
+import { AppSelect } from '../../components/ui/select';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 type StatusFilter = ExpenseStatus | 'all';
@@ -217,21 +218,21 @@ export default function ExpenseTransactionListPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <select
+        <AppSelect
           className="h-9 rounded-md border bg-background px-3 text-sm"
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value as StatusFilter)}
         >
           {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select
+        </AppSelect>
+        <AppSelect
           className="h-9 rounded-md border bg-background px-3 text-sm"
           value={dateFilter}
           onChange={e => setDateFilter(e.target.value)}
         >
           {DATE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-        </select>
-        <select
+        </AppSelect>
+        <AppSelect
           className="h-9 rounded-md border bg-background px-3 text-sm"
           value={paymentMethodFilter}
           onChange={e => setPaymentMethodFilter(e.target.value as PaymentMethod | 'all')}
@@ -240,7 +241,7 @@ export default function ExpenseTransactionListPage() {
           {PAYMENT_METHOD_OPTIONS.map(option => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
-        </select>
+        </AppSelect>
         {range && range.days > 0 && (
           <span className="inline-flex h-9 items-center gap-2 rounded-full border bg-muted/40 px-3 text-sm">
             Dates: <span className="font-medium">{range.label}</span>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type BillPayment = {
   id: string;
@@ -127,9 +128,9 @@ export default function BillPaymentDetailPage() {
           {parseFloat(p.unapplied_amount) > 0 && (
             <form className="grid grid-cols-12 gap-2 items-end" onSubmit={apply}>
               <div className="col-span-7"><label className="text-sm">Bill</label>
-                <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.bill_id} onChange={e => setApplyForm(f => ({ ...f, bill_id: e.target.value }))} required>
+                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.bill_id} onChange={e => setApplyForm(f => ({ ...f, bill_id: e.target.value }))} required>
                   <option value="">Select open bill…</option>{openBills.map(b => <option key={b.id} value={b.id}>{b.bill_number} — {fmtMoney(b.total)}</option>)}
-                </select>
+                </AppSelect>
               </div>
               <div className="col-span-3"><label className="text-sm">Apply amount</label><Input type="number" step="0.01" value={applyForm.applied_amount} onChange={e => setApplyForm(f => ({ ...f, applied_amount: e.target.value }))} /></div>
               <div className="col-span-2"><Button type="submit" disabled={busy}>Apply</Button></div>

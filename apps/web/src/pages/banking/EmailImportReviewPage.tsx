@@ -6,6 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import DocumentUpload from '@/pages/ai/DocumentUpload';
 import ConfidenceBadge, { type SuggestionMeta } from '@/pages/ai/ConfidenceBadge';
+import { AppSelect } from '../../components/ui/select';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -640,11 +641,11 @@ export default function EmailImportReviewPage() {
 
               <div className="flex items-center gap-3 rounded-lg border p-4 bg-muted/10">
                 <label className="text-sm font-medium whitespace-nowrap">Bank account (this statement)</label>
-                <select value={bankAccountId} onChange={e => void handleBankAccountChange(e.target.value)}
+                <AppSelect value={bankAccountId} onChange={e => void handleBankAccountChange(e.target.value)}
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— select —</option>
                   {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                </AppSelect>
               </div>
 
               {bankError && <p className="text-sm text-destructive">{bankError}</p>}
@@ -683,13 +684,13 @@ export default function EmailImportReviewPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <select disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
+                          <AppSelect disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
                             onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
                             title={tx.suggested_offset ? `AI suggested: ${tx.suggested_offset}` : undefined}
                             className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${offsets[i] ? 'border-emerald-400' : ''}`}>
                             <option value="">— select account —</option>
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                          </select>
+                          </AppSelect>
                           <div className="mt-1 space-y-1">
                             {tx.auto_posted
                               ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
@@ -1002,20 +1003,20 @@ export default function EmailImportReviewPage() {
                 {selectedInvoice.invoice_type === 'ap' ? (
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium whitespace-nowrap w-52">Vendor</label>
-                    <select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)}
+                    <AppSelect value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)}
                       className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                       <option value="">— select vendor —</option>
                       {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
+                    </AppSelect>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium whitespace-nowrap w-52">Customer</label>
-                    <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)}
+                    <AppSelect value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)}
                       className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                       <option value="">— select customer —</option>
                       {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                    </AppSelect>
                   </div>
                 )}
               </div>
@@ -1057,13 +1058,13 @@ export default function EmailImportReviewPage() {
                           </td>
                         )}
                         <td className="px-3 py-2">
-                          <select disabled={!lineIncluded[i]} value={lineAccountIds[i] ?? ''}
+                          <AppSelect disabled={!lineIncluded[i]} value={lineAccountIds[i] ?? ''}
                             onChange={e => setLineAccountIds(prev => ({ ...prev, [i]: e.target.value }))}
                             title={li.suggested_account ? `AI suggested: ${li.suggested_account}` : undefined}
                             className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${lineAccountIds[i] ? 'border-emerald-400' : ''}`}>
                             <option value="">— select account —</option>
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                          </select>
+                          </AppSelect>
                           <div className="mt-1 space-y-1">
                             <ConfidenceBadge suggestion={li.suggestion} />
                             {lineIncluded[i] && lineAccountIds[i] && lineAccountIds[i] !== li.suggested_account_id && (

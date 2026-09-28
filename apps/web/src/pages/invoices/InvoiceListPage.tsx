@@ -10,6 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { AppSelect } from '../../components/ui/select';
 
 type InvoiceStatus = 'draft' | 'posted' | 'paid' | 'voided';
 type InvoiceSummary = { id: string; customer_id: string; invoice_number: string; issue_date: string; due_date: string; status: InvoiceStatus; total: string };
@@ -88,9 +89,9 @@ export default function InvoiceListPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Invoices</h1>
         <div className="flex items-center gap-3">
-          <select className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>{['draft', 'posted', 'paid', 'voided'].map(s => <option key={s}>{s}</option>)}
-          </select>
+          </AppSelect>
           <div className="flex items-center gap-2">
             <div className="relative group">
               <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={handleExport} disabled={excelBusy} aria-label="Export to Excel">

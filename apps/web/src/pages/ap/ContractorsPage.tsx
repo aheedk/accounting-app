@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AppSelect } from '../../components/ui/select';
 
 // Decision: skip the inline "mark vendor as 1099" form on this page.
 // Users flag a vendor as 1099 from the existing Vendors page (or by editing W-9 here,
@@ -232,14 +233,14 @@ export default function ContractorsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Tax ID type</Label>
-                  <select
+                  <AppSelect
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={editForm.tax_id_type}
                     onChange={e => setEditForm(f => ({ ...f, tax_id_type: e.target.value as 'SSN' | 'EIN' }))}
                   >
                     <option value="SSN">SSN</option>
                     <option value="EIN">EIN</option>
-                  </select>
+                  </AppSelect>
                 </div>
                 <div>
                   <Label>Tax ID</Label>

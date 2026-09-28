@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AppSelect } from '../../components/ui/select';
 
 type BusinessAddress = {
   line1?: string;
@@ -199,7 +200,7 @@ export default function EntityPage() {
               </div>
               <div>
                 <Label htmlFor="fy_month">Fiscal year starts</Label>
-                <select
+                <AppSelect
                   id="fy_month"
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={form.fiscal_year_start_month}
@@ -209,7 +210,7 @@ export default function EntityPage() {
                   {MONTHS.map((m, idx) => (
                     <option key={idx + 1} value={idx + 1}>{m}</option>
                   ))}
-                </select>
+                </AppSelect>
               </div>
             </div>
           </CardContent>

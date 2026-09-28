@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Vendor = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -135,14 +136,14 @@ export default function BillPaymentNewPage() {
 
       <div className="max-w-sm">
         <Label className="text-xs text-muted-foreground">Vendor</Label>
-        <select
+        <AppSelect
           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
           value={form.vendor_id}
           onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))}
           required
         >
           <option value="">Choose a vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
+        </AppSelect>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -151,9 +152,9 @@ export default function BillPaymentNewPage() {
             <div><Label className="text-xs text-muted-foreground">Payment date</Label><DateInput value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} required /></div>
             <div><Label className="text-xs text-muted-foreground">{form.payment_method === 'check' ? 'Check no.' : 'Ref no.'}</Label><Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder={form.payment_method === 'check' ? 'e.g. 1042' : 'Transaction ID, confirmation #, etc.'} /></div>
             <div><Label className="text-xs text-muted-foreground">Payment method</Label>
-              <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
+              <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
                 {['cash', 'check', 'ach', 'wire', 'card', 'other'].map(m => <option key={m}>{m}</option>)}
-              </select>
+              </AppSelect>
             </div>
             <div><Label className="text-xs text-muted-foreground">Payment account</Label>
               <AccountSelect

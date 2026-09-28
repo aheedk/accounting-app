@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -126,7 +127,7 @@ export default function ItemReceiptNewPage() {
       <div className="mb-8 flex flex-wrap items-end gap-4">
         <div className="min-w-[220px]">
           <Label>Purchase order</Label>
-          <select
+          <AppSelect
             className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm shadow-sm"
             value={selectedPoId}
             onChange={(e) => { setSelectedPoId(e.target.value); setErr(null); }}
@@ -138,7 +139,7 @@ export default function ItemReceiptNewPage() {
                 {p.po_number} — {vendorMap.get(p.vendor_id) ?? 'Unknown vendor'}
               </option>
             ))}
-          </select>
+          </AppSelect>
           {pos.length === 0 && (
             <p className="mt-1 text-xs text-muted-foreground">No sent purchase orders available.</p>
           )}

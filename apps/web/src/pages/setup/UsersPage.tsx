@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
+import { AppSelect } from '../../components/ui/select';
 
 type Role = 'firm_admin' | 'accountant' | 'staff' | 'client';
 const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'client'];
@@ -246,13 +247,13 @@ export default function UsersPage() {
               </div>
               <div>
                 <Label>Firm-level role</Label>
-                <select
+                <AppSelect
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={invite.role}
                   onChange={e => setInvite(i => ({ ...i, role: e.target.value as Role }))}
                 >
                   {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                </AppSelect>
               </div>
               {inviteErr && <p className="text-sm text-destructive md:col-span-3">{inviteErr}</p>}
               <div className="md:col-span-3">
@@ -285,14 +286,14 @@ export default function UsersPage() {
                     <td className="p-3">{u.email}</td>
                     <td className="p-3">{u.full_name}</td>
                     <td className="p-3">
-                      <select
+                      <AppSelect
                         className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
                         value={u.role}
                         disabled={isSelf}
                         onChange={e => changeRole(u.id, e.target.value as Role)}
                       >
                         {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                      </select>
+                      </AppSelect>
                       {isSelf && <p className="text-xs text-muted-foreground mt-1">(you)</p>}
                     </td>
                     <td className="p-3">
@@ -324,7 +325,7 @@ export default function UsersPage() {
                         <form className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2 items-end" onSubmit={submitGrant}>
                           <div>
                             <Label className="text-xs">Business</Label>
-                            <select
+                            <AppSelect
                               className="h-9 w-full rounded-md border bg-background px-2 text-sm"
                               value={grantForm.business_id}
                               onChange={e => setGrantForm(g => ({ ...g, business_id: e.target.value }))}
@@ -334,18 +335,18 @@ export default function UsersPage() {
                               {availableBusinessesFor(u).map(b => (
                                 <option key={b.id} value={b.id}>{b.name}</option>
                               ))}
-                            </select>
+                            </AppSelect>
                           </div>
                           <div>
                             <Label className="text-xs">Role override (optional)</Label>
-                            <select
+                            <AppSelect
                               className="h-9 w-full rounded-md border bg-background px-2 text-sm"
                               value={grantForm.role_override}
                               onChange={e => setGrantForm(g => ({ ...g, role_override: e.target.value as '' | Role }))}
                             >
                               <option value="">(no override)</option>
                               {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
+                            </AppSelect>
                           </div>
                           <div className="flex gap-2">
                             <Button type="submit" size="sm" disabled={grantBusy}>

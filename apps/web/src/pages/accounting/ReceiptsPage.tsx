@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type LinkedEntityType =
   | 'bank_transaction'
@@ -282,14 +283,14 @@ export default function ReceiptsPage() {
       <div className="flex flex-wrap items-end gap-4">
         <div>
           <div className="mb-1 text-xs text-muted-foreground">Linked to</div>
-          <select
+          <AppSelect
             className="h-9 rounded-md border bg-background px-3 text-sm"
             value={filter}
             onChange={e => setFilter(e.target.value as LinkedEntityType | 'all')}
           >
             <option value="all">All receipts</option>
             {LINK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          </AppSelect>
         </div>
       </div>
 
@@ -348,7 +349,7 @@ export default function ReceiptsPage() {
               <form className="space-y-3" onSubmit={submitLink}>
                 <div>
                   <Label htmlFor="link-entity-type">Entity type</Label>
-                  <select
+                  <AppSelect
                     id="link-entity-type"
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={linkType}
@@ -360,7 +361,7 @@ export default function ReceiptsPage() {
                     }}
                   >
                     {LINK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  </AppSelect>
                 </div>
 
                 {linkType === 'unlinked' && (
@@ -370,7 +371,7 @@ export default function ReceiptsPage() {
                 {linkType === 'bank_transaction' && (
                   <div>
                     <Label htmlFor="link-bank-txn">Bank transaction</Label>
-                    <select
+                    <AppSelect
                       id="link-bank-txn"
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={linkId}
@@ -383,14 +384,14 @@ export default function ReceiptsPage() {
                           {t.transaction_date} · {t.description.slice(0, 40)} · {fmtMoney(t.amount)}
                         </option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 )}
 
                 {linkType === 'bill' && (
                   <div>
                     <Label htmlFor="link-bill">Bill</Label>
-                    <select
+                    <AppSelect
                       id="link-bill"
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={linkId}
@@ -403,14 +404,14 @@ export default function ReceiptsPage() {
                           {b.bill_number} · {fmtMoney(b.total)}
                         </option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 )}
 
                 {linkType === 'expense_transaction' && (
                   <div>
                     <Label htmlFor="link-expense-txn">Expense transaction</Label>
-                    <select
+                    <AppSelect
                       id="link-expense-txn"
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={linkId}
@@ -423,7 +424,7 @@ export default function ReceiptsPage() {
                           {t.transaction_date} · {(t.payee_text ?? '').slice(0, 40)} · {fmtMoney(t.amount)}
                         </option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 )}
 

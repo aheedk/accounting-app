@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
+import { AppSelect } from '../../components/ui/select';
 
 type ItemKey =
   | 'state_registration'
@@ -276,7 +277,7 @@ export default function CompliancePage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Label className="text-xs text-muted-foreground">Status</Label>
-                      <select
+                      <AppSelect
                         className="h-9 rounded-md border bg-background px-2 text-sm"
                         value={item.status}
                         disabled={isBusy}
@@ -289,7 +290,7 @@ export default function CompliancePage() {
                             {STATUS_LABELS[s]}
                           </option>
                         ))}
-                      </select>
+                      </AppSelect>
                     </div>
                   </div>
                 </CardHeader>

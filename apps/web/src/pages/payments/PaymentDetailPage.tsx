@@ -10,6 +10,7 @@ import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetail
 import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type Payment = {
   id: string;
@@ -214,10 +215,10 @@ export default function PaymentDetailPage() {
             <form className="grid gap-3 md:grid-cols-12 md:items-end" onSubmit={apply}>
               <div className="md:col-span-7">
                 <label className="text-sm font-medium">Invoice</label>
-                <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.invoice_id} onChange={e => setApplyForm(f => ({ ...f, invoice_id: e.target.value }))} required>
+                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.invoice_id} onChange={e => setApplyForm(f => ({ ...f, invoice_id: e.target.value }))} required>
                   <option value="">Select open invoice...</option>
                   {openInvoices.map(i => <option key={i.id} value={i.id}>{i.invoice_number} - {fmtMoney(i.total)}</option>)}
-                </select>
+                </AppSelect>
               </div>
               <div className="md:col-span-3">
                 <label className="text-sm font-medium">Apply amount</label>

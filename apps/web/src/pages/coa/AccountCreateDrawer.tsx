@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 const ACCOUNT_TYPE_GROUPS = [
   {
@@ -241,13 +242,13 @@ export default function AccountCreateDrawer({
               </div>
               <div>
                 <Label htmlFor="new-account-detail-type">Detail type</Label>
-                <select id="new-account-detail-type" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={form.detail_type} disabled={!selectedTypeLabel} onChange={event => setForm(current => ({ ...current, detail_type: event.target.value }))}>
+                <AppSelect id="new-account-detail-type" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={form.detail_type} disabled={!selectedTypeLabel} onChange={event => setForm(current => ({ ...current, detail_type: event.target.value }))}>
                   <option value="">— select —</option>
                   {form.detail_type && !(DETAIL_TYPES[selectedTypeLabel] ?? []).includes(form.detail_type) && (
                     <option value={form.detail_type}>{form.detail_type}</option>
                   )}
                   {(DETAIL_TYPES[selectedTypeLabel] ?? []).map(detail => <option key={detail} value={detail}>{detail}</option>)}
-                </select>
+                </AppSelect>
               </div>
             </div>
 
@@ -258,7 +259,7 @@ export default function AccountCreateDrawer({
             {isSubaccount && (
               <div>
                 <Label htmlFor="new-account-parent">Parent account <span className="text-destructive">*</span></Label>
-                <select id="new-account-parent" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" value={parentId ?? ''} onChange={event => {
+                <AppSelect id="new-account-parent" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" value={parentId ?? ''} onChange={event => {
                   const nextParentId = event.target.value || null;
                   setParentId(nextParentId);
                   const parent = accounts.find(account => account.id === nextParentId);
@@ -271,7 +272,7 @@ export default function AccountCreateDrawer({
                 }}>
                   <option value="">— select parent —</option>
                   {accounts.filter(account => account.is_active && account.account_type === form.account_type).map(account => <option key={account.id} value={account.id}>{account.code} {account.name}</option>)}
-                </select>
+                </AppSelect>
               </div>
             )}
 

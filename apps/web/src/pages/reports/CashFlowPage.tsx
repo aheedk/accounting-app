@@ -12,6 +12,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { addDaysLocal, fmtLongDate } from '@/lib/dates';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
+import { AppSelect } from '../../components/ui/select';
 
 type CashFlowLine = {
   entry_date: string;
@@ -121,7 +122,7 @@ export default function CashFlowPage() {
           </div>
           <div>
             <div className="mb-1 text-xs text-muted-foreground">Cash account</div>
-            <select
+            <AppSelect
               className="h-10 rounded-md border bg-background px-3 text-sm"
               value={cashAccountId}
               onChange={e => setCashAccountId(e.target.value)}
@@ -132,7 +133,7 @@ export default function CashFlowPage() {
                   {b.cash_account_code} — {b.cash_account_name}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <Button variant="outline" onClick={() => load()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
           <div className="flex items-center gap-2">

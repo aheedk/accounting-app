@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { currentYearLocal, todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type GroupBy = 'account' | 'month' | 'cost_center' | 'customer' | 'vendor';
 type Column = 'debit' | 'credit' | 'net';
@@ -371,7 +372,7 @@ export default function CustomReportsPage() {
                 </div>
                 <div>
                   <Label>Group by</Label>
-                  <select
+                  <AppSelect
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={form.definition.group_by}
                     onChange={e => setForm(f => ({
@@ -382,7 +383,7 @@ export default function CustomReportsPage() {
                     {GROUP_BY_OPTIONS.map(o => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </div>
               </div>
 

@@ -10,6 +10,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Address = {
   line1: string;
@@ -199,9 +200,9 @@ export default function CustomerNewPage() {
             <SelectInput value={form.primary_payment_method} onChange={v => setForm(f => ({ ...f, primary_payment_method: v }))} options={PAYMENT_METHODS} placeholder="Select a primary payment method" />
           </Field>
           <Field label="Terms">
-            <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_terms_days} onChange={e => setForm(f => ({ ...f, default_terms_days: Number(e.target.value) }))}>
+            <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_terms_days} onChange={e => setForm(f => ({ ...f, default_terms_days: Number(e.target.value) }))}>
               {TERMS_OPTIONS.map(t => <option key={t.days} value={t.days}>{t.label}</option>)}
-            </select>
+            </AppSelect>
           </Field>
           <Field label="Sales form delivery options">
             <SelectInput value={form.sales_form_delivery} onChange={v => setForm(f => ({ ...f, sales_form_delivery: v }))} options={DELIVERY_OPTIONS} />
@@ -275,10 +276,10 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 function SelectInput({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string }) {
   return (
-    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={e => onChange(e.target.value)}>
+    <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={e => onChange(e.target.value)}>
       <option value="">{placeholder ?? '—'}</option>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
+    </AppSelect>
   );
 }
 

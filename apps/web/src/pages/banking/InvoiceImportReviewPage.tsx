@@ -4,6 +4,7 @@ import { ChevronLeft, CheckCircle, XCircle } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type LineItem = {
   description: string;
@@ -231,20 +232,20 @@ export default function InvoiceImportReviewPage() {
             {selectedImport.invoice_type === 'ap' ? (
               <div className="flex items-center gap-3">
                 <label className="text-sm font-medium whitespace-nowrap w-48">Accounts Payable account</label>
-                <select value={apAccountId} onChange={e => setApAccountId(e.target.value)}
+                <AppSelect value={apAccountId} onChange={e => setApAccountId(e.target.value)}
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— select —</option>
                   {liabilityAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                </AppSelect>
               </div>
             ) : (
               <div className="flex items-center gap-3">
                 <label className="text-sm font-medium whitespace-nowrap w-48">Accounts Receivable account</label>
-                <select value={arAccountId} onChange={e => setArAccountId(e.target.value)}
+                <AppSelect value={arAccountId} onChange={e => setArAccountId(e.target.value)}
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— select —</option>
                   {assetAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                </AppSelect>
               </div>
             )}
 
@@ -255,11 +256,11 @@ export default function InvoiceImportReviewPage() {
                 Include tax ({selectedImport.tax_amount ? fmtMoney(selectedImport.tax_amount) : '0.00'})
               </label>
               {includeTax && (
-                <select value={taxAccountId} onChange={e => setTaxAccountId(e.target.value)}
+                <AppSelect value={taxAccountId} onChange={e => setTaxAccountId(e.target.value)}
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— tax account —</option>
                   {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                </AppSelect>
               )}
             </div>
           </div>
@@ -296,7 +297,7 @@ export default function InvoiceImportReviewPage() {
                     <td className="px-3 py-2 text-right font-mono text-xs">{fmtMoney(li.unit_price)}</td>
                     <td className="px-3 py-2 text-right font-mono font-medium">{fmtMoney(li.amount)}</td>
                     <td className="px-3 py-2">
-                      <select
+                      <AppSelect
                         disabled={!lineIncluded[i]}
                         value={lineAccountIds[i] ?? ''}
                         onChange={e => setLineAccountIds(prev => ({ ...prev, [i]: e.target.value }))}
@@ -305,7 +306,7 @@ export default function InvoiceImportReviewPage() {
                       >
                         <option value="">— select account —</option>
                         {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                      </select>
+                      </AppSelect>
                     </td>
                   </tr>
                 ))}

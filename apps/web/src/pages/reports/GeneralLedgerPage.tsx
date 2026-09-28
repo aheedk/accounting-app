@@ -31,6 +31,7 @@ import {
   type GeneralLedgerPreferences,
 } from '@/lib/generalLedgerCustomization';
 import { fmtMoney, fmtSigned } from '@/lib/money';
+import { AppSelect } from '../../components/ui/select';
 
 type Account = {
   id: string;
@@ -414,7 +415,7 @@ export default function GeneralLedgerPage() {
           </div>
           <div className="min-w-[16rem]">
             <div className="mb-1 text-xs text-muted-foreground">Account</div>
-            <select
+            <AppSelect
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
               value={accountId}
               onChange={event => setAccountId(event.target.value)}
@@ -423,7 +424,7 @@ export default function GeneralLedgerPage() {
               {accounts.map(account => (
                 <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <Button variant="outline" onClick={() => { void load(); }} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
@@ -652,7 +653,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Filters</h3>
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Account type</div>
-              <select
+              <AppSelect
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 value={props.accountTypeFilter}
                 onChange={event => props.onAccountTypeFilterChange(event.target.value as AccountTypeFilter)}
@@ -663,22 +664,22 @@ function CustomizationPanel(props: CustomizationPanelProps) {
                 <option value="equity">Equity</option>
                 <option value="revenue">Revenue</option>
                 <option value="expense">Expenses</option>
-              </select>
+              </AppSelect>
             </div>
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Transaction type</div>
-              <select
+              <AppSelect
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 value={props.sourceFilter}
                 onChange={event => props.onSourceFilterChange(event.target.value)}
               >
                 <option value="all">All transaction types</option>
                 {props.sourceTypes.map(source => <option key={source} value={source}>{fmtSource(source)}</option>)}
-              </select>
+              </AppSelect>
             </div>
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Posting status</div>
-              <select
+              <AppSelect
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 value={props.statusFilter}
                 onChange={event => props.onStatusFilterChange(event.target.value as StatusFilter)}
@@ -686,7 +687,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
                 <option value="all">Posted and voided</option>
                 <option value="posted">Posted only</option>
                 <option value="voided">Voided only</option>
-              </select>
+              </AppSelect>
             </div>
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Reference or memo contains</div>
@@ -704,25 +705,25 @@ function CustomizationPanel(props: CustomizationPanelProps) {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="mb-1 text-xs text-muted-foreground">Date order</div>
-                <select
+                <AppSelect
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                   value={preferences.sortDirection}
                   onChange={event => props.onPreferencesChange({ sortDirection: event.target.value as GeneralLedgerPreferences['sortDirection'] })}
                 >
                   <option value="oldest">Oldest first</option>
                   <option value="newest">Newest first</option>
-                </select>
+                </AppSelect>
               </div>
               <div>
                 <div className="mb-1 text-xs text-muted-foreground">Row spacing</div>
-                <select
+                <AppSelect
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                   value={preferences.density}
                   onChange={event => props.onPreferencesChange({ density: event.target.value as GeneralLedgerPreferences['density'] })}
                 >
                   <option value="comfortable">Comfortable</option>
                   <option value="compact">Compact</option>
-                </select>
+                </AppSelect>
               </div>
             </div>
             <CheckboxRow checked={preferences.showAccountNumbers} onChange={value => props.onPreferencesChange({ showAccountNumbers: value })} label="Show account numbers" />

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type Period = {
   id: string;
@@ -124,7 +125,7 @@ export default function BooksReviewPage() {
         <CardContent>
           <div className="max-w-md">
             <Label>Period</Label>
-            <select
+            <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={periodId}
               onChange={e => setPeriodId(e.target.value)}
@@ -135,7 +136,7 @@ export default function BooksReviewPage() {
                   {p.starts_on} → {p.ends_on} ({p.status})
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
         </CardContent>
       </Card>
@@ -168,7 +169,7 @@ export default function BooksReviewPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Label className="text-xs text-muted-foreground">Status</Label>
-                        <select
+                        <AppSelect
                           className="h-9 rounded-md border bg-background px-2 text-sm"
                           value={t.status}
                           onChange={e => void patchTask(t.id, { status: e.target.value as TaskStatus })}
@@ -176,7 +177,7 @@ export default function BooksReviewPage() {
                           <option value="todo">Todo</option>
                           <option value="in_progress">In progress</option>
                           <option value="done">Done</option>
-                        </select>
+                        </AppSelect>
                       </div>
                     </div>
 

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/ProductServiceSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
@@ -119,15 +120,15 @@ export default function InvoiceNewPage() {
       <Card><CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Customer</Label>
-            <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required>
+            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required>
               <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </AppSelect>
           </div>
           <div><Label>Invoice no.</Label><Input value={hdr.invoice_number} onChange={e => setHdr(h => ({ ...h, invoice_number: e.target.value }))} placeholder="e.g. 1042" required /></div>
           <div><Label>Terms</Label>
-            <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms} onChange={e => setHdr(h => ({ ...h, terms: e.target.value }))}>
+            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms} onChange={e => setHdr(h => ({ ...h, terms: e.target.value }))}>
               {STANDARD_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            </AppSelect>
           </div>
           <div><Label>Invoice date</Label><DateInput value={hdr.issue_date} onChange={e => setHdr(h => ({ ...h, issue_date: e.target.value }))} required /></div>
           <div><Label>Due date</Label><DateInput value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
@@ -180,9 +181,9 @@ export default function InvoiceNewPage() {
               <div className="flex justify-between items-center"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{fmtMoney(totals.subtotal.toFixed(2))}</span></div>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-muted-foreground shrink-0">Sales tax</span>
-                <select className="h-8 flex-1 rounded-md border bg-background px-2 text-xs" value={taxCodeId ?? ''} onChange={e => setTaxCodeId(e.target.value || null)}>
+                <AppSelect className="h-8 flex-1 rounded-md border bg-background px-2 text-xs" value={taxCodeId ?? ''} onChange={e => setTaxCodeId(e.target.value || null)}>
                   <option value="">No tax</option>{taxCodes.map(tc => <option key={tc.id} value={tc.id}>{tc.code}{tc.current_rate ? ` (${(Number(tc.current_rate) * 100).toFixed(2)}%)` : ''}</option>)}
-                </select>
+                </AppSelect>
                 <span className="font-mono w-20 text-right">{fmtMoney(totals.tax.toFixed(2))}</span>
               </div>
               <div className="flex justify-between border-t pt-2 font-semibold"><span>Invoice total</span><span className="font-mono">{fmtMoney(totals.total.toFixed(2))}</span></div>

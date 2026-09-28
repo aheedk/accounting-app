@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type BankAccount = {
   id: string;
@@ -344,7 +345,7 @@ export default function BankTransactionImportPage() {
         <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
             <Label htmlFor="import-bank-account">Bank account</Label>
-            <select
+            <AppSelect
               id="import-bank-account"
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={bankAccountId}
@@ -355,7 +356,7 @@ export default function BankTransactionImportPage() {
                   {b.name}{b.account_last_four ? ` ••${b.account_last_four}` : ''}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </div>
           <div className="flex items-end gap-2">
             <input
@@ -387,13 +388,13 @@ export default function BankTransactionImportPage() {
                     {parsed.headers.map((h, i) => (
                       <th key={i} className="p-2 text-left">
                         <div className="font-semibold">{h}</div>
-                        <select
+                        <AppSelect
                           className="mt-1 h-8 rounded-md border bg-background px-2 text-xs"
                           value={mapping[i] ?? 'ignore'}
                           onChange={e => updateMapping(i, e.target.value as FieldMapping)}
                         >
                           {MAPPING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        </AppSelect>
                       </th>
                     ))}
                   </tr>

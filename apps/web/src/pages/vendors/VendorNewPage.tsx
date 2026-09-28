@@ -10,6 +10,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { AppSelect } from '../../components/ui/select';
 
 type Address = {
   line1: string;
@@ -186,10 +187,10 @@ export default function VendorNewPage() {
               <Input value={form.tax_id} onChange={e => setForm(f => ({ ...f, tax_id: e.target.value }))} placeholder="e.g. 12-3456789" />
             </Field>
             <Field label="ID type">
-              <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.tax_id_type} onChange={e => setForm(f => ({ ...f, tax_id_type: e.target.value as 'EIN' | 'SSN' }))}>
+              <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.tax_id_type} onChange={e => setForm(f => ({ ...f, tax_id_type: e.target.value as 'EIN' | 'SSN' }))}>
                 <option value="EIN">Business ID No. (EIN)</option>
                 <option value="SSN">Social Security No. (SSN)</option>
-              </select>
+              </AppSelect>
             </Field>
           </div>
           <label className="flex items-center gap-2 pt-3 text-sm">
@@ -201,9 +202,9 @@ export default function VendorNewPage() {
           <div className="text-sm font-medium pb-2">Payments</div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Terms">
-              <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_terms_days} onChange={e => setForm(f => ({ ...f, default_terms_days: Number(e.target.value) }))}>
+              <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_terms_days} onChange={e => setForm(f => ({ ...f, default_terms_days: Number(e.target.value) }))}>
                 {TERMS_OPTIONS.map(t => <option key={t.days} value={t.days}>{t.label}</option>)}
-              </select>
+              </AppSelect>
             </Field>
             <Field label="Account no.">
               <Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} />
@@ -213,10 +214,10 @@ export default function VendorNewPage() {
         <div className="pt-3">
           <div className="text-sm font-medium pb-2">Accounting</div>
           <Field label="Default expense category">
-            <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_expense_account_id} onChange={e => setForm(f => ({ ...f, default_expense_account_id: e.target.value }))}>
+            <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_expense_account_id} onChange={e => setForm(f => ({ ...f, default_expense_account_id: e.target.value }))}>
               <option value="">Choose account</option>
               {expenseAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            </AppSelect>
           </Field>
         </div>
         <div className="pt-3">

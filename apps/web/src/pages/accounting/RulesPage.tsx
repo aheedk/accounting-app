@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { AppSelect } from '../../components/ui/select';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -442,7 +443,7 @@ export default function RulesPage() {
               onChange={e => setSearchQuery(e.target.value)}
               className="w-72 h-9"
             />
-            <select
+            <AppSelect
               className="h-9 rounded-md border bg-background px-3 text-sm"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
@@ -451,7 +452,7 @@ export default function RulesPage() {
               <option value="active">Active rules</option>
               <option value="disabled">Disabled rules</option>
               <option value="invalid">Invalid rules</option>
-            </select>
+            </AppSelect>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative group">
@@ -653,7 +654,7 @@ export default function RulesPage() {
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">Apply this to transactions that are</p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <select
+                    <AppSelect
                       className="h-10 rounded-md border bg-background px-3 text-sm"
                       value={form.sign_filter}
                       onChange={e => setForm(f => ({ ...f, sign_filter: e.target.value as SignFilter }))}
@@ -661,9 +662,9 @@ export default function RulesPage() {
                       {DIRECTION_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                     <span className="text-sm text-muted-foreground">in</span>
-                    <select
+                    <AppSelect
                       className="h-10 rounded-md border bg-background px-3 text-sm"
                       value={form.bank_account_id}
                       onChange={e => setForm(f => ({ ...f, bank_account_id: e.target.value }))}
@@ -672,7 +673,7 @@ export default function RulesPage() {
                       {bankAccounts.filter(ba => ba.is_active).map(ba => (
                         <option key={ba.id} value={ba.id}>{ba.name}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 </div>
 
@@ -745,7 +746,7 @@ export default function RulesPage() {
                   </div>
                   <div>
                     <Label>Category <span className="text-destructive">*</span></Label>
-                    <select
+                    <AppSelect
                       className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
                       value={form.offset_account_id}
                       onChange={e => setForm(f => ({ ...f, offset_account_id: e.target.value }))}
@@ -759,7 +760,7 @@ export default function RulesPage() {
                           ))}
                         </optgroup>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 </div>
 

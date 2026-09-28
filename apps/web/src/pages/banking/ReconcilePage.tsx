@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
+import { AppSelect } from '../../components/ui/select';
 
 type BankAccount = {
   id: string;
@@ -196,7 +197,7 @@ export default function ReconcilePage() {
           </div>
           <div className="min-w-[16rem]">
           <Label>Bank account</Label>
-          <select
+          <AppSelect
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
             value={bankAccountId}
             onChange={e => setBankAccountId(e.target.value)}
@@ -207,7 +208,7 @@ export default function ReconcilePage() {
                 {b.name}{b.account_last_four ? ` •••${b.account_last_four}` : ''}
               </option>
             ))}
-          </select>
+          </AppSelect>
           </div>
         </div>
       </div>
