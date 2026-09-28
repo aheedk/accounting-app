@@ -36,6 +36,7 @@ type CreateBody = {
   payment_method: PaymentMethod;
   amount: string;
   memo: string | null;
+  check_number: string | null;
 };
 
 type ExpenseForm = {
@@ -44,6 +45,7 @@ type ExpenseForm = {
   expense_account_id: string;
   payment_account_id: string;
   payment_method: PaymentMethod | '';
+  check_number: string;
   amount: string;
   memo: string;
 };
@@ -65,6 +67,7 @@ export default function ExpenseTransactionNewPage() {
     expense_account_id: '',
     payment_account_id: '',
     payment_method: '',
+    check_number: '',
     amount: '',
     memo: '',
   });
@@ -104,6 +107,7 @@ export default function ExpenseTransactionNewPage() {
         expense_account_id: form.expense_account_id,
         payment_account_id: form.payment_account_id,
         payment_method: form.payment_method,
+        check_number: form.payment_method === 'check' && form.check_number.trim() ? form.check_number.trim() : null,
         amount: form.amount,
         memo: form.memo || null,
       };
@@ -164,6 +168,17 @@ export default function ExpenseTransactionNewPage() {
             ))}
           </select>
         </div>
+        {form.payment_method === 'check' && (
+          <div>
+            <Label className="text-xs text-muted-foreground">Check no.</Label>
+            <Input
+              value={form.check_number}
+              onChange={(e) => setForm((f) => ({ ...f, check_number: e.target.value }))}
+              placeholder="e.g. 1042"
+              maxLength={30}
+            />
+          </div>
+        )}
         <div>
           <Label className="text-xs text-muted-foreground">Payment date</Label>
           <DateInput

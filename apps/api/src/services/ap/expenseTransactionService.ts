@@ -17,6 +17,7 @@ export type CreateDraftInput = {
   payment_method: PaymentMethod;
   amount: string;
   memo?: string | null;
+  check_number?: string | null;
 };
 
 export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateDraftInput) {
@@ -46,6 +47,8 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     payment_method: input.payment_method,
     amount: input.amount,
     memo: input.memo ?? null,
+    // Only meaningful for checks; drop it for other methods so stale input can't stick.
+    check_number: input.payment_method === 'check' ? (input.check_number || null) : null,
     created_by_user_id: ctx.user_id,
   }).returningAll().executeTakeFirstOrThrow();
 
