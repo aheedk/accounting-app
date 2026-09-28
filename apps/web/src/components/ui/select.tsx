@@ -4,6 +4,14 @@ import { cn } from '../../lib/utils';
 
 type OptionData = { value: string; label: string; disabled?: boolean | undefined };
 
+function childrenToText(node: React.ReactNode): string {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string' || typeof node === 'number' || typeof node === 'boolean') return String(node);
+  if (Array.isArray(node)) return node.map(childrenToText).join('');
+  if (React.isValidElement(node)) return childrenToText((node.props as { children?: React.ReactNode }).children);
+  return '';
+}
+
 function parseOptions(children: React.ReactNode): OptionData[] {
   const opts: OptionData[] = [];
   React.Children.forEach(children, child => {
@@ -12,7 +20,7 @@ function parseOptions(children: React.ReactNode): OptionData[] {
       const p = child.props as { value?: string; children?: React.ReactNode; disabled?: boolean };
       opts.push({
         value: String(p.value ?? ''),
-        label: String(p.children ?? ''),
+        label: childrenToText(p.children),
         disabled: p.disabled,
       });
     } else if (child.type === 'optgroup') {
@@ -111,7 +119,7 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
           ref={listRef}
           role="listbox"
           className={cn(
-            'absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border bg-popover py-1 shadow-lg',
+            'absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border bg-white dark:bg-zinc-900 py-1 shadow-xl',
             'focus:outline-none',
           )}
           style={{ minWidth: '100%' }}
