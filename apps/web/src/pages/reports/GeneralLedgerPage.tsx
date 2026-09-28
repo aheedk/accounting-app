@@ -848,10 +848,15 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
         </>
       );
       break;
-    case 'reference':
-      content = line.reference ?? '—';
-      className += ' font-mono text-xs';
+    case 'reference': {
+      const rawRef = line.reference;
+      const displayRef = rawRef ? rawRef.replace(/^AJE-/i, 'JE-') : null;
+      content = displayRef
+        ? <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{displayRef}</Link>
+        : '—';
+      className += ' font-mono text-xs whitespace-nowrap';
       break;
+    }
     case 'name':
       content = line.split_account ?? '—';
       className += ' max-w-[18rem] truncate text-xs text-muted-foreground';
