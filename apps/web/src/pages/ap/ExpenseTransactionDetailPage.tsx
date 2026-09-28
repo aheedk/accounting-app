@@ -24,6 +24,7 @@ type ExpenseTransaction = {
   expense_account_id: string;
   payment_account_id: string;
   payment_method: PaymentMethod;
+  check_number: string | null;
   amount: string;
   memo: string | null;
   status: ExpenseStatus;
@@ -164,6 +165,7 @@ export default function ExpenseTransactionDetailPage() {
             <DetailField label="Expense account" value={accountMap.get(data.expense_account_id) ?? data.expense_account_id.slice(0, 8)} />
             <DetailField label="Payment account" value={accountMap.get(data.payment_account_id) ?? data.payment_account_id.slice(0, 8)} />
             <DetailField label="Payment method" value={paymentMethodLabel(data.payment_method)} />
+            {data.check_number && <DetailField label="Check no." value={data.check_number} />}
             <DetailField label="Memo" className="sm:col-span-2" value={data.memo} />
           </CardContent>
         </Card>

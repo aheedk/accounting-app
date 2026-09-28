@@ -366,6 +366,7 @@ export interface ExpenseTransactionsTable {
   payment_method: Generated<PaymentMethod>;
   amount: ColumnType<string, string | number, string | number>;
   memo: string | null;
+  check_number: string | null;
   status: Generated<ExpenseTransactionStatus>;
   journal_entry_id: string | null;
   created_at: Generated<Timestamp>;

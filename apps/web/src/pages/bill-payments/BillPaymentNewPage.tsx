@@ -149,7 +149,7 @@ export default function BillPaymentNewPage() {
         <Card className="lg:col-span-2"><CardHeader><CardTitle className="text-base">Payment details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
             <div><Label className="text-xs text-muted-foreground">Payment date</Label><DateInput value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} required /></div>
-            <div><Label className="text-xs text-muted-foreground">Ref no.</Label><Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="Check #, transaction ID, etc." /></div>
+            <div><Label className="text-xs text-muted-foreground">{form.payment_method === 'check' ? 'Check no.' : 'Ref no.'}</Label><Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder={form.payment_method === 'check' ? 'e.g. 1042' : 'Transaction ID, confirmation #, etc.'} /></div>
             <div><Label className="text-xs text-muted-foreground">Payment method</Label>
               <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
                 {['cash', 'check', 'ach', 'wire', 'card', 'other'].map(m => <option key={m}>{m}</option>)}

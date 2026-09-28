@@ -54,6 +54,7 @@ router.post('/businesses/:businessId/expense-transactions', requireMinRole('staf
         payment_method: body.payment_method,
         amount: body.amount,
         memo: body.memo ?? null,
+        check_number: body.check_number ?? null,
       }),
     );
     res.status(201).json(created);

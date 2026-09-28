@@ -36,6 +36,22 @@ describe('expenseTransactionService', () => {
     expect(row.journal_entry_id).toBeNull();
   });
 
+  it('stores a check number for checks and drops it for other methods', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const base = {
+      business_id: biz.id, transaction_date: '2026-04-15',
+      payee_text: 'Landlord', expense_account_id: expense.id,
+      payment_account_id: cash.id, amount: '1200.00', memo: 'rent',
+    };
+    const check = await t.db.transaction().execute(trx =>
+      et.createDraft(trx, ctx, { ...base, payment_method: 'check', check_number: '1042' }));
+    expect(check.check_number).toBe('1042');
+
+    const card = await t.db.transaction().execute(trx =>
+      et.createDraft(trx, ctx, { ...base, payment_method: 'card', check_number: '1043' }));
+    expect(card.check_number).toBeNull();
+  });
+
   it('post creates a JE (DR expense / CR payment account) and links it', async () => {
     const { biz, ctx, expense, cash } = await bootstrap();
     const draft = await t.db.transaction().execute(trx =>

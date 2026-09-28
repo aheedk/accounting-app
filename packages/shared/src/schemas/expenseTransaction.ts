@@ -11,6 +11,7 @@ export const expenseTransactionCreateSchema = z.object({
   payment_method: paymentMethodSchema,
   amount: moneyStr,
   memo: z.string().max(500).nullable().optional(),
+  check_number: z.string().trim().max(30).nullable().optional(),
 }).refine(
   v => Boolean(v.payee_text) || Boolean(v.vendor_id),
   { message: 'either payee_text or vendor_id is required' },
