@@ -45,6 +45,7 @@ type GeneralLedgerLine = {
   line_id: string;
   entry_date: string;
   source_type: string;
+  transaction_type: string | null;
   reference: string | null;
   memo: string | null;
   split_account: string | null;
@@ -100,8 +101,21 @@ function fmtShortDate(iso: string): string {
   return `${Number(month)}/${Number(day)}/${year.slice(2)}`;
 }
 
-function fmtSource(source: string): string {
+function fmtSourceLabel(source: string): string {
+  if (source === 'bank_import') return 'Bank Import';
+  if (['manual', 'reversal', 'adjustment'].includes(source)) return 'Journal Entry';
+  if (source === 'invoice_import') return 'Invoice';
   return source.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function fmtTransactionLabel(line: GeneralLedgerLine): string {
+  if (line.source_type === 'bank_import') {
+    if (line.transaction_type === 'deposit') return 'Deposit';
+    if (line.transaction_type === 'check')   return 'Check';
+    if (line.transaction_type === 'expense') return 'Expense';
+    return 'Bank Import';
+  }
+  return fmtSourceLabel(line.source_type);
 }
 
 function pickErr(error: unknown): string {
@@ -148,7 +162,7 @@ function summaryValues(
 function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey): string {
   switch (column) {
     case 'date': return line.entry_date;
-    case 'transaction': return `${fmtSource(line.source_type)}${line.status === 'voided' ? ' (Voided)' : ''}`;
+    case 'transaction': return `${fmtTransactionLabel(line)}${line.status === 'voided' ? ' (Voided)' : ''}`;
     case 'reference': return line.reference ?? '';
     case 'name': return line.split_account ?? '';
     case 'memo': return line.memo ?? '';
@@ -266,7 +280,7 @@ export default function GeneralLedgerPage() {
   const sourceTypes = useMemo(() => {
     const values = new Set<string>();
     report?.accounts.forEach(account => account.lines.forEach(line => values.add(line.source_type)));
-    return [...values].sort((left, right) => fmtSource(left).localeCompare(fmtSource(right)));
+    return [...values].sort((left, right) => fmtSourceLabel(left).localeCompare(fmtSourceLabel(right)));
   }, [report]);
 
   useEffect(() => {
@@ -674,7 +688,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
                 onChange={event => props.onSourceFilterChange(event.target.value)}
               >
                 <option value="all">All transaction types</option>
-                {props.sourceTypes.map(source => <option key={source} value={source}>{fmtSource(source)}</option>)}
+                {props.sourceTypes.map(source => <option key={source} value={source}>{fmtSourceLabel(source)}</option>)}
               </AppSelect>
             </div>
             <div>
@@ -829,7 +843,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
     case 'transaction':
       content = (
         <>
-          <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{fmtSource(line.source_type)}</Link>
+          <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{fmtTransactionLabel(line)}</Link>
           {line.status === 'voided' && <span className="ml-2 text-xs uppercase">Voided</span>}
         </>
       );

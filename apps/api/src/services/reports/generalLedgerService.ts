@@ -8,6 +8,7 @@ export type GeneralLedgerLine = {
   line_id: string;
   entry_date: string;
   source_type: JournalEntrySourceType;
+  transaction_type: string | null;
   reference: string | null;
   memo: string | null;
   split_account: string | null;
@@ -96,7 +97,7 @@ export async function generalLedger(
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select([
       'jel.id as line_id', 'jel.account_id', 'jel.debit', 'jel.credit', 'jel.memo as line_memo',
-      'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.reference',
+      'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.transaction_type', 'je.reference',
       'je.memo as entry_memo', 'je.status',
     ])
     .where('je.business_id', '=', q.business_id)
@@ -166,6 +167,7 @@ export async function generalLedger(
         line_id: line.line_id,
         entry_date: line.entry_date,
         source_type: line.source_type,
+        transaction_type: line.transaction_type ?? null,
         reference: line.reference,
         memo: line.line_memo ?? line.entry_memo,
         split_account: splitMap.get(line.line_id) ?? null,

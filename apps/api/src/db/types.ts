@@ -135,6 +135,7 @@ export interface JournalEntriesTable {
   source_id: string | null;
   reversed_entry_id: string | null;
   corrected_from_entry_id: string | null;
+  transaction_type: ColumnType<string | null, string | null | undefined, string | null>;
   posted_at: Timestamp | null;
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;

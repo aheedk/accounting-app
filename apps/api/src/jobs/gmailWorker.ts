@@ -51,7 +51,7 @@ type ExtractedTransaction = {
   date: string;
   description: string;
   amount: string;
-  type: 'debit' | 'credit';
+  type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
   balance: string;
   suggested_offset?: string;
 };
@@ -127,7 +127,7 @@ If this is a BANK STATEMENT return:
       "date": "MM/DD/YYYY",
       "description": "string",
       "amount": "positive number e.g. 1250.00",
-      "type": "debit or credit",
+      "type": "deposit (money received/inflow), check (outflow paid by physical check), or expense (outflow via card/ACH/wire/cash/EFT)",
       "balance": "running balance e.g. 42500.00",
       "suggested_offset": "one account name from the chart of accounts above"
     }

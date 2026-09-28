@@ -13,7 +13,7 @@ type ExtractedTx = {
   date: string;
   description: string;
   amount: string;
-  type: 'debit' | 'credit';
+  type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
   balance: string;
   suggested_offset?: string;
   suggested_account_id?: string;
@@ -97,8 +97,8 @@ function deriveBankTitle(imp: StagedImport): string {
 
 function deriveBankSubtitle(imp: StagedImport): string {
   const txs = imp.extracted_transactions as ExtractedTx[];
-  const deposits = txs.filter(tx => tx.type === 'credit').length;
-  const payments = txs.filter(tx => tx.type === 'debit').length;
+  const deposits = txs.filter(tx => tx.type === 'credit' || tx.type === 'deposit').length;
+  const payments = txs.filter(tx => tx.type === 'debit' || tx.type === 'expense' || tx.type === 'check').length;
   return `${txs.length} transactions · ${deposits} deposits · ${payments} payments`;
 }
 
@@ -675,13 +675,19 @@ export default function EmailImportReviewPage() {
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{tx.date}</td>
                         <td className="px-3 py-2 max-w-[220px] truncate">{tx.description}</td>
-                        <td className={`px-3 py-2 text-right font-mono font-medium ${tx.type === 'credit' ? 'text-emerald-600' : 'text-destructive'}`}>
-                          {tx.type === 'credit' ? '+' : '-'}{fmtMoney(tx.amount)}
+                        <td className={`px-3 py-2 text-right font-mono font-medium ${(tx.type === 'credit' || tx.type === 'deposit') ? 'text-emerald-600' : 'text-destructive'}`}>
+                          {(tx.type === 'credit' || tx.type === 'deposit') ? '+' : '-'}{fmtMoney(tx.amount)}
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${tx.type === 'credit' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {tx.type === 'credit' ? 'Deposit' : 'Payment'}
-                          </span>
+                          {(tx.type === 'credit' || tx.type === 'deposit') && (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700">Deposit</span>
+                          )}
+                          {tx.type === 'check' && (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700">Check</span>
+                          )}
+                          {(tx.type === 'expense' || tx.type === 'debit') && (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-red-100 text-red-700">Expense</span>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <AppSelect disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}

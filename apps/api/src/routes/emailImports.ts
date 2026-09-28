@@ -177,7 +177,7 @@ router.post(
 
       type RawTx = {
         date: string; description: string; amount: string;
-        type: 'debit' | 'credit'; balance: string; auto_posted?: boolean;
+        type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit'; balance: string; auto_posted?: boolean;
       };
       const transactions: RawTx[] = (typeof staged.extracted_transactions === 'string'
         ? JSON.parse(staged.extracted_transactions)
@@ -197,13 +197,15 @@ router.post(
 
       const jeInputs = pairs.map(({ tx, item }) => {
         const amt = parseFloat(tx.amount).toFixed(2);
-        const isDeposit = tx.type === 'credit';
+        const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
+        const txType = isDeposit ? 'deposit' : tx.type === 'check' ? 'check' : 'expense';
         const [m, d, y] = tx.date.split('/');
         const entryDate = `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`;
         return {
           business_id: bizId,
           entry_date: entryDate,
           source_type: 'bank_import' as const,
+          transaction_type: txType,
           source_id: staged.id,
           memo: tx.description,
           lines: [
@@ -228,7 +230,7 @@ router.post(
       const suggestions = await suggestCodingBatch(db, serviceCtx, transactions.map(tx => ({
         description: tx.description ?? '',
         amount: `${Math.abs(Number(tx.amount ?? 0))}`,
-        direction: tx.type === 'credit' ? 'credit' as const : 'debit' as const,
+        direction: (tx.type === 'credit' || tx.type === 'deposit') ? 'credit' as const : 'debit' as const,
       })));
 
       const posted = jeInputs.length;
@@ -325,7 +327,7 @@ router.post(
 
       type AutoTx = {
         date: string; description: string; amount: string;
-        type: 'debit' | 'credit'; balance: string; auto_posted?: boolean;
+        type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit'; balance: string; auto_posted?: boolean;
       };
       const transactions: AutoTx[] = (typeof staged.extracted_transactions === 'string'
         ? JSON.parse(staged.extracted_transactions)
@@ -334,7 +336,7 @@ router.post(
       const suggestions = await suggestCodingBatch(db, serviceCtx, transactions.map(tx => ({
         description: tx.description ?? '',
         amount: `${Math.abs(Number(tx.amount ?? 0))}`,
-        direction: tx.type === 'credit' ? 'credit' as const : 'debit' as const,
+        direction: (tx.type === 'credit' || tx.type === 'deposit') ? 'credit' as const : 'debit' as const,
       })));
 
       const confident = transactions.flatMap((tx, index) => {
@@ -352,12 +354,14 @@ router.post(
 
       const jeInputs = confident.map(({ tx, accountId }) => {
         const amt = parseFloat(tx.amount).toFixed(2);
-        const isDeposit = tx.type === 'credit';
+        const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
+        const txType = isDeposit ? 'deposit' : tx.type === 'check' ? 'check' : 'expense';
         const [m, d, y] = tx.date.split('/');
         return {
           business_id: bizId,
           entry_date: `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`,
           source_type: 'bank_import' as const,
+          transaction_type: txType,
           source_id: staged.id,
           memo: tx.description,
           lines: [
