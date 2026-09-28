@@ -25,7 +25,7 @@ export type GeneralLedgerPreferences = {
 
 export const GENERAL_LEDGER_COLUMNS: ReadonlyArray<{ key: GeneralLedgerColumnKey; label: string; numeric?: boolean }> = [
   { key: 'date', label: 'Date' },
-  { key: 'transaction', label: 'Transaction' },
+  { key: 'transaction', label: 'Transaction Type' },
   { key: 'reference', label: 'Num' },
   { key: 'name', label: 'Name / Split' },
   { key: 'memo', label: 'Memo / Description' },
