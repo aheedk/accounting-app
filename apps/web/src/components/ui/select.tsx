@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 type OptionData = { value: string; label: string; disabled?: boolean | undefined };
@@ -37,10 +37,16 @@ type AppSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onCha
 
 export function AppSelect({ value, onChange, className, disabled, children, ...rest }: AppSelectProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const options = parseOptions(children);
+  const filtered = query.trim()
+    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
   const selectedOpt = options.find(o => o.value === String(value ?? ''));
   const displayLabel = selectedOpt?.label ?? (options[0]?.label ?? '');
 
@@ -68,7 +74,18 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
       onChange(syntheticEvent);
     }
     setOpen(false);
+    setQuery('');
   }, [onChange]);
+
+  useEffect(() => {
+    if (!open) { setQuery(''); return; }
+    // Auto-focus search input and scroll selected item into view
+    setTimeout(() => searchRef.current?.focus(), 0);
+    if (listRef.current) {
+      const active = listRef.current.querySelector('[data-selected="true"]') as HTMLElement | null;
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -79,13 +96,6 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (open && listRef.current) {
-      const active = listRef.current.querySelector('[data-selected="true"]') as HTMLElement | null;
-      if (active) active.scrollIntoView({ block: 'nearest' });
-    }
   }, [open]);
 
   return (
@@ -115,41 +125,62 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
       </button>
 
       {open && (
-        <ul
-          ref={listRef}
-          role="listbox"
-          className={cn(
-            'absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border bg-white dark:bg-zinc-900 py-1 shadow-xl',
-            'focus:outline-none',
-          )}
+        <div
+          className="absolute z-50 mt-1 w-full rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
           style={{ minWidth: '100%' }}
         >
-          {options.map(opt => {
-            const isSelected = opt.value === String(value ?? '');
-            return (
-              <li
-                key={opt.value}
-                role="option"
-                aria-selected={isSelected}
-                data-selected={isSelected}
-                aria-disabled={opt.disabled}
-                onClick={() => !opt.disabled && pick(opt.value)}
-                className={cn(
-                  'flex cursor-pointer select-none items-center px-3 py-2 text-sm',
-                  'hover:bg-accent hover:text-accent-foreground',
-                  opt.disabled && 'cursor-not-allowed opacity-40',
-                  isSelected && 'bg-accent/50 font-medium',
-                )}
-              >
-                <span className="flex-1 truncate">{opt.label}</span>
-                {isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />}
-              </li>
-            );
-          })}
-          {options.length === 0 && (
-            <li className="px-3 py-2 text-sm text-muted-foreground">No options</li>
-          )}
-        </ul>
+          {/* Search bar */}
+          <div className="flex items-center gap-2 border-b px-3 py-2">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              onKeyDown={e => {
+                if (e.key === 'Escape') { setOpen(false); }
+                if (e.key === 'Enter' && filtered.length === 1 && filtered[0]) {
+                  pick(filtered[0].value);
+                }
+              }}
+            />
+          </div>
+
+          {/* Option list */}
+          <ul
+            ref={listRef}
+            role="listbox"
+            className="max-h-60 overflow-y-auto py-1 focus:outline-none"
+          >
+            {filtered.map(opt => {
+              const isSelected = opt.value === String(value ?? '');
+              return (
+                <li
+                  key={opt.value}
+                  role="option"
+                  aria-selected={isSelected}
+                  data-selected={isSelected}
+                  aria-disabled={opt.disabled}
+                  onClick={() => !opt.disabled && pick(opt.value)}
+                  className={cn(
+                    'flex cursor-pointer select-none items-center px-3 py-2 text-sm',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    opt.disabled && 'cursor-not-allowed opacity-40',
+                    isSelected && 'bg-accent/50 font-medium',
+                  )}
+                >
+                  <span className="flex-1 truncate">{opt.label}</span>
+                  {isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />}
+                </li>
+              );
+            })}
+            {filtered.length === 0 && (
+              <li className="px-3 py-2 text-sm text-muted-foreground">No results</li>
+            )}
+          </ul>
+        </div>
       )}
     </div>
   );
