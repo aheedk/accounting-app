@@ -29,6 +29,7 @@ export type PostJournalEntryInput = {
   source_type: JournalEntrySourceType;
   source_id?: string | null;
   transaction_type?: string | null;
+  payee_name?: string | null;
   memo: string | null;
   reference?: string | null;
   corrected_from_entry_id?: string | null;
@@ -713,6 +714,7 @@ export async function postJournalEntryBatch(
       source_type: input.source_type,
       source_id: input.source_id ?? null,
       transaction_type: input.transaction_type ?? null,
+      payee_name: input.payee_name ?? null,
       corrected_from_entry_id: input.corrected_from_entry_id ?? null,
       created_by_user_id: ctx.user_id,
     })))

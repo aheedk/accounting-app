@@ -2,10 +2,11 @@ export type GeneralLedgerColumnKey =
   | 'date'
   | 'transaction'
   | 'reference'
+  | 'adj'
   | 'name'
   | 'memo'
-  | 'debit'
-  | 'credit'
+  | 'split'
+  | 'amount'
   | 'balance';
 
 export type GeneralLedgerSortDirection = 'oldest' | 'newest';
@@ -27,15 +28,16 @@ export const GENERAL_LEDGER_COLUMNS: ReadonlyArray<{ key: GeneralLedgerColumnKey
   { key: 'date', label: 'Date' },
   { key: 'transaction', label: 'Transaction Type' },
   { key: 'reference', label: 'Num' },
-  { key: 'name', label: 'Name / Split' },
+  { key: 'adj', label: 'Adj' },
+  { key: 'name', label: 'Name' },
   { key: 'memo', label: 'Memo / Description' },
-  { key: 'debit', label: 'Debit', numeric: true },
-  { key: 'credit', label: 'Credit', numeric: true },
+  { key: 'split', label: 'Split' },
+  { key: 'amount', label: 'Amount', numeric: true },
   { key: 'balance', label: 'Balance', numeric: true },
 ];
 
 const COLUMN_KEYS = GENERAL_LEDGER_COLUMNS.map(column => column.key);
-const STORAGE_KEY = 'accounting.general-ledger.preferences.v2';
+const STORAGE_KEY = 'accounting.general-ledger.preferences.v4';
 
 export function defaultGeneralLedgerPreferences(): GeneralLedgerPreferences {
   return {

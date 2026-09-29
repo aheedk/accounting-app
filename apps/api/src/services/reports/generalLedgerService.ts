@@ -9,6 +9,7 @@ export type GeneralLedgerLine = {
   entry_date: string;
   source_type: JournalEntrySourceType;
   transaction_type: string | null;
+  payee_name: string | null;
   reference: string | null;
   memo: string | null;
   split_account: string | null;
@@ -97,7 +98,7 @@ export async function generalLedger(
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select([
       'jel.id as line_id', 'jel.account_id', 'jel.debit', 'jel.credit', 'jel.memo as line_memo',
-      'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.transaction_type', 'je.reference',
+      'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.transaction_type', 'je.payee_name', 'je.reference',
       'je.memo as entry_memo', 'je.status',
     ])
     .where('je.business_id', '=', q.business_id)
@@ -126,18 +127,18 @@ export async function generalLedger(
   if (jeIds.length > 0) {
     const allJeLines = await db.selectFrom('journal_entry_lines as jel')
       .innerJoin('chart_of_accounts as ca', 'ca.id', 'jel.account_id')
-      .select(['jel.journal_entry_id', 'jel.id as line_id', 'ca.name as account_name'])
+      .select(['jel.journal_entry_id', 'jel.id as line_id', 'ca.code as account_code', 'ca.name as account_name'])
       .where('jel.journal_entry_id', 'in', jeIds)
       .execute();
-    const byJe = new Map<string, Array<{ line_id: string; account_name: string }>>();
+    const byJe = new Map<string, Array<{ line_id: string; account_code: string; account_name: string }>>();
     for (const l of allJeLines) {
       const arr = byJe.get(l.journal_entry_id) ?? [];
-      arr.push({ line_id: l.line_id, account_name: l.account_name });
+      arr.push({ line_id: l.line_id, account_code: l.account_code, account_name: l.account_name });
       byJe.set(l.journal_entry_id, arr);
     }
     for (const line of activity) {
       const jeLines = byJe.get(line.journal_entry_id) ?? [];
-      const others = [...new Set(jeLines.filter(l => l.line_id !== line.line_id).map(l => l.account_name))];
+      const others = [...new Set(jeLines.filter(l => l.line_id !== line.line_id).map(l => `${l.account_code} ${l.account_name}`))];
       splitMap.set(line.line_id, others.length === 0 ? null : others.length === 1 ? others[0]! : '–Split–');
     }
   }
@@ -168,6 +169,7 @@ export async function generalLedger(
         entry_date: line.entry_date,
         source_type: line.source_type,
         transaction_type: line.transaction_type ?? null,
+        payee_name: line.payee_name ?? null,
         reference: line.reference,
         memo: line.line_memo ?? line.entry_memo,
         split_account: splitMap.get(line.line_id) ?? null,

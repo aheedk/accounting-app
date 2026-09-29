@@ -49,6 +49,7 @@ function loadAuth(): GAuthClient | null {
 
 type ExtractedTransaction = {
   date: string;
+  payee_name?: string;
   description: string;
   amount: string;
   type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
@@ -125,7 +126,8 @@ If this is a BANK STATEMENT return:
   "transactions": [
     {
       "date": "MM/DD/YYYY",
-      "description": "string",
+      "payee_name": "vendor or payee name only (e.g. IRS, Duke Energy, Action Lawn Maintenance) — omit for deposits with no clear payee",
+      "description": "full transaction description from the statement",
       "amount": "positive number e.g. 1250.00",
       "type": "deposit (money received/inflow), check (outflow paid by physical check), or expense (outflow via card/ACH/wire/cash/EFT)",
       "balance": "running balance e.g. 42500.00",

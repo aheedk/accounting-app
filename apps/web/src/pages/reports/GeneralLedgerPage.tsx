@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Decimal } from 'decimal.js';
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   FileDown,
@@ -46,6 +47,7 @@ type GeneralLedgerLine = {
   entry_date: string;
   source_type: string;
   transaction_type: string | null;
+  payee_name: string | null;
   reference: string | null;
   memo: string | null;
   split_account: string | null;
@@ -83,16 +85,94 @@ type DisplayAccount = GeneralLedgerAccount & {
 
 type AccountTypeFilter = 'all' | 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 type StatusFilter = 'all' | GeneralLedgerLine['status'];
+type AdjFilter = 'all' | 'regular' | 'adjustments';
 
 const DEFAULT_PREFERENCES = defaultGeneralLedgerPreferences();
-const NON_NUMERIC_COLUMNS: GeneralLedgerColumnKey[] = ['date', 'transaction', 'reference', 'name', 'memo'];
+const NON_NUMERIC_COLUMNS: GeneralLedgerColumnKey[] = ['date', 'transaction', 'reference', 'adj', 'name', 'memo', 'split'];
 
-function currentMonthRange(): { start: string; end: string } {
+type DateRangePreset =
+  | 'all-dates' | 'custom'
+  | 'today' | 'yesterday'
+  | 'this-week' | 'this-week-to-date' | 'last-week' | 'last-week-to-date'
+  | 'this-month' | 'this-month-to-date' | 'last-month' | 'last-month-to-date'
+  | 'this-quarter' | 'this-quarter-to-date' | 'last-quarter' | 'last-quarter-to-date'
+  | 'this-year' | 'this-year-to-date' | 'last-year' | 'last-year-to-date'
+  | 'this-fiscal-year' | 'this-fiscal-year-to-date' | 'last-fiscal-year' | 'last-fiscal-year-to-date'
+  | 'last-7-days' | 'last-30-days' | 'last-90-days';
+
+type AccountingMethod = 'accrual' | 'cash';
+
+const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
+  { value: 'all-dates', label: 'All Dates' },
+  { value: 'custom', label: 'Custom' },
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'this-week', label: 'This Week' },
+  { value: 'this-week-to-date', label: 'This Week-to-date' },
+  { value: 'last-week', label: 'Last Week' },
+  { value: 'last-week-to-date', label: 'Last Week-to-date' },
+  { value: 'this-month', label: 'This Month' },
+  { value: 'this-month-to-date', label: 'This Month-to-date' },
+  { value: 'last-month', label: 'Last Month' },
+  { value: 'last-month-to-date', label: 'Last Month-to-date' },
+  { value: 'this-quarter', label: 'This Quarter' },
+  { value: 'this-quarter-to-date', label: 'This Quarter-to-date' },
+  { value: 'last-quarter', label: 'Last Quarter' },
+  { value: 'last-quarter-to-date', label: 'Last Quarter-to-date' },
+  { value: 'this-year', label: 'This Year' },
+  { value: 'this-year-to-date', label: 'This Year-to-date' },
+  { value: 'last-year', label: 'Last Year' },
+  { value: 'last-year-to-date', label: 'Last Year-to-date' },
+  { value: 'this-fiscal-year', label: 'This Fiscal Year' },
+  { value: 'this-fiscal-year-to-date', label: 'This Fiscal Year-to-date' },
+  { value: 'last-fiscal-year', label: 'Last Fiscal Year' },
+  { value: 'last-fiscal-year-to-date', label: 'Last Fiscal Year-to-date' },
+  { value: 'last-7-days', label: 'Last 7 Days' },
+  { value: 'last-30-days', label: 'Last 30 Days' },
+  { value: 'last-90-days', label: 'Last 90 Days' },
+];
+
+function shiftDays(d: Date, n: number): Date { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function weekStart(d: Date): Date { const r = new Date(d); r.setDate(r.getDate() - r.getDay()); return r; }
+function weekEnd(d: Date): Date { const r = new Date(d); r.setDate(r.getDate() + (6 - r.getDay())); return r; }
+function monthStart(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function monthEnd(d: Date): Date { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+function quarterStart(d: Date): Date { return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1); }
+function quarterEnd(d: Date): Date { const q = Math.floor(d.getMonth() / 3); return new Date(d.getFullYear(), q * 3 + 3, 0); }
+
+function computePresetRange(preset: DateRangePreset): { start: string; end: string } {
   const today = new Date();
-  return {
-    start: `${today.getFullYear()}-01-01`,
-    end: dateToLocalIso(today),
-  };
+  const iso = (d: Date) => dateToLocalIso(d);
+  const t = iso(today);
+  switch (preset) {
+    case 'all-dates':                 return { start: '2000-01-01', end: '2099-12-31' };
+    case 'custom':                    return { start: t, end: t };
+    case 'today':                     return { start: t, end: t };
+    case 'yesterday':                 { const y = shiftDays(today, -1); return { start: iso(y), end: iso(y) }; }
+    case 'this-week':                 return { start: iso(weekStart(today)), end: iso(weekEnd(today)) };
+    case 'this-week-to-date':         return { start: iso(weekStart(today)), end: t };
+    case 'last-week':                 { const lws = shiftDays(weekStart(today), -7); return { start: iso(lws), end: iso(weekEnd(lws)) }; }
+    case 'last-week-to-date':         { const lws = shiftDays(weekStart(today), -7); return { start: iso(lws), end: iso(shiftDays(today, -7)) }; }
+    case 'this-month':                return { start: iso(monthStart(today)), end: iso(monthEnd(today)) };
+    case 'this-month-to-date':        return { start: iso(monthStart(today)), end: t };
+    case 'last-month':                { const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1); return { start: iso(lm), end: iso(monthEnd(lm)) }; }
+    case 'last-month-to-date':        { const lmS = new Date(today.getFullYear(), today.getMonth() - 1, 1); return { start: iso(lmS), end: iso(new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())) }; }
+    case 'this-quarter':              return { start: iso(quarterStart(today)), end: iso(quarterEnd(today)) };
+    case 'this-quarter-to-date':      return { start: iso(quarterStart(today)), end: t };
+    case 'last-quarter':              { const lqE = new Date(quarterStart(today).getTime() - 86400000); return { start: iso(quarterStart(lqE)), end: iso(quarterEnd(lqE)) }; }
+    case 'last-quarter-to-date':      { const lqS = quarterStart(new Date(quarterStart(today).getTime() - 86400000)); const diq = Math.floor((today.getTime() - quarterStart(today).getTime()) / 86400000); return { start: iso(lqS), end: iso(shiftDays(lqS, diq)) }; }
+    case 'this-year':                 return { start: `${today.getFullYear()}-01-01`, end: `${today.getFullYear()}-12-31` };
+    case 'this-year-to-date':         return { start: `${today.getFullYear()}-01-01`, end: t };
+    case 'last-year':                 return { start: `${today.getFullYear() - 1}-01-01`, end: `${today.getFullYear() - 1}-12-31` };
+    case 'last-year-to-date':         { const ly = today.getFullYear() - 1; return { start: `${ly}-01-01`, end: iso(new Date(ly, today.getMonth(), today.getDate())) }; }
+    case 'this-fiscal-year':          return { start: `${today.getFullYear()}-01-01`, end: `${today.getFullYear()}-12-31` };
+    case 'this-fiscal-year-to-date':  return { start: `${today.getFullYear()}-01-01`, end: t };
+    case 'last-fiscal-year':          return { start: `${today.getFullYear() - 1}-01-01`, end: `${today.getFullYear() - 1}-12-31` };
+    case 'last-fiscal-year-to-date':  { const lfy = today.getFullYear() - 1; return { start: `${lfy}-01-01`, end: iso(new Date(lfy, today.getMonth(), today.getDate())) }; }
+    case 'last-7-days':               return { start: iso(shiftDays(today, -6)), end: t };
+    case 'last-30-days':              return { start: iso(shiftDays(today, -29)), end: t };
+    case 'last-90-days':              return { start: iso(shiftDays(today, -89)), end: t };
+  }
 }
 
 function fmtShortDate(iso: string): string {
@@ -149,12 +229,12 @@ function summaryLabelColumn(columns: GeneralLedgerColumnKey[]): GeneralLedgerCol
 function summaryValues(
   columns: GeneralLedgerColumnKey[],
   label: string,
-  amounts: Partial<Record<'debit' | 'credit' | 'balance', string>>,
+  amounts: Partial<Record<'amount' | 'balance', string>>,
 ): string[] {
   const labelColumn = summaryLabelColumn(columns);
   return columns.map(column => {
     if (column === labelColumn) return label;
-    if (column === 'debit' || column === 'credit' || column === 'balance') return amounts[column] ?? '';
+    if (column === 'amount' || column === 'balance') return amounts[column] ?? '';
     return '';
   });
 }
@@ -164,10 +244,15 @@ function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey
     case 'date': return line.entry_date;
     case 'transaction': return `${fmtTransactionLabel(line)}${line.status === 'voided' ? ' (Voided)' : ''}`;
     case 'reference': return line.reference ?? '';
-    case 'name': return line.split_account ?? '';
+    case 'adj': return line.source_type === 'adjustment' ? 'Yes' : 'No';
+    case 'name': return line.payee_name ?? '';
     case 'memo': return line.memo ?? '';
-    case 'debit': return line.debit === '0.0000' ? '' : line.debit;
-    case 'credit': return line.credit === '0.0000' ? '' : line.credit;
+    case 'split': return line.split_account ?? '';
+    case 'amount': {
+      if (line.debit !== '0.0000') return line.debit;
+      if (line.credit !== '0.0000') return `-${line.credit}`;
+      return '';
+    }
     case 'balance': return line.running_balance;
   }
 }
@@ -193,20 +278,21 @@ function exportRows(
       rows.push([...accountPrefix, ...columns.map(column => lineExportValue(line, column))]);
     }
     if (preferences.showAccountTotals) {
+      const netAmount = new Decimal(account.visible_total_debit).minus(account.visible_total_credit).toFixed(4);
       rows.push([
         ...accountPrefix,
         ...summaryValues(columns, 'Account Total', {
-          debit: account.visible_total_debit,
-          credit: account.visible_total_credit,
+          amount: netAmount,
           balance: account.ending_balance,
         }),
       ]);
     }
   }
   if (preferences.showReportTotal) {
+    const netReportAmount = new Decimal(reportTotals.debit).minus(reportTotals.credit).toFixed(4);
     rows.push([
       ...(preferences.showAccountNumbers ? ['', 'REPORT TOTAL'] : ['REPORT TOTAL']),
-      ...summaryValues(columns, '', { debit: reportTotals.debit, credit: reportTotals.credit }),
+      ...summaryValues(columns, '', { amount: netReportAmount }),
     ]);
   }
   return rows;
@@ -217,10 +303,12 @@ export default function GeneralLedgerPage() {
   const [searchParams] = useSearchParams();
   const { businesses } = useAuth();
   const businessName = businesses.find(business => business.id === businessId)?.name ?? '';
-  const defaults = currentMonthRange();
-  const [periodStart, setPeriodStart] = useState(() => searchParams.get('period_start') ?? defaults.start);
-  const [periodEnd, setPeriodEnd] = useState(() => searchParams.get('period_end') ?? defaults.end);
-  const [accountId, setAccountId] = useState(() => searchParams.get('account_id') ?? '');
+  const initPreset: DateRangePreset = searchParams.get('period_start') ? 'custom' : 'this-year-to-date';
+  const initRange = computePresetRange(initPreset);
+  const [periodPreset, setPeriodPreset] = useState<DateRangePreset>(initPreset);
+  const [draftStart, setDraftStart] = useState(() => searchParams.get('period_start') ?? initRange.start);
+  const [draftEnd, setDraftEnd] = useState(() => searchParams.get('period_end') ?? initRange.end);
+  const [draftAccountId, setDraftAccountId] = useState(() => searchParams.get('account_id') ?? '');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [report, setReport] = useState<GeneralLedgerReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -231,6 +319,7 @@ export default function GeneralLedgerPage() {
   const [accountTypeFilter, setAccountTypeFilter] = useState<AccountTypeFilter>('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [adjFilter, setAdjFilter] = useState<AdjFilter>('all');
   const [searchText, setSearchText] = useState('');
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(true);
   const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(() => new Set());
@@ -242,16 +331,16 @@ export default function GeneralLedgerPage() {
     api.get<{ accounts: Account[] }>(`/businesses/${businessId}/coa`, { params: { include_inactive: 'true' } })
       .then(response => {
         setAccounts(response.data.accounts);
-        setAccountId(current => (
+        setDraftAccountId(current => (
           current && !response.data.accounts.some(account => account.id === current) ? '' : current
         ));
       })
       .catch(() => setAccounts([]));
   }, [businessId]);
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (start: string, end: string, acctId: string): Promise<void> => {
     if (!businessId) return;
-    if (periodStart > periodEnd) {
+    if (start > end) {
       setError('Period end must be on or after period start');
       setReport(null);
       return;
@@ -261,9 +350,9 @@ export default function GeneralLedgerPage() {
     try {
       const response = await api.get<GeneralLedgerReport>(`/businesses/${businessId}/reports/general-ledger`, {
         params: {
-          period_start: periodStart,
-          period_end: periodEnd,
-          ...(accountId ? { account_id: accountId } : {}),
+          period_start: start,
+          period_end: end,
+          ...(acctId ? { account_id: acctId } : {}),
         },
       });
       setReport(response.data);
@@ -273,9 +362,17 @@ export default function GeneralLedgerPage() {
     } finally {
       setLoading(false);
     }
-  }, [accountId, businessId, periodEnd, periodStart]);
+  }, [businessId]);
 
-  useEffect(() => { void load(); }, [load]);
+  // Ref always holds current draft values; lets the mount/business-change effect read them without being a dep
+  const draftRef = useRef({ start: draftStart, end: draftEnd, acctId: draftAccountId });
+  draftRef.current = { start: draftStart, end: draftEnd, acctId: draftAccountId };
+
+  // Auto-load on mount and when business changes
+  useEffect(() => {
+    const { start, end, acctId } = draftRef.current;
+    void load(start, end, acctId);
+  }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sourceTypes = useMemo(() => {
     const values = new Set<string>();
@@ -299,6 +396,7 @@ export default function GeneralLedgerPage() {
       const lines = account.lines
         .filter(line => sourceFilter === 'all' || line.source_type === sourceFilter)
         .filter(line => statusFilter === 'all' || line.status === statusFilter)
+        .filter(line => adjFilter === 'all' || (adjFilter === 'adjustments' ? line.source_type === 'adjustment' : line.source_type !== 'adjustment'))
         .filter(line => !needle || `${line.reference ?? ''} ${line.memo ?? ''}`.toLowerCase().includes(needle))
         .sort((left, right) => {
           const comparison = left.entry_date.localeCompare(right.entry_date) || left.line_id.localeCompare(right.line_id);
@@ -312,12 +410,13 @@ export default function GeneralLedgerPage() {
         visible_total_credit: sumLines(lines, 'credit'),
       }];
     });
-  }, [accountTypeFilter, preferences.sortDirection, report, searchText, showEmptyAccounts, sourceFilter, statusFilter]);
+  }, [accountTypeFilter, adjFilter, preferences.sortDirection, report, searchText, showEmptyAccounts, sourceFilter, statusFilter]);
 
-  const reportTotals = useMemo(() => ({
-    debit: displayAccounts.reduce((sum, account) => sum.plus(account.visible_total_debit), new Decimal(0)).toFixed(4),
-    credit: displayAccounts.reduce((sum, account) => sum.plus(account.visible_total_credit), new Decimal(0)).toFixed(4),
-  }), [displayAccounts]);
+  const reportTotals = useMemo(() => {
+    const debit = displayAccounts.reduce((sum, account) => sum.plus(account.visible_total_debit), new Decimal(0)).toFixed(4);
+    const credit = displayAccounts.reduce((sum, account) => sum.plus(account.visible_total_credit), new Decimal(0)).toFixed(4);
+    return { debit, credit, amount: new Decimal(debit).minus(credit).toFixed(4) };
+  }, [displayAccounts]);
 
   const transactionCount = useMemo(
     () => displayAccounts.reduce((count, account) => count + account.lines.length, 0),
@@ -341,6 +440,7 @@ export default function GeneralLedgerPage() {
     accountTypeFilter !== 'all',
     sourceFilter !== 'all',
     statusFilter !== 'all',
+    adjFilter !== 'all',
     searchText.trim() !== '',
     !showEmptyAccounts,
   ].filter(Boolean).length;
@@ -369,9 +469,26 @@ export default function GeneralLedgerPage() {
     setAccountTypeFilter('all');
     setSourceFilter('all');
     setStatusFilter('all');
+    setAdjFilter('all');
     setSearchText('');
     setShowEmptyAccounts(true);
     setCollapsedAccounts(new Set());
+  }
+
+  function handlePresetChange(preset: DateRangePreset): void {
+    setPeriodPreset(preset);
+    const range = computePresetRange(preset);
+    setDraftStart(range.start);
+    setDraftEnd(range.end);
+  }
+
+  function handleRunReport(): void {
+    if (draftStart > draftEnd) {
+      setError('Period end must be on or after period start');
+      return;
+    }
+    setError(null);
+    void load(draftStart, draftEnd, draftAccountId);
   }
 
   function toggleAccount(accountIdToToggle: string): void {
@@ -412,68 +529,83 @@ export default function GeneralLedgerPage() {
   if (!businessId) return <div>Pick a business.</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">General Ledger</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Detailed activity and running balance for every ledger account.</p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
+    <div className="space-y-4">
+      {/* Back link */}
+      <div>
+        <Link to="/reports" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+          <ChevronLeft className="h-4 w-4" />Back to custom reports
+        </Link>
+      </div>
+
+      {/* Title */}
+      <div>
+        <h1 className="text-2xl font-semibold">General Ledger Report</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Detailed activity and running balance for every ledger account.</p>
+      </div>
+
+      {/* QBO-style report controls */}
+      <div className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-end gap-4">
           <div>
-            <div className="mb-1 text-xs text-muted-foreground">Period start</div>
-            <DateInput value={periodStart} onChange={event => setPeriodStart(event.target.value)} />
+            <div className="mb-1.5 text-sm font-medium">Report period</div>
+            <div className="flex items-center gap-2">
+              <AppSelect
+                className="w-48"
+                value={periodPreset}
+                onChange={event => handlePresetChange(event.target.value as DateRangePreset)}
+              >
+                {DATE_RANGE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </AppSelect>
+              <DateInput
+                className="h-9 w-36"
+                value={draftStart}
+                onChange={event => setDraftStart(event.target.value)}
+                disabled={periodPreset !== 'custom'}
+              />
+              <span className="text-sm text-muted-foreground">to</span>
+              <DateInput
+                className="h-9 w-36"
+                value={draftEnd}
+                onChange={event => setDraftEnd(event.target.value)}
+                disabled={periodPreset !== 'custom'}
+              />
+            </div>
           </div>
-          <div>
-            <div className="mb-1 text-xs text-muted-foreground">Period end</div>
-            <DateInput value={periodEnd} onChange={event => setPeriodEnd(event.target.value)} />
-          </div>
-          <div className="min-w-[16rem]">
-            <div className="mb-1 text-xs text-muted-foreground">Account</div>
-            <AppSelect
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              value={accountId}
-              onChange={event => setAccountId(event.target.value)}
-            >
-              <option value="">All accounts</option>
-              {accounts.map(account => (
-                <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
-              ))}
-            </AppSelect>
-          </div>
-          <Button variant="outline" onClick={() => { void load(); }} disabled={loading}>
-            {loading ? 'Loading…' : 'Refresh'}
-          </Button>
           <Button
-            variant={customizationOpen ? 'secondary' : 'outline'}
-            onClick={() => setCustomizationOpen(current => !current)}
-            aria-expanded={customizationOpen}
+            variant="outline"
+            className="rounded-full px-6"
+            onClick={handleRunReport}
+            disabled={loading}
           >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            Customize{customizationCount > 0 ? ` (${customizationCount})` : ''}
+            {loading ? 'Loading…' : 'Run report'}
           </Button>
-          <div className="relative group">
-            <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-              onClick={handleExport}
-              disabled={!report || exporting}
-              aria-label="Export customized report to Excel"
-            >
-              <FileDown className="h-4 w-4" />
-            </button>
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
-          </div>
-          <div className="relative group">
-            <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-              onClick={handlePrint}
-              disabled={!report}
-              aria-label="Print customized report"
-            >
-              <Printer className="h-4 w-4" />
-            </button>
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
-          </div>
         </div>
+      </div>
+
+      {/* Secondary toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-[16rem]">
+          <AppSelect
+            className="w-full"
+            value={draftAccountId}
+            onChange={event => setDraftAccountId(event.target.value)}
+          >
+            <option value="">All accounts</option>
+            {accounts.map(account => (
+              <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+            ))}
+          </AppSelect>
+        </div>
+        <Button
+          variant={customizationOpen ? 'secondary' : 'outline'}
+          onClick={() => setCustomizationOpen(current => !current)}
+          aria-expanded={customizationOpen}
+        >
+          <SlidersHorizontal className="mr-2 h-4 w-4" />
+          Customize{customizationCount > 0 ? ` (${customizationCount})` : ''}
+        </Button>
       </div>
 
       {customizationOpen && (
@@ -483,6 +615,7 @@ export default function GeneralLedgerPage() {
           sourceFilter={sourceFilter}
           sourceTypes={sourceTypes}
           statusFilter={statusFilter}
+          adjFilter={adjFilter}
           searchText={searchText}
           showEmptyAccounts={showEmptyAccounts}
           onPreferencesChange={updatePreferences}
@@ -493,6 +626,7 @@ export default function GeneralLedgerPage() {
           onAccountTypeFilterChange={setAccountTypeFilter}
           onSourceFilterChange={setSourceFilter}
           onStatusFilterChange={setStatusFilter}
+          onAdjFilterChange={setAdjFilter}
           onSearchTextChange={setSearchText}
           onShowEmptyAccountsChange={setShowEmptyAccounts}
           onReset={resetCustomization}
@@ -513,19 +647,44 @@ export default function GeneralLedgerPage() {
               {transactionCount} {transactionCount === 1 ? 'transaction' : 'transactions'}
               {activeFilterCount > 0 ? ` with ${activeFilterCount} active ${activeFilterCount === 1 ? 'filter' : 'filters'}` : ''}
             </span>
-            {displayAccounts.length > 0 && (
-              <span className="flex items-center gap-2">
-                <button type="button" className="text-primary hover:underline" onClick={() => setCollapsedAccounts(new Set())}>Expand all</button>
-                <span aria-hidden="true">·</span>
+            <span className="flex items-center gap-3">
+              {displayAccounts.length > 0 && (
+                <>
+                  <button type="button" className="text-primary hover:underline" onClick={() => setCollapsedAccounts(new Set())}>Expand all</button>
+                  <span aria-hidden="true">·</span>
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => setCollapsedAccounts(new Set(displayAccounts.map(account => account.account_id)))}
+                  >
+                    Collapse all
+                  </button>
+                  <span aria-hidden="true" className="text-border">|</span>
+                </>
+              )}
+              <div className="relative group">
                 <button
-                  type="button"
-                  className="text-primary hover:underline"
-                  onClick={() => setCollapsedAccounts(new Set(displayAccounts.map(account => account.account_id)))}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
+                  onClick={handleExport}
+                  disabled={!report || exporting}
+                  aria-label="Export to Excel"
                 >
-                  Collapse all
+                  <FileDown className="h-4 w-4" />
                 </button>
-              </span>
-            )}
+                <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
+              </div>
+              <div className="relative group">
+                <button
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
+                  onClick={handlePrint}
+                  disabled={!report}
+                  aria-label="Print report"
+                >
+                  <Printer className="h-4 w-4" />
+                </button>
+                <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
+              </div>
+            </span>
           </div>
           {activeFilterCount > 0 && (
             <p className="mb-3 text-xs text-muted-foreground">
@@ -550,7 +709,7 @@ export default function GeneralLedgerPage() {
                     {visibleColumns.map(column => {
                       const definition = columnDefinition(column);
                       return (
-                        <th key={column} className={`${preferences.density === 'compact' ? 'px-3 py-2' : 'p-3'} ${definition.numeric ? 'text-right' : 'text-left'}`}>
+                        <th key={column} className={`${preferences.density === 'compact' ? 'px-3 py-2' : 'p-3'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}>
                           {definition.label}
                         </th>
                       );
@@ -572,8 +731,7 @@ export default function GeneralLedgerPage() {
                     <SummaryRow
                       columns={visibleColumns}
                       label="REPORT TOTAL"
-                      debit={reportTotals.debit}
-                      credit={reportTotals.credit}
+                      amount={reportTotals.amount}
                       density={preferences.density}
                       className="border-t-2 font-semibold"
                     />
@@ -594,6 +752,7 @@ type CustomizationPanelProps = {
   sourceFilter: string;
   sourceTypes: string[];
   statusFilter: StatusFilter;
+  adjFilter: AdjFilter;
   searchText: string;
   showEmptyAccounts: boolean;
   onPreferencesChange: (patch: Partial<GeneralLedgerPreferences>) => void;
@@ -602,6 +761,7 @@ type CustomizationPanelProps = {
   onAccountTypeFilterChange: (value: AccountTypeFilter) => void;
   onSourceFilterChange: (value: string) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
+  onAdjFilterChange: (value: AdjFilter) => void;
   onSearchTextChange: (value: string) => void;
   onShowEmptyAccountsChange: (value: boolean) => void;
   onReset: () => void;
@@ -668,7 +828,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Account type</div>
               <AppSelect
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                className="w-full"
                 value={props.accountTypeFilter}
                 onChange={event => props.onAccountTypeFilterChange(event.target.value as AccountTypeFilter)}
               >
@@ -683,7 +843,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Transaction type</div>
               <AppSelect
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                className="w-full"
                 value={props.sourceFilter}
                 onChange={event => props.onSourceFilterChange(event.target.value)}
               >
@@ -694,13 +854,25 @@ function CustomizationPanel(props: CustomizationPanelProps) {
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Posting status</div>
               <AppSelect
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                className="w-full"
                 value={props.statusFilter}
                 onChange={event => props.onStatusFilterChange(event.target.value as StatusFilter)}
               >
                 <option value="all">Posted and voided</option>
                 <option value="posted">Posted only</option>
                 <option value="voided">Voided only</option>
+              </AppSelect>
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Adjusting entries</div>
+              <AppSelect
+                className="w-full"
+                value={props.adjFilter}
+                onChange={event => props.onAdjFilterChange(event.target.value as AdjFilter)}
+              >
+                <option value="all">All entries</option>
+                <option value="regular">Regular only</option>
+                <option value="adjustments">Adjustments only</option>
               </AppSelect>
             </div>
             <div>
@@ -720,7 +892,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
               <div>
                 <div className="mb-1 text-xs text-muted-foreground">Date order</div>
                 <AppSelect
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  className="w-full"
                   value={preferences.sortDirection}
                   onChange={event => props.onPreferencesChange({ sortDirection: event.target.value as GeneralLedgerPreferences['sortDirection'] })}
                 >
@@ -731,7 +903,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
               <div>
                 <div className="mb-1 text-xs text-muted-foreground">Row spacing</div>
                 <AppSelect
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  className="w-full"
                   value={preferences.density}
                   onChange={event => props.onPreferencesChange({ density: event.target.value as GeneralLedgerPreferences['density'] })}
                 >
@@ -819,8 +991,7 @@ function AccountSection({
             <SummaryRow
               columns={columns}
               label={`Total for ${preferences.showAccountNumbers ? `${account.account_code} — ` : ''}${account.account_name}`}
-              debit={account.visible_total_debit}
-              credit={account.visible_total_credit}
+              amount={new Decimal(account.visible_total_debit).minus(account.visible_total_credit).toFixed(4)}
               balance={account.ending_balance}
               density={preferences.density}
               className="border-b-2 font-semibold"
@@ -838,7 +1009,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
   switch (column) {
     case 'date':
       content = fmtShortDate(line.entry_date);
-      className += ' whitespace-nowrap';
+      className += ' whitespace-nowrap min-w-[6rem]';
       break;
     case 'transaction':
       content = (
@@ -853,30 +1024,40 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       const displayRef = rawRef ? rawRef.replace(/^AJE-/i, 'JE-') : null;
       content = displayRef
         ? <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{displayRef}</Link>
-        : '—';
+        : null;
       className += ' font-mono text-xs whitespace-nowrap';
       break;
     }
+    case 'adj':
+      content = line.source_type === 'adjustment'
+        ? <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Yes</span>
+        : <span className="text-xs text-muted-foreground">No</span>;
+      className += ' text-center';
+      break;
     case 'name':
-      content = line.split_account ?? '—';
-      className += ' max-w-[18rem] truncate text-xs text-muted-foreground';
+      content = line.payee_name ?? '';
+      className += ' max-w-[16rem] truncate';
       break;
     case 'memo':
-      content = line.memo ?? '—';
+      content = line.memo ?? '';
       className += ' max-w-[22rem] truncate';
       break;
-    case 'debit':
-      content = line.debit === '0.0000' ? '' : (
-        <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{fmtMoney(line.debit)}</ReportAmountLink>
-      );
+    case 'split':
+      content = line.split_account ?? '';
+      className += ' max-w-[16rem] truncate text-xs text-muted-foreground';
+      break;
+    case 'amount': {
+      const isDebit = line.debit !== '0.0000';
+      const isCredit = line.credit !== '0.0000';
+      if (!isDebit && !isCredit) { content = ''; }
+      else {
+        const val = isDebit ? line.debit : line.credit;
+        const display = isDebit ? fmtMoney(val) : `-${fmtMoney(val)}`;
+        content = <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{display}</ReportAmountLink>;
+      }
       className += ' text-right font-mono';
       break;
-    case 'credit':
-      content = line.credit === '0.0000' ? '' : (
-        <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{fmtMoney(line.credit)}</ReportAmountLink>
-      );
-      className += ' text-right font-mono';
-      break;
+    }
     case 'balance':
       content = fmtSigned(line.running_balance);
       className += ' text-right font-mono';
@@ -888,16 +1069,14 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
 function SummaryRow({
   columns,
   label,
-  debit,
-  credit,
+  amount,
   balance,
   density,
   className,
 }: {
   columns: GeneralLedgerColumnKey[];
   label: string;
-  debit?: string;
-  credit?: string;
+  amount?: string;
   balance?: string;
   density: GeneralLedgerPreferences['density'];
   className: string;
@@ -908,8 +1087,7 @@ function SummaryRow({
     <tr className={className}>
       {columns.map(column => {
         let value: ReactNode = column === labelColumn ? label : null;
-        if (column === 'debit' && debit !== undefined) value = fmtMoney(debit);
-        if (column === 'credit' && credit !== undefined) value = fmtMoney(credit);
+        if (column === 'amount' && amount !== undefined) value = fmtSigned(amount);
         if (column === 'balance' && balance !== undefined) value = fmtSigned(balance);
         const numeric = columnDefinition(column).numeric;
         return <td key={column} className={`${padding} ${numeric ? 'text-right font-mono' : ''}`}>{value}</td>;

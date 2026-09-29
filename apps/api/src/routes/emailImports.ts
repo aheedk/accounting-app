@@ -153,6 +153,8 @@ const approveSchema = z.object({
     include: z.boolean().default(true),
     /** "Use this account for future <vendor> transactions" was ticked. */
     remember: z.boolean().optional(),
+    /** Payee / vendor name edited by the reviewer. */
+    payee_name: z.string().optional(),
   })),
 });
 
@@ -176,7 +178,7 @@ router.post(
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
       type RawTx = {
-        date: string; description: string; amount: string;
+        date: string; payee_name?: string; description: string; amount: string;
         type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit'; balance: string; auto_posted?: boolean;
       };
       const transactions: RawTx[] = (typeof staged.extracted_transactions === 'string'
@@ -208,6 +210,7 @@ router.post(
           transaction_type: txType,
           source_id: staged.id,
           memo: tx.description,
+          payee_name: isDeposit ? null : (item.payee_name?.trim() || tx.payee_name || null),
           lines: [
             {
               account_id: body.bank_account_id,
@@ -326,7 +329,7 @@ router.post(
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
       type AutoTx = {
-        date: string; description: string; amount: string;
+        date: string; payee_name?: string; description: string; amount: string;
         type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit'; balance: string; auto_posted?: boolean;
       };
       const transactions: AutoTx[] = (typeof staged.extracted_transactions === 'string'
@@ -364,6 +367,7 @@ router.post(
           transaction_type: txType,
           source_id: staged.id,
           memo: tx.description,
+          payee_name: (!isDeposit && tx.payee_name) ? tx.payee_name : null,
           lines: [
             {
               account_id: body.bank_account_id,

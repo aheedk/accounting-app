@@ -11,6 +11,7 @@ import { AppSelect } from '../../components/ui/select';
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
   date: string;
+  payee_name?: string;
   description: string;
   amount: string;
   type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
@@ -126,6 +127,7 @@ export default function EmailImportReviewPage() {
   const [bankAccountId, setBankAccountId] = useState('');
   const [offsets, setOffsets] = useState<Record<number, string>>({});
   const [included, setIncluded] = useState<Record<number, boolean>>({});
+  const [payees, setPayees] = useState<Record<number, string>>({});
   // Rows where the accountant ticked "use this account next time".
   const [remember, setRemember] = useState<Record<number, boolean>>({});
   const [autoPostEnabled, setAutoPostEnabled] = useState(false);
@@ -196,6 +198,7 @@ export default function EmailImportReviewPage() {
     setBankAccountId('');
     setOffsets({});
     setIncluded({});
+    setPayees({});
     setRemember({});
     setAutoPostNote(null);
     setLineAccountIds({});
@@ -260,8 +263,10 @@ export default function EmailImportReviewPage() {
     setBankError(null);
     const initIncluded: Record<number, boolean> = {};
     const initOffsets: Record<number, string> = {};
+    const initPayees: Record<number, string> = {};
     imp.extracted_transactions.forEach((tx, i) => {
       initIncluded[i] = true;
+      if (tx.payee_name) initPayees[i] = tx.payee_name;
       if (tx.suggested_account_id) {
         initOffsets[i] = tx.suggested_account_id;
       } else if (tx.suggested_offset) {
@@ -274,6 +279,7 @@ export default function EmailImportReviewPage() {
     });
     setIncluded(initIncluded);
     setOffsets(initOffsets);
+    setPayees(initPayees);
     setRemember({});
   }
 
@@ -330,6 +336,7 @@ export default function EmailImportReviewPage() {
           offset_account_id: offsets[i] ?? '',
           include: included[i] ?? true,
           remember: remember[i] === true,
+          payee_name: payees[i] ?? '',
         })),
       });
       setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
@@ -660,6 +667,7 @@ export default function EmailImportReviewPage() {
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Date</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Description</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[140px]">Name</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Amount</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Type</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[200px]">Offset account</th>
@@ -675,6 +683,18 @@ export default function EmailImportReviewPage() {
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{tx.date}</td>
                         <td className="px-3 py-2 max-w-[220px] truncate">{tx.description}</td>
+                        <td className="px-3 py-2">
+                          {(tx.type === 'expense' || tx.type === 'check' || tx.type === 'debit') ? (
+                            <input
+                              type="text"
+                              value={payees[i] ?? ''}
+                              onChange={e => setPayees(prev => ({ ...prev, [i]: e.target.value }))}
+                              disabled={!included[i] || tx.auto_posted}
+                              placeholder="Payee…"
+                              className="w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          ) : null}
+                        </td>
                         <td className={`px-3 py-2 text-right font-mono font-medium ${(tx.type === 'credit' || tx.type === 'deposit') ? 'text-emerald-600' : 'text-destructive'}`}>
                           {(tx.type === 'credit' || tx.type === 'deposit') ? '+' : '-'}{fmtMoney(tx.amount)}
                         </td>
