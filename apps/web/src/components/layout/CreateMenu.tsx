@@ -21,8 +21,10 @@ const CATEGORIES: CreateCategory[] = [
     heading: 'Vendors',
     items: [
       { label: 'Expense', to: '/ap/expenses/new' },
+      { label: 'Check', to: '/ap/expenses/new' },
       { label: 'Bill', to: '/ap/bills/new' },
       { label: 'Pay bills', to: '/ap/bill-payments/new' },
+      { label: 'Credit card credit', to: '/ap/vendor-credits/new' },
       { label: 'Vendor credit', to: '/ap/vendor-credits/new' },
       { label: 'Add vendor', to: '/ap/vendors/new' },
     ],
@@ -31,12 +33,14 @@ const CATEGORIES: CreateCategory[] = [
     heading: 'Team',
     items: [
       { label: 'Add employee', to: '/payroll/employees/new' },
+      { label: 'Add contractor', to: '/ap/contractors' },
     ],
   },
   {
     heading: 'Other',
     items: [
       { label: 'Journal entry', to: '/journal/new' },
+      { label: 'Bank deposit', to: '/accounting/bank-transactions' },
       { label: 'Fixed asset', to: '/accounting/fixed-assets/new' },
       { label: 'Sales order', to: '/inventory/sales-orders/new' },
       { label: 'Purchase order', to: '/inventory/purchase-orders/new' },
