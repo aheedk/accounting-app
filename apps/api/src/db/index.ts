@@ -15,6 +15,13 @@ export function makeDb(connectionString = config.DATABASE_URL): Kysely<DB> {
     connectionString,
     max: 10,
     idleTimeoutMillis: 30_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+  });
+  // Without this listener, Node.js throws idle-client errors as unhandled
+  // exceptions and kills the process when the DB server closes a connection.
+  pool.on('error', (err) => {
+    console.error('[db] idle client error — connection will be replaced:', err.message);
   });
   return new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
 }
