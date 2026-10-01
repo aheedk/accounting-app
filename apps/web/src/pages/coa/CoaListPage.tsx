@@ -298,6 +298,38 @@ export default function CoaListPage() {
   const startNum = filtered.length === 0 ? 0 : page * pageSize + 1;
   const endNum = Math.min((page + 1) * pageSize, filtered.length);
 
+  const tableTopRef = useRef<HTMLDivElement | null>(null);
+  // The same pager sits above and below the table. Paging from the bottom
+  // scrolls back up, so the new page is read from its first row.
+  function goToPage(next: number, fromBottom: boolean) {
+    setPage(next);
+    if (fromBottom) tableTopRef.current?.scrollIntoView({ block: 'start' });
+  }
+  const pager = (atBottom: boolean) => filtered.length > 0 && (
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <button
+        className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
+        disabled={page === 0}
+        onClick={() => goToPage(page - 1, atBottom)}
+        aria-label="Previous page"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="px-1 tabular-nums text-xs">
+        {page === 0 && totalPages <= 1 ? `1 - ${filtered.length}` : `${startNum} - ${endNum}`}
+        {atBottom && ` of ${filtered.length}`}
+      </span>
+      <button
+        className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
+        disabled={page >= totalPages - 1}
+        onClick={() => goToPage(page + 1, atBottom)}
+        aria-label="Next page"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
   // --- Checkbox helpers ---
   function toggleCheck(id: string) {
     setCheckedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -800,29 +832,7 @@ export default function CoaListPage() {
           </div>
 
           {/* Pagination below icons */}
-          {filtered.length > 0 && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <button
-                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
-                disabled={page === 0}
-                onClick={() => setPage(p => p - 1)}
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="px-1 tabular-nums text-xs">
-                {page === 0 && totalPages <= 1 ? `1 - ${filtered.length}` : `${startNum} - ${endNum}`}
-              </span>
-              <button
-                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage(p => p + 1)}
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          {pager(false)}
         </div>
       </div>
 
@@ -835,7 +845,7 @@ export default function CoaListPage() {
         const colCount = (batchEdit ? 1 : 3) + (showNumber ? 1 : 0) + (colType ? 1 : 0) + (colDetailType ? 1 : 0) + (colDescription ? 1 : 0) + (colQBBalance ? 1 : 0) + (colBankBalance ? 1 : 0) + (colStatus ? 1 : 0);
         const thCls = `px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide`;
         return (
-      <div className="rounded-md border bg-background overflow-hidden">
+      <div ref={tableTopRef} className="scroll-mt-4 rounded-md border bg-background overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30">
             <tr>
@@ -1026,6 +1036,10 @@ export default function CoaListPage() {
             })}
           </tbody>
         </table>
+        {/* Same pager again under the table, so a long page does not need scrolling back up. */}
+        {filtered.length > 0 && (
+          <div className="flex justify-end border-t px-3 py-2">{pager(true)}</div>
+        )}
       </div>
         );
       })()}
