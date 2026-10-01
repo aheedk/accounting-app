@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
+import { AppSelect } from '@/components/ui/select';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 
@@ -175,16 +176,16 @@ export default function BankDepositPage() {
               Account
             </label>
             <div className="flex items-center gap-3">
-              <select
+              <AppSelect
                 value={bankAccountId}
                 onChange={e => setBankAccountId(e.target.value)}
                 disabled={!isNew}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+                className="w-56"
               >
                 {bankAccounts.map(ba => (
                   <option key={ba.id} value={ba.id}>{ba.name}</option>
                 ))}
-              </select>
+              </AppSelect>
               {selectedBankAccount && (
                 <span className="text-sm text-muted-foreground">
                   Balance {fmtMoney(selectedBankAccount.balance ?? '0')}
