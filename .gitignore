@@ -21,3 +21,6 @@ packages/shared/dist/
 
 # OAuth credentials — never commit
 secrets/
+
+# Uploaded files in local development (FILE_STORAGE_DIR default)
+.local-data/
