@@ -321,6 +321,26 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }
   }
 
+  async function deleteEntry() {
+    if (!businessId || !existing?.can_delete) return;
+    const confirmed = window.confirm(
+      existing.delete_removes_pair
+        ? 'Delete this entry and the entry that reverses it? Both will be removed from the books and reports. This cannot be undone.'
+        : 'Delete this journal entry? It will be removed from the books and reports. This cannot be undone.',
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.delete(`/businesses/${businessId}/journal-entries/${existing.entry.id}`);
+      navigate(JOURNAL_CLOSE_PATH);
+    } catch (requestError: unknown) {
+      setError(pickErr(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function voidEntry() {
     if (!businessId || !existing?.can_correct) return;
     const reason = window.prompt('Reason for voiding?');
@@ -626,8 +646,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
           {readOnly ? 'Back' : 'Cancel'}
         </Button>
+        {existing?.can_delete && (
+          <Button type="button" variant="destructive" onClick={() => { void deleteEntry(); }} disabled={busy}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        )}
         {existing?.can_correct && (
-          <Button type="button" variant="destructive" onClick={() => { void voidEntry(); }} disabled={busy}>
+          <Button type="button" variant="outline" onClick={() => { void voidEntry(); }} disabled={busy}>
             Void entry
           </Button>
         )}

@@ -34,6 +34,7 @@ export const AUDIT = {
   JOURNAL_ENTRY_POST: 'journal_entry.post',
   JOURNAL_ENTRY_VOID: 'journal_entry.void',
   JOURNAL_ENTRY_REVERSE: 'journal_entry.reverse',
+  JOURNAL_ENTRY_DELETE: 'journal_entry.delete',
 
   // Customers
   CUSTOMER_CREATE: 'customer.create',

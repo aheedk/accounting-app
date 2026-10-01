@@ -594,6 +594,150 @@ export async function updateJournalEntry(
   return { entry: updated, lines: updatedLines };
 }
 
+export type JournalEntryDeletePlan = {
+  /** Why this entry cannot be deleted, or null when it can. */
+  block_reason: string | null;
+  /** Entries a delete removes, in the order they must go (a reversal before its original). */
+  entry_ids: string[];
+  /** True when deleting also removes the other half of a void (the original or its reversal). */
+  removes_pair: boolean;
+};
+
+type DeletableEntry = {
+  id: string;
+  business_id: string;
+  period_id: string;
+  status: 'draft' | 'posted' | 'voided';
+  source_type: JournalEntrySourceType;
+  source_id: string | null;
+  reversed_entry_id: string | null;
+};
+
+/**
+ * What deleting a journal entry would remove, and whether it is allowed.
+ *
+ * Only entries that stand on their own can be deleted: hand-entered manual and
+ * adjusting entries, and reversing entries of those. A void leaves two entries
+ * that cancel out (the voided original and its reversal); those are only ever
+ * deleted together, since removing one half would change the books.
+ */
+export async function planJournalEntryDelete(
+  db: Kysely<DB>, ctx: ServiceCtx, entry: DeletableEntry, opts: { allowClosedPeriods?: boolean } = {},
+): Promise<JournalEntryDeletePlan> {
+  const blocked = (block_reason: string): JournalEntryDeletePlan => ({ block_reason, entry_ids: [], removes_pair: false });
+  if (!hasMinRole(ctx.effective_role, 'accountant')) {
+    return blocked('Accountant access is required to delete journal entries.');
+  }
+  const sourceMessage = 'This entry was created by a source transaction. Void or delete the source transaction instead.';
+
+  let entries: DeletableEntry[];
+  if (entry.source_type === 'reversal') {
+    const original = entry.reversed_entry_id
+      ? await db.selectFrom('journal_entries').selectAll()
+        .where('id', '=', entry.reversed_entry_id)
+        .where('business_id', '=', entry.business_id)
+        .executeTakeFirst()
+      : undefined;
+    if (!original) return blocked('The entry this one reverses could not be found.');
+    if (await isSourceGeneratedJournalEntry(db, original)) return blocked(sourceMessage);
+    // Reversal of a voided original: the pair goes together. Reversal made with
+    // "Reverse" (original still posted): removing it simply undoes the reversal.
+    entries = original.status === 'voided' ? [entry, original] : [entry];
+  } else {
+    if (await isSourceGeneratedJournalEntry(db, entry)) return blocked(sourceMessage);
+    const reversals = await db.selectFrom('journal_entries').selectAll()
+      .where('business_id', '=', entry.business_id)
+      .where('reversed_entry_id', '=', entry.id)
+      .execute();
+    if (entry.status === 'voided') {
+      entries = [...reversals, entry];
+    } else if (reversals.length > 0) {
+      return blocked('This journal entry has been reversed. Delete the reversing entry first.');
+    } else {
+      entries = [entry];
+    }
+  }
+
+  const ids = entries.map(item => item.id);
+  const correction = await db.selectFrom('journal_entries').select('id')
+    .where('business_id', '=', entry.business_id)
+    .where('corrected_from_entry_id', 'in', ids)
+    .where('id', 'not in', ids)
+    .executeTakeFirst();
+  if (correction) return blocked('Another journal entry was created as a correction of this one.');
+
+  if (!opts.allowClosedPeriods) {
+    const closed = await db.selectFrom('fiscal_periods').select('id')
+      .where('id', 'in', entries.map(item => item.period_id))
+      .where('status', '=', 'closed')
+      .executeTakeFirst();
+    if (closed) {
+      return blocked(entries.length > 1
+        ? 'This journal entry or its reversal is in a closed accounting period.'
+        : 'This journal entry is in a closed accounting period.');
+    }
+  }
+  return { block_reason: null, entry_ids: ids, removes_pair: entries.length > 1 };
+}
+
+/**
+ * Remove a journal entry from the books (QBO "Delete"), as opposed to voiding
+ * it, which keeps the entry and adds a reversal. The removed rows are written
+ * to the audit log; see planJournalEntryDelete for what qualifies.
+ */
+export async function deleteJournalEntry(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { journal_entry_id: string },
+): Promise<{ deleted_entry_ids: string[] }> {
+  const entry = await trx.selectFrom('journal_entries').selectAll()
+    .where('id', '=', input.journal_entry_id)
+    .where('business_id', '=', ctx.business_id)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!entry) throw new BusinessRuleError(ERR.NOT_FOUND, `Journal entry ${input.journal_entry_id} not found`);
+
+  const adminOverride = (await currentSetting(trx, 'app.admin_override')) === 'on';
+  const plan = await planJournalEntryDelete(trx, ctx, entry, { allowClosedPeriods: adminOverride });
+  if (plan.block_reason) {
+    throw new BusinessRuleError(
+      hasMinRole(ctx.effective_role, 'accountant') ? ERR.IMMUTABLE_RECORD : ERR.FORBIDDEN,
+      plan.block_reason,
+    );
+  }
+
+  const entries = await trx.selectFrom('journal_entries').selectAll()
+    .where('id', 'in', plan.entry_ids).execute();
+  const lines = await trx.selectFrom('journal_entry_lines').selectAll()
+    .where('journal_entry_id', 'in', plan.entry_ids)
+    .orderBy('journal_entry_id').orderBy('line_number')
+    .execute();
+
+  // Attached files outlive the entry as unlinked receipts.
+  await trx.updateTable('receipts')
+    .set({ linked_entity_type: 'unlinked', linked_entity_id: null })
+    .where('linked_entity_type', '=', 'journal_entry')
+    .where('linked_entity_id', 'in', plan.entry_ids)
+    .execute();
+
+  // Controlled escape hatch for the posted-immutability trigger; scoped to
+  // this transaction only (see 0074_journal_entry_delete.sql).
+  await sql`SELECT set_config('app.allow_delete', 'on', true)`.execute(trx);
+  for (const id of plan.entry_ids) {
+    await trx.deleteFrom('journal_entries')
+      .where('id', '=', id)
+      .where('business_id', '=', entry.business_id)
+      .execute();
+  }
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.JOURNAL_ENTRY_DELETE,
+    entity_type: 'journal_entry',
+    entity_id: entry.id,
+    before: { entries, lines },
+    after: null,
+  });
+  return { deleted_entry_ids: plan.entry_ids };
+}
+
 export async function computeAccountBalance(
   db: Kysely<DB>, q: { account_id: string; as_of: string },
 ): Promise<string> {

@@ -75,6 +75,9 @@ const detail: JournalEntryDetail = {
   reversal_block_reason: null,
   is_standalone_manual: true,
   source_path: null,
+  can_delete: true,
+  delete_block_reason: null,
+  delete_removes_pair: false,
 };
 
 describe('journal entry form mappings', () => {

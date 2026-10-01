@@ -72,6 +72,9 @@ const readOnlyEntry = {
   correction_block_reason: 'This entry is read-only.',
   can_reverse: false,
   reversal_block_reason: 'This entry is read-only.',
+  can_delete: false,
+  delete_block_reason: 'This entry is read-only.',
+  delete_removes_pair: false,
   is_standalone_manual: true,
   source_path: null,
 } satisfies JournalEntryDetail;

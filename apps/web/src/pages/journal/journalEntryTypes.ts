@@ -61,6 +61,9 @@ export type JournalEntryDetail = {
   correction_block_reason: string | null;
   can_reverse: boolean;
   reversal_block_reason: string | null;
+  can_delete: boolean;
+  delete_block_reason: string | null;
+  delete_removes_pair: boolean;
   is_standalone_manual: boolean;
   source_path: string | null;
 };
