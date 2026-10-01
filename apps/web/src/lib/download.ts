@@ -48,7 +48,7 @@ export function downloadAsExcel(headers: string[], rows: string[][], filename: s
   });
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, (meta.title ?? 'Report').replace(/[\/?*[\]:]/g, ' ').slice(0, 31) || 'Report');
+  XLSX.utils.book_append_sheet(wb, ws, (meta.title ?? 'Report').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Report');
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
