@@ -12,6 +12,8 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { addDaysLocal, todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Line = { description: string; quantity: string; unit_price: string; expense_account_id: string };
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
@@ -43,6 +45,8 @@ export default function BillNewPage() {
   const [params] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(expenseAccounts, account => setExpenseAccounts(prev => [...prev, account]));
+  const addVendor = useAddParty<Vendor>('vendor', vendor => setVendors(prev => [...prev, vendor]));
   const today = todayLocal();
   const [hdr, setHdr] = useState({
     vendor_id: params.get('vendor_id') ?? '',
@@ -117,7 +121,7 @@ export default function BillNewPage() {
       <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-4">
         <div>
           <Label className="text-xs text-muted-foreground">Vendor</Label>
-          <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.vendor_id} onChange={e => pickVendor(e.target.value)} required>
+          <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.vendor_id} onChange={e => pickVendor(e.target.value)} required onAddNew={() => addVendor.open(id => setHdr(h => ({ ...h, vendor_id: id })))} addNewLabel="Add new vendor">
             <option value="">Choose a vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </AppSelect>
           <div className="mt-3">
@@ -172,6 +176,7 @@ export default function BillNewPage() {
                     value={l.expense_account_id}
                     onChange={(id) => update(i, { expense_account_id: id })}
                     placeholder="Choose category…"
+                    onCreate={() => addAccount.open({ onPick: id => update(i, { expense_account_id: id }) })}
                   />
                 </td>
                 <td className="p-3">
@@ -220,6 +225,7 @@ export default function BillNewPage() {
         <div className="flex-1" />
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </div>
+      {addAccount.drawer}{addVendor.dialog}
     </form>
   );
 }

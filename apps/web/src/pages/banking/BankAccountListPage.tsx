@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 function statusBadge(active: boolean) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
@@ -43,6 +44,7 @@ export default function BankAccountListPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [cashAccounts, setCashAccounts] = useState<CashAccountRow[]>([]);
+  const addAccount = useAddAccount(cashAccounts, account => setCashAccounts(prev => [...prev, account]));
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', institution: '', account_last_four: '', cash_account_id: '' });
   const [err, setErr] = useState<string | null>(null);
@@ -162,6 +164,8 @@ export default function BankAccountListPage() {
                     value={form.cash_account_id}
                     onChange={e => setForm(f => ({ ...f, cash_account_id: e.target.value }))}
                     required
+                    onAddNew={() => addAccount.open({ accountType: 'asset', onPick: id => setForm(f => ({ ...f, cash_account_id: id })) })}
+                    addNewLabel="Add new account"
                   >
                     <option value="">Select…</option>
                     {cashAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
@@ -199,6 +203,7 @@ export default function BankAccountListPage() {
           />
         </CardContent>
       </Card>
+      {addAccount.drawer}
     </div>
   );
 }

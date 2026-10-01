@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -40,6 +41,7 @@ export default function InventoryNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, (account) => setAccounts((prev) => [...prev, account]));
   const [form, setForm] = useState({
     sku: '',
     name: '',
@@ -157,6 +159,8 @@ export default function InventoryNewPage() {
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.income_account_id}
               onChange={(e) => setForm((f) => ({ ...f, income_account_id: e.target.value }))}
+              onAddNew={() => addAccount.open({ accountType: 'revenue', onPick: (id) => setForm((f) => ({ ...f, income_account_id: id })) })}
+              addNewLabel="Add new account"
             >
               <option value="">None</option>
               {revenueAccounts.map((a) => (
@@ -172,6 +176,8 @@ export default function InventoryNewPage() {
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.expense_account_id}
               onChange={(e) => setForm((f) => ({ ...f, expense_account_id: e.target.value }))}
+              onAddNew={() => addAccount.open({ onPick: (id) => setForm((f) => ({ ...f, expense_account_id: id })) })}
+              addNewLabel="Add new account"
             >
               <option value="">None</option>
               {expenseAccounts.map((a) => (
@@ -187,6 +193,8 @@ export default function InventoryNewPage() {
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={form.inventory_asset_account_id}
               onChange={(e) => setForm((f) => ({ ...f, inventory_asset_account_id: e.target.value }))}
+              onAddNew={() => addAccount.open({ onPick: (id) => setForm((f) => ({ ...f, inventory_asset_account_id: id })) })}
+              addNewLabel="Add new account"
             >
               <option value="">None</option>
               {assetAccounts.map((a) => (
@@ -207,6 +215,7 @@ export default function InventoryNewPage() {
           Cancel
         </Button>
       </div>
+      {addAccount.drawer}
     </form>
   );
 }

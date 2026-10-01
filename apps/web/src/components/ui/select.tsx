@@ -33,9 +33,14 @@ function parseOptions(children: React.ReactNode): OptionData[] {
 
 type AppSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> & {
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  /** Shows an "Add new" action pinned under the options. */
+  onAddNew?: () => void;
+  addNewLabel?: string;
 };
 
-export function AppSelect({ value, onChange, className, disabled, children, ...rest }: AppSelectProps) {
+export function AppSelect({
+  value, onChange, className, disabled, children, onAddNew, addNewLabel = 'Add new', ...rest
+}: AppSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,6 +185,17 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
               <li className="px-3 py-2 text-sm text-muted-foreground">No results</li>
             )}
           </ul>
+          {onAddNew && (
+            <div className="border-t p-1">
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onAddNew(); }}
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+              >
+                {addNewLabel}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -43,6 +44,7 @@ export default function FixedAssetNewPage() {
   const nav = useNavigate();
   const today = todayLocal();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, (account) => setAccounts((prev) => [...prev, account]));
   const [form, setForm] = useState({
     name: '',
     asset_account_id: '',
@@ -124,6 +126,7 @@ export default function FixedAssetNewPage() {
               onChange={(id) => setForm((f) => ({ ...f, asset_account_id: id }))}
               required
               placeholder="Search asset account…"
+              onCreate={() => addAccount.open({ onPick: (id) => setForm((f) => ({ ...f, asset_account_id: id })) })}
             />
           </div>
           <div>
@@ -134,6 +137,7 @@ export default function FixedAssetNewPage() {
               onChange={(id) => setForm((f) => ({ ...f, depreciation_expense_account_id: id }))}
               required
               placeholder="Search depreciation expense…"
+              onCreate={() => addAccount.open({ onPick: (id) => setForm((f) => ({ ...f, depreciation_expense_account_id: id })) })}
             />
           </div>
           <div>
@@ -144,6 +148,7 @@ export default function FixedAssetNewPage() {
               onChange={(id) => setForm((f) => ({ ...f, accumulated_depreciation_account_id: id }))}
               required
               placeholder="Search accumulated depreciation…"
+              onCreate={() => addAccount.open({ onPick: (id) => setForm((f) => ({ ...f, accumulated_depreciation_account_id: id })) })}
             />
           </div>
           <div>
@@ -213,6 +218,7 @@ export default function FixedAssetNewPage() {
           Cancel
         </Button>
       </div>
+      {addAccount.drawer}
     </form>
   );
 }

@@ -52,6 +52,24 @@ describe('expenseTransactionService', () => {
     expect(card.check_number).toBeNull();
   });
 
+  it('accepts any account as the category except the payment account itself', async () => {
+    const { biz, ctx, cash } = await bootstrap();
+    const equipment = await makeAccount(t.db, biz.id, { code: '1599', name: 'Shop Equipment', account_type: 'asset' });
+    const base = {
+      business_id: biz.id, transaction_date: '2026-04-15', payee_text: 'Dell',
+      payment_account_id: cash.id, payment_method: 'card' as const, amount: '900.00',
+    };
+    const draft = await t.db.transaction().execute(trx =>
+      et.createDraft(trx, ctx, { ...base, expense_account_id: equipment.id }));
+    const posted = await t.db.transaction().execute(trx =>
+      et.post(trx, ctx, { expense_transaction_id: draft.id }));
+    expect(posted.status).toBe('posted');
+
+    await expect(t.db.transaction().execute(trx =>
+      et.createDraft(trx, ctx, { ...base, expense_account_id: cash.id }),
+    )).rejects.toThrow(/different accounts/);
+  });
+
   it('post creates a JE (DR expense / CR payment account) and links it', async () => {
     const { biz, ctx, expense, cash } = await bootstrap();
     const draft = await t.db.transaction().execute(trx =>

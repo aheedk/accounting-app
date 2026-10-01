@@ -13,6 +13,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type Period = 'monthly' | 'quarterly' | 'annual';
 type Status = 'accrued' | 'paid';
@@ -56,6 +57,7 @@ export default function PayrollTaxesPage() {
   const today = todayLocal();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [liabilities, setLiabilities] = useState<PayrollTaxLiability[]>([]);
   const [filter, setFilter] = useState<Status | 'all'>('all');
   const [err, setErr] = useState<string | null>(null);
@@ -250,6 +252,8 @@ export default function PayrollTaxesPage() {
                 value={form.liability_account_id}
                 onChange={e => setForm(f => ({ ...f, liability_account_id: e.target.value }))}
                 required
+                onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, liability_account_id: id })) })}
+                addNewLabel="Add new account"
               >
                 <option value="">Select…</option>
                 {liabilityAccounts.map(a => (
@@ -402,6 +406,7 @@ export default function PayrollTaxesPage() {
           </DialogContent>
         )}
       </Dialog>
+      {addAccount.drawer}
     </div>
   );
 }

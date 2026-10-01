@@ -11,6 +11,8 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Customer = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -29,6 +31,8 @@ export default function PaymentNewPage() {
   const [params] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(cashAccounts, account => setCashAccounts(prev => [...prev, account]));
+  const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   const today = todayLocal();
   const [form, setForm] = useState({
     customer_id: params.get('customer_id') ?? '',
@@ -142,6 +146,8 @@ export default function PaymentNewPage() {
           value={form.customer_id}
           onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))}
           required
+          onAddNew={() => addCustomer.open(id => setForm(f => ({ ...f, customer_id: id })))}
+          addNewLabel="Add new customer"
         >
           <option value="">Choose a customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </AppSelect>
@@ -164,6 +170,7 @@ export default function PaymentNewPage() {
                 onChange={(id) => setForm(f => ({ ...f, cash_account_id: id }))}
                 required
                 placeholder="Search cash account…"
+                onCreate={() => addAccount.open({ accountType: 'asset', onPick: id => setForm(f => ({ ...f, cash_account_id: id })) })}
               />
             </div>
           </CardContent>
@@ -245,6 +252,7 @@ export default function PaymentNewPage() {
         <div className="flex-1" />
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </div>
+      {addAccount.drawer}{addCustomer.dialog}
     </form>
   );
 }

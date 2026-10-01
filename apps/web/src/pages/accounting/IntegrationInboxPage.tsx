@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
 type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
@@ -189,6 +190,7 @@ export default function IntegrationInboxPage() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [rows, setRows] = useState<IntegrationInboxRow[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [action, setAction] = useState<ActionFormState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -536,6 +538,8 @@ export default function IntegrationInboxPage() {
                                 value={action.cash_account_id}
                                 onChange={e => setAction(a => (a ? { ...a, cash_account_id: e.target.value } : a))}
                                 required
+                                onAddNew={() => addAccount.open({ accountType: 'asset', onPick: id => setAction(a => (a ? { ...a, cash_account_id: id } : a)) })}
+                                addNewLabel="Add new account"
                               >
                                 <option value="">Select cash account…</option>
                                 {cashAccounts.map(a => (
@@ -550,6 +554,8 @@ export default function IntegrationInboxPage() {
                                 value={action.offset_account_id}
                                 onChange={e => setAction(a => (a ? { ...a, offset_account_id: e.target.value } : a))}
                                 required
+                                onAddNew={() => addAccount.open({ onPick: id => setAction(a => (a ? { ...a, offset_account_id: id } : a)) })}
+                                addNewLabel="Add new account"
                               >
                                 <option value="">Select account…</option>
                                 {Object.keys(groupedAccounts).sort().map(type => {
@@ -605,6 +611,7 @@ export default function IntegrationInboxPage() {
           </tbody>
         </table>
       </CardContent></Card>
+      {addAccount.drawer}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/P
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
@@ -23,6 +24,7 @@ export default function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   const [items, setItems] = useState<ProductServiceItem[]>([]);
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const today = todayLocal();
@@ -120,7 +122,7 @@ export default function InvoiceNewPage() {
       <Card><CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Customer</Label>
-            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required>
+            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required onAddNew={() => addCustomer.open(id => setHdr(h => ({ ...h, customer_id: id })))} addNewLabel="Add new customer">
               <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </AppSelect>
           </div>
@@ -193,6 +195,7 @@ export default function InvoiceNewPage() {
       </Card>
       {err && <p className="text-sm text-destructive">{err}</p>}
       <div className="flex gap-2"><Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Create draft'}</Button><Button type="button" variant="outline" onClick={() => nav('/invoices')}>Cancel</Button></div>
+      {addCustomer.dialog}
     </form>
   );
 }

@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
+import { ComboInput } from '@/components/ui/ComboInput';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { PAYMENT_METHOD_OPTIONS, type PaymentMethod } from '@/lib/paymentMethods';
@@ -85,10 +88,15 @@ export default function ExpenseTransactionNewPage() {
     () => accounts.filter((a) => (a.account_type === 'asset' || a.account_type === 'liability') && a.is_active),
     [accounts],
   );
-  const expenseAccounts = useMemo(
-    () => accounts.filter((a) => a.account_type === 'expense' && a.is_active),
-    [accounts],
-  );
+  // QBO lets an expense be categorised to any account (an asset purchase, a
+  // loan payment, an owner draw), so the category list is the whole chart.
+  const categoryAccounts = useMemo(() => accounts.filter((a) => a.is_active), [accounts]);
+  const addAccount = useAddAccount(accounts, (account) => setAccounts((prev) => [...prev, account]));
+  // A new vendor becomes the payee: the name is what links it on save.
+  const addVendor = useAddParty<Vendor>('vendor', (vendor) => {
+    setVendors((prev) => [...prev, vendor]);
+    setForm((f) => ({ ...f, payee_text: vendor.name }));
+  });
 
   const amountNum = Number(form.amount) || 0;
 
@@ -134,16 +142,15 @@ export default function ExpenseTransactionNewPage() {
       <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label className="text-xs text-muted-foreground">Payee</Label>
-          <Input
-            list="expense-payees"
+          <ComboInput
             value={form.payee_text}
-            onChange={(e) => setForm((f) => ({ ...f, payee_text: e.target.value }))}
+            onChange={(payee_text) => setForm((f) => ({ ...f, payee_text }))}
+            options={vendors.map((v) => v.name)}
             placeholder="Who did you pay?"
             required
+            onAddNew={() => addVendor.open()}
+            addNewLabel="Add new vendor"
           />
-          <datalist id="expense-payees">
-            {vendors.map((v) => <option key={v.id} value={v.name} />)}
-          </datalist>
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Payment account</Label>
@@ -153,6 +160,10 @@ export default function ExpenseTransactionNewPage() {
             onChange={(id) => setForm((f) => ({ ...f, payment_account_id: id }))}
             required
             placeholder="Which account paid?"
+            onCreate={() => addAccount.open({
+              accountType: 'asset',
+              onPick: (id) => setForm((f) => ({ ...f, payment_account_id: id })),
+            })}
           />
         </div>
         <div>
@@ -206,11 +217,14 @@ export default function ExpenseTransactionNewPage() {
               <td className="p-3 text-muted-foreground">1</td>
               <td className="p-3">
                 <AccountSelect
-                  accounts={expenseAccounts}
+                  accounts={categoryAccounts}
                   value={form.expense_account_id}
                   onChange={(id) => setForm((f) => ({ ...f, expense_account_id: id }))}
                   required
                   placeholder="Choose category…"
+                  onCreate={() => addAccount.open({
+                    onPick: (id) => setForm((f) => ({ ...f, expense_account_id: id })),
+                  })}
                 />
               </td>
               <td className="p-3">
@@ -240,6 +254,7 @@ export default function ExpenseTransactionNewPage() {
         <div className="flex-1" />
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </div>
+      {addAccount.drawer}{addVendor.dialog}
     </form>
   );
 }

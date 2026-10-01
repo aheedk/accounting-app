@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
 type StatusFilter = BankTransactionStatus | 'all';
@@ -189,6 +190,7 @@ export default function BankTransactionsInboxPage() {
   const [txns, setTxns] = useState<BankTransaction[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [action, setAction] = useState<ActionFormState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -818,6 +820,8 @@ export default function BankTransactionsInboxPage() {
                                 value={action.offset_account_id}
                                 onChange={e => setAction(a => (a ? { ...a, offset_account_id: e.target.value } : a))}
                                 required
+                                onAddNew={() => addAccount.open({ onPick: id => setAction(a => (a ? { ...a, offset_account_id: id } : a)) })}
+                                addNewLabel="Add new account"
                               >
                                 <option value="">Select account…</option>
                                 {Object.keys(groupedAccounts).sort().map(type => {
@@ -872,6 +876,7 @@ export default function BankTransactionsInboxPage() {
           </tbody>
         </table>
       </CardContent></Card>
+      {addAccount.drawer}
     </div>
   );
 }

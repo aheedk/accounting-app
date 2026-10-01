@@ -11,6 +11,8 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Vendor = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -29,6 +31,8 @@ export default function BillPaymentNewPage() {
   const [params] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(cashAccounts, account => setCashAccounts(prev => [...prev, account]));
+  const addVendor = useAddParty<Vendor>('vendor', vendor => setVendors(prev => [...prev, vendor]));
   const today = todayLocal();
   const [form, setForm] = useState({
     vendor_id: params.get('vendor_id') ?? '',
@@ -141,6 +145,8 @@ export default function BillPaymentNewPage() {
           value={form.vendor_id}
           onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))}
           required
+          onAddNew={() => addVendor.open(id => setForm(f => ({ ...f, vendor_id: id })))}
+          addNewLabel="Add new vendor"
         >
           <option value="">Choose a vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
         </AppSelect>
@@ -163,6 +169,7 @@ export default function BillPaymentNewPage() {
                 onChange={(id) => setForm(f => ({ ...f, cash_account_id: id }))}
                 required
                 placeholder="Select an account…"
+                onCreate={() => addAccount.open({ accountType: 'asset', onPick: id => setForm(f => ({ ...f, cash_account_id: id })) })}
               />
             </div>
           </CardContent>
@@ -241,6 +248,7 @@ export default function BillPaymentNewPage() {
         <div className="flex-1" />
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </div>
+      {addAccount.drawer}{addVendor.dialog}
     </form>
   );
 }

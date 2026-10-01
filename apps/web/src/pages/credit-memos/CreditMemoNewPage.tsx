@@ -11,6 +11,8 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Customer = { id: string; name: string; billing_address: Address | null };
@@ -27,6 +29,8 @@ export default function CreditMemoNewPage() {
   const nav = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [revenueAccounts, setRevenueAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(revenueAccounts, account => setRevenueAccounts(prev => [...prev, account]));
+  const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   const today = todayLocal();
   const [form, setForm] = useState({ customer_id: '', memo_date: today, amount: '', revenue_account_id: '', memo: '' });
   const [err, setErr] = useState<string | null>(null);
@@ -74,6 +78,8 @@ export default function CreditMemoNewPage() {
             value={form.customer_id}
             onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))}
             required
+            onAddNew={() => addCustomer.open(id => setForm(f => ({ ...f, customer_id: id })))}
+            addNewLabel="Add new customer"
           >
             <option value="">Choose a customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </AppSelect>
@@ -113,6 +119,7 @@ export default function CreditMemoNewPage() {
                   onChange={(id) => setForm(f => ({ ...f, revenue_account_id: id }))}
                   required
                   placeholder="Search revenue account (e.g. Sales Returns)…"
+                  onCreate={() => addAccount.open({ accountType: 'revenue', onPick: id => setForm(f => ({ ...f, revenue_account_id: id })) })}
                 />
               </td>
               <td className="p-3">
@@ -143,6 +150,7 @@ export default function CreditMemoNewPage() {
         <div className="flex-1" />
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
       </div>
+      {addAccount.drawer}{addCustomer.dialog}
     </form>
   );
 }

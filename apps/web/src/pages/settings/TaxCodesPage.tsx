@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null; is_active: boolean };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -24,6 +25,7 @@ export default function TaxCodesPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<TaxCode[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', tax_payable_account_id: '', rate: '0.0875', effective_from: '2026-01-01' });
   const [err, setErr] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export default function TaxCodesPage() {
               <div><Label>Code</Label><Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required /></div>
               <div><Label>Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
               <div><Label>Payable account</Label>
-                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.tax_payable_account_id} onChange={e => setForm(f => ({ ...f, tax_payable_account_id: e.target.value }))} required>
+                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.tax_payable_account_id} onChange={e => setForm(f => ({ ...f, tax_payable_account_id: e.target.value }))} required onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, tax_payable_account_id: id })) })} addNewLabel="Add new account">
                   <option value="">Select…</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                 </AppSelect>
               </div>
@@ -121,6 +123,7 @@ export default function TaxCodesPage() {
           </tr>))}</tbody>
         </table>
       </CardContent></Card>
+      {addAccount.drawer}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 
@@ -93,6 +94,7 @@ export default function RecurringTransactionsPage() {
   const [bizId] = useActiveBusinessId();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, (account) => setAccounts((prev) => [...prev, account]));
   const [showForm, setShowForm] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
   const [runErr, setRunErr] = useState<string | null>(null);
@@ -476,6 +478,8 @@ export default function RecurringTransactionsPage() {
                         value={l.account_id}
                         onChange={(e) => updateLine(i, { account_id: e.target.value })}
                         required
+                        onAddNew={() => addAccount.open({ onPick: (id) => updateLine(i, { account_id: id }) })}
+                        addNewLabel="Add new account"
                       >
                         <option value="">Select account…</option>
                         {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
@@ -602,6 +606,7 @@ export default function RecurringTransactionsPage() {
           </div>
         </div>
       )}
+      {addAccount.drawer}
     </div>
   );
 }

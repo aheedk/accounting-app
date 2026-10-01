@@ -10,6 +10,7 @@ import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -168,6 +169,7 @@ export default function RulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
 
   const [applyBankAccountId, setApplyBankAccountId] = useState<string>('');
 
@@ -751,6 +753,8 @@ export default function RulesPage() {
                       value={form.offset_account_id}
                       onChange={e => setForm(f => ({ ...f, offset_account_id: e.target.value }))}
                       required
+                      onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, offset_account_id: id })) })}
+                      addNewLabel="Add new account"
                     >
                       <option value="">Select account…</option>
                       {Object.keys(groupedAccounts).sort().map(type => (
@@ -793,6 +797,7 @@ export default function RulesPage() {
           </div>
         </div>
       )}
+      {addAccount.drawer}
     </div>
   );
 }
