@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 
 type CreateItem = { label: string; to: string };
 type CreateCategory = { heading: string; items: CreateItem[] };
@@ -55,6 +56,7 @@ export function CreateMenu() {
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  useArrowKeyMenu(open, popupRef);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function scheduleClose() {

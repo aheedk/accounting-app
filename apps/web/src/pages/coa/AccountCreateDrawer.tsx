@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { todayLocal } from '@/lib/dates';
+import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 import { AppSelect } from '../../components/ui/select';
 
 const ACCOUNT_TYPE_GROUPS = [
@@ -121,6 +122,8 @@ export default function AccountCreateDrawer({
   const [locked, setLocked] = useState(false);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const typeMenuRef = useRef<HTMLDivElement>(null);
+  useArrowKeyMenu(showTypeMenu, typeMenuRef);
   const [selectedTypeLabel, setSelectedTypeLabel] = useState(initialChoice?.label ?? '');
   const saveAndNewRef = useRef(false);
   const [form, setForm] = useState(() => blankForm(
@@ -215,7 +218,7 @@ export default function AccountCreateDrawer({
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   </button>
                   {showTypeMenu && (
-                    <div role="menu" aria-label="Account type choices" className="absolute left-0 top-full z-50 mt-1 max-h-96 w-72 overflow-y-auto rounded-md border bg-background py-2 shadow-lg">
+                    <div ref={typeMenuRef} role="menu" aria-label="Account type choices" className="absolute left-0 top-full z-50 mt-1 max-h-96 w-72 overflow-y-auto rounded-md border bg-background py-2 shadow-lg">
                       {ACCOUNT_TYPE_GROUPS.map(group => (
                         <div key={group.heading} className="pb-1">
                           <div data-account-type-group className="px-3 pb-1 pt-2 text-xs font-bold tracking-wide text-foreground">{group.heading}</div>

@@ -4,6 +4,7 @@ import { Building2, Check, ChevronsUpDown, Plus, Undo2 } from 'lucide-react';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 import { cn } from '@/lib/utils';
+import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 
 // QBO-style company switcher: shows the current company and lets you jump to
 // another company, add a client, or return to the firm practice view.
@@ -17,6 +18,8 @@ export function BusinessSwitcher() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useArrowKeyMenu(open, menuRef);
 
   // Close on outside click or Escape.
   useEffect(() => {
@@ -75,6 +78,7 @@ export function BusinessSwitcher() {
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border bg-card shadow-card"
         >
