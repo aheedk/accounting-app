@@ -15,7 +15,7 @@ export function DownloadButtons({ headers, getRows, filename, title }: Props) {
 
   function handleExcel() {
     setExcelBusy(true);
-    try { downloadAsExcel(headers, getRows(), filename); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(headers, getRows(), filename, { title }); } finally { setExcelBusy(false); }
   }
   function handlePdf() {
     setPdfBusy(true);

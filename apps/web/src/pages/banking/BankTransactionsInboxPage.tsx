@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { printReport } from '@/lib/reportExport';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
 type StatusFilter = BankTransactionStatus | 'all';
@@ -337,34 +338,29 @@ export default function BankTransactionsInboxPage() {
     finally { setBusy(false); }
   }
 
+  // One table for both the Excel export and the printed page.
+  function exportTable() {
+    const headers = ['Date', 'Description', 'Spent', 'Received', 'Status', 'Reconciled'];
+    const rows = txns.map(t => {
+      const n = parseFloat(t.amount);
+      const spent = Number.isFinite(n) && n < 0 ? fmtMoney(Math.abs(n)) : '';
+      const received = Number.isFinite(n) && n >= 0 ? fmtMoney(n) : '';
+      return [t.transaction_date, t.description, spent, received, t.status, t.is_reconciled ? 'Yes' : 'No'];
+    });
+    return { headers, rows };
+  }
+
   function handleExcel() {
     setExcelBusy(true);
     try {
-      downloadAsExcel(
-        ['Date', 'Description', 'Spent', 'Received', 'Status', 'Reconciled'],
-        txns.map(t => {
-          const n = parseFloat(t.amount);
-          const spent = Number.isFinite(n) && n < 0 ? fmtMoney(Math.abs(n)) : '';
-          const received = Number.isFinite(n) && n >= 0 ? fmtMoney(n) : '';
-          return [t.transaction_date, t.description, spent, received, t.status, t.is_reconciled ? 'Yes' : 'No'];
-        }),
-        'bank-transactions'
-      );
+      const { headers, rows } = exportTable();
+      downloadAsExcel(headers, rows, 'bank-transactions', { title: 'Bank Transactions' });
     } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const hdrs = ['Date', 'Description', 'Spent', 'Received', 'Status'];
-    const rowsHtml = txns.map(t => {
-      const n = parseFloat(t.amount);
-      const spent = Number.isFinite(n) && n < 0 ? fmtMoney(Math.abs(n)) : '';
-      const received = Number.isFinite(n) && n >= 0 ? fmtMoney(n) : '';
-      return `<tr><td>${t.transaction_date}</td><td>${t.description}</td><td>${spent}</td><td>${received}</td><td>${t.status}</td></tr>`;
-    }).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Bank Transactions</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Bank Transactions</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    const { headers, rows } = exportTable();
+    printReport({ title: 'Bank Transactions', headers, rows });
   }
 
   const groupedAccounts = useMemo(() => {

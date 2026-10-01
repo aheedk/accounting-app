@@ -4,7 +4,9 @@ import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { TopBar } from './TopBar';
 import { CompanySwitchedScreen } from './CompanySwitchedScreen';
-import { useCompanySwitchedElsewhere } from '@/lib/business';
+import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business';
+import { setExportCompany } from '@/lib/reportExport';
+import { useAuth } from '@/auth/useAuth';
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -19,6 +21,12 @@ export function AppShell() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
+
+  // Exports and printed reports are headed with the company whose books are open.
+  const { businesses } = useAuth();
+  const [activeBusinessId] = useActiveBusinessId();
+  const activeBusinessName = businesses.find(b => b.id === activeBusinessId)?.name ?? '';
+  useEffect(() => { setExportCompany(activeBusinessName); }, [activeBusinessName]);
 
   // Another tab switched company: replace the page outright, so nothing from
   // the old company stays on screen or stays clickable.

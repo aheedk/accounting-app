@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AccountCreateDrawer from './AccountCreateDrawer';
 import { AppSelect } from '../../components/ui/select';
+import { printReport } from '@/lib/reportExport';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -468,23 +469,27 @@ export default function CoaListPage() {
   }
 
   // --- Export / Print ---
+  // One table for both the Excel export and the printed page.
+  function exportTable() {
+    const headers = ['Number', 'Name', 'Type', 'Detail Type', 'Balance', 'Status'];
+    const rows = filtered.map(a => [
+      a.code, a.name, a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1), a.detail_type ?? '',
+      displayBalance(a) ?? '', a.is_active ? 'Active' : 'Inactive',
+    ]);
+    return { headers, rows };
+  }
+
   function handleExport() {
     setExcelBusy(true);
     try {
-      downloadAsExcel(
-        ['Number', 'Name', 'Type', 'Detail Type', 'Balance', 'Status'],
-        filtered.map(a => [a.code, a.name, a.account_type, a.detail_type ?? '', displayBalance(a) ?? '', a.is_active ? 'active' : 'inactive']),
-        'chart-of-accounts'
-      );
+      const { headers, rows } = exportTable();
+      downloadAsExcel(headers, rows, 'chart-of-accounts', { title: 'Chart of Accounts' });
     } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rows = filtered.map(a => `<tr><td>${a.code}</td><td>${a.name}</td><td style="text-transform:capitalize">${a.account_type}</td><td>${a.detail_type ?? ''}</td><td style="text-align:right">${displayBalance(a) ?? ''}</td><td>${a.is_active ? 'active' : 'inactive'}</td></tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Chart of Accounts</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:11px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:6px 8px;border-bottom:2px solid #ccc;font-size:11px;text-transform:uppercase}td{padding:5px 8px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Chart of Accounts</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr><th>Number</th><th>Name</th><th>Type</th><th>Detail Type</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`);
-    win.document.close();
+    const { headers, rows } = exportTable();
+    printReport({ title: 'Chart of Accounts', headers, rows });
   }
 
   // --- Import ---
@@ -558,7 +563,7 @@ export default function CoaListPage() {
   }
 
   function downloadSampleTemplate() {
-    downloadAsExcel(['Name', 'Code', 'Account Type'], [['Cash', '1000', 'asset'], ['Revenue', '4000', 'revenue'], ['Accounts Payable', '2000', 'liability']], 'coa-template');
+    downloadAsExcel(['Name', 'Code', 'Account Type'], [['Cash', '1000', 'asset'], ['Revenue', '4000', 'revenue'], ['Accounts Payable', '2000', 'liability']], 'coa-template', { bare: true });
   }
 
   const validImportCount = importRows.filter(r => !r.error).length;

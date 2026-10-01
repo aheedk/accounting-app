@@ -22,6 +22,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { dateToLocalIso, fmtLongDate } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
+import { printReport } from '@/lib/reportExport';
 import {
   GENERAL_LEDGER_COLUMNS,
   defaultGeneralLedgerPreferences,
@@ -201,15 +202,6 @@ function fmtNum(line: GeneralLedgerLine): string {
 function pickErr(error: unknown): string {
   return (error as { response?: { data?: { error?: { message?: string } } } } | undefined)
     ?.response?.data?.error?.message ?? 'Failed to load the General Ledger report';
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }
 
 function columnDefinition(key: GeneralLedgerColumnKey) {
@@ -515,7 +507,10 @@ export default function GeneralLedgerPage() {
     if (!report) return;
     setExporting(true);
     try {
-      downloadAsExcel(exportHeaders, rowsForExport, `general-ledger-${report.period_start}-to-${report.period_end}`);
+      downloadAsExcel(exportHeaders, rowsForExport, `general-ledger-${report.period_start}-to-${report.period_end}`, {
+        title: 'General Ledger',
+        subtitle: `${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`,
+      });
     } finally {
       setExporting(false);
     }
@@ -523,18 +518,12 @@ export default function GeneralLedgerPage() {
 
   function handlePrint(): void {
     if (!report) return;
-    const numericIndexes = new Set<number>();
-    const offset = preferences.showAccountNumbers ? 2 : 1;
-    visibleColumns.forEach((column, index) => {
-      if (columnDefinition(column).numeric) numericIndexes.add(offset + index);
+    printReport({
+      title: 'General Ledger',
+      subtitle: `${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`,
+      headers: exportHeaders,
+      rows: rowsForExport,
     });
-    const body = rowsForExport.map(row => (
-      `<tr>${row.map((cell, index) => `<td${numericIndexes.has(index) ? ' class="number"' : ''}>${escapeHtml(cell)}</td>`).join('')}</tr>`
-    )).join('');
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>General Ledger</title><style>body{font-family:Arial,sans-serif;font-size:10px;margin:24px}h2{margin:0 0 4px;text-align:center}p{color:#666;margin:0 0 16px;text-align:center}table{width:100%;border-collapse:collapse}th{background:#eee;text-align:left;padding:5px;border-bottom:2px solid #bbb}td{padding:4px 5px;border-bottom:1px solid #ddd}.number{text-align:right}</style></head><body><h2>${escapeHtml(businessName)} — General Ledger</h2><p>${escapeHtml(fmtLongDate(report.period_start))} – ${escapeHtml(fmtLongDate(report.period_end))}</p><table><thead><tr>${exportHeaders.map((header, index) => `<th${numericIndexes.has(index) ? ' class="number"' : ''}>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    printWindow.document.close();
   }
 
   if (!businessId) return <div>Pick a business.</div>;
