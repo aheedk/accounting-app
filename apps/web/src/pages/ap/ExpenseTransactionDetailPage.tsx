@@ -13,6 +13,7 @@ import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { paymentMethodLabel, type PaymentMethod } from '@/lib/paymentMethods';
 import { PostErrorNotice } from '@/components/SaveAndPost';
+import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 
@@ -57,6 +58,7 @@ function roleAtLeast(role: Role | undefined, floor: Role): boolean {
 export default function ExpenseTransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
+  const attachments = useAttachments('expense_transaction', id ?? null);
   const nav = useNavigate();
   const { user } = useAuth();
   const canMutate = roleAtLeast(user?.role, 'accountant');
@@ -192,6 +194,10 @@ export default function ExpenseTransactionDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card><CardContent className="pt-6">
+        <AttachmentsPanel attachments={attachments} className="max-w-xl" />
+      </CardContent></Card>
 
       <Button variant="outline" onClick={() => nav('/ap/expenses')}>Back to expenses</Button>
     </div>

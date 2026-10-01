@@ -8,7 +8,8 @@ import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 
 type SaveIntent = 'draft' | 'post';
-type PostErrorState = { postError?: string } | null;
+/** Things that went wrong after the document itself was saved. */
+export type SaveWarningState = { saveWarnings?: string[] } | null;
 
 /**
  * One-click "Save and post" for forms whose documents are created as drafts
@@ -27,19 +28,24 @@ export function useSaveAndPost() {
    * Call once the draft exists. Posts it when "Save and post" was clicked,
    * then opens it. A failed post still opens the saved draft -- staying on the
    * form would invite a second click and a duplicate -- and carries the reason
-   * along for PostErrorNotice.
+   * along for PostErrorNotice. `warning` is any earlier after-save problem
+   * (e.g. an attachment that failed to upload) to show the same way.
    */
-  async function finish(postUrl: string, detailPath: string) {
+  async function finish(postUrl: string, detailPath: string, warning?: string | null) {
+    const saveWarnings = warning ? [warning] : [];
     if (canPost && intent.current === 'post') {
       try {
         await api.post(postUrl);
       } catch (e: unknown) {
-        const state: PostErrorState = { postError: pickErr(e) };
-        nav(detailPath, { state });
-        return;
+        saveWarnings.push(`Saved as a draft, but it could not be posted: ${pickErr(e)}`);
       }
     }
-    nav(detailPath);
+    if (saveWarnings.length > 0) {
+      const state: SaveWarningState = { saveWarnings };
+      nav(detailPath, { state });
+    } else {
+      nav(detailPath);
+    }
   }
 
   return { intent, canPost, finish };
@@ -69,13 +75,13 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
   );
 }
 
-/** Shown on the document page when it was saved but the post step failed. */
-export function PostErrorNotice() {
-  const postError = (useLocation().state as PostErrorState)?.postError;
-  if (!postError) return null;
+/** Shown on the document page when it was saved but a follow-up step (posting, attaching) failed. */
+export function PostErrorNotice({ className }: { className?: string }) {
+  const warnings = (useLocation().state as SaveWarningState)?.saveWarnings;
+  if (!warnings || warnings.length === 0) return null;
   return (
-    <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-      Saved as a draft, but it could not be posted: {postError}
+    <div className={`rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 ${className ?? ''}`}>
+      {warnings.map(warning => <p key={warning}>{warning}</p>)}
     </div>
   );
 }

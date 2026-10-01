@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Copy, Paperclip, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -31,6 +31,8 @@ import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
 import JournalRecurringDialog from './JournalRecurringDialog';
 import AccountCreateDrawer from '@/pages/coa/AccountCreateDrawer';
+import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
+import { PostErrorNotice, type SaveWarningState } from '@/components/SaveAndPost';
 import { JournalNumberRequestGate } from './journalNumberPreview';
 import {
   JOURNAL_CLOSE_PATH,
@@ -86,6 +88,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const pendingAccountFocusRef = useRef<number | null>(null);
   const navigate = useNavigate();
+  const attachments = useAttachments('journal_entry', existing?.entry.id ?? null);
   const readOnly = existing !== undefined && !existing.can_correct;
   const supportsManualActions = journalSupportsManualActions(existing);
   const totals = journalEntryTotals(form.lines);
@@ -241,11 +244,21 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         savedId = response.data.id;
       }
 
+      // Files added before the entry existed are uploaded now that it has an id.
+      const attachWarning = existing ? null : await attachments.attachTo(savedId);
+      if (attachWarning) {
+        // Open the saved entry so the missing files can be re-added there.
+        const state: SaveWarningState = { saveWarnings: [attachWarning] };
+        navigate(`/journal/${savedId}`, { state });
+        return;
+      }
+
       if (destination === 'new') {
         if (existing) navigate(journalDestinationPath(destination, savedId));
         else {
           journalNumberRequestGateRef.current.invalidate();
           setForm(newJournalEntryForm(todayLocal()));
+          attachments.reset();
           journalNumberEditedRef.current = false;
           setNumberRefresh(current => current + 1);
         }
@@ -596,17 +609,11 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
               className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">Attachments</label>
-            <div className="flex h-[108px] flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/20">
-              <Paperclip className="h-5 w-5" />
-              <span>Add attachment</span>
-              <span className="text-xs">Max file size: 20 MB</span>
-            </div>
-          </div>
+          <AttachmentsPanel attachments={attachments} />
         </div>
       </div>
 
+      <PostErrorNotice className="mx-6 mb-2" />
       {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
       {notice && <p className="px-6 pb-2 text-sm text-emerald-700">{notice}</p>}
 

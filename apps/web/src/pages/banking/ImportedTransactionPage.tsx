@@ -12,6 +12,7 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { AppSelect } from '@/components/ui/select';
 import { ComboInput } from '@/components/ui/ComboInput';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 
 type TransactionType = 'check' | 'expense' | 'deposit';
@@ -85,6 +86,8 @@ export default function ImportedTransactionPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
+  // The transaction is its journal entry, so that is what files attach to.
+  const attachments = useAttachments('journal_entry', id ?? null);
 
   useEffect(() => {
     if (!bizId || !id) return;
@@ -290,6 +293,10 @@ export default function ImportedTransactionPage() {
           <span>Total</span>
           <span className="font-mono">{fmtMoney(String(amountNum))}</span>
         </div>
+      </CardContent></Card>
+
+      <Card><CardContent className="pt-6">
+        <AttachmentsPanel attachments={attachments} className="max-w-xl" />
       </CardContent></Card>
 
       {err && <p className="text-sm text-destructive">{err}</p>}

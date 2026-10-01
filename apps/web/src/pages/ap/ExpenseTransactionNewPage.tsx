@@ -16,6 +16,7 @@ import { todayLocal } from '@/lib/dates';
 import { PAYMENT_METHOD_OPTIONS, type PaymentMethod } from '@/lib/paymentMethods';
 import { AppSelect } from '../../components/ui/select';
 import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -65,6 +66,7 @@ export default function ExpenseTransactionNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
+  const attachments = useAttachments('expense_transaction', null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [form, setForm] = useState<ExpenseForm>({
@@ -123,7 +125,8 @@ export default function ExpenseTransactionNewPage() {
         memo: form.memo || null,
       };
       const r = await api.post<CreatedExpense>(`/businesses/${bizId}/expense-transactions`, body);
-      await save.finish(`/businesses/${bizId}/expense-transactions/${r.data.id}/post`, `/ap/expenses/${r.data.id}`);
+      const attachWarning = await attachments.attachTo(r.data.id);
+      await save.finish(`/businesses/${bizId}/expense-transactions/${r.data.id}/post`, `/ap/expenses/${r.data.id}`, attachWarning);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -248,6 +251,10 @@ export default function ExpenseTransactionNewPage() {
           <span>Total</span>
           <span className="font-mono">{fmtMoney(String(amountNum))}</span>
         </div>
+      </CardContent></Card>
+
+      <Card><CardContent className="pt-6">
+        <AttachmentsPanel attachments={attachments} className="max-w-xl" />
       </CardContent></Card>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
