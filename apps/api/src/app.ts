@@ -60,6 +60,7 @@ import gmailAuthRouter from './routes/gmailAuth.js';
 import emailImportsRouter from './routes/emailImports.js';
 import invoiceImportsRouter from './routes/invoiceImports.js';
 import aiRouter from './routes/ai.js';
+import bankDepositsRouter from './routes/bankDeposits.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -129,6 +130,7 @@ export function makeApp(): Express {
   app.use(emailImportsRouter);
   app.use(invoiceImportsRouter);
   app.use(aiRouter);
+  app.use(bankDepositsRouter);
   app.use(errorHandler);
   return app;
 }

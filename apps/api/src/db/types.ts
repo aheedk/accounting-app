@@ -91,7 +91,8 @@ export type JournalEntryStatus = 'draft' | 'posted' | 'voided';
 export type JournalEntrySourceType =
   | 'manual' | 'invoice' | 'payment' | 'credit_memo'
   | 'bill' | 'bill_payment' | 'vendor_credit'
-  | 'reversal' | 'adjustment' | 'bank_import' | 'invoice_import';
+  | 'reversal' | 'adjustment' | 'bank_import' | 'invoice_import'
+  | 'bank_deposit';
 
 export interface ChartOfAccountsTable {
   id: Generated<string>;
@@ -996,6 +997,8 @@ export interface DB {
   bank_import_batches: BankImportBatchesTable;
   email_import_staging: EmailImportStagingTable;
   invoice_import_staging: InvoiceImportStagingTable;
+  bank_deposits: BankDepositsTable;
+  bank_deposit_lines: BankDepositLinesTable;
 }
 
 export interface InvoiceImportStagingTable {
@@ -1044,4 +1047,33 @@ export interface EmailImportStagingTable {
   uploaded_by_user_id: string | null;
   original_filename: string | null;
   created_at: Generated<string>;
+}
+export interface BankDepositsTable {
+  id: Generated<string>;
+  business_id: string;
+  bank_account_id: string;
+  deposit_date: ColumnType<string, string, string>;
+  deposit_number: string;
+  memo: string | null;
+  total_amount: ColumnType<string, string | number, string | number>;
+  cash_back_account_id: string | null;
+  cash_back_memo: string | null;
+  cash_back_amount: ColumnType<string | null, string | number | null, string | number | null>;
+  journal_entry_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface BankDepositLinesTable {
+  id: Generated<string>;
+  deposit_id: string;
+  business_id: string;
+  received_from: string | null;
+  account_id: string | null;
+  description: string | null;
+  payment_method: string | null;
+  ref_no: string | null;
+  amount: ColumnType<string, string | number, string | number>;
+  sort_order: Generated<number>;
+  created_at: Generated<Timestamp>;
 }

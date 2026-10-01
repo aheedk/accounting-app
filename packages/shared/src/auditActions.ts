@@ -196,6 +196,11 @@ export const AUDIT = {
 
   // Banking import batches
   BANK_IMPORT_UNDO: 'bank_import.undo',
+
+  // Bank deposits
+  BANK_DEPOSIT_CREATE: 'bank_deposit.create',
+  BANK_DEPOSIT_UPDATE: 'bank_deposit.update',
+  BANK_DEPOSIT_DELETE: 'bank_deposit.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

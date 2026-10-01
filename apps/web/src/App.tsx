@@ -59,6 +59,7 @@ import RulesPage from '@/pages/accounting/RulesPage';
 import FixedAssetListPage from '@/pages/accounting/FixedAssetListPage';
 import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
 import FixedAssetDetailPage from '@/pages/accounting/FixedAssetDetailPage';
+import BankDepositPage from '@/pages/accounting/BankDepositPage';
 import EntityPage from '@/pages/setup/EntityPage';
 import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
@@ -171,6 +172,8 @@ export default function App() {
             <Route path="/accounting/books-review" element={<BooksReviewPage />} />
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
+            <Route path="/accounting/bank-deposits/new" element={<BankDepositPage />} />
+            <Route path="/accounting/bank-deposits/:id" element={<BankDepositPage />} />
             {/* AI is a top-level area now; the old paths redirect so existing links keep working. */}
             <Route path="/ai/inbox" element={<EmailImportReviewPage />} />
             <Route path="/ai/coding-rules" element={<CodingRulesPage />} />
