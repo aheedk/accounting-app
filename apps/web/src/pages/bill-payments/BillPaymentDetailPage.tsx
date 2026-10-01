@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
+import { PostErrorNotice } from '@/components/SaveAndPost';
 
 type BillPayment = {
   id: string;
@@ -138,6 +139,7 @@ export default function BillPaymentDetailPage() {
           )}
         </CardContent>
       </Card>
+      <PostErrorNotice />
       {err && <p className="text-sm text-destructive">{err}</p>}
     </div>
   );

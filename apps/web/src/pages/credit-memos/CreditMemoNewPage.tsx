@@ -13,6 +13,7 @@ import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
+import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Customer = { id: string; name: string; billing_address: Address | null };
@@ -27,6 +28,7 @@ function fmtAddress(a: Address | null | undefined): string {
 export default function CreditMemoNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [revenueAccounts, setRevenueAccounts] = useState<Account[]>([]);
   const addAccount = useAddAccount(revenueAccounts, account => setRevenueAccounts(prev => [...prev, account]));
@@ -51,7 +53,7 @@ export default function CreditMemoNewPage() {
     try {
       const body = { ...form, amount: parseMoneyInput(form.amount), memo: form.memo || null };
       const r = await api.post(`/businesses/${bizId}/credit-memos`, body);
-      nav(`/credit-memos/${r.data.id}`);
+      await save.finish(`/businesses/${bizId}/credit-memos/${r.data.id}/post`, `/credit-memos/${r.data.id}`);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -148,7 +150,7 @@ export default function CreditMemoNewPage() {
       <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/credit-memos')}>Cancel</Button>
         <div className="flex-1" />
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
+        <SaveButtons save={save} busy={busy} />
       </div>
       {addAccount.drawer}{addCustomer.dialog}
     </form>

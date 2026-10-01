@@ -13,6 +13,7 @@ import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
+import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Customer = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -28,6 +29,7 @@ function fmtShortDate(iso: string) {
 export default function PaymentNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [params] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
@@ -119,7 +121,7 @@ export default function PaymentNewPage() {
         ...(initial_applications.length > 0 ? { initial_applications } : {}),
       };
       const r = await api.post(`/businesses/${bizId}/payments`, body);
-      nav(`/payments/${r.data.payment.id}`);
+      await save.finish(`/businesses/${bizId}/payments/${r.data.payment.id}/post`, `/payments/${r.data.payment.id}`);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -250,7 +252,7 @@ export default function PaymentNewPage() {
       <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/payments')}>Cancel</Button>
         <div className="flex-1" />
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
+        <SaveButtons save={save} busy={busy} />
       </div>
       {addAccount.drawer}{addCustomer.dialog}
     </form>

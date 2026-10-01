@@ -12,6 +12,7 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddParty } from '@/components/addNew/useAddParty';
+import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
@@ -23,6 +24,7 @@ const STANDARD_TERMS = ['Net 30', 'Net 60', 'Net 90', '2/10 Net 30'];
 export default function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   const [items, setItems] = useState<ProductServiceItem[]>([]);
@@ -107,7 +109,7 @@ export default function InvoiceNewPage() {
         lines: mapped,
       };
       const r = await api.post(`/businesses/${bizId}/invoices`, body);
-      nav(`/invoices/${r.data.invoice.id}`);
+      await save.finish(`/businesses/${bizId}/invoices/${r.data.invoice.id}/post`, `/invoices/${r.data.invoice.id}`);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -194,7 +196,7 @@ export default function InvoiceNewPage() {
         </CardContent>
       </Card>
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex gap-2"><Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Create draft'}</Button><Button type="button" variant="outline" onClick={() => nav('/invoices')}>Cancel</Button></div>
+      <div className="flex gap-2"><SaveButtons save={save} busy={busy} /><Button type="button" variant="outline" onClick={() => nav('/invoices')}>Cancel</Button></div>
       {addCustomer.dialog}
     </form>
   );

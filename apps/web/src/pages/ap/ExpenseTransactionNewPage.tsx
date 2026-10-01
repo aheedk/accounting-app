@@ -15,6 +15,7 @@ import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { PAYMENT_METHOD_OPTIONS, type PaymentMethod } from '@/lib/paymentMethods';
 import { AppSelect } from '../../components/ui/select';
+import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
 
 type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -63,6 +64,7 @@ function today(): string {
 export default function ExpenseTransactionNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [form, setForm] = useState<ExpenseForm>({
@@ -121,7 +123,7 @@ export default function ExpenseTransactionNewPage() {
         memo: form.memo || null,
       };
       const r = await api.post<CreatedExpense>(`/businesses/${bizId}/expense-transactions`, body);
-      nav(`/ap/expenses/${r.data.id}`);
+      await save.finish(`/businesses/${bizId}/expense-transactions/${r.data.id}/post`, `/ap/expenses/${r.data.id}`);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -252,7 +254,7 @@ export default function ExpenseTransactionNewPage() {
       <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/ap/expenses')}>Cancel</Button>
         <div className="flex-1" />
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
+        <SaveButtons save={save} busy={busy} />
       </div>
       {addAccount.drawer}{addVendor.dialog}
     </form>

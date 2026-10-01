@@ -9,6 +9,7 @@ import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetail
 import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { PostErrorNotice } from '@/components/SaveAndPost';
 
 type Bill = {
   id: string;
@@ -186,6 +187,7 @@ export default function BillDetailPage() {
         </CardContent>
       </Card>
 
+      <PostErrorNotice />
       {err && <p className="text-sm text-destructive">{err}</p>}
       <Button variant="outline" onClick={() => nav('/ap/bills')}>Back to bills</Button>
     </div>

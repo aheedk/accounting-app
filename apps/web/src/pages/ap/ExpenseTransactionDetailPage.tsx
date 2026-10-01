@@ -12,6 +12,7 @@ import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { paymentMethodLabel, type PaymentMethod } from '@/lib/paymentMethods';
+import { PostErrorNotice } from '@/components/SaveAndPost';
 
 type ExpenseStatus = 'draft' | 'posted' | 'void';
 
@@ -147,6 +148,7 @@ export default function ExpenseTransactionDetailPage() {
         ]}
       />
 
+      <PostErrorNotice />
       {err && <p className="text-sm text-destructive">{err}</p>}
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
