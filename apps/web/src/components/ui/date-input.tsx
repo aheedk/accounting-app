@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import type { InputProps } from '@/components/ui/input';
+import { normalizeDateInput } from '@/lib/dates';
 
 type Props = Omit<InputProps, 'type' | 'value' | 'onChange'> & {
   value: string;
@@ -23,17 +24,10 @@ export function DateInput({ value, onChange, ...props }: Props) {
     onChangeFn.current({ target: { value: val } } as React.ChangeEvent<HTMLInputElement>);
   }
 
-  function sanitize(raw: string): string {
-    if (!raw) return raw;
-    const parts = raw.split('-');
-    if (parts.length !== 3) return value; // malformed — reset
-    const y = Math.min(Math.max(parseInt(parts[0]!, 10), 1000), 9999);
-    const m = parseInt(parts[1]!, 10);
-    const d = parseInt(parts[2]!, 10);
-    const date = new Date(y, m - 1, d);
-    // If month/day rolled over the date is invalid (e.g. June 31 → July 1)
-    if (date.getMonth() !== m - 1 || date.getDate() !== d) return value;
-    return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  function commit(raw: string) {
+    const clean = normalizeDateInput(raw, value);
+    setLocal(clean);
+    fire(clean);
   }
 
   return (
@@ -44,11 +38,14 @@ export function DateInput({ value, onChange, ...props }: Props) {
       onChange={e => setLocal(e.target.value)}
       onBlur={e => {
         editing.current = false;
-        const clean = sanitize(e.target.value);
-        setLocal(clean);
-        fire(clean);
+        commit(e.target.value);
       }}
       {...props}
+      onKeyDown={e => {
+        // Enter submits a form without a blur, so settle the date first.
+        if (e.key === 'Enter') commit(e.currentTarget.value);
+        props.onKeyDown?.(e);
+      }}
     />
   );
 }

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
+import { normalizeDateInput } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 
 type ItemKey =
@@ -303,7 +304,9 @@ export default function CompliancePage() {
                         defaultValue={item.due_date ?? ''}
                         disabled={isBusy}
                         onBlur={(e) => {
-                          const v = e.target.value;
+                          // Same clean-up as DateInput (a two-digit year means 20xx).
+                          const v = normalizeDateInput(e.target.value, item.due_date ?? '');
+                          e.target.value = v;
                           const next = v.trim().length > 0 ? v : null;
                           if (next !== (item.due_date ?? null)) {
                             void patchItem(item.id, { due_date: next });

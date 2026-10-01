@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ChevronDown, Info, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -287,7 +288,7 @@ export default function AccountCreateDrawer({
                 </div>
                 <div>
                   <Label htmlFor="new-account-opening-date">As of</Label>
-                  <Input id="new-account-opening-date" type="date" className="mt-1" value={form.opening_balance_as_of} onChange={event => setForm(current => ({ ...current, opening_balance_as_of: event.target.value }))} />
+                  <DateInput id="new-account-opening-date" className="mt-1" value={form.opening_balance_as_of} onChange={event => setForm(current => ({ ...current, opening_balance_as_of: event.target.value }))} />
                 </div>
                 <p className="col-span-2 -mt-2 text-xs text-muted-foreground">Posts a journal entry against Opening Balance Equity as of this date.</p>
               </div>

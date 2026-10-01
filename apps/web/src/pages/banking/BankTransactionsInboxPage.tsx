@@ -8,6 +8,7 @@ import { useAuth } from '@/auth/useAuth';
 import type { Role } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
@@ -539,20 +540,18 @@ export default function BankTransactionsInboxPage() {
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">From (MM/DD/YYYY)</label>
-                    <input
-                      type="date"
-                      className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    <DateInput
+                      className="h-9"
                       value={dateFrom}
-                      onChange={e => { setDateFrom(e.target.value); setDatePreset('custom'); }}
+                      onChange={e => { if (e.target.value !== dateFrom) { setDateFrom(e.target.value); setDatePreset('custom'); } }}
                     />
                   </div>
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">To (MM/DD/YYYY)</label>
-                    <input
-                      type="date"
-                      className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    <DateInput
+                      className="h-9"
                       value={dateTo}
-                      onChange={e => { setDateTo(e.target.value); setDatePreset('custom'); }}
+                      onChange={e => { if (e.target.value !== dateTo) { setDateTo(e.target.value); setDatePreset('custom'); } }}
                     />
                   </div>
                 </div>
