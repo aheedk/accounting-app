@@ -9,7 +9,9 @@ export type JournalEntrySourceType =
   | 'bill_payment'
   | 'vendor_credit'
   | 'reversal'
-  | 'adjustment';
+  | 'adjustment'
+  | 'bank_import'
+  | 'invoice_import';
 
 export type JournalEntryLine = {
   id: string;
@@ -60,4 +62,5 @@ export type JournalEntryDetail = {
   can_reverse: boolean;
   reversal_block_reason: string | null;
   is_standalone_manual: boolean;
+  source_path: string | null;
 };

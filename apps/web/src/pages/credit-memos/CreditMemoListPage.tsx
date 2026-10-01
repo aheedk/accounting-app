@@ -15,6 +15,7 @@ import { AppSelect } from '../../components/ui/select';
 
 type CreditMemoSummary = {
   id: string;
+  credit_memo_number: string | null;
   customer_id: string;
   memo_date: string;
   status: string;
@@ -86,6 +87,7 @@ export default function CreditMemoListPage() {
   }, [items]);
 
   const columns: Column<Row>[] = [
+    { key: 'number', header: 'No.', sortable: true, sortValue: r => r.credit_memo_number ?? '', render: r => <span className="whitespace-nowrap font-mono text-xs">{r.credit_memo_number ?? '—'}</span> },
     { key: 'memo_date', header: 'Date', sortable: true, sortValue: r => r.memo_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.memo_date)}</span> },
     { key: 'customer', header: 'Customer', sortable: true, sortValue: r => r.customer_name, render: r => r.customer_name || <span className="text-muted-foreground">—</span> },
     { key: 'memo', header: 'Memo', sortable: false, render: r => r.memo ? <span className="block max-w-[16rem] truncate">{r.memo}</span> : <span className="text-muted-foreground">—</span> },

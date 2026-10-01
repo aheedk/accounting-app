@@ -3,6 +3,7 @@ import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/te
 import { makeFirm, makeBusiness, makeUser, makeCustomer, seedYearPeriods, seedCoa } from '../helpers/factories.js';
 import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
 import * as cm from '../../src/services/ar/creditMemoService.js';
+import * as gl from '../../src/services/reports/generalLedgerService.js';
 import { ERR } from '@accounting/shared';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -40,6 +41,23 @@ describe('creditMemoService', () => {
     expect(drLine.debit).toBe('20.0000');
     const crLine = lines.find(l => l.account_id === ar.id)!;
     expect(crLine.credit).toBe('20.0000');
+  });
+
+  it('numbers credit memos in sequence and shows the number, customer and memo in the general ledger', async () => {
+    const { biz, ctx, customer, returns, ar } = await setup(t);
+    const input = { business_id: biz.id, customer_id: customer.id, memo_date: '2026-04-15', amount: '20.0000', revenue_account_id: returns.id };
+    const first = await t.db.transaction().execute(trx => cm.createDraft(trx, ctx, { ...input, memo: 'Damaged in transit' }));
+    const second = await t.db.transaction().execute(trx => cm.createDraft(trx, ctx, { ...input, memo: null }));
+    expect([first.credit_memo_number, second.credit_memo_number]).toEqual(['CM-1001', 'CM-1002']);
+
+    await t.db.transaction().execute(trx => cm.postCreditMemo(trx, ctx, { credit_memo_id: first.id }));
+    const report = await gl.generalLedger(t.db, {
+      business_id: biz.id, period_start: '2026-04-01', period_end: '2026-04-30', account_id: ar.id,
+    });
+    expect(report.accounts[0]!.lines[0]).toMatchObject({
+      transaction_label: 'Credit Memo', num: 'CM-1001', name: 'Acme', memo: 'Damaged in transit',
+      transaction_path: `/credit-memos/${first.id}`,
+    });
   });
 
   it('apply credit memo to invoice reduces remaining_amount, no JE generated', async () => {

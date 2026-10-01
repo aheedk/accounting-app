@@ -15,6 +15,7 @@ import { AppSelect } from '../../components/ui/select';
 
 type VendorCreditSummary = {
   id: string;
+  vendor_credit_number: string | null;
   vendor_id: string;
   credit_date: string;
   status: string;
@@ -86,6 +87,7 @@ export default function VendorCreditListPage() {
   }, [items]);
 
   const columns: Column<Row>[] = [
+    { key: 'number', header: 'No.', sortable: true, sortValue: r => r.vendor_credit_number ?? '', render: r => <span className="whitespace-nowrap font-mono text-xs">{r.vendor_credit_number ?? '—'}</span> },
     { key: 'credit_date', header: 'Date', sortable: true, sortValue: r => r.credit_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.credit_date)}</span> },
     { key: 'vendor', header: 'Vendor', sortable: true, sortValue: r => r.vendor_name, render: r => r.vendor_name || <span className="text-muted-foreground">—</span> },
     { key: 'memo', header: 'Memo', sortable: false, render: r => r.memo ? <span className="block max-w-[16rem] truncate">{r.memo}</span> : <span className="text-muted-foreground">—</span> },

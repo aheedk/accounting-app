@@ -7,6 +7,7 @@ import { OverApplicationError } from '../../lib/arErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
+import { nextCounter } from '../core/numberingService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateDraftCreditMemoInput = {
@@ -21,8 +22,10 @@ export type CreateDraftCreditMemoInput = {
 export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateDraftCreditMemoInput) {
   if (parseFloat(input.amount) <= 0) throw new PreconditionError('amount must be > 0');
   const ar = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, '1100');
+  const sequence = await nextCounter(trx, input.business_id, 'credit_memo');
   const row = await trx.insertInto('credit_memos').values({
     business_id: input.business_id, customer_id: input.customer_id,
+    credit_memo_number: `CM-${1000 + Number(sequence)}`,
     memo_date: input.memo_date,
     amount: input.amount, remaining_amount: input.amount,
     revenue_account_id: input.revenue_account_id,

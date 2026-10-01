@@ -10,6 +10,7 @@ import { AppSelect } from '../../components/ui/select';
 
 type VendorCredit = {
   id: string;
+  vendor_credit_number: string | null;
   vendor_id: string;
   credit_date: string;
   status: string;
@@ -77,7 +78,7 @@ export default function VendorCreditDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Vendor Credit</h1>
+        <h1 className="text-2xl font-semibold">Vendor Credit{data.vendor_credit_number ? ` ${data.vendor_credit_number}` : ''}</h1>
         <div className="flex gap-2">
           {data.status === 'draft' && <Button disabled={busy} onClick={post}>Post</Button>}
           {(data.status === 'posted' || data.status === 'applied') && <Button variant="destructive" disabled={busy} onClick={voidIt}>Void</Button>}

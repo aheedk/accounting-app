@@ -2,6 +2,7 @@ import { type Kysely, sql } from 'kysely';
 import { ERR, addMoney, isZero, subMoney, toMoneyString } from '@accounting/shared';
 import type { AccountType, DB, JournalEntrySourceType, JournalEntryStatus } from '../../db/types.js';
 import { BusinessRuleError } from '../../lib/errors.js';
+import { describeTransactions } from '../core/transactionDescriptorService.js';
 
 export type GeneralLedgerLine = {
   journal_entry_id: string;
@@ -11,6 +12,18 @@ export type GeneralLedgerLine = {
   transaction_type: string | null;
   payee_name: string | null;
   reference: string | null;
+  /** QBO-style type: Invoice, Bill, Check, Expense, Deposit, Journal Entry... */
+  transaction_label: string;
+  /** Document number: invoice no., bill no., check no., or the journal no. */
+  num: string | null;
+  /** Customer, vendor, or payee. */
+  name: string | null;
+  /** True only for real adjusting journal entries. */
+  is_adjusting: boolean;
+  /** Web path of the form where this transaction is edited. */
+  transaction_path: string;
+  /** Signed in the account's natural direction, so it adds up to the balance. */
+  amount: string;
   memo: string | null;
   split_account: string | null;
   status: JournalEntryStatus;
@@ -97,8 +110,9 @@ export async function generalLedger(
   const activity = await db.selectFrom('journal_entry_lines as jel')
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select([
-      'jel.id as line_id', 'jel.account_id', 'jel.debit', 'jel.credit', 'jel.memo as line_memo',
-      'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.transaction_type', 'je.payee_name', 'je.reference',
+      'jel.id as line_id', 'jel.account_id', 'jel.debit', 'jel.credit', 'jel.memo as line_memo', 'jel.name as line_name',
+      'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.source_id', 'je.journal_number',
+      'je.transaction_type', 'je.payee_name', 'je.reference',
       'je.memo as entry_memo', 'je.status',
     ])
     .where('je.business_id', '=', q.business_id)
@@ -143,6 +157,18 @@ export async function generalLedger(
     }
   }
 
+  // Type / Num / Name: resolved once per journal entry, not per line.
+  const entryById = new Map(activity.map(line => [line.journal_entry_id, {
+    id: line.journal_entry_id,
+    source_type: line.source_type,
+    source_id: line.source_id,
+    transaction_type: line.transaction_type ?? null,
+    payee_name: line.payee_name ?? null,
+    reference: line.reference,
+    journal_number: line.journal_number,
+  }]));
+  const descriptors = await describeTransactions(db, [...entryById.values()]);
+
   let reportDebit = '0.0000';
   let reportCredit = '0.0000';
   const accounts: GeneralLedgerAccount[] = [];
@@ -162,7 +188,9 @@ export async function generalLedger(
       const credit = toMoneyString(line.credit);
       totalDebit = toMoneyString(addMoney(totalDebit, debit));
       totalCredit = toMoneyString(addMoney(totalCredit, credit));
-      running = toMoneyString(addMoney(running, naturalChange(account.account_type, debit, credit)));
+      const amount = naturalChange(account.account_type, debit, credit);
+      running = toMoneyString(addMoney(running, amount));
+      const described = descriptors.get(line.journal_entry_id);
       return {
         journal_entry_id: line.journal_entry_id,
         line_id: line.line_id,
@@ -171,7 +199,16 @@ export async function generalLedger(
         transaction_type: line.transaction_type ?? null,
         payee_name: line.payee_name ?? null,
         reference: line.reference,
-        memo: line.line_memo ?? line.entry_memo,
+        transaction_label: described?.label ?? 'Journal Entry',
+        num: described?.num ?? null,
+        // A journal entry line can carry its own name (the Name column in the grid).
+        name: line.line_name ?? described?.name ?? null,
+        is_adjusting: described?.is_adjusting ?? false,
+        transaction_path: described?.path ?? `/journal/${line.journal_entry_id}`,
+        amount,
+        // Prefer what the document says it was for over the system-written
+        // entry memo ("Payment from customer (check)").
+        memo: described?.memo ?? line.line_memo ?? line.entry_memo,
         split_account: splitMap.get(line.line_id) ?? null,
         status: line.status,
         debit,

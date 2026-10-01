@@ -10,6 +10,7 @@ import { AppSelect } from '../../components/ui/select';
 
 type CreditMemo = {
   id: string;
+  credit_memo_number: string | null;
   customer_id: string;
   memo_date: string;
   status: string;
@@ -77,7 +78,7 @@ export default function CreditMemoDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Credit Memo</h1>
+        <h1 className="text-2xl font-semibold">Credit Memo{data.credit_memo_number ? ` ${data.credit_memo_number}` : ''}</h1>
         <div className="flex gap-2">
           {data.status === 'draft' && <Button disabled={busy} onClick={post}>Post</Button>}
           {(data.status === 'posted' || data.status === 'applied') && <Button variant="destructive" disabled={busy} onClick={voidIt}>Void</Button>}

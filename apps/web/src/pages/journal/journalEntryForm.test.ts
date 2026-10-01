@@ -73,6 +73,7 @@ const detail: JournalEntryDetail = {
   can_reverse: true,
   reversal_block_reason: null,
   is_standalone_manual: true,
+  source_path: null,
 };
 
 describe('journal entry form mappings', () => {

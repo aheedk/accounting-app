@@ -31,7 +31,7 @@ import {
   type GeneralLedgerColumnKey,
   type GeneralLedgerPreferences,
 } from '@/lib/generalLedgerCustomization';
-import { fmtMoney, fmtSigned } from '@/lib/money';
+import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 
 type Account = {
@@ -49,6 +49,13 @@ type GeneralLedgerLine = {
   transaction_type: string | null;
   payee_name: string | null;
   reference: string | null;
+  transaction_label: string;
+  num: string | null;
+  name: string | null;
+  is_adjusting: boolean;
+  transaction_path: string;
+  /** Signed in the account's natural direction, so the column adds up to the balance. */
+  amount: string;
   memo: string | null;
   split_account: string | null;
   status: 'posted' | 'voided';
@@ -81,6 +88,7 @@ type GeneralLedgerReport = {
 type DisplayAccount = GeneralLedgerAccount & {
   visible_total_debit: string;
   visible_total_credit: string;
+  visible_total_amount: string;
 };
 
 type AccountTypeFilter = 'all' | 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
@@ -99,8 +107,6 @@ type DateRangePreset =
   | 'this-year' | 'this-year-to-date' | 'last-year' | 'last-year-to-date'
   | 'this-fiscal-year' | 'this-fiscal-year-to-date' | 'last-fiscal-year' | 'last-fiscal-year-to-date'
   | 'last-7-days' | 'last-30-days' | 'last-90-days';
-
-type AccountingMethod = 'accrual' | 'cash';
 
 const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
   { value: 'all-dates', label: 'All Dates' },
@@ -181,21 +187,15 @@ function fmtShortDate(iso: string): string {
   return `${Number(month)}/${Number(day)}/${year.slice(2)}`;
 }
 
-function fmtSourceLabel(source: string): string {
-  if (source === 'bank_import') return 'Bank Import';
-  if (['manual', 'reversal', 'adjustment'].includes(source)) return 'Journal Entry';
-  if (source === 'invoice_import') return 'Invoice';
-  return source.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+// QuickBooks shows negatives with a leading minus in this report, not parentheses.
+function fmtAmount(value: string): string {
+  const amount = new Decimal(value);
+  const formatted = fmtMoney(amount.abs().toFixed(4));
+  return amount.isNegative() ? `-${formatted}` : formatted;
 }
 
-function fmtTransactionLabel(line: GeneralLedgerLine): string {
-  if (line.source_type === 'bank_import') {
-    if (line.transaction_type === 'deposit') return 'Deposit';
-    if (line.transaction_type === 'check')   return 'Check';
-    if (line.transaction_type === 'expense') return 'Expense';
-    return 'Bank Import';
-  }
-  return fmtSourceLabel(line.source_type);
+function fmtNum(line: GeneralLedgerLine): string {
+  return line.num ? line.num.replace(/^AJE-/i, 'JE-') : '';
 }
 
 function pickErr(error: unknown): string {
@@ -216,7 +216,7 @@ function columnDefinition(key: GeneralLedgerColumnKey) {
   return GENERAL_LEDGER_COLUMNS.find(column => column.key === key)!;
 }
 
-function sumLines(lines: GeneralLedgerLine[], key: 'debit' | 'credit'): string {
+function sumLines(lines: GeneralLedgerLine[], key: 'debit' | 'credit' | 'amount'): string {
   return lines.reduce((sum, line) => sum.plus(line[key]), new Decimal(0)).toFixed(4);
 }
 
@@ -242,17 +242,13 @@ function summaryValues(
 function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey): string {
   switch (column) {
     case 'date': return line.entry_date;
-    case 'transaction': return `${fmtTransactionLabel(line)}${line.status === 'voided' ? ' (Voided)' : ''}`;
-    case 'reference': return line.reference ?? '';
-    case 'adj': return line.source_type === 'adjustment' ? 'Yes' : 'No';
-    case 'name': return line.payee_name ?? '';
+    case 'transaction': return `${line.transaction_label}${line.status === 'voided' ? ' (Voided)' : ''}`;
+    case 'reference': return fmtNum(line);
+    case 'adj': return line.is_adjusting ? 'Yes' : 'No';
+    case 'name': return line.name ?? '';
     case 'memo': return line.memo ?? '';
     case 'split': return line.split_account ?? '';
-    case 'amount': {
-      if (line.debit !== '0.0000') return line.debit;
-      if (line.credit !== '0.0000') return `-${line.credit}`;
-      return '';
-    }
+    case 'amount': return new Decimal(line.amount).isZero() ? '' : line.amount;
     case 'balance': return line.running_balance;
   }
 }
@@ -278,7 +274,7 @@ function exportRows(
       rows.push([...accountPrefix, ...columns.map(column => lineExportValue(line, column))]);
     }
     if (preferences.showAccountTotals) {
-      const netAmount = new Decimal(account.visible_total_debit).minus(account.visible_total_credit).toFixed(4);
+      const netAmount = account.visible_total_amount;
       rows.push([
         ...accountPrefix,
         ...summaryValues(columns, 'Account Total', {
@@ -376,8 +372,8 @@ export default function GeneralLedgerPage() {
 
   const sourceTypes = useMemo(() => {
     const values = new Set<string>();
-    report?.accounts.forEach(account => account.lines.forEach(line => values.add(line.source_type)));
-    return [...values].sort((left, right) => fmtSourceLabel(left).localeCompare(fmtSourceLabel(right)));
+    report?.accounts.forEach(account => account.lines.forEach(line => values.add(line.transaction_label)));
+    return [...values].sort((left, right) => left.localeCompare(right));
   }, [report]);
 
   useEffect(() => {
@@ -393,21 +389,24 @@ export default function GeneralLedgerPage() {
     const needle = searchText.trim().toLowerCase();
     return report.accounts.flatMap(account => {
       if (accountTypeFilter !== 'all' && account.account_type !== accountTypeFilter) return [];
-      const lines = account.lines
-        .filter(line => sourceFilter === 'all' || line.source_type === sourceFilter)
+      // The server returns lines in posting order, which is the order the
+      // running balance was computed in -- so only ever keep or reverse it.
+      const matching = account.lines
+        .filter(line => sourceFilter === 'all' || line.transaction_label === sourceFilter)
         .filter(line => statusFilter === 'all' || line.status === statusFilter)
-        .filter(line => adjFilter === 'all' || (adjFilter === 'adjustments' ? line.source_type === 'adjustment' : line.source_type !== 'adjustment'))
-        .filter(line => !needle || `${line.reference ?? ''} ${line.memo ?? ''}`.toLowerCase().includes(needle))
-        .sort((left, right) => {
-          const comparison = left.entry_date.localeCompare(right.entry_date) || left.line_id.localeCompare(right.line_id);
-          return preferences.sortDirection === 'oldest' ? comparison : -comparison;
-        });
+        .filter(line => adjFilter === 'all' || (adjFilter === 'adjustments' ? line.is_adjusting : !line.is_adjusting))
+        .filter(line => !needle || [
+          line.transaction_label, fmtNum(line), line.name, line.memo, line.split_account,
+          fmtAmount(line.amount), new Decimal(line.amount).toFixed(2),
+        ].join(' ').toLowerCase().includes(needle));
+      const lines = preferences.sortDirection === 'oldest' ? matching : [...matching].reverse();
       if (!showEmptyAccounts && lines.length === 0) return [];
       return [{
         ...account,
         lines,
         visible_total_debit: sumLines(lines, 'debit'),
         visible_total_credit: sumLines(lines, 'credit'),
+        visible_total_amount: sumLines(lines, 'amount'),
       }];
     });
   }, [accountTypeFilter, adjFilter, preferences.sortDirection, report, searchText, showEmptyAccounts, sourceFilter, statusFilter]);
@@ -513,7 +512,7 @@ export default function GeneralLedgerPage() {
   function handlePrint(): void {
     if (!report) return;
     const numericIndexes = new Set<number>();
-    let offset = preferences.showAccountNumbers ? 2 : 1;
+    const offset = preferences.showAccountNumbers ? 2 : 1;
     visibleColumns.forEach((column, index) => {
       if (columnDefinition(column).numeric) numericIndexes.add(offset + index);
     });
@@ -848,7 +847,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
                 onChange={event => props.onSourceFilterChange(event.target.value)}
               >
                 <option value="all">All transaction types</option>
-                {props.sourceTypes.map(source => <option key={source} value={source}>{fmtSourceLabel(source)}</option>)}
+                {props.sourceTypes.map(source => <option key={source} value={source}>{source}</option>)}
               </AppSelect>
             </div>
             <div>
@@ -991,7 +990,7 @@ function AccountSection({
             <SummaryRow
               columns={columns}
               label={`Total for ${preferences.showAccountNumbers ? `${account.account_code} — ` : ''}${account.account_name}`}
-              amount={new Decimal(account.visible_total_debit).minus(account.visible_total_credit).toFixed(4)}
+              amount={account.visible_total_amount}
               balance={account.ending_balance}
               density={preferences.density}
               className="border-b-2 font-semibold"
@@ -1014,28 +1013,27 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
     case 'transaction':
       content = (
         <>
-          <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{fmtTransactionLabel(line)}</Link>
+          <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{line.transaction_label}</Link>
           {line.status === 'voided' && <span className="ml-2 text-xs uppercase">Voided</span>}
         </>
       );
       break;
     case 'reference': {
-      const rawRef = line.reference;
-      const displayRef = rawRef ? rawRef.replace(/^AJE-/i, 'JE-') : null;
-      content = displayRef
-        ? <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{displayRef}</Link>
+      const num = fmtNum(line);
+      content = num
+        ? <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{num}</Link>
         : null;
       className += ' font-mono text-xs whitespace-nowrap';
       break;
     }
     case 'adj':
-      content = line.source_type === 'adjustment'
+      content = line.is_adjusting
         ? <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Yes</span>
         : <span className="text-xs text-muted-foreground">No</span>;
       className += ' text-center';
       break;
     case 'name':
-      content = line.payee_name ?? '';
+      content = line.name ?? '';
       className += ' max-w-[16rem] truncate';
       break;
     case 'memo':
@@ -1046,20 +1044,14 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       content = line.split_account ?? '';
       className += ' max-w-[16rem] truncate text-xs text-muted-foreground';
       break;
-    case 'amount': {
-      const isDebit = line.debit !== '0.0000';
-      const isCredit = line.credit !== '0.0000';
-      if (!isDebit && !isCredit) { content = ''; }
-      else {
-        const val = isDebit ? line.debit : line.credit;
-        const display = isDebit ? fmtMoney(val) : `-${fmtMoney(val)}`;
-        content = <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{display}</ReportAmountLink>;
-      }
+    case 'amount':
+      content = new Decimal(line.amount).isZero()
+        ? ''
+        : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(line.amount)}</ReportAmountLink>;
       className += ' text-right font-mono';
       break;
-    }
     case 'balance':
-      content = fmtSigned(line.running_balance);
+      content = fmtAmount(line.running_balance);
       className += ' text-right font-mono';
       break;
   }
@@ -1087,8 +1079,8 @@ function SummaryRow({
     <tr className={className}>
       {columns.map(column => {
         let value: ReactNode = column === labelColumn ? label : null;
-        if (column === 'amount' && amount !== undefined) value = fmtSigned(amount);
-        if (column === 'balance' && balance !== undefined) value = fmtSigned(balance);
+        if (column === 'amount' && amount !== undefined) value = fmtAmount(amount);
+        if (column === 'balance' && balance !== undefined) value = fmtAmount(balance);
         const numeric = columnDefinition(column).numeric;
         return <td key={column} className={`${padding} ${numeric ? 'text-right font-mono' : ''}`}>{value}</td>;
       })}

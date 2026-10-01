@@ -39,6 +39,11 @@ export type PostJournalEntryInput = {
 export type UpdateJournalEntryInput = {
   journal_entry_id: string;
   replacement: PostJournalEntryInput;
+  /**
+   * Lets the owning source service edit its own entry in place. Without it
+   * only standalone manual/adjusting entries are editable.
+   */
+  source_guard?: JournalEntrySourceGuard;
 };
 
 export type JournalEntrySourceGuard = {
@@ -155,6 +160,8 @@ export async function postJournalEntry(
     status: 'draft',
     source_type: input.source_type,
     source_id: input.source_id ?? null,
+    transaction_type: input.transaction_type ?? null,
+    payee_name: input.payee_name ?? null,
     corrected_from_entry_id: input.corrected_from_entry_id ?? null,
     created_by_user_id: ctx.user_id,
   }).returningAll().executeTakeFirstOrThrow();
@@ -441,20 +448,35 @@ export async function updateJournalEntry(
   if (originalBefore.status !== 'posted') {
     throw new InvalidStateTransitionError('journal_entry', originalBefore.id, originalBefore.status, 'voided');
   }
-  if (originalBefore.source_type !== 'manual' && originalBefore.source_type !== 'adjustment') {
-    throw new BusinessRuleError(
-      ERR.IMMUTABLE_RECORD,
-      'Source-generated and reversing journal entries must be corrected from their source transaction',
-    );
-  }
-  if (await isSourceGeneratedJournalEntry(trx, originalBefore)) {
-    throw new BusinessRuleError(
-      ERR.IMMUTABLE_RECORD,
-      'Source-generated journal entries must be corrected from their source transaction',
-    );
-  }
-  if (input.replacement.source_type !== 'manual' && input.replacement.source_type !== 'adjustment') {
-    throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'An edited journal entry must be manual or adjusting');
+  if (input.source_guard) {
+    // The source service is editing its own entry; it must still be that
+    // entry, and the edit may not re-home it to another source.
+    if (
+      originalBefore.source_type !== input.source_guard.source_type
+      || originalBefore.source_id !== input.source_guard.source_id
+      || input.replacement.source_type !== input.source_guard.source_type
+    ) {
+      throw new BusinessRuleError(
+        ERR.IMMUTABLE_RECORD,
+        'Journal entry does not belong to the source transaction requesting the edit',
+      );
+    }
+  } else {
+    if (originalBefore.source_type !== 'manual' && originalBefore.source_type !== 'adjustment') {
+      throw new BusinessRuleError(
+        ERR.IMMUTABLE_RECORD,
+        'Source-generated and reversing journal entries must be corrected from their source transaction',
+      );
+    }
+    if (await isSourceGeneratedJournalEntry(trx, originalBefore)) {
+      throw new BusinessRuleError(
+        ERR.IMMUTABLE_RECORD,
+        'Source-generated journal entries must be corrected from their source transaction',
+      );
+    }
+    if (input.replacement.source_type !== 'manual' && input.replacement.source_type !== 'adjustment') {
+      throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'An edited journal entry must be manual or adjusting');
+    }
   }
   if (await hasPostedReversal(trx as unknown as Kysely<DB>, ctx.business_id, originalBefore.id)) {
     throw new BusinessRuleError(ERR.IMMUTABLE_RECORD, 'This journal entry has already been reversed');
@@ -529,6 +551,10 @@ export async function updateJournalEntry(
       journal_number: journalNumber,
       memo: input.replacement.memo,
       reference: input.replacement.reference ?? null,
+      ...(input.replacement.transaction_type !== undefined
+        ? { transaction_type: input.replacement.transaction_type } : {}),
+      ...(input.replacement.payee_name !== undefined
+        ? { payee_name: input.replacement.payee_name } : {}),
       updated_at: sql`now()`,
     })
     .where('id', '=', originalBefore.id)

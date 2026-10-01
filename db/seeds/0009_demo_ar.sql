@@ -134,10 +134,13 @@ BEGIN
       v_date := make_date(2026, 5, 10 + i);
       v_total := 180 * i;
       v_cm := gen_random_uuid();
-      INSERT INTO credit_memos (id, business_id, customer_id, memo_date, status, amount, remaining_amount,
+      INSERT INTO credit_memos (id, business_id, customer_id, credit_memo_number, memo_date, status, amount, remaining_amount,
                                 ar_account_id, revenue_account_id, created_by_user_id, memo)
-      VALUES (v_cm, r.id, v_cust, v_date, 'draft', v_total, v_total, v_ar, v_returns, v_user,
+      VALUES (v_cm, r.id, v_cust, 'CM-' || (1000 + i), v_date, 'draft', v_total, v_total, v_ar, v_returns, v_user,
               'Returned merchandise credit');
+      -- Keep the counter in step so documents created in the app continue the sequence.
+      INSERT INTO numbering_counters (business_id, entity_type, last_value) VALUES (r.id, 'credit_memo', i)
+        ON CONFLICT (business_id, entity_type) DO UPDATE SET last_value = GREATEST(numbering_counters.last_value, EXCLUDED.last_value);
       v_je := seed_post_je(r.id, v_date, 'Credit memo', 'credit_memo', v_cm,
         jsonb_build_array(
           jsonb_build_object('code','4910','debit',v_total,'credit',0),

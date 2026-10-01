@@ -8,6 +8,7 @@ import type {
 } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { isSourceGeneratedJournalEntry } from './ledgerService.js';
+import { describeTransactions } from './transactionDescriptorService.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 
 export type JournalEntryLineRead = {
@@ -45,6 +46,8 @@ export type JournalEntryDetail = {
   can_reverse: boolean;
   reversal_block_reason: string | null;
   is_standalone_manual: boolean;
+  /** Web path of the transaction that generated this entry, when it has a page. */
+  source_path: string | null;
 };
 
 async function readLines(db: Kysely<DB>, journalEntryIds: string[]): Promise<JournalEntryLineRead[]> {
@@ -206,5 +209,10 @@ export async function getJournalEntryDetail(
     is_standalone_manual: !sourceGenerated
       && entry.source_id == null
       && (entry.source_type === 'manual' || entry.source_type === 'adjustment'),
+    // Where to send someone who opens a source-generated entry, since the
+    // entry itself can only be changed from its source.
+    source_path: sourceGenerated
+      ? (await describeTransactions(db, [entry])).get(entry.id)?.path ?? null
+      : null,
   };
 }

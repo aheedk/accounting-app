@@ -73,6 +73,7 @@ const readOnlyEntry = {
   can_reverse: false,
   reversal_block_reason: 'This entry is read-only.',
   is_standalone_manual: true,
+  source_path: null,
 } satisfies JournalEntryDetail;
 
 describe('JournalEntryEditor line keyboard navigation', () => {

@@ -84,7 +84,7 @@ BEGIN
       v_fa := gen_random_uuid();
 
       -- Purchase (DR equipment / CR cash) so the balance sheet carries the cost.
-      v_je := seed_post_je(r.id, '2026-01-10', 'Asset purchase: ' || v_name, 'adjustment', NULL,
+      v_je := seed_post_je(r.id, '2026-01-10', 'Asset purchase: ' || v_name, 'manual', NULL,
         jsonb_build_array(
           jsonb_build_object('code','1500','debit',v_cost,'credit',0),
           jsonb_build_object('code','1020','debit',0,'credit',v_cost)));
