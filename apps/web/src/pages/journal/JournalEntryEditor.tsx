@@ -19,6 +19,7 @@ import {
   journalAccountsForLine,
   journalEntryPayload,
   journalSupportsManualActions,
+  pickJournalLineAccount,
   journalEntryToForm,
   journalEntryTotals,
   newJournalEntryForm,
@@ -170,10 +171,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }));
   }
 
+  function pickLineAccount(index: number, accountId: string) {
+    setForm(current => ({ ...current, lines: pickJournalLineAccount(current.lines, index, accountId) }));
+  }
+
   function handleAccountCreated(account: JournalAccount) {
     setAccounts(current => [...current.filter(item => item.id !== account.id), account]);
     if (newAccountLineIndex !== null) {
-      updateLine(newAccountLineIndex, { account_id: account.id });
+      pickLineAccount(newAccountLineIndex, account.id);
     }
     setNewAccountLineIndex(null);
   }
@@ -477,7 +482,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                       ariaLabel={`Account, line ${index + 1}`}
                       accounts={journalAccountsForLine(accounts, line.account_id)}
                       value={line.account_id}
-                      onChange={accountId => updateLine(index, { account_id: accountId })}
+                      onChange={accountId => pickLineAccount(index, accountId)}
                       placeholder=""
                       disabled={readOnly}
                       className="w-full"

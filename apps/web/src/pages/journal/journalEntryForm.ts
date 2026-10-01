@@ -165,6 +165,44 @@ export function journalEntryTotals(lines: JournalEntryFormLine[]): {
   };
 }
 
+/**
+ * Choosing an account on a row (QuickBooks behaviour). On a row nothing has
+ * been typed into yet, this also fills in the amount that would balance the
+ * entry -- on the opposite side from the lines so far -- and carries down the
+ * description from the line above. A row the user has already started is only
+ * given the account.
+ */
+export function pickJournalLineAccount(
+  lines: JournalEntryFormLine[],
+  index: number,
+  accountId: string,
+): JournalEntryFormLine[] {
+  const line = lines[index];
+  if (!line) return lines;
+  let next: JournalEntryFormLine = { ...line, account_id: accountId };
+
+  const untouched = !line.account_id && !line.debit && !line.credit && !line.description;
+  if (untouched && accountId) {
+    // Same lines the totals row counts: the ones that already have an account.
+    const others = lines.filter((other, otherIndex) => otherIndex !== index && other.account_id);
+    const difference = others.reduce(
+      (sum, other) => sum.plus(other.debit || 0).minus(other.credit || 0),
+      new Decimal(0),
+    );
+    if (!difference.isZero()) {
+      const amount = difference.abs();
+      const text = amount.decimalPlaces() <= 2 ? amount.toFixed(2) : amount.toFixed(4);
+      next = difference.isPositive()
+        ? { ...next, credit: text, debit: '' }
+        : { ...next, debit: text, credit: '' };
+    }
+    const above = lines.slice(0, index).reverse().find(other => other.account_id);
+    if (above?.description) next = { ...next, description: above.description };
+  }
+
+  return lines.map((other, otherIndex) => (otherIndex === index ? next : other));
+}
+
 export function journalAccountsForLine(
   accounts: JournalAccount[],
   selectedAccountId: string,

@@ -9,6 +9,7 @@ import {
   journalEntryTotals,
   journalAccountsForLine,
   newJournalEntryForm,
+  pickJournalLineAccount,
   shouldAppendJournalLines,
 } from './journalEntryForm';
 import type { JournalEntryDetail } from './journalEntryTypes';
@@ -240,5 +241,42 @@ describe('journal entry form mappings', () => {
       rowIndex: 6,
       rowCount: 8,
     })).toBe(false);
+  });
+
+  describe('picking an account on a line', () => {
+    const blank = { account_id: '', debit: '', credit: '', description: '', name: '', class_name: '' };
+    const first = { ...blank, account_id: CASH_ID, debit: '250.00', description: 'October rent' };
+
+    it('fills the balancing amount on the other side and carries the description down', () => {
+      const lines = pickJournalLineAccount([first, blank, blank], 1, REVENUE_ID);
+      expect(lines[1]).toEqual({ ...blank, account_id: REVENUE_ID, credit: '250.00', description: 'October rent' });
+      expect(lines[2]).toEqual(blank);
+    });
+
+    it('fills only what is still unbalanced once more lines exist', () => {
+      const second = { ...blank, account_id: REVENUE_ID, credit: '100.00', description: 'Part one' };
+      const lines = pickJournalLineAccount([first, second, blank], 2, REVENUE_ID);
+      expect(lines[2]).toMatchObject({ credit: '150.00', debit: '', description: 'Part one' });
+    });
+
+    it('fills a debit when credits are ahead', () => {
+      const credit = { ...blank, account_id: REVENUE_ID, credit: '80.5', description: '' };
+      const lines = pickJournalLineAccount([credit, blank], 1, CASH_ID);
+      expect(lines[1]).toMatchObject({ debit: '80.50', credit: '', description: '' });
+    });
+
+    it('leaves a line the user already started alone, apart from the account', () => {
+      const started = { ...blank, debit: '40.00' };
+      expect(pickJournalLineAccount([first, started], 1, REVENUE_ID)[1]).toEqual({ ...started, account_id: REVENUE_ID });
+      const changing = { ...blank, account_id: REVENUE_ID, credit: '250.00' };
+      expect(pickJournalLineAccount([first, changing], 1, CASH_ID)[1]).toEqual({ ...changing, account_id: CASH_ID });
+    });
+
+    it('fills nothing on the first line or when the entry already balances', () => {
+      expect(pickJournalLineAccount([blank, blank], 0, CASH_ID)[0]).toEqual({ ...blank, account_id: CASH_ID });
+      const balanced = { ...blank, account_id: REVENUE_ID, credit: '250.00' };
+      expect(pickJournalLineAccount([first, balanced, blank], 2, CASH_ID)[2])
+        .toEqual({ ...blank, account_id: CASH_ID, description: '' });
+    });
   });
 });
