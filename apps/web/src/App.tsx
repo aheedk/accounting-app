@@ -52,6 +52,7 @@ import TaxCodesPage from '@/pages/settings/TaxCodesPage';
 import BankAccountListPage from '@/pages/banking/BankAccountListPage';
 import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage';
 import EmailImportReviewPage from '@/pages/banking/EmailImportReviewPage';
+import ImportedTransactionPage from '@/pages/banking/ImportedTransactionPage';
 import CodingRulesPage from '@/pages/ai/CodingRulesPage';
 import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage';
 import ReconcilePage from '@/pages/banking/ReconcilePage';
@@ -123,6 +124,7 @@ export default function App() {
             <Route path={JOURNAL_NAV_ITEM.path} element={<JournalLandingPage />} />
             <Route path="/journal/new" element={<JournalNewPage />} />
             <Route path="/journal/:id" element={<JournalDetailPage />} />
+            <Route path="/transactions/:id" element={<ImportedTransactionPage />} />
 
             {/* Reports */}
             <Route path="/reports/standard" element={<StandardReportsPage />} />

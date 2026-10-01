@@ -40,3 +40,4 @@ export * from './employee.js';
 export * from './payRun.js';
 export * from './payrollTax.js';
 export * from './complianceItem.js';
+export * from './importedTransaction.js';

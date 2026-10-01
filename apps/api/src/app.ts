@@ -11,6 +11,7 @@ import healthRoutes from './routes/health.js';
 import coaRoutes from './routes/chartOfAccounts.js';
 import periodRoutes from './routes/fiscalPeriods.js';
 import journalEntryRoutes from './routes/journalEntries.js';
+import importedTransactionRoutes from './routes/importedTransactions.js';
 import trialBalanceRoutes from './routes/trialBalance.js';
 import customerRoutes from './routes/customers.js';
 import taxCodeRoutes from './routes/taxCodes.js';
@@ -81,6 +82,7 @@ export function makeApp(): Express {
   app.use(coaRoutes);
   app.use(periodRoutes);
   app.use(journalEntryRoutes);
+  app.use(importedTransactionRoutes);
   app.use(trialBalanceRoutes);
   app.use(customerRoutes);
   app.use(taxCodeRoutes);
