@@ -1005,9 +1005,14 @@ function AccountSection({
 function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumnKey; line: GeneralLedgerLine; padding: string }) {
   let content: ReactNode;
   let className = padding;
+  // Date, name and memo open the transaction too, like the type, number and
+  // amount do. They keep the look of plain text until hovered.
+  const textLink = (text: string) => (
+    <Link className="block truncate hover:text-primary hover:underline" to={line.transaction_path} title={text}>{text}</Link>
+  );
   switch (column) {
     case 'date':
-      content = fmtShortDate(line.entry_date);
+      content = textLink(fmtShortDate(line.entry_date));
       className += ' whitespace-nowrap min-w-[6rem]';
       break;
     case 'transaction':
@@ -1033,12 +1038,12 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       className += ' text-center';
       break;
     case 'name':
-      content = line.name ?? '';
-      className += ' max-w-[16rem] truncate';
+      content = line.name ? textLink(line.name) : '';
+      className += ' max-w-[16rem]';
       break;
     case 'memo':
-      content = line.memo ?? '';
-      className += ' max-w-[22rem] truncate';
+      content = line.memo ? textLink(line.memo) : '';
+      className += ' max-w-[22rem]';
       break;
     case 'split':
       content = line.split_account ?? '';
@@ -1055,7 +1060,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       className += ' text-right font-mono';
       break;
   }
-  return <td className={className} title={column === 'memo' ? line.memo ?? undefined : undefined}>{content}</td>;
+  return <td className={className}>{content}</td>;
 }
 
 function SummaryRow({
