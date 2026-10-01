@@ -3,6 +3,8 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { TopBar } from './TopBar';
+import { CompanySwitchedScreen } from './CompanySwitchedScreen';
+import { useCompanySwitchedElsewhere } from '@/lib/business';
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -17,6 +19,11 @@ export function AppShell() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
+
+  // Another tab switched company: replace the page outright, so nothing from
+  // the old company stays on screen or stays clickable.
+  const switchedTo = useCompanySwitchedElsewhere();
+  if (switchedTo) return <CompanySwitchedScreen businessId={switchedTo} />;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">

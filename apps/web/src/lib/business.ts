@@ -33,3 +33,29 @@ export function useActiveBusinessId(): [string | null, (id: string) => void] {
   }
   return [active, pick];
 }
+
+/**
+ * The company another tab of this browser switched to, or null while this tab
+ * is still in step. The active company lives in localStorage, which every tab
+ * shares, so once another tab switches, this one is showing one company while
+ * the browser's "current" company is another -- the cue to stop and ask
+ * (QuickBooks does the same) rather than let work land in the wrong books.
+ */
+export function useCompanySwitchedElsewhere(): string | null {
+  const [mine] = useActiveBusinessId();
+  const [stored, setStored] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
+
+  // `storage` only fires in the *other* tabs, which is exactly the signal wanted.
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === STORAGE_KEY || e.key === null) setStored(localStorage.getItem(STORAGE_KEY));
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // A switch made in this tab writes localStorage itself; stay in step with it.
+  useEffect(() => { setStored(localStorage.getItem(STORAGE_KEY)); }, [mine]);
+
+  return stored && mine && stored !== mine ? stored : null;
+}
