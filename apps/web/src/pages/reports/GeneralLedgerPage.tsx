@@ -476,9 +476,21 @@ export default function GeneralLedgerPage() {
 
   function handlePresetChange(preset: DateRangePreset): void {
     setPeriodPreset(preset);
+    // "Custom" means "these dates, as typed" -- keep whatever is in the boxes.
+    if (preset === 'custom') return;
     const range = computePresetRange(preset);
     setDraftStart(range.start);
     setDraftEnd(range.end);
+  }
+
+  // The dates are always editable. Changing one by hand no longer matches the
+  // chosen preset, so the dropdown moves to Custom (as QuickBooks does).
+  function handleDateEdit(which: 'start' | 'end', value: string): void {
+    const current = which === 'start' ? draftStart : draftEnd;
+    if (value === current) return;
+    if (which === 'start') setDraftStart(value);
+    else setDraftEnd(value);
+    setPeriodPreset('custom');
   }
 
   function handleRunReport(): void {
@@ -560,15 +572,13 @@ export default function GeneralLedgerPage() {
               <DateInput
                 className="h-9 w-36"
                 value={draftStart}
-                onChange={event => setDraftStart(event.target.value)}
-                disabled={periodPreset !== 'custom'}
+                onChange={event => handleDateEdit('start', event.target.value)}
               />
               <span className="text-sm text-muted-foreground">to</span>
               <DateInput
                 className="h-9 w-36"
                 value={draftEnd}
-                onChange={event => setDraftEnd(event.target.value)}
-                disabled={periodPreset !== 'custom'}
+                onChange={event => handleDateEdit('end', event.target.value)}
               />
             </div>
           </div>
