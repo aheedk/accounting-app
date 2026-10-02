@@ -57,6 +57,10 @@ type GeneralLedgerLine = {
   transaction_path: string;
   /** Signed in the account's natural direction, so the column adds up to the balance. */
   amount: string;
+  class_name: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
   memo: string | null;
   split_account: string | null;
   status: 'posted' | 'voided';
@@ -195,6 +199,13 @@ function fmtAmount(value: string): string {
   return amount.isNegative() ? `-${formatted}` : formatted;
 }
 
+// "10/1/26 3:57 PM" for the created / modified columns.
+function fmtStamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, { year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 function fmtNum(line: GeneralLedgerLine): string {
   return line.num ? line.num.replace(/^AJE-/i, 'JE-') : '';
 }
@@ -221,12 +232,12 @@ function summaryLabelColumn(columns: GeneralLedgerColumnKey[]): GeneralLedgerCol
 function summaryValues(
   columns: GeneralLedgerColumnKey[],
   label: string,
-  amounts: Partial<Record<'amount' | 'balance', string>>,
+  amounts: Partial<Record<'debit' | 'credit' | 'amount' | 'balance', string>>,
 ): string[] {
   const labelColumn = summaryLabelColumn(columns);
   return columns.map(column => {
     if (column === labelColumn) return label;
-    if (column === 'amount' || column === 'balance') return amounts[column] ?? '';
+    if (column === 'debit' || column === 'credit' || column === 'amount' || column === 'balance') return amounts[column] ?? '';
     return '';
   });
 }
@@ -240,8 +251,14 @@ function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey
     case 'name': return line.name ?? '';
     case 'memo': return line.memo ?? '';
     case 'split': return line.split_account ?? '';
+    case 'debit': return new Decimal(line.debit).isZero() ? '' : line.debit;
+    case 'credit': return new Decimal(line.credit).isZero() ? '' : line.credit;
     case 'amount': return new Decimal(line.amount).isZero() ? '' : line.amount;
     case 'balance': return line.running_balance;
+    case 'class': return line.class_name ?? '';
+    case 'createDate': return fmtStamp(line.created_at);
+    case 'createdBy': return line.created_by ?? '';
+    case 'lastModified': return fmtStamp(line.updated_at);
   }
 }
 
@@ -270,6 +287,8 @@ function exportRows(
       rows.push([
         ...accountPrefix,
         ...summaryValues(columns, 'Account Total', {
+          debit: account.visible_total_debit,
+          credit: account.visible_total_credit,
           amount: netAmount,
           balance: account.ending_balance,
         }),
@@ -280,7 +299,7 @@ function exportRows(
     const netReportAmount = new Decimal(reportTotals.debit).minus(reportTotals.credit).toFixed(4);
     rows.push([
       ...(preferences.showAccountNumbers ? ['', 'REPORT TOTAL'] : ['REPORT TOTAL']),
-      ...summaryValues(columns, '', { amount: netReportAmount }),
+      ...summaryValues(columns, '', { debit: reportTotals.debit, credit: reportTotals.credit, amount: netReportAmount }),
     ]);
   }
   return rows;
@@ -288,10 +307,15 @@ function exportRows(
 
 export default function GeneralLedgerPage() {
   const [businessId] = useActiveBusinessId();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { businesses } = useAuth();
   const businessName = businesses.find(business => business.id === businessId)?.name ?? '';
-  const initPreset: DateRangePreset = searchParams.get('period_start') ? 'custom' : 'this-year-to-date';
+  // The period lives in the URL, so coming Back from a transaction returns to
+  // the same report rather than to the default year-to-date.
+  const savedPreset = searchParams.get('range');
+  const initPreset: DateRangePreset = DATE_RANGE_OPTIONS.some(option => option.value === savedPreset)
+    ? savedPreset as DateRangePreset
+    : searchParams.get('period_start') ? 'custom' : 'this-year-to-date';
   const initRange = computePresetRange(initPreset);
   const [periodPreset, setPeriodPreset] = useState<DateRangePreset>(initPreset);
   const [draftStart, setDraftStart] = useState(() => searchParams.get('period_start') ?? initRange.start);
@@ -353,12 +377,26 @@ export default function GeneralLedgerPage() {
   }, [businessId]);
 
   // Ref always holds current draft values; lets the mount/business-change effect read them without being a dep
-  const draftRef = useRef({ start: draftStart, end: draftEnd, acctId: draftAccountId });
-  draftRef.current = { start: draftStart, end: draftEnd, acctId: draftAccountId };
+  const draftRef = useRef({ start: draftStart, end: draftEnd, acctId: draftAccountId, preset: periodPreset });
+  draftRef.current = { start: draftStart, end: draftEnd, acctId: draftAccountId, preset: periodPreset };
+
+  // Kept in a ref: setSearchParams gets a new identity on every URL change,
+  // which would otherwise re-run the load effect.
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+  function rememberPeriod(start: string, end: string, acctId: string, preset: DateRangePreset): void {
+    setSearchParamsRef.current({
+      range: preset,
+      period_start: start,
+      period_end: end,
+      ...(acctId ? { account_id: acctId } : {}),
+    }, { replace: true });
+  }
 
   // Auto-load on mount and when business changes
   useEffect(() => {
-    const { start, end, acctId } = draftRef.current;
+    const { start, end, acctId, preset } = draftRef.current;
+    rememberPeriod(start, end, acctId, preset);
     void load(start, end, acctId);
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -491,6 +529,7 @@ export default function GeneralLedgerPage() {
       return;
     }
     setError(null);
+    rememberPeriod(draftStart, draftEnd, draftAccountId, periodPreset);
     void load(draftStart, draftEnd, draftAccountId);
   }
 
@@ -729,6 +768,8 @@ export default function GeneralLedgerPage() {
                     <SummaryRow
                       columns={visibleColumns}
                       label="REPORT TOTAL"
+                      debit={reportTotals.debit}
+                      credit={reportTotals.credit}
                       amount={reportTotals.amount}
                       density={preferences.density}
                       className="border-t-2 font-semibold"
@@ -989,6 +1030,8 @@ function AccountSection({
             <SummaryRow
               columns={columns}
               label={`Total for ${preferences.showAccountNumbers ? `${account.account_code} — ` : ''}${account.account_name}`}
+              debit={account.visible_total_debit}
+              credit={account.visible_total_credit}
               amount={account.visible_total_amount}
               balance={account.ending_balance}
               density={preferences.density}
@@ -1054,9 +1097,34 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
         : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(line.amount)}</ReportAmountLink>;
       className += ' text-right font-mono';
       break;
+    case 'debit':
+    case 'credit': {
+      const value = column === 'debit' ? line.debit : line.credit;
+      content = new Decimal(value).isZero()
+        ? ''
+        : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(value)}</ReportAmountLink>;
+      className += ' text-right font-mono';
+      break;
+    }
     case 'balance':
       content = fmtAmount(line.running_balance);
       className += ' text-right font-mono';
+      break;
+    case 'class':
+      content = line.class_name ?? '';
+      className += ' max-w-[12rem] truncate';
+      break;
+    case 'createDate':
+      content = fmtStamp(line.created_at);
+      className += ' whitespace-nowrap text-xs text-muted-foreground';
+      break;
+    case 'createdBy':
+      content = line.created_by ?? '';
+      className += ' max-w-[12rem] truncate text-xs text-muted-foreground';
+      break;
+    case 'lastModified':
+      content = fmtStamp(line.updated_at);
+      className += ' whitespace-nowrap text-xs text-muted-foreground';
       break;
   }
   return <td className={className}>{content}</td>;
@@ -1065,6 +1133,8 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
 function SummaryRow({
   columns,
   label,
+  debit,
+  credit,
   amount,
   balance,
   density,
@@ -1072,6 +1142,8 @@ function SummaryRow({
 }: {
   columns: GeneralLedgerColumnKey[];
   label: string;
+  debit?: string;
+  credit?: string;
   amount?: string;
   balance?: string;
   density: GeneralLedgerPreferences['density'];
@@ -1083,6 +1155,8 @@ function SummaryRow({
     <tr className={className}>
       {columns.map(column => {
         let value: ReactNode = column === labelColumn ? label : null;
+        if (column === 'debit' && debit !== undefined) value = fmtAmount(debit);
+        if (column === 'credit' && credit !== undefined) value = fmtAmount(credit);
         if (column === 'amount' && amount !== undefined) value = fmtAmount(amount);
         if (column === 'balance' && balance !== undefined) value = fmtAmount(balance);
         const numeric = columnDefinition(column).numeric;

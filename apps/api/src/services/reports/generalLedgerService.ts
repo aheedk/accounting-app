@@ -24,6 +24,10 @@ export type GeneralLedgerLine = {
   transaction_path: string;
   /** Signed in the account's natural direction, so it adds up to the balance. */
   amount: string;
+  class_name: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
   memo: string | null;
   split_account: string | null;
   status: JournalEntryStatus;
@@ -55,6 +59,11 @@ export type GeneralLedgerReport = {
     total_credit: string;
   };
 };
+
+// Timestamps come back from the driver as Date objects, whatever the column type says.
+function toIso(value: unknown): string {
+  return new Date(value as string | Date).toISOString();
+}
 
 function isDebitNormal(accountType: AccountType): boolean {
   return accountType === 'asset' || accountType === 'expense';
@@ -109,7 +118,9 @@ export async function generalLedger(
 
   const activity = await db.selectFrom('journal_entry_lines as jel')
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
+    .leftJoin('users as creator', 'creator.id', 'je.created_by_user_id')
     .select([
+      'jel.class_name', 'je.created_at', 'je.updated_at', 'creator.full_name as created_by',
       'jel.id as line_id', 'jel.account_id', 'jel.debit', 'jel.credit', 'jel.memo as line_memo', 'jel.name as line_name',
       'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.source_id', 'je.journal_number',
       'je.transaction_type', 'je.payee_name', 'je.reference',
@@ -206,6 +217,10 @@ export async function generalLedger(
         is_adjusting: described?.is_adjusting ?? false,
         transaction_path: described?.path ?? `/journal/${line.journal_entry_id}`,
         amount,
+        class_name: line.class_name,
+        created_at: toIso(line.created_at),
+        created_by: line.created_by ?? null,
+        updated_at: toIso(line.updated_at),
         // Prefer what the document says it was for over the system-written
         // entry memo ("Payment from customer (check)").
         memo: described?.memo ?? line.line_memo ?? line.entry_memo,
