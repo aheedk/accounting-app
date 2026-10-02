@@ -92,7 +92,7 @@ export type JournalEntrySourceType =
   | 'manual' | 'invoice' | 'payment' | 'credit_memo'
   | 'bill' | 'bill_payment' | 'vendor_credit'
   | 'reversal' | 'adjustment' | 'bank_import' | 'invoice_import'
-  | 'bank_deposit';
+  | 'bank_deposit' | 'expense';
 
 export interface ChartOfAccountsTable {
   id: Generated<string>;
@@ -164,7 +164,7 @@ export interface JournalEntryLinesTable {
 
 export type InvoiceStatus = 'draft' | 'posted' | 'voided' | 'paid';
 export type PaymentStatus = 'draft' | 'posted' | 'voided';
-export type PaymentMethod = 'cash' | 'check' | 'ach' | 'wire' | 'card' | 'other';
+export type PaymentMethod = 'cash' | 'check' | 'ach' | 'wire' | 'card' | 'other' | 'credit_card' | 'debit_card';
 export type CreditMemoStatus = 'draft' | 'posted' | 'voided' | 'applied';
 
 export interface CustomersTable {
@@ -366,12 +366,12 @@ export interface ExpenseTransactionsTable {
   transaction_date: ColumnType<string, string, string>;
   payee_text: string | null;
   vendor_id: string | null;
-  expense_account_id: string;
+  customer_id: string | null;
   payment_account_id: string;
   payment_method: Generated<PaymentMethod>;
-  amount: ColumnType<string, string | number, string | number>;
+  reference: string | null;
+  total_amount: ColumnType<string, string | number | undefined, string | number>;
   memo: string | null;
-  check_number: string | null;
   status: Generated<ExpenseTransactionStatus>;
   journal_entry_id: string | null;
   created_at: Generated<Timestamp>;
@@ -381,6 +381,17 @@ export interface ExpenseTransactionsTable {
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;
   voided_by_user_id: string | null;
+}
+
+export interface ExpenseTransactionLinesTable {
+  id: Generated<string>;
+  expense_transaction_id: string;
+  business_id: string;
+  category_account_id: string;
+  description: string | null;
+  amount: ColumnType<string, string | number | undefined, string | number>;
+  sort_order: Generated<number>;
+  created_at: Generated<Timestamp>;
 }
 
 export type PeriodReviewTaskKey = 'reconcile_bank' | 'post_adjustments' | 'review_unreviewed_txns' | 'close_period';
@@ -400,7 +411,7 @@ export interface PeriodReviewTasksTable {
   updated_at: Generated<Timestamp>;
 }
 
-export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit';
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense';
 export type RecurringTemplateRecurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface RecurringTemplatesTable {
@@ -979,6 +990,7 @@ export interface DB {
   inventory_items: InventoryItemsTable;
   stock_movements: StockMovementsTable;
   expense_transactions: ExpenseTransactionsTable;
+  expense_transaction_lines: ExpenseTransactionLinesTable;
   period_review_tasks: PeriodReviewTasksTable;
   recurring_templates: RecurringTemplatesTable;
   files: FilesTable;

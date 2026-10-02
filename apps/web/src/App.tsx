@@ -62,6 +62,8 @@ import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
 import FixedAssetDetailPage from '@/pages/accounting/FixedAssetDetailPage';
 import BankDepositPage from '@/pages/accounting/BankDepositPage';
 import BankDepositListPage from '@/pages/accounting/BankDepositListPage';
+import ExpensePage from '@/pages/accounting/ExpensePage';
+import ExpenseListPage from '@/pages/accounting/ExpenseListPage';
 import EntityPage from '@/pages/setup/EntityPage';
 import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
@@ -81,9 +83,6 @@ import SalesOrderDetailPage from '@/pages/inventory/SalesOrderDetailPage';
 import ShippingLabelListPage from '@/pages/inventory/ShippingLabelListPage';
 import ShippingLabelNewPage from '@/pages/inventory/ShippingLabelNewPage';
 import ApOverviewPage from '@/pages/ap/ApOverviewPage';
-import ExpenseTransactionListPage from '@/pages/ap/ExpenseTransactionListPage';
-import ExpenseTransactionNewPage from '@/pages/ap/ExpenseTransactionNewPage';
-import ExpenseTransactionDetailPage from '@/pages/ap/ExpenseTransactionDetailPage';
 import ContractorsPage from '@/pages/ap/ContractorsPage';
 import ClientOverviewPage from '@/pages/accounting/ClientOverviewPage';
 import BooksReviewPage from '@/pages/accounting/BooksReviewPage';
@@ -152,9 +151,6 @@ export default function App() {
 
             {/* Accounts Payable */}
             <Route path="/ap/overview" element={<ApOverviewPage />} />
-            <Route path="/ap/expenses" element={<ExpenseTransactionListPage />} />
-            <Route path="/ap/expenses/new" element={<ExpenseTransactionNewPage />} />
-            <Route path="/ap/expenses/:id" element={<ExpenseTransactionDetailPage />} />
             <Route path="/ap/vendors" element={<VendorListPage />} />
             <Route path="/ap/vendors/new" element={<VendorNewPage />} />
             <Route path="/ap/vendors/:id" element={<VendorDetailPage />} />
@@ -178,6 +174,9 @@ export default function App() {
             <Route path="/accounting/bank-deposits" element={<BankDepositListPage />} />
             <Route path="/accounting/bank-deposits/new" element={<BankDepositPage />} />
             <Route path="/accounting/bank-deposits/:id" element={<BankDepositPage />} />
+            <Route path="/accounting/expense-transactions" element={<ExpenseListPage />} />
+            <Route path="/accounting/expenses/new" element={<ExpensePage />} />
+            <Route path="/accounting/expenses/:id" element={<ExpensePage />} />
             {/* AI is a top-level area now; the old paths redirect so existing links keep working. */}
             <Route path="/ai/inbox" element={<EmailImportReviewPage />} />
             <Route path="/ai/coding-rules" element={<CodingRulesPage />} />

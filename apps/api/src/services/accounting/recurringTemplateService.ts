@@ -8,10 +8,12 @@ import { nextNumber } from '../core/numberingService.js';
 import * as invoiceService from '../ar/invoiceService.js';
 import * as billService from '../ap/billService.js';
 import * as depositService from '../banking/bankDepositService.js';
+import * as expenseService from '../ap/expenseTransactionService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import type { PaymentMethod } from '../../db/types.js';
 
 export type RecurringTemplateRow = Selectable<RecurringTemplatesTable>;
-export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit';
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense';
 export type RecurringTemplateRecurrenceType = 'scheduled' | 'reminder' | 'unscheduled';
 
 export type CreateTemplateInput = {
@@ -31,6 +33,7 @@ const PAYLOAD_LABELS: Record<RecurringTemplateType, string> = {
   invoice: 'invoice',
   bill: 'bill',
   deposit: 'deposit',
+  expense: 'expense',
 };
 
 /** Validate a payload against the type-specific schema; returns the parsed payload (zod defaults applied). */
@@ -40,6 +43,7 @@ function parsePayload(
   const schema = template_type === 'journal_entry' ? schemas.recurringJePayloadSchema
     : template_type === 'invoice' ? schemas.recurringInvoicePayloadSchema
     : template_type === 'bill' ? schemas.recurringBillPayloadSchema
+    : template_type === 'expense' ? schemas.recurringExpensePayloadSchema
     : schemas.recurringDepositPayloadSchema;
   const r = schema.safeParse(payload);
   if (!r.success) {
@@ -248,7 +252,7 @@ async function materializeOnce(
       })),
     });
     await billService.postBill(trx, ctx, { bill_id: created.bill.id });
-  } else {
+  } else if (t.template_type === 'deposit') {
     const payload = parsePayload('deposit', t.payload) as schemas.RecurringDepositPayload;
     await depositService.createDeposit(trx, ctx, {
       bank_account_id: payload.bank_account_id,
@@ -261,6 +265,24 @@ async function materializeOnce(
         description: l.description ?? null,
         payment_method: l.payment_method ?? null,
         ref_no: l.ref_no ?? null,
+        amount: l.amount,
+        sort_order: i,
+      })),
+    });
+  } else {
+    const payload = parsePayload('expense', t.payload) as schemas.RecurringExpensePayload;
+    await expenseService.createExpense(trx, ctx, {
+      transaction_date: runDate,
+      payee_text: payload.payee_text ?? null,
+      vendor_id: payload.vendor_id ?? null,
+      customer_id: payload.customer_id ?? null,
+      payment_account_id: payload.payment_account_id,
+      payment_method: payload.payment_method as PaymentMethod,
+      reference: payload.reference ?? null,
+      memo: payload.memo ?? `Recurring: ${t.name}`,
+      lines: payload.lines.map((l, i) => ({
+        category_account_id: l.category_account_id,
+        description: l.description ?? null,
         amount: l.amount,
         sort_order: i,
       })),
@@ -287,10 +309,10 @@ export async function materializeDueTemplate(
   if (!locked || !locked.is_active || locked.next_run_date > today) {
     return { template_id: t.id, runs_created: 0 };
   }
-  // Deposit templates: only 'scheduled' auto-fires. 'reminder' and 'unscheduled'
-  // sit here forever (next_run_date never advances) until the user invokes
-  // runTemplateNow — there is no notification channel yet to back 'reminder'.
-  if (locked.template_type === 'deposit' && locked.recurrence_type !== 'scheduled') {
+  // Deposit/Expense templates: only 'scheduled' auto-fires. 'reminder' and
+  // 'unscheduled' sit here forever (next_run_date never advances) until the
+  // user invokes runTemplateNow — there is no notification channel yet to back 'reminder'.
+  if ((locked.template_type === 'deposit' || locked.template_type === 'expense') && locked.recurrence_type !== 'scheduled') {
     return { template_id: t.id, runs_created: 0 };
   }
 

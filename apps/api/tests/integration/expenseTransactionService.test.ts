@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { sql } from 'kysely';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, seedCoa, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeVendor, makeCustomer, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
 import * as et from '../../src/services/ap/expenseTransactionService.js';
+import * as ledger from '../../src/services/core/ledgerService.js';
 
 let t: TestDb;
 beforeAll(async () => { t = await startTestDb(); });
@@ -15,129 +17,381 @@ async function bootstrap() {
   await grantAccess(t.db, user.id, biz.id);
   await seedCoa(t.db, biz.id);
   await seedYearPeriods(t.db, biz.id, 2026);
-  const expense = await makeAccount(t.db, biz.id, { code: '6000', name: 'Office Supplies', account_type: 'expense' });
+  const supplies = await makeAccount(t.db, biz.id, { code: '6000', name: 'Office Supplies', account_type: 'expense' });
+  const rent = await makeAccount(t.db, biz.id, { code: '6010', name: 'Rent', account_type: 'expense' });
   const cash = await makeAccount(t.db, biz.id, { code: '1015', name: 'Cash', account_type: 'asset' });
+  const creditCard = await makeAccount(t.db, biz.id, { code: '2015', name: 'Business Credit Card', account_type: 'liability' });
   const ctx = systemCtx({ firm_id: firm.id, business_id: biz.id, user_id: user.id });
-  return { firm, biz, user, ctx, expense, cash };
+  return { firm, biz, user, ctx, supplies, rent, cash, creditCard };
 }
 
 describe('expenseTransactionService', () => {
-  it('createDraft inserts an expense transaction with status=draft and no JE', async () => {
-    const { biz, ctx, expense, cash } = await bootstrap();
-    const row = await t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, {
-        business_id: biz.id, transaction_date: '2026-04-15',
-        payee_text: 'Staples', expense_account_id: expense.id,
-        payment_account_id: cash.id, payment_method: 'card', amount: '42.50', memo: 'pens',
-      }),
-    );
-    expect(row.status).toBe('draft');
-    expect(row.payment_method).toBe('card');
-    expect(row.journal_entry_id).toBeNull();
-  });
+  it('createExpense posts a balanced JE (debit each line, credit the payment account) and sets the total', async () => {
+    const { biz, ctx, supplies, rent, cash } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15',
+      payee_text: 'Staples',
+      payment_account_id: cash.id,
+      payment_method: 'cash',
+      memo: 'Office run',
+      lines: [
+        { category_account_id: supplies.id, amount: '30.00', description: 'Pens' },
+        { category_account_id: rent.id, amount: '12.50' },
+      ],
+    }));
 
-  it('stores a check number for checks and drops it for other methods', async () => {
-    const { biz, ctx, expense, cash } = await bootstrap();
-    const base = {
-      business_id: biz.id, transaction_date: '2026-04-15',
-      payee_text: 'Landlord', expense_account_id: expense.id,
-      payment_account_id: cash.id, amount: '1200.00', memo: 'rent',
-    };
-    const check = await t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, { ...base, payment_method: 'check', check_number: '1042' }));
-    expect(check.check_number).toBe('1042');
+    expect(expense.status).toBe('posted');
+    expect(expense.total_amount).toBe('42.5000');
+    expect(expense.journal_entry_id).toBeTruthy();
 
-    const card = await t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, { ...base, payment_method: 'card', check_number: '1043' }));
-    expect(card.check_number).toBeNull();
-  });
-
-  it('accepts any account as the category except the payment account itself', async () => {
-    const { biz, ctx, cash } = await bootstrap();
-    const equipment = await makeAccount(t.db, biz.id, { code: '1599', name: 'Shop Equipment', account_type: 'asset' });
-    const base = {
-      business_id: biz.id, transaction_date: '2026-04-15', payee_text: 'Dell',
-      payment_account_id: cash.id, payment_method: 'card' as const, amount: '900.00',
-    };
-    const draft = await t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, { ...base, expense_account_id: equipment.id }));
-    const posted = await t.db.transaction().execute(trx =>
-      et.post(trx, ctx, { expense_transaction_id: draft.id }));
-    expect(posted.status).toBe('posted');
-
-    await expect(t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, { ...base, expense_account_id: cash.id }),
-    )).rejects.toThrow(/different accounts/);
-  });
-
-  it('post creates a JE (DR expense / CR payment account) and links it', async () => {
-    const { biz, ctx, expense, cash } = await bootstrap();
-    const draft = await t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, {
-        business_id: biz.id, transaction_date: '2026-04-15',
-        payee_text: 'Staples', expense_account_id: expense.id,
-        payment_account_id: cash.id, payment_method: 'check', amount: '42.50',
-      }),
-    );
-    const posted = await t.db.transaction().execute(trx =>
-      et.post(trx, ctx, { expense_transaction_id: draft.id }),
-    );
-    expect(posted.status).toBe('posted');
-    expect(posted.journal_entry_id).not.toBeNull();
     const entry = await t.db.selectFrom('journal_entries').selectAll()
-      .where('id', '=', posted.journal_entry_id!).executeTakeFirstOrThrow();
-    expect(entry).toMatchObject({
-      source_type: 'adjustment',
-      source_id: posted.id,
-    });
+      .where('id', '=', expense.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(entry.source_type).toBe('expense');
+    expect(entry.source_id).toBe(expense.id);
 
     const lines = await t.db.selectFrom('journal_entry_lines').selectAll()
-      .where('journal_entry_id', '=', posted.journal_entry_id!).execute();
-    expect(lines).toHaveLength(2);
-    const dr = lines.find(l => l.account_id === expense.id);
+      .where('journal_entry_id', '=', expense.journal_entry_id!).execute();
+    expect(lines).toHaveLength(3);
+    const dr1 = lines.find(l => l.account_id === supplies.id);
+    const dr2 = lines.find(l => l.account_id === rent.id);
     const cr = lines.find(l => l.account_id === cash.id);
-    expect(dr?.debit).toBe('42.5000');
+    expect(dr1?.debit).toBe('30.0000');
+    expect(dr2?.debit).toBe('12.5000');
     expect(cr?.credit).toBe('42.5000');
+
+    const audit = await t.db.selectFrom('audit_logs').selectAll()
+      .where('business_id', '=', biz.id).where('action', '=', 'expense_transaction.create').execute();
+    expect(audit).toHaveLength(1);
   });
 
-  it('void on a posted transaction reverses the JE and flips status', async () => {
-    const { biz, ctx, expense, cash } = await bootstrap();
-    const draft = await t.db.transaction().execute(trx =>
-      et.createDraft(trx, ctx, {
-        business_id: biz.id, transaction_date: '2026-04-15',
-        payee_text: 'Staples', expense_account_id: expense.id,
-        payment_account_id: cash.id, payment_method: 'cash', amount: '42.50',
-      }),
-    );
-    const posted = await t.db.transaction().execute(trx =>
-      et.post(trx, ctx, { expense_transaction_id: draft.id }),
-    );
+  it('accepts a vendor or a customer as payee, but not both', async () => {
+    const { biz, ctx, supplies, cash } = await bootstrap();
+    const vendor = await makeVendor(t.db, biz.id);
+    const customer = await makeCustomer(t.db, biz.id);
+
+    const viaVendor = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', vendor_id: vendor.id,
+      payment_account_id: cash.id, payment_method: 'check',
+      lines: [{ category_account_id: supplies.id, amount: '10.00' }],
+    }));
+    expect(viaVendor.vendor_id).toBe(vendor.id);
+
+    await expect(t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', vendor_id: vendor.id, customer_id: customer.id,
+      payment_account_id: cash.id, payment_method: 'check',
+      lines: [{ category_account_id: supplies.id, amount: '10.00' }],
+    }))).rejects.toThrow(/pick one payee/i);
+
+    await expect(t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15',
+      payment_account_id: cash.id, payment_method: 'check',
+      lines: [{ category_account_id: supplies.id, amount: '10.00' }],
+    }))).rejects.toThrow(/payee is required/i);
+  });
+
+  it('allows a credit-card (liability) payment account, same as cash', async () => {
+    const { ctx, supplies, creditCard } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Amazon',
+      payment_account_id: creditCard.id, payment_method: 'credit_card',
+      lines: [{ category_account_id: supplies.id, amount: '19.99' }],
+    }));
+    expect(expense.payment_account_id).toBe(creditCard.id);
+  });
+
+  it('rejects a line that uses the payment account as its own category', async () => {
+    const { ctx, cash } = await bootstrap();
+    await expect(t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: cash.id, amount: '10.00' }],
+    }))).rejects.toThrow(/same account as the payment account/);
+  });
+
+  it('rejects a zero or negative total', async () => {
+    const { ctx, supplies, cash } = await bootstrap();
+    await expect(t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '0' }],
+    }))).rejects.toThrow(/greater than zero/);
+  });
+
+  it('updateExpense voids the old JE and posts a replacement with the new lines', async () => {
+    const { supplies, rent, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+    const originalJeId = expense.journal_entry_id!;
+
+    const updated = await t.db.transaction().execute(trx => et.updateExpense(trx, ctx, expense.id, {
+      transaction_date: '2026-04-16', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'check', reference: '2001',
+      lines: [{ category_account_id: rent.id, amount: '55.00' }],
+    }));
+
+    expect(updated.total_amount).toBe('55.0000');
+    expect(updated.reference).toBe('2001');
+    expect(updated.journal_entry_id).not.toBe(originalJeId);
+
+    const originalJe = await t.db.selectFrom('journal_entries').select('status')
+      .where('id', '=', originalJeId).executeTakeFirstOrThrow();
+    expect(originalJe.status).toBe('voided');
+
+    const newLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', updated.journal_entry_id!).execute();
+    expect(newLines.find(l => l.account_id === rent.id)?.debit).toBe('55.0000');
+
+    const linesOnFile = await t.db.selectFrom('expense_transaction_lines').selectAll()
+      .where('expense_transaction_id', '=', expense.id).execute();
+    expect(linesOnFile).toHaveLength(1);
+    expect(linesOnFile[0]!.category_account_id).toBe(rent.id);
+  });
+
+  it('voidExpense reverses the JE, flips status, and blocks a second void', async () => {
+    const { supplies, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
     const voided = await t.db.transaction().execute(trx =>
-      et.voidExpense(trx, ctx, { expense_transaction_id: posted.id }),
-    );
+      et.voidExpense(trx, ctx, { expense_transaction_id: expense.id }));
     expect(voided.status).toBe('void');
     expect(voided.voided_at).not.toBeNull();
-    // Audit trail: void preserves the original JE link
-    expect(voided.journal_entry_id).toBe(posted.journal_entry_id);
-    expect(voided.posted_at).not.toBeNull();
+    // Audit trail: void preserves the original JE link.
+    expect(voided.journal_entry_id).toBe(expense.journal_entry_id);
+
+    const je = await t.db.selectFrom('journal_entries').select('status')
+      .where('id', '=', expense.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(je.status).toBe('voided');
+
+    await expect(t.db.transaction().execute(trx =>
+      et.voidExpense(trx, ctx, { expense_transaction_id: expense.id }),
+    )).rejects.toThrow(/already void/);
   });
 
-  it('filters the expense list by payment method', async () => {
-    const { biz, ctx, expense, cash } = await bootstrap();
-    for (const payment_method of ['cash', 'card'] as const) {
-      await t.db.transaction().execute(trx => et.createDraft(trx, ctx, {
-        business_id: biz.id,
-        transaction_date: '2026-04-15',
-        payee_text: payment_method,
-        expense_account_id: expense.id,
-        payment_account_id: cash.id,
-        payment_method,
-        amount: '10.00',
-      }));
-    }
+  it('a voided expense cannot be edited', async () => {
+    const { supplies, rent, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+    await t.db.transaction().execute(trx => et.voidExpense(trx, ctx, { expense_transaction_id: expense.id }));
 
-    const rows = await et.listExpenses(t.db, biz.id, { payment_method: 'card' });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.payment_method).toBe('card');
+    await expect(t.db.transaction().execute(trx => et.updateExpense(trx, ctx, expense.id, {
+      transaction_date: '2026-04-16', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: rent.id, amount: '10.00' }],
+    }))).rejects.toThrow(/voided expense cannot be edited/);
+  });
+
+  it('deleteExpense voids the JE and removes the row entirely', async () => {
+    const { supplies, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+    const jeId = expense.journal_entry_id!;
+
+    await t.db.transaction().execute(trx => et.deleteExpense(trx, ctx, expense.id));
+
+    const row = await t.db.selectFrom('expense_transactions').select('id')
+      .where('id', '=', expense.id).executeTakeFirst();
+    expect(row).toBeUndefined();
+
+    const je = await t.db.selectFrom('journal_entries').select('status')
+      .where('id', '=', jeId).executeTakeFirstOrThrow();
+    expect(je.status).toBe('voided');
+
+    const audit = await t.db.selectFrom('audit_logs').selectAll()
+      .where('action', '=', 'expense_transaction.delete').execute();
+    expect(audit).toHaveLength(1);
+  });
+
+  it('refuses to delete an expense whose JE has been reconciled', async () => {
+    const { biz, supplies, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+
+    // Simulate the expense's cash line having been matched + reconciled via the bank feed.
+    await t.db.insertInto('bank_transactions').values({
+      business_id: biz.id,
+      bank_account_id: (await t.db.insertInto('bank_accounts').values({
+        business_id: biz.id, cash_account_id: cash.id, name: 'Checking',
+      }).returning('id').executeTakeFirstOrThrow()).id,
+      transaction_date: '2026-04-15',
+      description: 'Staples',
+      amount: '-30.00',
+      status: 'matched',
+      matched_journal_entry_id: expense.journal_entry_id,
+      is_reconciled: true,
+      reviewed_at: new Date(),
+    }).execute();
+
+    await expect(t.db.transaction().execute(trx =>
+      et.deleteExpense(trx, ctx, expense.id),
+    )).rejects.toThrow(/reconciled and cannot be deleted/);
+  });
+
+  it('getExpense reports is_reconciled and editable', async () => {
+    const { supplies, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+    const fetched = await et.getExpense(t.db, ctx, expense.id);
+    expect(fetched.is_reconciled).toBe(false);
+    expect(fetched.editable).toBe(true);
+    expect(fetched.payee_name).toBe('Staples');
+    expect(fetched.lines).toHaveLength(1);
+
+    await t.db.transaction().execute(trx => et.voidExpense(trx, ctx, { expense_transaction_id: expense.id }));
+    const afterVoid = await et.getExpense(t.db, ctx, expense.id);
+    expect(afterVoid.editable).toBe(false);
+  });
+
+  it('listExpenses returns every expense for the business, newest first', async () => {
+    const { supplies, cash, ctx } = await bootstrap();
+    await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-01', payee_text: 'Older',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '10.00' }],
+    }));
+    await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Newer',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '20.00' }],
+    }));
+
+    const rows = await et.listExpenses(t.db, ctx);
+    expect(rows.map(r => r.payee_name)).toEqual(['Newer', 'Older']);
+  });
+
+  it('isSourceGeneratedJournalEntry protects an expense JE without a source_guard', async () => {
+    const { supplies, cash, ctx } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+    await expect(t.db.transaction().execute(trx => ledger.voidJournalEntry(trx, ctx, {
+      journal_entry_id: expense.journal_entry_id!,
+      void_reason: 'should be blocked',
+    }))).rejects.toThrow(/source transaction/);
+  });
+
+  it('voids, edits, and deletes a legacy expense whose JE still carries source_type=adjustment', async () => {
+    // je_protect_posted_row() treats source_type as permanent identity on a
+    // posted JE, so rows created before the dedicated 'expense' type existed
+    // can never be migrated to it — they stay 'adjustment' forever. voidGuardFor
+    // must echo that back, not assume every expense JE says 'expense'.
+    const { biz, supplies, rent, cash, ctx } = await bootstrap();
+    const legacy = await t.db.transaction().execute(async trx => {
+      const row = await trx.insertInto('expense_transactions').values({
+        business_id: biz.id, transaction_date: '2026-03-01', payee_text: 'Old Vendor',
+        payment_account_id: cash.id, payment_method: 'other', total_amount: '15.00',
+      }).returningAll().executeTakeFirstOrThrow();
+      const je = await ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id, entry_date: '2026-03-01', source_type: 'adjustment', source_id: row.id,
+        memo: 'Legacy expense', lines: [
+          { account_id: supplies.id, debit: '15.00', credit: '0', memo: null },
+          { account_id: cash.id, debit: '0', credit: '15.00', memo: null },
+        ],
+      });
+      await trx.insertInto('expense_transaction_lines').values({
+        expense_transaction_id: row.id, business_id: biz.id, category_account_id: supplies.id, amount: '15.00',
+      }).execute();
+      return trx.updateTable('expense_transactions')
+        .set({ status: 'posted', journal_entry_id: je.id, posted_at: new Date() })
+        .where('id', '=', row.id).returningAll().executeTakeFirstOrThrow();
+    });
+    expect(legacy.journal_entry_id).toBeTruthy();
+
+    const updated = await t.db.transaction().execute(trx => et.updateExpense(trx, ctx, legacy.id, {
+      transaction_date: '2026-03-02', payee_text: 'Old Vendor',
+      payment_account_id: cash.id, payment_method: 'other',
+      lines: [{ category_account_id: rent.id, amount: '20.00' }],
+    }));
+    expect(updated.total_amount).toBe('20.0000');
+    const oldJe = await t.db.selectFrom('journal_entries').select('status')
+      .where('id', '=', legacy.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(oldJe.status).toBe('voided');
+
+    const voided = await t.db.transaction().execute(trx =>
+      et.voidExpense(trx, ctx, { expense_transaction_id: legacy.id }));
+    expect(voided.status).toBe('void');
+
+    await t.db.transaction().execute(trx => et.deleteExpense(trx, ctx, legacy.id));
+    const row = await t.db.selectFrom('expense_transactions').select('id')
+      .where('id', '=', legacy.id).executeTakeFirst();
+    expect(row).toBeUndefined();
+  });
+
+  it('wrapImportedExpenseJournalEntry produces an expense that is still fully editable, voidable, and deletable', async () => {
+    const { biz, supplies, cash, ctx } = await bootstrap();
+
+    const je = await t.db.transaction().execute(async trx => {
+      const posted = await trx.insertInto('journal_entries').values({
+        business_id: biz.id,
+        period_id: (await trx.selectFrom('fiscal_periods').select('id').where('business_id', '=', biz.id).where('starts_on', '<=', '2026-03-07').where('ends_on', '>=', '2026-03-07').executeTakeFirstOrThrow()).id,
+        entry_date: '2026-03-07',
+        journal_number: 'IMPORT-1',
+        memo: 'IRS USATAXPYMT',
+        status: 'draft',
+        source_type: 'bank_import',
+        // Real imports always set a staging-row source_id (see emailImports.ts);
+        // only a non-null source_id lets voidGuardFor authorize the edit below.
+        source_id: '00000000-0000-0000-0000-000000000001',
+        transaction_type: 'expense',
+        payee_name: 'IRS',
+        created_by_user_id: ctx.user_id,
+      }).returningAll().executeTakeFirstOrThrow();
+      await trx.insertInto('journal_entry_lines').values([
+        { journal_entry_id: posted.id, line_number: 1, account_id: cash.id, debit: '0', credit: '690.20', memo: null },
+        { journal_entry_id: posted.id, line_number: 2, account_id: supplies.id, debit: '690.20', credit: '0', memo: null },
+      ]).execute();
+      return trx.updateTable('journal_entries').set({ status: 'posted', posted_at: sql`now()` }).where('id', '=', posted.id).returningAll().executeTakeFirstOrThrow();
+    });
+
+    const wrapped = await t.db.transaction().execute(trx => et.wrapImportedExpenseJournalEntry(trx, ctx, {
+      journal_entry_id: je.id,
+      payment_account_id: cash.id,
+      category_account_id: supplies.id,
+      payment_method: 'other',
+      entry_date: '2026-03-07',
+      description: 'IRS USATAXPYMT',
+      payee_name: 'IRS',
+      amount: '690.20',
+    }));
+    expect(wrapped).not.toBeNull();
+
+    // imported=true still marks its provenance (drives the "Imported" badge),
+    // but — same as Bank Deposits — it does not block editing, voiding, or deleting.
+    const full = await et.getExpense(t.db, ctx, wrapped.id);
+    expect(full.imported).toBe(true);
+    expect(full.editable).toBe(true);
+    expect(full.payee_name).toBe('IRS');
+    expect(full.total_amount).toBe('690.2000');
+
+    const updated = await t.db.transaction().execute(trx => et.updateExpense(trx, ctx, wrapped.id, {
+      transaction_date: '2026-03-08', payee_text: 'IRS',
+      payment_account_id: cash.id, payment_method: 'other',
+      lines: [{ category_account_id: supplies.id, amount: '700.00' }],
+    }));
+    expect(updated.total_amount).toBe('700.0000');
+
+    await t.db.transaction().execute(trx => et.deleteExpense(trx, ctx, wrapped.id));
+    const row = await t.db.selectFrom('expense_transactions').select('id')
+      .where('id', '=', wrapped.id).executeTakeFirst();
+    expect(row).toBeUndefined();
   });
 });

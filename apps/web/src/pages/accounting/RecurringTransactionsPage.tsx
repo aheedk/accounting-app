@@ -17,7 +17,7 @@ import { printReport } from '@/lib/reportExport';
 type Account = { id: string; code: string; name: string; account_type: string };
 
 type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-type TemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit';
+type TemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense';
 
 type Template = {
   id: string;
@@ -71,6 +71,7 @@ const TXN_TYPE_LABELS: Record<TemplateType, string> = {
   invoice: 'Invoice',
   journal_entry: 'Journal Entry',
   deposit: 'Bank Deposit',
+  expense: 'Expense',
 };
 
 const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; disabled?: boolean; title?: string }> = [
@@ -78,6 +79,7 @@ const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; disabled?: b
   { value: 'invoice', label: 'Invoice (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
   { value: 'bill', label: 'Bill (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
   { value: 'deposit', label: 'Bank Deposit (create from a deposit)', disabled: true, title: 'Create a recurring deposit template from the Bank Deposit page’s "Make recurring" action.' },
+  { value: 'expense', label: 'Expense (create from an expense)', disabled: true, title: 'Create a recurring expense template from the Expense page’s "Make recurring" action.' },
 ];
 
 function fmtShortDate(iso: string | null) {

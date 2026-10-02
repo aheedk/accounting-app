@@ -173,22 +173,31 @@ export async function makeFixedAsset(
   }).returningAll().executeTakeFirstOrThrow();
 }
 
+/** Raw-insert factory (header + one line), not through the service — for
+ * tests that only need a row on the table, not a posted journal entry. */
 export async function makeExpenseTransaction(
   db: Kysely<DB>,
   business_id: string,
-  expense_account_id: string,
+  category_account_id: string,
   payment_account_id: string,
   opts: Partial<{ amount: string; payee_text: string; transaction_date: string; payment_method: PaymentMethod }> = {},
 ) {
-  return db.insertInto('expense_transactions').values({
+  const amount = opts.amount ?? '50.00';
+  const expense = await db.insertInto('expense_transactions').values({
     business_id,
-    expense_account_id,
     payment_account_id,
     payment_method: opts.payment_method ?? 'other',
-    amount: opts.amount ?? '50.00',
+    total_amount: amount,
     payee_text: opts.payee_text ?? 'Test Payee',
     transaction_date: opts.transaction_date ?? '2026-04-01',
   }).returningAll().executeTakeFirstOrThrow();
+  await db.insertInto('expense_transaction_lines').values({
+    expense_transaction_id: expense.id,
+    business_id,
+    category_account_id,
+    amount,
+  }).execute();
+  return expense;
 }
 
 export async function makeRecurringTemplate(

@@ -32,7 +32,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/credit-memos': 'Credit Memos',
   '/reports/aging': 'AR Aging',
   '/ap/overview': 'AP Overview',
-  '/ap/expenses': 'Expense Transactions',
+  '/accounting/expense-transactions': 'Expense Transactions',
   '/ap/vendors': 'Vendors',
   '/ap/bills': 'Bills',
   '/ap/bill-payments': 'Bill Payments',

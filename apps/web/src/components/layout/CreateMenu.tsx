@@ -21,7 +21,7 @@ const CATEGORIES: CreateCategory[] = [
   {
     heading: 'Vendors',
     items: [
-      { label: 'Expense', to: '/ap/expenses/new' },
+      { label: 'Expense', to: '/accounting/expenses/new' },
       { label: 'Bill', to: '/ap/bills/new' },
       { label: 'Pay bills', to: '/ap/bill-payments/new' },
       { label: 'Vendor credit', to: '/ap/vendor-credits/new' },

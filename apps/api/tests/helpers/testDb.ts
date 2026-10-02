@@ -74,6 +74,7 @@ export async function truncateAll(db: Kysely<DB>) {
       files,
       recurring_templates,
       period_review_tasks,
+      expense_transaction_lines,
       expense_transactions,
       depreciation_entries,
       fixed_assets,

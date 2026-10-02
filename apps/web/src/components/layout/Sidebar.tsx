@@ -55,7 +55,7 @@ const groups: NavGroup[] = [
     icon: Wallet,
     children: [
       { to: '/ap/overview', label: 'Overview' },
-      { to: '/ap/expenses', label: 'Expense Transactions' },
+      { to: '/accounting/expense-transactions', label: 'Expense Transactions' },
       { to: '/ap/vendors', label: 'Vendors' },
       { to: '/ap/bills', label: 'Bills' },
       { to: '/ap/bill-payments', label: 'Bill Payments' },

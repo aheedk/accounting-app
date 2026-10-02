@@ -75,6 +75,7 @@ export async function describeTransactions(
   const billIds = idsOf(entries, 'bill');
   const billPaymentIds = idsOf(entries, 'bill_payment');
   const vendorCreditIds = idsOf(entries, 'vendor_credit');
+  const expenseIds = idsOf(entries, 'expense');
   const bankImportIds = entries.filter(entry => entry.source_type === 'bank_import').map(entry => entry.id);
   // Older services post as unlinked manual/adjustment rows and point back from
   // their own table, so those are found by journal entry id instead.
@@ -83,8 +84,9 @@ export async function describeTransactions(
     .map(entry => entry.id);
 
   const [
-    invoices, payments, creditMemos, bills, billPayments, vendorCredits,
-    bankImportLines, expenses, depreciation, payRuns, taxPayments, bankMatches, inboxMatches,
+    invoices, payments, creditMemos, bills, billPayments, vendorCredits, dedicatedExpenses,
+    bankImportLines, wrappedImportExpenses, wrappedImportDeposits,
+    expenses, depreciation, payRuns, taxPayments, bankMatches, inboxMatches,
     invoiceLines, billLines, paymentApplications, billPaymentApplications, payRunEmployees,
   ] = await Promise.all([
     invoiceIds.length === 0 ? [] : db.selectFrom('invoices as d')
@@ -111,13 +113,31 @@ export async function describeTransactions(
       .innerJoin('vendors as v', 'v.id', 'd.vendor_id')
       .select(['d.id', 'd.vendor_credit_number as num', 'd.memo', 'v.name'])
       .where('d.id', 'in', vendorCreditIds).execute(),
+    expenseIds.length === 0 ? [] : db.selectFrom('expense_transactions as e')
+      .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
+      .leftJoin('customers as c', 'c.id', 'e.customer_id')
+      .select(['e.id', 'e.reference', 'e.payment_method', 'e.memo', 'e.payee_text', 'v.name as vendor_name', 'c.name as customer_name'])
+      .where('e.id', 'in', expenseIds).execute(),
     bankImportIds.length === 0 ? [] : db.selectFrom('journal_entry_lines')
       .select(({ fn }) => ['journal_entry_id', fn.countAll<string>().as('line_count')])
       .where('journal_entry_id', 'in', bankImportIds)
       .groupBy('journal_entry_id').execute(),
+    // An AI-imported check/expense (or deposit) may have been wrapped into its
+    // own feature's table after the fact (wrapImportedExpenseJournalEntry /
+    // wrapImportedDepositJournalEntry) — its JE keeps source_type='bank_import'
+    // forever (protect_posted treats source_type as permanent identity), so
+    // that wrapper can only be found by this back-link, never by source_type.
+    bankImportIds.length === 0 ? [] : db.selectFrom('expense_transactions as e')
+      .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
+      .leftJoin('customers as c', 'c.id', 'e.customer_id')
+      .select(['e.id', 'e.journal_entry_id', 'e.payment_method', 'e.reference', 'e.payee_text', 'e.memo', 'v.name as vendor_name', 'c.name as customer_name'])
+      .where('e.journal_entry_id', 'in', bankImportIds).execute(),
+    bankImportIds.length === 0 ? [] : db.selectFrom('bank_deposits')
+      .select(['id', 'journal_entry_id'])
+      .where('journal_entry_id', 'in', bankImportIds).execute(),
     looseIds.length === 0 ? [] : db.selectFrom('expense_transactions as e')
       .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
-      .select(['e.id', 'e.journal_entry_id', 'e.payment_method', 'e.check_number', 'e.payee_text', 'e.memo', 'v.name as vendor_name'])
+      .select(['e.id', 'e.journal_entry_id', 'e.payment_method', 'e.reference', 'e.payee_text', 'e.memo', 'v.name as vendor_name'])
       .where('e.journal_entry_id', 'in', looseIds).execute(),
     looseIds.length === 0 ? [] : db.selectFrom('depreciation_entries')
       .select(['journal_entry_id', 'fixed_asset_id'])
@@ -161,7 +181,10 @@ export async function describeTransactions(
   const billById = byId(bills);
   const billPaymentById = byId(billPayments);
   const vendorCreditById = byId(vendorCredits);
+  const expenseById = byId(dedicatedExpenses);
   const importLineCount = new Map(bankImportLines.map(row => [row.journal_entry_id, Number(row.line_count)]));
+  const wrappedExpenseByJe = new Map(wrappedImportExpenses.map(row => [row.journal_entry_id, row]));
+  const wrappedDepositByJe = new Map(wrappedImportDeposits.map(row => [row.journal_entry_id, row]));
   const expenseByEntry = new Map(expenses.map(row => [row.journal_entry_id, row]));
   const depreciationByEntry = new Map(depreciation.map(row => [row.journal_entry_id, row]));
   const payRunByEntry = new Map(payRuns.map(row => [row.journal_entry_id, row]));
@@ -236,18 +259,49 @@ export async function describeTransactions(
         described = { label: 'Vendor Credit', num: doc?.num ?? null, name: doc?.name ?? null, memo: doc?.memo?.trim() || null, path: sid ? `/ap/vendor-credits/${sid}` : null, is_adjusting: false };
         break;
       }
-      case 'bank_import': {
-        const label = entry.transaction_type === 'deposit' ? 'Deposit'
-          : entry.transaction_type === 'check' ? 'Check'
-          : entry.transaction_type === 'expense' ? 'Expense'
-          : 'Bank Import';
+      case 'expense': {
+        const doc = sid ? expenseById.get(sid) : undefined;
         described = {
-          label, num: entry.reference, name: entry.payee_name, memo: null,
-          // An imported Check / Expense / Deposit is edited on its own page; one
-          // that has been split into more lines has no such form.
-          path: importLineCount.get(entry.id) === 2 ? `/transactions/${entry.id}` : '/ai/inbox',
+          label: doc?.payment_method === 'check' ? 'Check' : 'Expense',
+          num: doc?.reference ?? null,
+          name: doc?.vendor_name ?? doc?.customer_name ?? doc?.payee_text ?? null,
+          memo: doc?.memo?.trim() || null,
+          path: sid ? `/accounting/expenses/${sid}` : null,
           is_adjusting: false,
         };
+        break;
+      }
+      case 'bank_import': {
+        const wrappedExpense = wrappedExpenseByJe.get(entry.id);
+        const wrappedDeposit = wrappedDepositByJe.get(entry.id);
+        if (wrappedExpense) {
+          described = {
+            label: wrappedExpense.payment_method === 'check' ? 'Check' : 'Expense',
+            num: wrappedExpense.reference, name: wrappedExpense.vendor_name ?? wrappedExpense.customer_name ?? wrappedExpense.payee_text,
+            memo: wrappedExpense.memo?.trim() || null,
+            path: `/accounting/expenses/${wrappedExpense.id}`,
+            is_adjusting: false,
+          };
+        } else if (wrappedDeposit) {
+          described = {
+            label: 'Deposit', num: entry.reference, name: entry.payee_name, memo: null,
+            path: `/accounting/bank-deposits/${wrappedDeposit.id}`,
+            is_adjusting: false,
+          };
+        } else {
+          const label = entry.transaction_type === 'deposit' ? 'Deposit'
+            : entry.transaction_type === 'check' ? 'Check'
+            : entry.transaction_type === 'expense' ? 'Expense'
+            : 'Bank Import';
+          described = {
+            label, num: entry.reference, name: entry.payee_name, memo: null,
+            // Not (yet) wrapped into its own feature's table: an imported Check /
+            // Expense / Deposit with exactly 2 lines still lands on the raw
+            // import-review form; a split one has no form at all, only the inbox.
+            path: importLineCount.get(entry.id) === 2 ? `/transactions/${entry.id}` : '/ai/inbox',
+            is_adjusting: false,
+          };
+        }
         break;
       }
       case 'invoice_import':
@@ -265,10 +319,10 @@ export async function describeTransactions(
         if (expense) {
           described = {
             label: expense.payment_method === 'check' ? 'Check' : 'Expense',
-            num: expense.check_number,
+            num: expense.reference,
             name: expense.vendor_name ?? expense.payee_text,
             memo: expense.memo?.trim() || null,
-            path: `/ap/expenses/${expense.id}`,
+            path: `/accounting/expenses/${expense.id}`,
             is_adjusting: false,
           };
         } else if (dep) {

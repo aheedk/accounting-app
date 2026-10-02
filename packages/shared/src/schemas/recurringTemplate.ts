@@ -55,14 +55,31 @@ export const recurringDepositPayloadSchema = z.object({
 });
 export type RecurringDepositPayload = z.infer<typeof recurringDepositPayloadSchema>;
 
+export const recurringExpenseLineSchema = z.object({
+  category_account_id: z.string().uuid(),
+  description: z.string().max(500).nullable().optional(),
+  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+});
+export const recurringExpensePayloadSchema = z.object({
+  payee_text: z.string().max(200).nullable().optional(),
+  vendor_id: z.string().uuid().nullable().optional(),
+  customer_id: z.string().uuid().nullable().optional(),
+  payment_account_id: z.string().uuid(),
+  payment_method: z.string().max(50),
+  reference: z.string().max(100).nullable().optional(),
+  memo: z.string().max(2000).nullable().optional(),
+  lines: z.array(recurringExpenseLineSchema).min(1),
+});
+export type RecurringExpensePayload = z.infer<typeof recurringExpensePayloadSchema>;
+
 export const recurringTemplateCreateSchema = z.object({
   name: z.string().min(1).max(200),
-  template_type: z.enum(['journal_entry', 'invoice', 'bill', 'deposit']),
+  template_type: z.enum(['journal_entry', 'invoice', 'bill', 'deposit', 'expense']),
   payload: z.record(z.unknown()),
   recurrence: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']),
-  // Deposit-only: scheduled auto-creates on next_run_date; reminder/unscheduled
-  // never auto-fire (no notification channel exists yet) and are materialized
-  // only via the explicit "run now" action. Ignored by other template types.
+  // Deposit/Expense-only: scheduled auto-creates on next_run_date; reminder/
+  // unscheduled never auto-fire (no notification channel exists yet) and are
+  // materialized only via the explicit "run now" action. Ignored by other template types.
   recurrence_type: z.enum(['scheduled', 'reminder', 'unscheduled']).optional(),
   days_in_advance: z.number().int().min(0).nullable().optional(),
   next_run_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

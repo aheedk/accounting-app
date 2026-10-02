@@ -16,7 +16,7 @@ const ALL_PAGES: Page[] = [
   { label: 'AR Aging', group: 'Accounts Receivable', to: '/reports/aging' },
   // Accounts Payable
   { label: 'AP Overview', group: 'Accounts Payable', to: '/ap/overview' },
-  { label: 'Expense Transactions', group: 'Accounts Payable', to: '/ap/expenses' },
+  { label: 'Expense Transactions', group: 'Accounts Payable', to: '/accounting/expense-transactions' },
   { label: 'Vendors', group: 'Accounts Payable', to: '/ap/vendors' },
   { label: 'Bills', group: 'Accounts Payable', to: '/ap/bills' },
   { label: 'Bill Payments', group: 'Accounts Payable', to: '/ap/bill-payments' },

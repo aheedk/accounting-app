@@ -6,6 +6,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { postJournalEntryBatch } from '../services/core/ledgerService.js';
 import { wrapImportedDepositJournalEntry } from '../services/banking/bankDepositService.js';
+import { wrapImportedExpenseJournalEntry } from '../services/ap/expenseTransactionService.js';
 import { suggestCodingBatch, rememberCoding, learningDecision } from '../services/ai/autoCodingService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
@@ -245,14 +246,26 @@ router.post(
         for (let i = 0; i < pairs.length; i++) {
           const { tx, item } = pairs[i]!;
           const je = createdJEs[i];
+          if (!je) continue;
           const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
-          if (je && isDeposit) {
+          if (isDeposit) {
             await wrapImportedDepositJournalEntry(trx, serviceCtx, {
               journal_entry_id: je.id,
               chart_account_id: body.bank_account_id,
               offset_account_id: item.offset_account_id,
               entry_date: jeInputs[i]!.entry_date,
               description: tx.description,
+              amount: parseFloat(tx.amount).toFixed(2),
+            });
+          } else {
+            await wrapImportedExpenseJournalEntry(trx, serviceCtx, {
+              journal_entry_id: je.id,
+              payment_account_id: body.bank_account_id,
+              category_account_id: item.offset_account_id,
+              payment_method: tx.type === 'check' ? 'check' : 'other',
+              entry_date: jeInputs[i]!.entry_date,
+              description: tx.description,
+              payee_name: item.payee_name?.trim() || tx.payee_name || null,
               amount: parseFloat(tx.amount).toFixed(2),
             });
           }
@@ -411,14 +424,26 @@ router.post(
         for (let i = 0; i < confident.length; i++) {
           const { tx, accountId } = confident[i]!;
           const je = createdJEs[i];
+          if (!je) continue;
           const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
-          if (je && isDeposit) {
+          if (isDeposit) {
             await wrapImportedDepositJournalEntry(trx, serviceCtx, {
               journal_entry_id: je.id,
               chart_account_id: body.bank_account_id,
               offset_account_id: accountId,
               entry_date: jeInputs[i]!.entry_date,
               description: tx.description,
+              amount: parseFloat(tx.amount).toFixed(2),
+            });
+          } else {
+            await wrapImportedExpenseJournalEntry(trx, serviceCtx, {
+              journal_entry_id: je.id,
+              payment_account_id: body.bank_account_id,
+              category_account_id: accountId,
+              payment_method: tx.type === 'check' ? 'check' : 'other',
+              entry_date: jeInputs[i]!.entry_date,
+              description: tx.description,
+              payee_name: tx.payee_name?.trim() || null,
               amount: parseFloat(tx.amount).toFixed(2),
             });
           }

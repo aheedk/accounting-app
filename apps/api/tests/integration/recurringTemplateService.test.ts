@@ -360,4 +360,61 @@ describe('recurringTemplateService', () => {
     const afterManualRun = await t.db.selectFrom('bank_deposits').selectAll().where('business_id', '=', biz.id).execute();
     expect(afterManualRun).toHaveLength(1);
   });
+
+  it('runDue materializes a due "scheduled" expense template as a posted expense with a JE', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await t.db.transaction().execute(trx => rt.create(trx, ctx, {
+      business_id: biz.id,
+      name: 'Monthly rent expense',
+      template_type: 'expense',
+      recurrence_type: 'scheduled',
+      payload: {
+        payee_text: 'Landlord',
+        payment_account_id: cash.id,
+        payment_method: 'check',
+        lines: [{ category_account_id: expense.id, amount: '1000.00' }],
+      },
+      recurrence: 'monthly',
+      next_run_date: today,
+    }));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
+    expect(results[0]?.runs_created).toBe(1);
+
+    const expenses = await t.db.selectFrom('expense_transactions').selectAll().where('business_id', '=', biz.id).execute();
+    expect(expenses).toHaveLength(1);
+    expect(expenses[0]?.total_amount).toBe('1000.0000');
+    expect(expenses[0]?.journal_entry_id).toBeTruthy();
+  });
+
+  it('runDue does not auto-fire "unscheduled" or "reminder" expense templates', async () => {
+    const { biz, ctx, expense, cash } = await bootstrap();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const unscheduled = await t.db.transaction().execute(trx => rt.create(trx, ctx, {
+      business_id: biz.id,
+      name: 'Ad hoc vendor payment',
+      template_type: 'expense',
+      recurrence_type: 'unscheduled',
+      payload: {
+        payee_text: 'Office Depot',
+        payment_account_id: cash.id,
+        payment_method: 'cash',
+        lines: [{ category_account_id: expense.id, amount: '25.00' }],
+      },
+      recurrence: 'weekly',
+      next_run_date: today,
+    }));
+
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
+    expect(results.every(r => r.runs_created === 0)).toBe(true);
+    const expenses = await t.db.selectFrom('expense_transactions').selectAll().where('business_id', '=', biz.id).execute();
+    expect(expenses).toHaveLength(0);
+
+    const run = await t.db.transaction().execute(trx => rt.runTemplateNow(trx, ctx, { template_id: unscheduled.id }));
+    expect(run.runs_created).toBe(1);
+    const afterManualRun = await t.db.selectFrom('expense_transactions').selectAll().where('business_id', '=', biz.id).execute();
+    expect(afterManualRun).toHaveLength(1);
+  });
 });

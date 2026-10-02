@@ -19,7 +19,7 @@ function loadBookmarks(): BookmarkItem[] {
 
 // Only items from the QBO My Menu screenshots that exist in our app
 const CREATE_ITEMS = [
-  { label: 'Expense', to: '/ap/expenses/new' },
+  { label: 'Expense', to: '/accounting/expenses/new' },
   { label: 'Receive payment', to: '/payments/new' },
   { label: 'Journal entry', to: '/journal/new' },
 ];

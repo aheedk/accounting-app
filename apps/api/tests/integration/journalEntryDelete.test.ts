@@ -118,12 +118,11 @@ describe('deleting journal entries', () => {
 
   it('refuses source-generated entries, closed periods, staff, and other tenants', async () => {
     const data = await setup(t);
-    const draft = await t.db.transaction().execute(trx => expenses.createDraft(trx, data.ctx, {
-      business_id: data.business.id, transaction_date: '2026-04-15', payee_text: 'Staples',
-      expense_account_id: data.supplies.id, payment_account_id: data.cash.id, payment_method: 'other', amount: '40.00',
+    const expense = await t.db.transaction().execute(trx => expenses.createExpense(trx, data.ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: data.cash.id, payment_method: 'other',
+      lines: [{ category_account_id: data.supplies.id, amount: '40.00' }],
     }));
-    const expense = await t.db.transaction().execute(trx =>
-      expenses.post(trx, data.ctx, { expense_transaction_id: draft.id }));
     await expect(t.db.transaction().execute(trx =>
       ledger.deleteJournalEntry(trx, data.ctx, { journal_entry_id: expense.journal_entry_id! }),
     )).rejects.toThrow(/source transaction/);

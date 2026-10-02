@@ -96,12 +96,12 @@ describe('general ledger report', () => {
   it('describes each line the way QuickBooks does: type, number, name, and natural-sign amount', async () => {
     const { biz, ctx, cash, revenue, expense } = await setup();
     // A check written through the expense form.
-    const draft = await t.db.transaction().execute(trx => expenses.createDraft(trx, ctx, {
-      business_id: biz.id, transaction_date: '2026-03-10', payee_text: 'Staples',
-      expense_account_id: expense.id, payment_account_id: cash.id,
-      payment_method: 'check', check_number: '1042', amount: '40.00',
+    const draft = await t.db.transaction().execute(trx => expenses.createExpense(trx, ctx, {
+      transaction_date: '2026-03-10', payee_text: 'Staples',
+      payment_account_id: cash.id,
+      payment_method: 'check', reference: '1042',
+      lines: [{ category_account_id: expense.id, amount: '40.00' }],
     }));
-    await t.db.transaction().execute(trx => expenses.post(trx, ctx, { expense_transaction_id: draft.id }));
     // A deposit posted from a bank statement import, same day as a sale entered by hand.
     const deposit = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
       business_id: biz.id, entry_date: '2026-03-12', source_type: 'bank_import',
@@ -130,7 +130,7 @@ describe('general ledger report', () => {
       ['Journal Entry', sale.journal_number, 'Acme Co', true, '25.0000'],
     ]);
     expect(cashLines.map(line => line.transaction_path)).toEqual([
-      `/ap/expenses/${draft.id}`, `/transactions/${deposit.id}`, `/journal/${sale.id}`,
+      `/accounting/expenses/${draft.id}`, `/transactions/${deposit.id}`, `/journal/${sale.id}`,
     ]);
     // Same-day lines keep posting order, so each balance follows from the one above.
     expect(cashLines.map(line => line.running_balance)).toEqual(['-40.0000', '260.0000', '285.0000']);
@@ -140,6 +140,35 @@ describe('general ledger report', () => {
     expect(revenueLines.map(line => [line.amount, line.running_balance])).toEqual([
       ['300.0000', '300.0000'], ['25.0000', '325.0000'],
     ]);
+  });
+
+  it('prefers the expense page over the raw import form once a bank-import expense is wrapped', async () => {
+    const { biz, ctx, cash, expense } = await setup();
+    const je = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-03-15', source_type: 'bank_import',
+      source_id: '55555555-5555-4555-8555-555555555555', transaction_type: 'expense',
+      payee_name: 'IRS', memo: 'USATAXPYMT', lines: [
+        { account_id: cash.id, debit: '0.0000', credit: '690.20', memo: null },
+        { account_id: expense.id, debit: '690.20', credit: '0.0000', memo: null },
+      ],
+    }));
+
+    // Before wrapping: falls back to the raw import-review form, same as an
+    // untouched bank-import deposit does.
+    const before = await reportService.generalLedger(t.db, { business_id: biz.id, period_start: '2026-03-01', period_end: '2026-03-31' });
+    const beforeLine = before.accounts.find(a => a.account_id === cash.id)!.lines[0]!;
+    expect(beforeLine.transaction_path).toBe(`/transactions/${je.id}`);
+
+    const wrapped = await t.db.transaction().execute(trx => expenses.wrapImportedExpenseJournalEntry(trx, ctx, {
+      journal_entry_id: je.id, payment_account_id: cash.id, category_account_id: expense.id,
+      payment_method: 'other', entry_date: '2026-03-15', description: 'USATAXPYMT', payee_name: 'IRS', amount: '690.20',
+    }));
+
+    const after = await reportService.generalLedger(t.db, { business_id: biz.id, period_start: '2026-03-01', period_end: '2026-03-31' });
+    const afterLine = after.accounts.find(a => a.account_id === cash.id)!.lines[0]!;
+    expect(afterLine.transaction_label).toBe('Expense');
+    expect(afterLine.name).toBe('IRS');
+    expect(afterLine.transaction_path).toBe(`/accounting/expenses/${wrapped.id}`);
   });
 
   it('filters to one tenant-owned account and rejects an account from another business', async () => {
