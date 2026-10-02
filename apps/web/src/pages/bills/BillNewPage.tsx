@@ -14,7 +14,7 @@ import { addDaysLocal, todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
-import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Line = { description: string; quantity: string; unit_price: string; expense_account_id: string };
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
@@ -40,7 +40,7 @@ function fmtAddress(a: Address | null | undefined): string {
   return [a.line1, a.line2, cityLine, a.country].filter(Boolean).join('\n');
 }
 
-export default function BillNewPage() {
+function BillNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
@@ -101,7 +101,12 @@ export default function BillNewPage() {
         })),
       };
       const r = await api.post(`/businesses/${bizId}/bills`, body);
-      await save.finish(`/businesses/${bizId}/bills/${r.data.bill.id}/post`, `/ap/bills/${r.data.bill.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/bills/${r.data.bill.id}/post`,
+        detailPath: `/ap/bills/${r.data.bill.id}`,
+        listPath: '/ap/bills',
+        label: 'Bill',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -231,3 +236,6 @@ export default function BillNewPage() {
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(BillNewPage);

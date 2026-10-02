@@ -13,7 +13,7 @@ import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
-import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Customer = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -26,7 +26,7 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-export default function PaymentNewPage() {
+function PaymentNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
@@ -121,7 +121,12 @@ export default function PaymentNewPage() {
         ...(initial_applications.length > 0 ? { initial_applications } : {}),
       };
       const r = await api.post(`/businesses/${bizId}/payments`, body);
-      await save.finish(`/businesses/${bizId}/payments/${r.data.payment.id}/post`, `/payments/${r.data.payment.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/payments/${r.data.payment.id}/post`,
+        detailPath: `/payments/${r.data.payment.id}`,
+        listPath: '/payments',
+        label: 'Payment',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -258,3 +263,6 @@ export default function PaymentNewPage() {
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(PaymentNewPage);

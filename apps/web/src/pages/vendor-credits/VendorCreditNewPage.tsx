@@ -13,7 +13,7 @@ import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
-import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Vendor = { id: string; name: string; billing_address: Address | null };
@@ -25,7 +25,7 @@ function fmtAddress(a: Address | null | undefined): string {
   return [a.line1, a.line2, cityLine, a.country].filter(Boolean).join('\n');
 }
 
-export default function VendorCreditNewPage() {
+function VendorCreditNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
@@ -53,7 +53,12 @@ export default function VendorCreditNewPage() {
     try {
       const body = { ...form, amount: parseMoneyInput(form.amount), memo: form.memo || null };
       const r = await api.post(`/businesses/${bizId}/vendor-credits`, body);
-      await save.finish(`/businesses/${bizId}/vendor-credits/${r.data.id}/post`, `/ap/vendor-credits/${r.data.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/vendor-credits/${r.data.id}/post`,
+        detailPath: `/ap/vendor-credits/${r.data.id}`,
+        listPath: '/ap/vendor-credits',
+        label: 'Vendor credit',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -146,3 +151,6 @@ export default function VendorCreditNewPage() {
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(VendorCreditNewPage);

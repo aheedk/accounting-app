@@ -13,7 +13,7 @@ import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
-import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Vendor = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -26,7 +26,7 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-export default function BillPaymentNewPage() {
+function BillPaymentNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
@@ -120,7 +120,12 @@ export default function BillPaymentNewPage() {
         ...(initial_applications.length > 0 ? { initial_applications } : {}),
       };
       const r = await api.post(`/businesses/${bizId}/bill-payments`, body);
-      await save.finish(`/businesses/${bizId}/bill-payments/${r.data.bill_payment.id}/post`, `/ap/bill-payments/${r.data.bill_payment.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/bill-payments/${r.data.bill_payment.id}/post`,
+        detailPath: `/ap/bill-payments/${r.data.bill_payment.id}`,
+        listPath: '/ap/bill-payments',
+        label: 'Bill payment',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -254,3 +259,6 @@ export default function BillPaymentNewPage() {
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(BillPaymentNewPage);

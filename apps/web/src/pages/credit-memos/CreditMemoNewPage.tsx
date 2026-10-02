@@ -13,7 +13,7 @@ import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
-import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Customer = { id: string; name: string; billing_address: Address | null };
@@ -25,7 +25,7 @@ function fmtAddress(a: Address | null | undefined): string {
   return [a.line1, a.line2, cityLine, a.country].filter(Boolean).join('\n');
 }
 
-export default function CreditMemoNewPage() {
+function CreditMemoNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
@@ -53,7 +53,12 @@ export default function CreditMemoNewPage() {
     try {
       const body = { ...form, amount: parseMoneyInput(form.amount), memo: form.memo || null };
       const r = await api.post(`/businesses/${bizId}/credit-memos`, body);
-      await save.finish(`/businesses/${bizId}/credit-memos/${r.data.id}/post`, `/credit-memos/${r.data.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/credit-memos/${r.data.id}/post`,
+        detailPath: `/credit-memos/${r.data.id}`,
+        listPath: '/credit-memos',
+        label: 'Credit memo',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -156,3 +161,6 @@ export default function CreditMemoNewPage() {
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(CreditMemoNewPage);

@@ -12,7 +12,7 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddParty } from '@/components/addNew/useAddParty';
-import { SaveButtons, useSaveAndPost } from '@/components/SaveAndPost';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
@@ -21,7 +21,7 @@ const blank = (): Line => ({ description: '', inventory_item_id: '', amount: '' 
 
 const STANDARD_TERMS = ['Net 30', 'Net 60', 'Net 90', '2/10 Net 30'];
 
-export default function InvoiceNewPage() {
+function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const save = useSaveAndPost();
@@ -109,7 +109,12 @@ export default function InvoiceNewPage() {
         lines: mapped,
       };
       const r = await api.post(`/businesses/${bizId}/invoices`, body);
-      await save.finish(`/businesses/${bizId}/invoices/${r.data.invoice.id}/post`, `/invoices/${r.data.invoice.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/invoices/${r.data.invoice.id}/post`,
+        detailPath: `/invoices/${r.data.invoice.id}`,
+        listPath: '/invoices',
+        label: 'Invoice',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -201,3 +206,6 @@ export default function InvoiceNewPage() {
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(InvoiceNewPage);
