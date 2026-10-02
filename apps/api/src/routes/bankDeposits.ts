@@ -70,8 +70,20 @@ router.patch('/businesses/:businessId/bank-deposits/:id',
   },
 );
 
-router.delete('/businesses/:businessId/bank-deposits/:id',
+router.post('/businesses/:businessId/bank-deposits/:id/void',
   requireMinRole('accountant'),
+  async (req, res, next) => {
+    try {
+      const deposit = await db.transaction().execute(trx =>
+        depositSvc.voidDeposit(trx, ctxFromReq(req), req.params['id']!),
+      );
+      res.json(deposit);
+    } catch (e) { next(e); }
+  },
+);
+
+router.delete('/businesses/:businessId/bank-deposits/:id',
+  requireMinRole('firm_admin'),
   async (req, res, next) => {
     try {
       await db.transaction().execute(trx =>

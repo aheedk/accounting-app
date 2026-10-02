@@ -161,7 +161,7 @@ describe('bankDepositService', () => {
     expect(reloaded.is_deposited).toBe(true);
   });
 
-  it('deleteDeposit voids the JE and un-marks any included payments', async () => {
+  it('deleteDeposit removes the JE entirely (not just voids it) and un-marks any included payments', async () => {
     const { biz, ctx, bankAccount, undepositedFunds } = await bootstrap();
     const payment = await makePostedPayment(ctx, biz.id, undepositedFunds);
     const deposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, ctx, {
@@ -172,14 +172,48 @@ describe('bankDepositService', () => {
 
     await t.db.transaction().execute(trx => depositSvc.deleteDeposit(trx, ctx, deposit.id));
 
-    const je = await t.db.selectFrom('journal_entries').select('status').where('id', '=', deposit.journal_entry_id!).executeTakeFirstOrThrow();
-    expect(je.status).toBe('voided');
+    // Delete is a true QBO-style hard delete — nothing left in the GL, unlike
+    // Void, which keeps the JE (voided) plus a reversal.
+    const je = await t.db.selectFrom('journal_entries').select('id').where('id', '=', deposit.journal_entry_id!).executeTakeFirst();
+    expect(je).toBeUndefined();
     const reloaded = await t.db.selectFrom('payments').select('is_deposited').where('id', '=', payment.id).executeTakeFirstOrThrow();
     expect(reloaded.is_deposited).toBe(false);
     await expect(depositSvc.getDeposit(t.db, ctx, deposit.id)).rejects.toThrow();
   });
 
-  it('deleteDeposit reverses on the original deposit date, not today — so a date-bounded GL view nets to zero', async () => {
+  it('voidDeposit keeps the record, reverses on the original deposit date (not today), and flips editable to false', async () => {
+    const { ctx, bankAccount, income } = await bootstrap();
+    const deposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, ctx, {
+      bank_account_id: bankAccount.id,
+      deposit_date: '2026-03-06',
+      lines: [{ line_type: 'other_funds', account_id: income.id, amount: '500.00' }],
+    }));
+
+    const voided = await t.db.transaction().execute(trx => depositSvc.voidDeposit(trx, ctx, deposit.id));
+    expect(voided.voided_at).not.toBeNull();
+
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', deposit.journal_entry_id!).executeTakeFirstOrThrow();
+    // voidJournalEntry defaults reversal_date to today when the caller omits
+    // it — without passing deposit_date explicitly, this would be today's
+    // date instead of 2026-03-06, stranding the voided original's full
+    // amount unoffset in any GL view that doesn't extend to today.
+    expect(reversal.entry_date).toBe('2026-03-06');
+
+    // The record survives (read-only), unlike Delete.
+    const full = await depositSvc.getDeposit(t.db, ctx, deposit.id);
+    expect(full.editable).toBe(false);
+
+    await expect(t.db.transaction().execute(trx =>
+      depositSvc.voidDeposit(trx, ctx, deposit.id),
+    )).rejects.toThrow(/already void/);
+    await expect(t.db.transaction().execute(trx => depositSvc.updateDeposit(trx, ctx, deposit.id, {
+      bank_account_id: bankAccount.id, deposit_date: '2026-03-06',
+      lines: [{ line_type: 'other_funds', account_id: income.id, amount: '500.00' }],
+    }))).rejects.toThrow(/voided deposit cannot be edited/);
+  });
+
+  it('deleteDeposit removes the JE entirely, leaving nothing in the General Ledger', async () => {
     const { ctx, bankAccount, income } = await bootstrap();
     const deposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, ctx, {
       bank_account_id: bankAccount.id,
@@ -189,13 +223,12 @@ describe('bankDepositService', () => {
 
     await t.db.transaction().execute(trx => depositSvc.deleteDeposit(trx, ctx, deposit.id));
 
-    const reversal = await t.db.selectFrom('journal_entries').selectAll()
-      .where('reversed_entry_id', '=', deposit.journal_entry_id!).executeTakeFirstOrThrow();
-    // voidJournalEntry defaults reversal_date to today when the caller omits
-    // it — without passing deposit_date explicitly, this would be today's
-    // date instead of 2026-03-06, stranding the voided original's full
-    // amount unoffset in any GL view that doesn't extend to today.
-    expect(reversal.entry_date).toBe('2026-03-06');
+    const je = await t.db.selectFrom('journal_entries').select('id')
+      .where('id', '=', deposit.journal_entry_id!).executeTakeFirst();
+    expect(je).toBeUndefined();
+    const reversal = await t.db.selectFrom('journal_entries').select('id')
+      .where('reversed_entry_id', '=', deposit.journal_entry_id!).executeTakeFirst();
+    expect(reversal).toBeUndefined();
   });
 
   it('a normally created deposit is editable', async () => {
@@ -244,10 +277,12 @@ describe('bankDepositService', () => {
     }));
     expect(wrapped).not.toBeNull();
 
-    // editable=false still marks its provenance (drives the "Imported" badge),
-    // but — same as QuickBooks — it does not block editing or deleting.
+    // imported=true just marks its provenance (drives the "Imported" badge),
+    // but — same as QuickBooks — it does not block editing or deleting:
+    // editable tracks the real terminal state (voided), not provenance.
     const full = await depositSvc.getDeposit(t.db, ctx, wrapped!.id);
-    expect(full.editable).toBe(false);
+    expect(full.imported).toBe(true);
+    expect(full.editable).toBe(true);
 
     const updated = await t.db.transaction().execute(trx => depositSvc.updateDeposit(trx, ctx, wrapped!.id, {
       bank_account_id: bankAccount.id,

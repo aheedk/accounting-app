@@ -202,6 +202,7 @@ export const AUDIT = {
   // Bank deposits
   BANK_DEPOSIT_CREATE: 'bank_deposit.create',
   BANK_DEPOSIT_UPDATE: 'bank_deposit.update',
+  BANK_DEPOSIT_VOID: 'bank_deposit.void',
   BANK_DEPOSIT_DELETE: 'bank_deposit.delete',
 } as const;
 

@@ -129,5 +129,7 @@ describe('payRunService', () => {
       .where('reversed_entry_id', '=', finalized.journal_entry_id!)
       .execute();
     expect(reversals).toHaveLength(1);
+    // Reverses on the pay run's own pay_date, not today.
+    expect(reversals[0]?.entry_date).toBe('2026-04-20');
   });
 });

@@ -613,6 +613,18 @@ type DeletableEntry = {
   reversed_entry_id: string | null;
 };
 
+/** True when the guard's source_type/source_id match the entry's own — the
+ * owning source service is deleting its own entry, so the generic
+ * "source-generated entries are protected" block does not apply to it. */
+function deleteSourceGuardMatches(
+  entry: { source_type: JournalEntrySourceType; source_id: string | null },
+  guard: JournalEntrySourceGuard | undefined,
+): boolean {
+  if (!guard) return false;
+  if (entry.source_type === guard.source_type && entry.source_id === guard.source_id) return true;
+  return guard.allow_legacy_manual === true && entry.source_type === 'manual' && entry.source_id === null;
+}
+
 /**
  * What deleting a journal entry would remove, and whether it is allowed.
  *
@@ -620,9 +632,14 @@ type DeletableEntry = {
  * adjusting entries, and reversing entries of those. A void leaves two entries
  * that cancel out (the voided original and its reversal); those are only ever
  * deleted together, since removing one half would change the books.
+ *
+ * `source_guard` lets a source service (Bank Deposit, Expense, ...) delete its
+ * own source-generated entry — same escape hatch voidJournalEntry already has.
+ * Without it, source-generated entries are refused, same as before.
  */
 export async function planJournalEntryDelete(
-  db: Kysely<DB>, ctx: ServiceCtx, entry: DeletableEntry, opts: { allowClosedPeriods?: boolean } = {},
+  db: Kysely<DB>, ctx: ServiceCtx, entry: DeletableEntry,
+  opts: { allowClosedPeriods?: boolean; source_guard?: JournalEntrySourceGuard } = {},
 ): Promise<JournalEntryDeletePlan> {
   const blocked = (block_reason: string): JournalEntryDeletePlan => ({ block_reason, entry_ids: [], removes_pair: false });
   if (!hasMinRole(ctx.effective_role, 'accountant')) {
@@ -639,12 +656,12 @@ export async function planJournalEntryDelete(
         .executeTakeFirst()
       : undefined;
     if (!original) return blocked('The entry this one reverses could not be found.');
-    if (await isSourceGeneratedJournalEntry(db, original)) return blocked(sourceMessage);
+    if (!deleteSourceGuardMatches(original, opts.source_guard) && await isSourceGeneratedJournalEntry(db, original)) return blocked(sourceMessage);
     // Reversal of a voided original: the pair goes together. Reversal made with
     // "Reverse" (original still posted): removing it simply undoes the reversal.
     entries = original.status === 'voided' ? [entry, original] : [entry];
   } else {
-    if (await isSourceGeneratedJournalEntry(db, entry)) return blocked(sourceMessage);
+    if (!deleteSourceGuardMatches(entry, opts.source_guard) && await isSourceGeneratedJournalEntry(db, entry)) return blocked(sourceMessage);
     const reversals = await db.selectFrom('journal_entries').selectAll()
       .where('business_id', '=', entry.business_id)
       .where('reversed_entry_id', '=', entry.id)
@@ -686,7 +703,8 @@ export async function planJournalEntryDelete(
  * to the audit log; see planJournalEntryDelete for what qualifies.
  */
 export async function deleteJournalEntry(
-  trx: Transaction<DB>, ctx: ServiceCtx, input: { journal_entry_id: string },
+  trx: Transaction<DB>, ctx: ServiceCtx,
+  input: { journal_entry_id: string; source_guard?: JournalEntrySourceGuard },
 ): Promise<{ deleted_entry_ids: string[] }> {
   const entry = await trx.selectFrom('journal_entries').selectAll()
     .where('id', '=', input.journal_entry_id)
@@ -696,7 +714,10 @@ export async function deleteJournalEntry(
   if (!entry) throw new BusinessRuleError(ERR.NOT_FOUND, `Journal entry ${input.journal_entry_id} not found`);
 
   const adminOverride = (await currentSetting(trx, 'app.admin_override')) === 'on';
-  const plan = await planJournalEntryDelete(trx, ctx, entry, { allowClosedPeriods: adminOverride });
+  const plan = await planJournalEntryDelete(trx, ctx, entry, {
+    allowClosedPeriods: adminOverride,
+    ...(input.source_guard !== undefined ? { source_guard: input.source_guard } : {}),
+  });
   if (plan.block_reason) {
     throw new BusinessRuleError(
       hasMinRole(ctx.effective_role, 'accountant') ? ERR.IMMUTABLE_RECORD : ERR.FORBIDDEN,

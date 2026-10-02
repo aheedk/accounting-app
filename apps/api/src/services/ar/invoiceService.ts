@@ -179,6 +179,7 @@ export async function voidInvoice(
   await voidJournalEntry(trx, ctx, {
     journal_entry_id: inv.posted_journal_entry_id,
     void_reason: `Void invoice ${inv.invoice_number}: ${input.void_reason}`,
+    reversal_date: inv.issue_date,
     source_guard: { source_type: 'invoice', source_id: inv.id },
   });
 

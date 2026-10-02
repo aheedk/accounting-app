@@ -147,4 +147,39 @@ describe('deleting journal entries', () => {
     const detail = await journalQueries.getJournalEntryDetail(t.db, data.ctx, entry.id);
     expect(detail.can_delete).toBe(false);
   });
+
+  it('refuses a source-generated entry without a matching source_guard, and allows it with one', async () => {
+    const data = await setup(t);
+    const posted = await t.db.transaction().execute(trx => expenses.createExpense(trx, data.ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: data.cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: data.supplies.id, amount: '40.00' }],
+    }));
+    const jeId = posted.journal_entry_id!;
+
+    // No guard: refused, same as any other source-generated entry.
+    await expect(t.db.transaction().execute(trx =>
+      ledger.deleteJournalEntry(trx, data.ctx, { journal_entry_id: jeId }),
+    )).rejects.toThrow(/source transaction/);
+
+    // A guard for the WRONG source is also refused.
+    await expect(t.db.transaction().execute(trx =>
+      ledger.deleteJournalEntry(trx, data.ctx, {
+        journal_entry_id: jeId,
+        source_guard: { source_type: 'bank_deposit', source_id: posted.id },
+      }),
+    )).rejects.toThrow(/source transaction/);
+
+    // The owning source's own guard is honored (the real deleteExpense flow
+    // clears expense_transactions' own FK to the JE first, same as here).
+    const result = await t.db.transaction().execute(async trx => {
+      await trx.deleteFrom('expense_transactions').where('id', '=', posted.id).execute();
+      return ledger.deleteJournalEntry(trx, data.ctx, {
+        journal_entry_id: jeId,
+        source_guard: { source_type: 'expense', source_id: posted.id },
+      });
+    });
+    expect(result.deleted_entry_ids).toEqual([jeId]);
+    expect(await entryCount(t)).toBe(0);
+  });
 });

@@ -233,6 +233,7 @@ export async function voidPayRun(
     await voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: input.void_reason ?? 'pay run voided',
+      reversal_date: before.pay_date,
       source_guard: {
         source_type: 'adjustment',
         source_id: before.id,

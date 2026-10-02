@@ -145,4 +145,19 @@ describe('paymentService', () => {
       t.db.transaction().execute(trx => paymentSvc.voidPayment(trx, ctx, { payment_id: posted.id, void_reason: 'oops' })),
     ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
   });
+
+  it('voidPayment reverses on the payment_date, not today', async () => {
+    const { biz, ctx, customer, cash } = await setup(t);
+    const dr = await t.db.transaction().execute(trx =>
+      paymentSvc.createDraft(trx, ctx, {
+        business_id: biz.id, customer_id: customer.id, payment_date: '2026-04-20',
+        payment_method: 'cash', reference: null, amount: '100.0000', cash_account_id: cash.id, memo: null,
+      }),
+    );
+    const posted = await t.db.transaction().execute(trx => paymentSvc.postPayment(trx, ctx, { payment_id: dr.payment.id }));
+    await t.db.transaction().execute(trx => paymentSvc.voidPayment(trx, ctx, { payment_id: posted.id, void_reason: 'oops' }));
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', posted.posted_journal_entry_id!).executeTakeFirstOrThrow();
+    expect(reversal.entry_date).toBe('2026-04-20');
+  });
 });

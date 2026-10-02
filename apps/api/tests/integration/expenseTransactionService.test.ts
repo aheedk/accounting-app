@@ -203,7 +203,7 @@ describe('expenseTransactionService', () => {
     }))).rejects.toThrow(/voided expense cannot be edited/);
   });
 
-  it('deleteExpense voids the JE and removes the row entirely', async () => {
+  it('deleteExpense removes the row AND the JE entirely — nothing left in the General Ledger', async () => {
     const { supplies, cash, ctx } = await bootstrap();
     const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
       transaction_date: '2026-04-15', payee_text: 'Staples',
@@ -218,13 +218,14 @@ describe('expenseTransactionService', () => {
       .where('id', '=', expense.id).executeTakeFirst();
     expect(row).toBeUndefined();
 
-    const je = await t.db.selectFrom('journal_entries').select('status')
-      .where('id', '=', jeId).executeTakeFirstOrThrow();
-    expect(je.status).toBe('voided');
-
-    const reversal = await t.db.selectFrom('journal_entries').selectAll()
-      .where('reversed_entry_id', '=', jeId).executeTakeFirstOrThrow();
-    expect(reversal.entry_date).toBe('2026-04-15');
+    // Delete is a true QBO-style hard delete — unlike voidExpense, which
+    // keeps the JE (voided) plus a reversal, nothing is left behind here.
+    const je = await t.db.selectFrom('journal_entries').select('id')
+      .where('id', '=', jeId).executeTakeFirst();
+    expect(je).toBeUndefined();
+    const reversal = await t.db.selectFrom('journal_entries').select('id')
+      .where('reversed_entry_id', '=', jeId).executeTakeFirst();
+    expect(reversal).toBeUndefined();
 
     const audit = await t.db.selectFrom('audit_logs').selectAll()
       .where('action', '=', 'expense_transaction.delete').execute();

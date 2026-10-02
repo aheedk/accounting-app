@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { hasMinRole } from '@accounting/shared';
 import { BookOpen, ChevronDown, Clock, Copy, History, Paperclip, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { cachedGet, invalidateReferenceCache } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
@@ -57,9 +59,13 @@ type DepositDetail = {
   cash_back_memo: string | null;
   cash_back_amount: string | null;
   journal_entry_id: string | null;
-  // false when this deposit wraps a journal entry this feature didn't post
-  // itself (AI-coded from a bank statement import) — corrections belong there.
+  voided_at: string | null;
+  // False once voided — a terminal, read-only state (see voidDeposit).
   editable: boolean;
+  // True when this deposit wraps a journal entry this feature didn't post
+  // itself (AI-coded from a bank statement import) — informational only.
+  imported: boolean;
+  is_reconciled: boolean;
   lines: DepositLine[];
 };
 
@@ -311,6 +317,8 @@ export default function BankDepositPage() {
   const isNew = !id || id === 'new';
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const { user, businesses } = useAuth();
+  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [accounts, setAccounts] = useState<AccountLike[]>([]);
@@ -445,10 +453,12 @@ export default function BankDepositPage() {
   const hasUndepositedLines = isNew
     ? selectedPaymentIds.size > 0
     : (deposit?.lines.some(l => l.line_type === 'undeposited_funds') ?? false);
-  // Every deposit opens directly in edit mode, same as QuickBooks — there is
-  // no separate read-only view, including for deposits wrapping an AI-coded
-  // import (deposit.editable only drives the "Imported" badge now).
-  const canEdit = true;
+  // A new or posted deposit opens directly in edit mode, same as QuickBooks —
+  // including one wrapping an AI-coded import (deposit.imported only drives
+  // the "Imported" badge). A voided deposit is read-only, same as Expense.
+  const canEdit = isNew || (deposit?.editable ?? true);
+  const canVoid = role !== undefined && hasMinRole(role, 'accountant');
+  const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
 
   async function handleSave() {
     setErr(null);
@@ -517,13 +527,27 @@ export default function BankDepositPage() {
     }
   }
 
+  async function handleVoid() {
+    if (!id || !bizId) return;
+    if (!confirm('Are you sure you want to void this deposit? This will reverse the journal entry.')) return;
+    setBusy(true);
+    try {
+      await api.post(`/businesses/${bizId}/bank-deposits/${id}/void`);
+      await load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Failed to void deposit.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDelete() {
     if (!id || !bizId) return;
-    if (!confirm('Delete this deposit? The journal entry will be voided and payments returned to Undeposited Funds.')) return;
+    if (!confirm('Are you sure you want to delete this deposit? This cannot be undone.')) return;
     setBusy(true);
     try {
       await api.delete(`/businesses/${bizId}/bank-deposits/${id}`);
-      nav('/accounting/bank-transactions');
+      nav('/accounting/bank-deposits');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Failed to delete deposit.');
     } finally {
@@ -654,17 +678,31 @@ export default function BankDepositPage() {
         <h1 className="text-xl font-semibold">
           Bank Deposit{deposit ? ` — ${deposit.deposit_number}` : ''}
         </h1>
-        {deposit && (
+        {deposit && deposit.voided_at && (
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Voided</span>
+        )}
+        {deposit && !deposit.voided_at && (
           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
             Posted
           </span>
         )}
-        {deposit && !deposit.editable && (
+        {deposit?.imported && (
           <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
             Imported
           </span>
         )}
+        {deposit?.is_reconciled && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="This deposit's payment has been reconciled">
+            Reconciled
+          </span>
+        )}
       </div>
+
+      {deposit?.is_reconciled && canEdit && (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-900">
+          This deposit has been reconciled. Editing it may require re-reconciling the affected bank statement.
+        </div>
+      )}
 
       {/* ── Header strip: Account · Date · AMOUNT ── */}
       <div className="flex items-end justify-between border-b bg-muted/10 px-6 pb-4 pt-5">
@@ -1029,16 +1067,23 @@ export default function BankDepositPage() {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
                     <div className="absolute bottom-8 left-0 z-50 w-52 rounded-lg border bg-card shadow-xl">
-                      {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => { setMoreOpen(false); alert('Copy — coming soon'); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
+                      >
+                        <Copy className="h-4 w-4" /> Copy
+                      </button>
+                      {canEdit && canVoid && (
                         <button
                           type="button"
-                          onClick={() => { setMoreOpen(false); alert('Copy — coming soon'); }}
+                          onClick={() => { setMoreOpen(false); void handleVoid(); }}
                           className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
                         >
-                          <Copy className="h-4 w-4" /> Copy
+                          <X className="h-4 w-4" /> Void
                         </button>
                       )}
-                      {canEdit && (
+                      {canDelete && (
                         <button
                           type="button"
                           onClick={() => { setMoreOpen(false); void handleDelete(); }}

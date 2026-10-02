@@ -1077,6 +1077,8 @@ export interface BankDepositsTable {
   cash_back_memo: string | null;
   cash_back_amount: ColumnType<string | null, string | number | null, string | number | null>;
   journal_entry_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

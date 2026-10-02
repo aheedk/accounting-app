@@ -90,4 +90,16 @@ describe('vendorCreditService', () => {
       t.db.transaction().execute(trx => vc.applyToBill(trx, ctx, { vendor_credit_id: postedVc.id, bill_id: draftBill.bill.id, applied_amount: '60.0000' })),
     ).rejects.toMatchObject({ code: ERR.OVERAPPLICATION });
   });
+
+  it('voidVendorCredit reverses on the credit_date, not today', async () => {
+    const { biz, ctx, vendor, offset } = await setup(t);
+    const c = await t.db.transaction().execute(trx =>
+      vc.createDraft(trx, ctx, { business_id: biz.id, vendor_id: vendor.id, credit_date: '2026-04-16', amount: '20.0000', offset_account_id: offset.id, memo: null }),
+    );
+    const posted = await t.db.transaction().execute(trx => vc.postVendorCredit(trx, ctx, { vendor_credit_id: c.id }));
+    await t.db.transaction().execute(trx => vc.voidVendorCredit(trx, ctx, { vendor_credit_id: posted.id, void_reason: 'oops' }));
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', posted.posted_journal_entry_id!).executeTakeFirstOrThrow();
+    expect(reversal.entry_date).toBe('2026-04-16');
+  });
 });

@@ -131,6 +131,7 @@ export async function voidCreditMemo(
   await voidJournalEntry(trx, ctx, {
     journal_entry_id: cm.posted_journal_entry_id,
     void_reason: `Void credit memo: ${input.void_reason}`,
+    reversal_date: cm.memo_date,
     source_guard: { source_type: 'credit_memo', source_id: cm.id },
   });
 

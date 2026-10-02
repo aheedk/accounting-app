@@ -190,6 +190,7 @@ export async function voidBillPayment(
   await voidJournalEntry(trx, ctx, {
     journal_entry_id: payment.posted_journal_entry_id,
     void_reason: `Void bill payment: ${input.void_reason}`,
+    reversal_date: payment.payment_date,
     source_guard: { source_type: 'bill_payment', source_id: payment.id },
   });
 

@@ -1,4 +1,4 @@
-import { type Transaction, type Kysely } from 'kysely';
+import { sql, type Transaction, type Kysely } from 'kysely';
 import { AUDIT } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
@@ -232,6 +232,7 @@ export async function updateDeposit(
     .forUpdate()
     .executeTakeFirst();
   if (!before) throw new NotFoundError('bank_deposit', id);
+  if (before.voided_at) throw new PreconditionError('A voided deposit cannot be edited');
 
   const existingLines = await trx.selectFrom('bank_deposit_lines').selectAll()
     .where('deposit_id', '=', id)
@@ -344,7 +345,7 @@ export async function getDeposit(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
       'd.id', 'd.business_id', 'd.bank_account_id', 'd.deposit_date',
       'd.deposit_number', 'd.memo', 'd.total_amount', 'd.journal_entry_id',
       'd.cash_back_account_id', 'd.cash_back_memo', 'd.cash_back_amount',
-      'd.created_at', 'd.updated_at',
+      'd.voided_at', 'd.created_at', 'd.updated_at',
       'ba.name as bank_account_name',
       'coa.name as cash_account_name',
     ])
@@ -353,16 +354,19 @@ export async function getDeposit(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
     .executeTakeFirst();
   if (!deposit) throw new NotFoundError('bank_deposit', id);
 
-  // A deposit wrapping a JE this feature didn't post itself (e.g. AI-coded from
-  // a bank statement import) is view-only here — it must be corrected at its
-  // real source so the two never drift out of sync with each other.
-  let editable = true;
+  // A deposit wrapping a JE this feature didn't post itself (e.g. AI-coded
+  // from a bank statement import) is flagged "Imported" only — informational,
+  // same as Expense; it does not affect editability. editable instead tracks
+  // the real terminal state (voided), matching Expense's own pattern.
+  let imported = false;
   if (deposit.journal_entry_id) {
     const je = await db.selectFrom('journal_entries').select('source_type')
       .where('id', '=', deposit.journal_entry_id)
       .executeTakeFirst();
-    editable = je?.source_type === 'bank_deposit';
+    imported = je !== undefined && je.source_type !== 'bank_deposit';
   }
+  const editable = deposit.voided_at === null;
+  const is_reconciled = await isReconciled(db, deposit.journal_entry_id);
 
   const lines = await db.selectFrom('bank_deposit_lines as l')
     .leftJoin('chart_of_accounts as a', 'a.id', 'l.account_id')
@@ -376,7 +380,7 @@ export async function getDeposit(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
     .orderBy('l.sort_order', 'asc')
     .execute();
 
-  return { ...deposit, editable, lines };
+  return { ...deposit, editable, imported, is_reconciled, lines };
 }
 
 export async function listDeposits(db: Kysely<DB>, ctx: ServiceCtx) {
@@ -503,6 +507,65 @@ export async function wrapImportedDepositJournalEntry(
   return { id: deposit.id };
 }
 
+/**
+ * Void a deposit (QBO "Void"): keeps the bank_deposits record — still visible
+ * and viewable, just read-only — and reverses the JE. Distinct from Delete,
+ * which removes the record and the JE entirely.
+ */
+export async function voidDeposit(
+  trx: Transaction<DB>,
+  ctx: ServiceCtx,
+  id: string,
+) {
+  const before = await trx.selectFrom('bank_deposits').selectAll()
+    .where('id', '=', id)
+    .where('business_id', '=', ctx.business_id!)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!before) throw new NotFoundError('bank_deposit', id);
+  if (before.voided_at) throw new PreconditionError('This deposit is already void');
+
+  if (before.journal_entry_id) {
+    await ledger.voidJournalEntry(trx, ctx, {
+      journal_entry_id: before.journal_entry_id,
+      void_reason: `Bank deposit ${before.deposit_number} voided`,
+      reversal_date: before.deposit_date,
+      ...(await voidGuardFor(trx, before.journal_entry_id)),
+    });
+  }
+
+  const updated = await trx.updateTable('bank_deposits').set({
+    voided_at: sql`now()`,
+    voided_by_user_id: ctx.user_id,
+  }).where('id', '=', id).returningAll().executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.BANK_DEPOSIT_VOID,
+    entity_type: 'bank_deposit',
+    entity_id: id,
+    before, after: updated,
+  });
+  return updated;
+}
+
+/** True once the deposit's journal entry's bank-side line has gone through a bank reconciliation. */
+async function isReconciled(db: Transaction<DB> | Kysely<DB>, journal_entry_id: string | null): Promise<boolean> {
+  if (!journal_entry_id) return false;
+  const match = await db.selectFrom('bank_transactions')
+    .select('id')
+    .where('matched_journal_entry_id', '=', journal_entry_id)
+    .where('is_reconciled', '=', true)
+    .executeTakeFirst();
+  return match !== undefined;
+}
+
+/**
+ * Remove a deposit entirely (QBO "Delete"), as opposed to voidDeposit, which
+ * keeps the record and reverses the JE. The JE itself is hard-deleted via
+ * ledger.deleteJournalEntry — not just voided — so nothing is left in the
+ * General Ledger once this returns (deleteJournalEntry also cleans up an
+ * existing void's reversal pair, for a deposit that was voided first).
+ */
 export async function deleteDeposit(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
@@ -515,6 +578,10 @@ export async function deleteDeposit(
     .where('business_id', '=', bizId)
     .executeTakeFirst();
   if (!before) throw new NotFoundError('bank_deposit', id);
+
+  if (await isReconciled(trx, before.journal_entry_id)) {
+    throw new PreconditionError('This deposit has been reconciled and cannot be deleted.');
+  }
 
   // Un-mark payments so they return to Undeposited Funds
   const paymentLines = await trx.selectFrom('bank_deposit_lines')
@@ -530,16 +597,17 @@ export async function deleteDeposit(
       .execute();
   }
 
+  // The journal_entry_id FK must be gone before the JE itself can be deleted,
+  // so resolve the guard (reads the JE) and delete the wrapper row first.
+  const guard = before.journal_entry_id ? await voidGuardFor(trx, before.journal_entry_id) : {};
+  await trx.deleteFrom('bank_deposits').where('id', '=', id).execute();
+
   if (before.journal_entry_id) {
-    await ledger.voidJournalEntry(trx, ctx, {
+    await ledger.deleteJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
-      void_reason: `Bank deposit ${before.deposit_number} deleted`,
-      reversal_date: before.deposit_date,
-      ...(await voidGuardFor(trx, before.journal_entry_id)),
+      ...guard,
     });
   }
-
-  await trx.deleteFrom('bank_deposits').where('id', '=', id).execute();
 
   await auditRecord(trx, ctx, {
     action: AUDIT.BANK_DEPOSIT_DELETE,

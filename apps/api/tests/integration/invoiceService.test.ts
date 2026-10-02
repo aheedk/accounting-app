@@ -135,6 +135,8 @@ describe('invoiceService', () => {
       .where('source_id', '=', posted.posted_journal_entry_id!).execute();
     const reversal = jes.find(j => j.source_type === 'reversal');
     expect(reversal).toBeTruthy();
+    // Reverses on the invoice's own date, not today.
+    expect(reversal?.entry_date).toBe('2026-04-15');
   });
 
   it('addLine and removeLine work on drafts; refused on posted', async () => {

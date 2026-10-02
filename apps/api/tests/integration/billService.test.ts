@@ -149,5 +149,8 @@ describe('billService', () => {
       .where('source_id', '=', posted.posted_journal_entry_id!).execute();
     const reversal = jes.find(j => j.source_type === 'reversal');
     expect(reversal).toBeTruthy();
+    // Reverses on the bill's own date, not today — otherwise the voided
+    // original's amount sits unoffset in any GL view bounded to its period.
+    expect(reversal?.entry_date).toBe('2026-04-15');
   });
 });

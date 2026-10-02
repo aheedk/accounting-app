@@ -344,6 +344,13 @@ export async function voidExpense(
   return updated;
 }
 
+/**
+ * Remove an expense entirely (QBO "Delete"), as opposed to voidExpense, which
+ * keeps the record and reverses the JE. The JE itself is hard-deleted via
+ * ledger.deleteJournalEntry — not just voided — so nothing is left in the
+ * General Ledger once this returns (deleteJournalEntry also cleans up an
+ * existing void's reversal pair, for an expense that was voided first).
+ */
 export async function deleteExpense(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
@@ -363,16 +370,17 @@ export async function deleteExpense(
   const lines = await trx.selectFrom('expense_transaction_lines').selectAll()
     .where('expense_transaction_id', '=', id).execute();
 
-  if (before.journal_entry_id && before.status !== 'void') {
-    await ledger.voidJournalEntry(trx, ctx, {
+  // The journal_entry_id FK must be gone before the JE itself can be deleted,
+  // so resolve the guard (reads the JE) and delete the wrapper row first.
+  const guard = before.journal_entry_id ? await voidGuardFor(trx, before.journal_entry_id) : {};
+  await trx.deleteFrom('expense_transactions').where('id', '=', id).execute();
+
+  if (before.journal_entry_id) {
+    await ledger.deleteJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
-      void_reason: 'Expense deleted',
-      reversal_date: before.transaction_date,
-      ...(await voidGuardFor(trx, before.journal_entry_id)),
+      ...guard,
     });
   }
-
-  await trx.deleteFrom('expense_transactions').where('id', '=', id).execute();
 
   await auditRecord(trx, ctx, {
     action: AUDIT.EXPENSE_TRANSACTION_DELETE,

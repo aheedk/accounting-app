@@ -131,6 +131,7 @@ export async function voidVendorCredit(
   await voidJournalEntry(trx, ctx, {
     journal_entry_id: vc.posted_journal_entry_id,
     void_reason: `Void vendor credit: ${input.void_reason}`,
+    reversal_date: vc.credit_date,
     source_guard: { source_type: 'vendor_credit', source_id: vc.id },
   });
 
