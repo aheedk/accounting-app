@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AccountCreateDrawer from './AccountCreateDrawer';
 import { AppSelect } from '../../components/ui/select';
+import { printReport } from '@/lib/reportExport';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -90,8 +91,6 @@ const DETAIL_TYPES: Record<string, string[]> = {
   revenue: ['Sales Income', 'Service Income', 'Interest Earned', 'Dividend Income', 'Other Income', 'Discounts Given'],
   expense: ['Advertising', 'Auto', 'Bank Charges', 'Cost of Labor', 'Dues & Subscriptions', 'Equipment Rental', 'Insurance', 'Legal & Professional Fees', 'Meals & Entertainment', 'Office Expenses', 'Payroll Expenses', 'Rent', 'Repairs & Maintenance', 'Taxes & Licenses', 'Travel', 'Utilities', 'Other Expenses'],
 };
-
-const PAGE_SIZE = 50;
 
 // Balances display in the account's natural sign (QBO convention): debit-normal
 // for asset/expense, credit-normal for liability/equity/revenue. Trial-balance
@@ -298,6 +297,38 @@ export default function CoaListPage() {
   const startNum = filtered.length === 0 ? 0 : page * pageSize + 1;
   const endNum = Math.min((page + 1) * pageSize, filtered.length);
 
+  const tableTopRef = useRef<HTMLDivElement | null>(null);
+  // The same pager sits above and below the table. Paging from the bottom
+  // scrolls back up, so the new page is read from its first row.
+  function goToPage(next: number, fromBottom: boolean) {
+    setPage(next);
+    if (fromBottom) tableTopRef.current?.scrollIntoView({ block: 'start' });
+  }
+  const pager = (atBottom: boolean) => filtered.length > 0 && (
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <button
+        className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
+        disabled={page === 0}
+        onClick={() => goToPage(page - 1, atBottom)}
+        aria-label="Previous page"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="px-1 tabular-nums text-xs">
+        {page === 0 && totalPages <= 1 ? `1 - ${filtered.length}` : `${startNum} - ${endNum}`}
+        {atBottom && ` of ${filtered.length}`}
+      </span>
+      <button
+        className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
+        disabled={page >= totalPages - 1}
+        onClick={() => goToPage(page + 1, atBottom)}
+        aria-label="Next page"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
   // --- Checkbox helpers ---
   function toggleCheck(id: string) {
     setCheckedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -436,23 +467,27 @@ export default function CoaListPage() {
   }
 
   // --- Export / Print ---
+  // One table for both the Excel export and the printed page.
+  function exportTable() {
+    const headers = ['Number', 'Name', 'Type', 'Detail Type', 'Balance', 'Status'];
+    const rows = filtered.map(a => [
+      a.code, a.name, a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1), a.detail_type ?? '',
+      displayBalance(a) ?? '', a.is_active ? 'Active' : 'Inactive',
+    ]);
+    return { headers, rows };
+  }
+
   function handleExport() {
     setExcelBusy(true);
     try {
-      downloadAsExcel(
-        ['Number', 'Name', 'Type', 'Detail Type', 'Balance', 'Status'],
-        filtered.map(a => [a.code, a.name, a.account_type, a.detail_type ?? '', displayBalance(a) ?? '', a.is_active ? 'active' : 'inactive']),
-        'chart-of-accounts'
-      );
+      const { headers, rows } = exportTable();
+      downloadAsExcel(headers, rows, 'chart-of-accounts', { title: 'Chart of Accounts' });
     } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rows = filtered.map(a => `<tr><td>${a.code}</td><td>${a.name}</td><td style="text-transform:capitalize">${a.account_type}</td><td>${a.detail_type ?? ''}</td><td style="text-align:right">${displayBalance(a) ?? ''}</td><td>${a.is_active ? 'active' : 'inactive'}</td></tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Chart of Accounts</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:11px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:6px 8px;border-bottom:2px solid #ccc;font-size:11px;text-transform:uppercase}td{padding:5px 8px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Chart of Accounts</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr><th>Number</th><th>Name</th><th>Type</th><th>Detail Type</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=function(){window.print()}<\/script></body></html>`);
-    win.document.close();
+    const { headers, rows } = exportTable();
+    printReport({ title: 'Chart of Accounts', headers, rows });
   }
 
   // --- Import ---
@@ -526,7 +561,7 @@ export default function CoaListPage() {
   }
 
   function downloadSampleTemplate() {
-    downloadAsExcel(['Name', 'Code', 'Account Type'], [['Cash', '1000', 'asset'], ['Revenue', '4000', 'revenue'], ['Accounts Payable', '2000', 'liability']], 'coa-template');
+    downloadAsExcel(['Name', 'Code', 'Account Type'], [['Cash', '1000', 'asset'], ['Revenue', '4000', 'revenue'], ['Accounts Payable', '2000', 'liability']], 'coa-template', { bare: true });
   }
 
   const validImportCount = importRows.filter(r => !r.error).length;
@@ -800,29 +835,7 @@ export default function CoaListPage() {
           </div>
 
           {/* Pagination below icons */}
-          {filtered.length > 0 && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <button
-                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
-                disabled={page === 0}
-                onClick={() => setPage(p => p - 1)}
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="px-1 tabular-nums text-xs">
-                {page === 0 && totalPages <= 1 ? `1 - ${filtered.length}` : `${startNum} - ${endNum}`}
-              </span>
-              <button
-                className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted/50 disabled:opacity-40"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage(p => p + 1)}
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          {pager(false)}
         </div>
       </div>
 
@@ -835,7 +848,7 @@ export default function CoaListPage() {
         const colCount = (batchEdit ? 1 : 3) + (showNumber ? 1 : 0) + (colType ? 1 : 0) + (colDetailType ? 1 : 0) + (colDescription ? 1 : 0) + (colQBBalance ? 1 : 0) + (colBankBalance ? 1 : 0) + (colStatus ? 1 : 0);
         const thCls = `px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide`;
         return (
-      <div className="rounded-md border bg-background overflow-hidden">
+      <div ref={tableTopRef} className="scroll-mt-4 rounded-md border bg-background overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30">
             <tr>
@@ -1026,6 +1039,10 @@ export default function CoaListPage() {
             })}
           </tbody>
         </table>
+        {/* Same pager again under the table, so a long page does not need scrolling back up. */}
+        {filtered.length > 0 && (
+          <div className="flex justify-end border-t px-3 py-2">{pager(true)}</div>
+        )}
       </div>
         );
       })()}

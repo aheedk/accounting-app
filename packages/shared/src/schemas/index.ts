@@ -41,3 +41,4 @@ export * from './payRun.js';
 export * from './payrollTax.js';
 export * from './complianceItem.js';
 export * from './bankDeposit.js';
+export * from './importedTransaction.js';

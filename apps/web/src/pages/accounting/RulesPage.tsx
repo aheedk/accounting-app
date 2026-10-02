@@ -10,6 +10,8 @@ import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { printReport } from '@/lib/reportExport';
 
 type SignFilter = 'any' | 'inflow_only' | 'outflow_only';
 
@@ -168,6 +170,7 @@ export default function RulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
 
   const [applyBankAccountId, setApplyBankAccountId] = useState<string>('');
 
@@ -367,56 +370,34 @@ export default function RulesPage() {
     } catch (e: unknown) { setErr(pickErr(e)); await reload(); }
   }
 
+  // One table for both the Excel export and the printed page.
+  function exportTable() {
+    const headers = ['Name', 'Direction', 'Conditions', 'Amount Range', 'Category', 'Priority', 'Active'];
+    const rows = filteredRules.map(r => [
+      r.name,
+      directionLabel(r.sign_filter),
+      `Description contains "${r.description_contains}"`,
+      amountRangeLabel(r.min_amount, r.max_amount) || 'Any',
+      `${r.offset_account_code} — ${r.offset_account_name}`,
+      String(r.priority),
+      r.is_active ? 'Yes' : 'No',
+    ]);
+    return { headers, rows };
+  }
+
   function handleExport() {
     setExcelBusy(true);
     try {
-      const headers = ['Name', 'Direction', 'Conditions', 'Amount Range', 'Category', 'Priority', 'Active'];
-      const rows = filteredRules.map(r => [
-        r.name,
-        directionLabel(r.sign_filter),
-        `Description contains "${r.description_contains}"`,
-        amountRangeLabel(r.min_amount, r.max_amount) || 'Any',
-        `${r.offset_account_code} — ${r.offset_account_name}`,
-        String(r.priority),
-        r.is_active ? 'Yes' : 'No',
-      ]);
-      downloadAsExcel(headers, rows, 'bank-rules');
+      const { headers, rows } = exportTable();
+      downloadAsExcel(headers, rows, 'bank-rules', { title: 'Bank Rules' });
     } finally {
       setExcelBusy(false);
     }
   }
 
   function handlePrint() {
-    const rows = filteredRules.map(r => `
-      <tr>
-        <td>${r.name}</td>
-        <td>${directionLabel(r.sign_filter)}</td>
-        <td>Description contains "${r.description_contains}"</td>
-        <td>${amountRangeLabel(r.min_amount, r.max_amount) || 'Any'}</td>
-        <td>${r.offset_account_code} — ${r.offset_account_name}</td>
-        <td style="text-align:right">${r.priority}</td>
-        <td>${r.is_active ? 'Yes' : 'No'}</td>
-      </tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Bank Rules</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; margin: 24px; }
-        h2 { margin-bottom: 4px; } p { color:#666; font-size:10px; margin-bottom:16px; }
-        table { width:100%; border-collapse:collapse; }
-        th { background:#f0f0f0; text-align:left; padding:5px 7px; border-bottom:2px solid #ccc; font-size:10px; text-transform:uppercase; }
-        td { padding:4px 7px; border-bottom:1px solid #e5e5e5; }
-        tr:last-child td { border-bottom:none; }
-      </style></head><body>
-      <h2>Bank Rules</h2>
-      <p>Generated ${new Date().toLocaleDateString()}</p>
-      <table>
-        <thead><tr><th>Name</th><th>Direction</th><th>Conditions</th><th>Amount Range</th><th>Category</th><th>Priority</th><th>Active</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <script>window.onload = function(){ window.print(); }</script>
-    </body></html>`);
-    win.document.close();
+    const { headers, rows } = exportTable();
+    printReport({ title: 'Bank Rules', headers, rows });
   }
 
   const formValid = form.name.trim() !== '' && form.description_contains.trim() !== '' && form.offset_account_id !== '';
@@ -751,6 +732,8 @@ export default function RulesPage() {
                       value={form.offset_account_id}
                       onChange={e => setForm(f => ({ ...f, offset_account_id: e.target.value }))}
                       required
+                      onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, offset_account_id: id })) })}
+                      addNewLabel="Add new account"
                     >
                       <option value="">Select account…</option>
                       {Object.keys(groupedAccounts).sort().map(type => (
@@ -793,6 +776,7 @@ export default function RulesPage() {
           </div>
         </div>
       )}
+      {addAccount.drawer}
     </div>
   );
 }

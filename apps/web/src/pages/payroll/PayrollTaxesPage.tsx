@@ -13,6 +13,8 @@ import { downloadAsExcel } from '@/lib/download';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { printReport } from '@/lib/reportExport';
 
 type Period = 'monthly' | 'quarterly' | 'annual';
 type Status = 'accrued' | 'paid';
@@ -56,6 +58,7 @@ export default function PayrollTaxesPage() {
   const today = todayLocal();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [liabilities, setLiabilities] = useState<PayrollTaxLiability[]>([]);
   const [filter, setFilter] = useState<Status | 'all'>('all');
   const [err, setErr] = useState<string | null>(null);
@@ -194,15 +197,11 @@ export default function PayrollTaxesPage() {
 
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'payroll-taxes'); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), 'payroll-taxes', { title: 'Payroll Tax Liabilities' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Payroll Taxes</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Payroll Tax Liabilities</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    printReport({ title: 'Payroll Tax Liabilities', headers: dlHeaders, rows: dlRows() });
   }
 
   return (
@@ -250,6 +249,8 @@ export default function PayrollTaxesPage() {
                 value={form.liability_account_id}
                 onChange={e => setForm(f => ({ ...f, liability_account_id: e.target.value }))}
                 required
+                onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, liability_account_id: id })) })}
+                addNewLabel="Add new account"
               >
                 <option value="">Select…</option>
                 {liabilityAccounts.map(a => (
@@ -402,6 +403,7 @@ export default function PayrollTaxesPage() {
           </DialogContent>
         )}
       </Dialog>
+      {addAccount.drawer}
     </div>
   );
 }

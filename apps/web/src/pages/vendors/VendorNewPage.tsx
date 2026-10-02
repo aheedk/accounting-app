@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 
 type Address = {
   line1: string;
@@ -32,7 +33,7 @@ const TERMS_OPTIONS: { label: string; days: number }[] = [
   { label: 'Net 90', days: 90 },
 ];
 
-type Account = { id: string; name: string; account_type: string };
+type Account = { id: string; code: string; name: string; account_type: string };
 
 export default function VendorNewPage() {
   const [bizId] = useActiveBusinessId();
@@ -68,6 +69,7 @@ export default function VendorNewPage() {
   });
   const [billing, setBilling] = useState<Address>(emptyAddress());
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -214,7 +216,7 @@ export default function VendorNewPage() {
         <div className="pt-3">
           <div className="text-sm font-medium pb-2">Accounting</div>
           <Field label="Default expense category">
-            <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_expense_account_id} onChange={e => setForm(f => ({ ...f, default_expense_account_id: e.target.value }))}>
+            <AppSelect className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.default_expense_account_id} onChange={e => setForm(f => ({ ...f, default_expense_account_id: e.target.value }))} onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, default_expense_account_id: id })) })} addNewLabel="Add new account">
               <option value="">Choose account</option>
               {expenseAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </AppSelect>
@@ -238,6 +240,7 @@ export default function VendorNewPage() {
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
         <Button type="button" variant="outline" onClick={() => nav('/ap/vendors')}>Cancel</Button>
       </div>
+      {addAccount.drawer}
     </form>
   );
 }

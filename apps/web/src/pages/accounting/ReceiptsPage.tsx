@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { printReport } from '@/lib/reportExport';
 
 type LinkedEntityType =
   | 'bank_transaction'
@@ -245,13 +246,13 @@ export default function ReceiptsPage() {
         <h1 className="text-2xl font-semibold">Receipts</h1>
         <div className="flex items-center gap-2">
           <div className="relative group">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['ID', 'Linked To', 'Created At'], receipts.map(r => [r.id, r.linked_entity_type, r.created_at]), 'receipts'); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['ID', 'Linked To', 'Created At'], receipts.map(r => [r.id, r.linked_entity_type, r.created_at]), 'receipts', { title: 'Receipts' }); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
               <FileDown className="h-4 w-4" />
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
           </div>
           <div className="relative group">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { const hdrs = ['ID', 'Linked To', 'Created At']; const rowsHtml = receipts.map(r => `<tr><td>${r.id}</td><td>${r.linked_entity_type}</td><td>${r.created_at}</td></tr>`).join(''); const win = window.open('', '_blank'); if (!win) return; win.document.write(`<!DOCTYPE html><html><head><title>Receipts</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Receipts</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`); win.document.close(); }} aria-label="Print">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { printReport({ title: 'Receipts', headers: ['ID', 'Linked To', 'Created At'], rows: receipts.map(r => [r.id, r.linked_entity_type, r.created_at]) }); }} aria-label="Print">
               <Printer className="h-4 w-4" />
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>

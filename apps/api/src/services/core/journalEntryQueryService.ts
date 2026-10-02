@@ -7,7 +7,8 @@ import type {
   JournalEntryStatus,
 } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
-import { isSourceGeneratedJournalEntry } from './ledgerService.js';
+import { isSourceGeneratedJournalEntry, planJournalEntryDelete } from './ledgerService.js';
+import { describeTransactions } from './transactionDescriptorService.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 
 export type JournalEntryLineRead = {
@@ -44,7 +45,13 @@ export type JournalEntryDetail = {
   correction_block_reason: string | null;
   can_reverse: boolean;
   reversal_block_reason: string | null;
+  can_delete: boolean;
+  delete_block_reason: string | null;
+  /** Deleting also removes the other half of a void (the original or its reversal). */
+  delete_removes_pair: boolean;
   is_standalone_manual: boolean;
+  /** Web path of the transaction that generated this entry, when it has a page. */
+  source_path: string | null;
 };
 
 async function readLines(db: Kysely<DB>, journalEntryIds: string[]): Promise<JournalEntryLineRead[]> {
@@ -196,6 +203,7 @@ export async function getJournalEntryDetail(
     hasReversal,
     reversalNumberConflict !== undefined,
   );
+  const deletePlan = await planJournalEntryDelete(db, ctx, entry);
   return {
     entry,
     lines,
@@ -203,8 +211,16 @@ export async function getJournalEntryDetail(
     correction_block_reason: blockReason,
     can_reverse: reverseBlockReason === null,
     reversal_block_reason: reverseBlockReason,
+    can_delete: deletePlan.block_reason === null,
+    delete_block_reason: deletePlan.block_reason,
+    delete_removes_pair: deletePlan.removes_pair,
     is_standalone_manual: !sourceGenerated
       && entry.source_id == null
       && (entry.source_type === 'manual' || entry.source_type === 'adjustment'),
+    // Where to send someone who opens a source-generated entry, since the
+    // entry itself can only be changed from its source.
+    source_path: sourceGenerated
+      ? (await describeTransactions(db, [entry])).get(entry.id)?.path ?? null
+      : null,
   };
 }

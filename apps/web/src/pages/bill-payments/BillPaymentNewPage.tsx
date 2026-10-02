@@ -11,6 +11,9 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Vendor = { id: string; name: string };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -23,12 +26,15 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-export default function BillPaymentNewPage() {
+function BillPaymentNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [params] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(cashAccounts, account => setCashAccounts(prev => [...prev, account]));
+  const addVendor = useAddParty<Vendor>('vendor', vendor => setVendors(prev => [...prev, vendor]));
   const today = todayLocal();
   const [form, setForm] = useState({
     vendor_id: params.get('vendor_id') ?? '',
@@ -114,7 +120,12 @@ export default function BillPaymentNewPage() {
         ...(initial_applications.length > 0 ? { initial_applications } : {}),
       };
       const r = await api.post(`/businesses/${bizId}/bill-payments`, body);
-      nav(`/ap/bill-payments/${r.data.bill_payment.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/bill-payments/${r.data.bill_payment.id}/post`,
+        detailPath: `/ap/bill-payments/${r.data.bill_payment.id}`,
+        listPath: '/ap/bill-payments',
+        label: 'Bill payment',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -141,6 +152,8 @@ export default function BillPaymentNewPage() {
           value={form.vendor_id}
           onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))}
           required
+          onAddNew={() => addVendor.open(id => setForm(f => ({ ...f, vendor_id: id })))}
+          addNewLabel="Add new vendor"
         >
           <option value="">Choose a vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
         </AppSelect>
@@ -163,6 +176,7 @@ export default function BillPaymentNewPage() {
                 onChange={(id) => setForm(f => ({ ...f, cash_account_id: id }))}
                 required
                 placeholder="Select an account…"
+                onCreate={() => addAccount.open({ accountType: 'asset', onPick: id => setForm(f => ({ ...f, cash_account_id: id })) })}
               />
             </div>
           </CardContent>
@@ -239,8 +253,12 @@ export default function BillPaymentNewPage() {
       <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/ap/bill-payments')}>Cancel</Button>
         <div className="flex-1" />
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
+        <SaveButtons save={save} busy={busy} />
       </div>
+      {addAccount.drawer}{addVendor.dialog}
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(BillPaymentNewPage);

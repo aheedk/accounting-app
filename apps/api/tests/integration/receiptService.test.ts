@@ -38,6 +38,28 @@ describe('receiptService', () => {
     expect(logs.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('lists the attachments of one transaction with their file names, and keeps tenants apart', async () => {
+    const { biz, file, ctx } = await bootstrap();
+    const expenseId = '00000000-0000-0000-0000-000000000222';
+    const attached = await t.db.transaction().execute(trx => r.createReceipt(trx, ctx, {
+      business_id: biz.id, file_id: file.id, linked_entity_type: 'expense_transaction', linked_entity_id: expenseId,
+    }));
+    await t.db.transaction().execute(trx => r.createReceipt(trx, ctx, { business_id: biz.id, file_id: file.id }));
+
+    const list = await r.listReceipts(t.db, biz.id, { entity_type: 'expense_transaction', entity_id: expenseId });
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: attached.id, file_name: file.original_name, file_mime_type: file.mime_type });
+
+    // Another business can neither attach this file nor re-link this receipt.
+    const other = await bootstrap();
+    await expect(t.db.transaction().execute(trx =>
+      r.createReceipt(trx, other.ctx, { business_id: other.biz.id, file_id: file.id }),
+    )).rejects.toThrow(/not found/i);
+    await expect(t.db.transaction().execute(trx =>
+      r.linkReceipt(trx, other.ctx, { receipt_id: attached.id, linked_entity_type: 'unlinked', linked_entity_id: null }),
+    )).rejects.toThrow(/not found/i);
+  });
+
   it('linkReceipt back to unlinked clears the link and audit-logs UNLINK', async () => {
     const { biz, file, ctx } = await bootstrap();
     const created = await t.db.transaction().execute(trx =>

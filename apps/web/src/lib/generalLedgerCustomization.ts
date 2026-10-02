@@ -6,8 +6,14 @@ export type GeneralLedgerColumnKey =
   | 'name'
   | 'memo'
   | 'split'
+  | 'debit'
+  | 'credit'
   | 'amount'
-  | 'balance';
+  | 'balance'
+  | 'class'
+  | 'createDate'
+  | 'createdBy'
+  | 'lastModified';
 
 export type GeneralLedgerSortDirection = 'oldest' | 'newest';
 export type GeneralLedgerDensity = 'comfortable' | 'compact';
@@ -32,17 +38,27 @@ export const GENERAL_LEDGER_COLUMNS: ReadonlyArray<{ key: GeneralLedgerColumnKey
   { key: 'name', label: 'Name' },
   { key: 'memo', label: 'Memo / Description' },
   { key: 'split', label: 'Split' },
+  { key: 'debit', label: 'Debit', numeric: true },
+  { key: 'credit', label: 'Credit', numeric: true },
   { key: 'amount', label: 'Amount', numeric: true },
   { key: 'balance', label: 'Balance', numeric: true },
+  { key: 'class', label: 'Class' },
+  { key: 'createDate', label: 'Create Date' },
+  { key: 'createdBy', label: 'Created By' },
+  { key: 'lastModified', label: 'Last Modified' },
 ];
 
 const COLUMN_KEYS = GENERAL_LEDGER_COLUMNS.map(column => column.key);
+// Shown until the user picks otherwise; the rest are opt-in from Customize.
+const DEFAULT_VISIBLE: GeneralLedgerColumnKey[] = [
+  'date', 'transaction', 'reference', 'adj', 'name', 'memo', 'split', 'amount', 'balance',
+];
 const STORAGE_KEY = 'accounting.general-ledger.preferences.v4';
 
 export function defaultGeneralLedgerPreferences(): GeneralLedgerPreferences {
   return {
     columnOrder: [...COLUMN_KEYS],
-    visibleColumns: [...COLUMN_KEYS],
+    visibleColumns: [...DEFAULT_VISIBLE],
     sortDirection: 'oldest',
     density: 'comfortable',
     showAccountNumbers: true,

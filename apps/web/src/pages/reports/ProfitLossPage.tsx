@@ -12,6 +12,7 @@ import { fmtLongDate } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl } from '@/lib/reportDrilldown';
+import { printReport } from '@/lib/reportExport';
 
 type PnlLine = {
   account_id: string;
@@ -97,15 +98,11 @@ export default function ProfitLossPage() {
   const netIncomeNum = report ? parseFloat(report.net_income) : 0;
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), `pnl-${periodStart}-${periodEnd}`); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), `pnl-${periodStart}-${periodEnd}`, { title: 'Profit & Loss', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Profit & Loss</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Profit &amp; Loss — ${periodStart} to ${periodEnd}</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    printReport({ title: 'Profit & Loss', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}`, headers: dlHeaders, rows: dlRows() });
   }
   const netIncomeClass = netIncomeNum >= 0 ? 'text-emerald-600' : 'text-destructive';
 

@@ -27,8 +27,10 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
   const exp = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', input.expense_account_id).where('business_id', '=', input.business_id).executeTakeFirst();
   if (!exp) throw new NotFoundError('chart_of_accounts', input.expense_account_id);
-  if (exp.account_type !== 'expense') {
-    throw new PreconditionError('expense_account_id must be an expense account');
+  // Any account can be the category (an asset purchase, a loan payment, an
+  // owner draw) -- only paying an account from itself is meaningless.
+  if (input.expense_account_id === input.payment_account_id) {
+    throw new PreconditionError('Category and payment account must be different accounts');
   }
   const pay = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', input.payment_account_id).where('business_id', '=', input.business_id).executeTakeFirst();

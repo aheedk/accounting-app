@@ -157,7 +157,7 @@ export function DataTable<T>({
     );
     if (format === 'excel') {
       setExcelBusy(true);
-      try { downloadAsExcel(headers, exportRows, downloadable.filename); } finally { setExcelBusy(false); }
+      try { downloadAsExcel(headers, exportRows, downloadable.filename, { title: downloadable.title }); } finally { setExcelBusy(false); }
     } else {
       setPdfBusy(true);
       try { downloadAsPdf(headers, exportRows, downloadable.title, downloadable.filename); } finally { setPdfBusy(false); }

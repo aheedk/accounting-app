@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Vendor = { id: string; name: string };
 type InventoryItem = { id: string; sku: string; name: string; purchase_cost: string | null };
@@ -25,6 +26,7 @@ export default function PurchaseOrderNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const addVendor = useAddParty<Vendor>('vendor', (vendor) => setVendors((prev) => [...prev, vendor]));
   const [items, setItems] = useState<InventoryItem[]>([]);
   const today = todayLocal();
   const [hdr, setHdr] = useState({ vendor_id: '', order_date: today, expected_delivery_date: '', memo: '' });
@@ -104,6 +106,8 @@ export default function PurchaseOrderNewPage() {
               value={hdr.vendor_id}
               onChange={(e) => setHdr((h) => ({ ...h, vendor_id: e.target.value }))}
               required
+              onAddNew={() => addVendor.open((id) => setHdr((h) => ({ ...h, vendor_id: id })))}
+              addNewLabel="Add new vendor"
             >
               <option value="">Select…</option>
               {vendors.map((v) => (
@@ -215,6 +219,7 @@ export default function PurchaseOrderNewPage() {
           Cancel
         </Button>
       </div>
+      {addVendor.dialog}
     </form>
   );
 }

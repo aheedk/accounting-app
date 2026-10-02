@@ -49,3 +49,27 @@ export function addDaysLocal(iso: string, days: number): string {
 export function currentYearLocal(): number {
   return new Date().getFullYear();
 }
+
+/**
+ * Tidy what a date box holds once the user leaves it (YYYY-MM-DD).
+ *
+ * A two-digit year means this century: typing 26 gives 2026, the way
+ * QuickBooks reads it (the browser's own date box would keep the year 0026).
+ * Anything that is not a real calendar date falls back to `fallback`, the
+ * last good value.
+ */
+export function normalizeDateInput(raw: string, fallback: string): string {
+  if (!raw) return raw;
+  const parts = raw.split('-');
+  if (parts.length !== 3) return fallback;
+  let y = parseInt(parts[0]!, 10);
+  const m = parseInt(parts[1]!, 10);
+  const d = parseInt(parts[2]!, 10);
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return fallback;
+  if (y < 100) y += 2000;
+  if (y < 1000 || y > 9999) return fallback;
+  const date = new Date(y, m - 1, d);
+  // If month/day rolled over the date is invalid (e.g. June 31 -> July 1).
+  if (date.getMonth() !== m - 1 || date.getDate() !== d) return fallback;
+  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}

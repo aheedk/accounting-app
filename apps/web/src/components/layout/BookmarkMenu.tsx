@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bookmark, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type BookmarkItem = { id: string; label: string; path: string };
@@ -98,6 +99,7 @@ export function BookmarkMenu() {
   const location = useLocation();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  useArrowKeyMenu(open, panelRef);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function scheduleClose() {

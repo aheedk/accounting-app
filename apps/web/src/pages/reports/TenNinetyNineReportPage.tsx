@@ -8,6 +8,7 @@ import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { currentYearLocal } from '@/lib/dates';
+import { printReport } from '@/lib/reportExport';
 
 type Row = { vendor_id: string; vendor_name: string; tax_id: string | null; total_paid: string };
 
@@ -25,15 +26,11 @@ export default function TenNinetyNineReportPage() {
   const dlRows = () => rows.map(r => [r.vendor_name, r.tax_id ?? '—', r.total_paid]);
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), `1099-${year}`); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), `1099-${year}`, { title: '1099 Report', subtitle: `Tax year ${year}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>1099 Report</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>1099 Report — ${year}</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    printReport({ title: '1099 Report', subtitle: `Tax year ${year}`, headers: dlHeaders, rows: dlRows() });
   }
 
   return (

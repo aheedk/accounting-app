@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { printReport } from '@/lib/reportExport';
 
 function statusBadge(active: boolean) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
@@ -43,6 +45,7 @@ export default function BankAccountListPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [cashAccounts, setCashAccounts] = useState<CashAccountRow[]>([]);
+  const addAccount = useAddAccount(cashAccounts, account => setCashAccounts(prev => [...prev, account]));
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', institution: '', account_last_four: '', cash_account_id: '' });
   const [err, setErr] = useState<string | null>(null);
@@ -105,15 +108,11 @@ export default function BankAccountListPage() {
 
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'bank-accounts'); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), 'bank-accounts', { title: 'Bank Accounts' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Bank Accounts</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Bank Accounts</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    printReport({ title: 'Bank Accounts', headers: dlHeaders, rows: dlRows() });
   }
 
   return (
@@ -162,6 +161,8 @@ export default function BankAccountListPage() {
                     value={form.cash_account_id}
                     onChange={e => setForm(f => ({ ...f, cash_account_id: e.target.value }))}
                     required
+                    onAddNew={() => addAccount.open({ accountType: 'asset', onPick: id => setForm(f => ({ ...f, cash_account_id: id })) })}
+                    addNewLabel="Add new account"
                   >
                     <option value="">Select…</option>
                     {cashAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
@@ -199,6 +200,7 @@ export default function BankAccountListPage() {
           />
         </CardContent>
       </Card>
+      {addAccount.drawer}
     </div>
   );
 }

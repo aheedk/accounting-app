@@ -22,6 +22,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { dateToLocalIso, fmtLongDate } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
+import { printReport } from '@/lib/reportExport';
 import {
   GENERAL_LEDGER_COLUMNS,
   defaultGeneralLedgerPreferences,
@@ -31,7 +32,7 @@ import {
   type GeneralLedgerColumnKey,
   type GeneralLedgerPreferences,
 } from '@/lib/generalLedgerCustomization';
-import { fmtMoney, fmtSigned } from '@/lib/money';
+import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 
 type Account = {
@@ -49,6 +50,17 @@ type GeneralLedgerLine = {
   transaction_type: string | null;
   payee_name: string | null;
   reference: string | null;
+  transaction_label: string;
+  num: string | null;
+  name: string | null;
+  is_adjusting: boolean;
+  transaction_path: string;
+  /** Signed in the account's natural direction, so the column adds up to the balance. */
+  amount: string;
+  class_name: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
   memo: string | null;
   split_account: string | null;
   status: 'posted' | 'voided';
@@ -57,14 +69,6 @@ type GeneralLedgerLine = {
   running_balance: string;
   bank_deposit_id: string | null;
 };
-
-/** Deposits (manually entered or AI-coded from a bank statement) drill through
- * to the Bank Deposit page instead of the raw journal entry when one exists. */
-function lineDrillThroughPath(line: GeneralLedgerLine): string {
-  return line.bank_deposit_id
-    ? `/accounting/bank-deposits/${line.bank_deposit_id}`
-    : `/journal/${line.journal_entry_id}`;
-}
 
 type GeneralLedgerAccount = {
   account_id: string;
@@ -90,6 +94,7 @@ type GeneralLedgerReport = {
 type DisplayAccount = GeneralLedgerAccount & {
   visible_total_debit: string;
   visible_total_credit: string;
+  visible_total_amount: string;
 };
 
 type AccountTypeFilter = 'all' | 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
@@ -108,8 +113,6 @@ type DateRangePreset =
   | 'this-year' | 'this-year-to-date' | 'last-year' | 'last-year-to-date'
   | 'this-fiscal-year' | 'this-fiscal-year-to-date' | 'last-fiscal-year' | 'last-fiscal-year-to-date'
   | 'last-7-days' | 'last-30-days' | 'last-90-days';
-
-type AccountingMethod = 'accrual' | 'cash';
 
 const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
   { value: 'all-dates', label: 'All Dates' },
@@ -190,21 +193,22 @@ function fmtShortDate(iso: string): string {
   return `${Number(month)}/${Number(day)}/${year.slice(2)}`;
 }
 
-function fmtSourceLabel(source: string): string {
-  if (source === 'bank_import') return 'Bank Import';
-  if (['manual', 'reversal', 'adjustment'].includes(source)) return 'Journal Entry';
-  if (source === 'invoice_import') return 'Invoice';
-  return source.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+// QuickBooks shows negatives with a leading minus in this report, not parentheses.
+function fmtAmount(value: string): string {
+  const amount = new Decimal(value);
+  const formatted = fmtMoney(amount.abs().toFixed(4));
+  return amount.isNegative() ? `-${formatted}` : formatted;
 }
 
-function fmtTransactionLabel(line: GeneralLedgerLine): string {
-  if (line.source_type === 'bank_import') {
-    if (line.transaction_type === 'deposit') return 'Deposit';
-    if (line.transaction_type === 'check')   return 'Check';
-    if (line.transaction_type === 'expense') return 'Expense';
-    return 'Bank Import';
-  }
-  return fmtSourceLabel(line.source_type);
+// "10/1/26 3:57 PM" for the created / modified columns.
+function fmtStamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, { year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function fmtNum(line: GeneralLedgerLine): string {
+  return line.num ? line.num.replace(/^AJE-/i, 'JE-') : '';
 }
 
 function pickErr(error: unknown): string {
@@ -212,20 +216,11 @@ function pickErr(error: unknown): string {
     ?.response?.data?.error?.message ?? 'Failed to load the General Ledger report';
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 function columnDefinition(key: GeneralLedgerColumnKey) {
   return GENERAL_LEDGER_COLUMNS.find(column => column.key === key)!;
 }
 
-function sumLines(lines: GeneralLedgerLine[], key: 'debit' | 'credit'): string {
+function sumLines(lines: GeneralLedgerLine[], key: 'debit' | 'credit' | 'amount'): string {
   return lines.reduce((sum, line) => sum.plus(line[key]), new Decimal(0)).toFixed(4);
 }
 
@@ -238,12 +233,12 @@ function summaryLabelColumn(columns: GeneralLedgerColumnKey[]): GeneralLedgerCol
 function summaryValues(
   columns: GeneralLedgerColumnKey[],
   label: string,
-  amounts: Partial<Record<'amount' | 'balance', string>>,
+  amounts: Partial<Record<'debit' | 'credit' | 'amount' | 'balance', string>>,
 ): string[] {
   const labelColumn = summaryLabelColumn(columns);
   return columns.map(column => {
     if (column === labelColumn) return label;
-    if (column === 'amount' || column === 'balance') return amounts[column] ?? '';
+    if (column === 'debit' || column === 'credit' || column === 'amount' || column === 'balance') return amounts[column] ?? '';
     return '';
   });
 }
@@ -251,18 +246,20 @@ function summaryValues(
 function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey): string {
   switch (column) {
     case 'date': return line.entry_date;
-    case 'transaction': return `${fmtTransactionLabel(line)}${line.status === 'voided' ? ' (Voided)' : ''}`;
-    case 'reference': return line.reference ?? '';
-    case 'adj': return line.source_type === 'adjustment' ? 'Yes' : 'No';
-    case 'name': return line.payee_name ?? '';
+    case 'transaction': return `${line.transaction_label}${line.status === 'voided' ? ' (Voided)' : ''}`;
+    case 'reference': return fmtNum(line);
+    case 'adj': return line.is_adjusting ? 'Yes' : 'No';
+    case 'name': return line.name ?? '';
     case 'memo': return line.memo ?? '';
     case 'split': return line.split_account ?? '';
-    case 'amount': {
-      if (line.debit !== '0.0000') return line.debit;
-      if (line.credit !== '0.0000') return `-${line.credit}`;
-      return '';
-    }
+    case 'debit': return new Decimal(line.debit).isZero() ? '' : line.debit;
+    case 'credit': return new Decimal(line.credit).isZero() ? '' : line.credit;
+    case 'amount': return new Decimal(line.amount).isZero() ? '' : line.amount;
     case 'balance': return line.running_balance;
+    case 'class': return line.class_name ?? '';
+    case 'createDate': return fmtStamp(line.created_at);
+    case 'createdBy': return line.created_by ?? '';
+    case 'lastModified': return fmtStamp(line.updated_at);
   }
 }
 
@@ -287,10 +284,12 @@ function exportRows(
       rows.push([...accountPrefix, ...columns.map(column => lineExportValue(line, column))]);
     }
     if (preferences.showAccountTotals) {
-      const netAmount = new Decimal(account.visible_total_debit).minus(account.visible_total_credit).toFixed(4);
+      const netAmount = account.visible_total_amount;
       rows.push([
         ...accountPrefix,
         ...summaryValues(columns, 'Account Total', {
+          debit: account.visible_total_debit,
+          credit: account.visible_total_credit,
           amount: netAmount,
           balance: account.ending_balance,
         }),
@@ -301,7 +300,7 @@ function exportRows(
     const netReportAmount = new Decimal(reportTotals.debit).minus(reportTotals.credit).toFixed(4);
     rows.push([
       ...(preferences.showAccountNumbers ? ['', 'REPORT TOTAL'] : ['REPORT TOTAL']),
-      ...summaryValues(columns, '', { amount: netReportAmount }),
+      ...summaryValues(columns, '', { debit: reportTotals.debit, credit: reportTotals.credit, amount: netReportAmount }),
     ]);
   }
   return rows;
@@ -309,10 +308,15 @@ function exportRows(
 
 export default function GeneralLedgerPage() {
   const [businessId] = useActiveBusinessId();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { businesses } = useAuth();
   const businessName = businesses.find(business => business.id === businessId)?.name ?? '';
-  const initPreset: DateRangePreset = searchParams.get('period_start') ? 'custom' : 'this-year-to-date';
+  // The period lives in the URL, so coming Back from a transaction returns to
+  // the same report rather than to the default year-to-date.
+  const savedPreset = searchParams.get('range');
+  const initPreset: DateRangePreset = DATE_RANGE_OPTIONS.some(option => option.value === savedPreset)
+    ? savedPreset as DateRangePreset
+    : searchParams.get('period_start') ? 'custom' : 'this-year-to-date';
   const initRange = computePresetRange(initPreset);
   const [periodPreset, setPeriodPreset] = useState<DateRangePreset>(initPreset);
   const [draftStart, setDraftStart] = useState(() => searchParams.get('period_start') ?? initRange.start);
@@ -374,19 +378,33 @@ export default function GeneralLedgerPage() {
   }, [businessId]);
 
   // Ref always holds current draft values; lets the mount/business-change effect read them without being a dep
-  const draftRef = useRef({ start: draftStart, end: draftEnd, acctId: draftAccountId });
-  draftRef.current = { start: draftStart, end: draftEnd, acctId: draftAccountId };
+  const draftRef = useRef({ start: draftStart, end: draftEnd, acctId: draftAccountId, preset: periodPreset });
+  draftRef.current = { start: draftStart, end: draftEnd, acctId: draftAccountId, preset: periodPreset };
+
+  // Kept in a ref: setSearchParams gets a new identity on every URL change,
+  // which would otherwise re-run the load effect.
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+  function rememberPeriod(start: string, end: string, acctId: string, preset: DateRangePreset): void {
+    setSearchParamsRef.current({
+      range: preset,
+      period_start: start,
+      period_end: end,
+      ...(acctId ? { account_id: acctId } : {}),
+    }, { replace: true });
+  }
 
   // Auto-load on mount and when business changes
   useEffect(() => {
-    const { start, end, acctId } = draftRef.current;
+    const { start, end, acctId, preset } = draftRef.current;
+    rememberPeriod(start, end, acctId, preset);
     void load(start, end, acctId);
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sourceTypes = useMemo(() => {
     const values = new Set<string>();
-    report?.accounts.forEach(account => account.lines.forEach(line => values.add(line.source_type)));
-    return [...values].sort((left, right) => fmtSourceLabel(left).localeCompare(fmtSourceLabel(right)));
+    report?.accounts.forEach(account => account.lines.forEach(line => values.add(line.transaction_label)));
+    return [...values].sort((left, right) => left.localeCompare(right));
   }, [report]);
 
   useEffect(() => {
@@ -402,21 +420,24 @@ export default function GeneralLedgerPage() {
     const needle = searchText.trim().toLowerCase();
     return report.accounts.flatMap(account => {
       if (accountTypeFilter !== 'all' && account.account_type !== accountTypeFilter) return [];
-      const lines = account.lines
-        .filter(line => sourceFilter === 'all' || line.source_type === sourceFilter)
+      // The server returns lines in posting order, which is the order the
+      // running balance was computed in -- so only ever keep or reverse it.
+      const matching = account.lines
+        .filter(line => sourceFilter === 'all' || line.transaction_label === sourceFilter)
         .filter(line => statusFilter === 'all' || line.status === statusFilter)
-        .filter(line => adjFilter === 'all' || (adjFilter === 'adjustments' ? line.source_type === 'adjustment' : line.source_type !== 'adjustment'))
-        .filter(line => !needle || `${line.reference ?? ''} ${line.memo ?? ''}`.toLowerCase().includes(needle))
-        .sort((left, right) => {
-          const comparison = left.entry_date.localeCompare(right.entry_date) || left.line_id.localeCompare(right.line_id);
-          return preferences.sortDirection === 'oldest' ? comparison : -comparison;
-        });
+        .filter(line => adjFilter === 'all' || (adjFilter === 'adjustments' ? line.is_adjusting : !line.is_adjusting))
+        .filter(line => !needle || [
+          line.transaction_label, fmtNum(line), line.name, line.memo, line.split_account,
+          fmtAmount(line.amount), new Decimal(line.amount).toFixed(2),
+        ].join(' ').toLowerCase().includes(needle));
+      const lines = preferences.sortDirection === 'oldest' ? matching : [...matching].reverse();
       if (!showEmptyAccounts && lines.length === 0) return [];
       return [{
         ...account,
         lines,
         visible_total_debit: sumLines(lines, 'debit'),
         visible_total_credit: sumLines(lines, 'credit'),
+        visible_total_amount: sumLines(lines, 'amount'),
       }];
     });
   }, [accountTypeFilter, adjFilter, preferences.sortDirection, report, searchText, showEmptyAccounts, sourceFilter, statusFilter]);
@@ -486,9 +507,21 @@ export default function GeneralLedgerPage() {
 
   function handlePresetChange(preset: DateRangePreset): void {
     setPeriodPreset(preset);
+    // "Custom" means "these dates, as typed" -- keep whatever is in the boxes.
+    if (preset === 'custom') return;
     const range = computePresetRange(preset);
     setDraftStart(range.start);
     setDraftEnd(range.end);
+  }
+
+  // The dates are always editable. Changing one by hand no longer matches the
+  // chosen preset, so the dropdown moves to Custom (as QuickBooks does).
+  function handleDateEdit(which: 'start' | 'end', value: string): void {
+    const current = which === 'start' ? draftStart : draftEnd;
+    if (value === current) return;
+    if (which === 'start') setDraftStart(value);
+    else setDraftEnd(value);
+    setPeriodPreset('custom');
   }
 
   function handleRunReport(): void {
@@ -497,6 +530,7 @@ export default function GeneralLedgerPage() {
       return;
     }
     setError(null);
+    rememberPeriod(draftStart, draftEnd, draftAccountId, periodPreset);
     void load(draftStart, draftEnd, draftAccountId);
   }
 
@@ -513,7 +547,10 @@ export default function GeneralLedgerPage() {
     if (!report) return;
     setExporting(true);
     try {
-      downloadAsExcel(exportHeaders, rowsForExport, `general-ledger-${report.period_start}-to-${report.period_end}`);
+      downloadAsExcel(exportHeaders, rowsForExport, `general-ledger-${report.period_start}-to-${report.period_end}`, {
+        title: 'General Ledger',
+        subtitle: `${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`,
+      });
     } finally {
       setExporting(false);
     }
@@ -521,18 +558,12 @@ export default function GeneralLedgerPage() {
 
   function handlePrint(): void {
     if (!report) return;
-    const numericIndexes = new Set<number>();
-    let offset = preferences.showAccountNumbers ? 2 : 1;
-    visibleColumns.forEach((column, index) => {
-      if (columnDefinition(column).numeric) numericIndexes.add(offset + index);
+    printReport({
+      title: 'General Ledger',
+      subtitle: `${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`,
+      headers: exportHeaders,
+      rows: rowsForExport,
     });
-    const body = rowsForExport.map(row => (
-      `<tr>${row.map((cell, index) => `<td${numericIndexes.has(index) ? ' class="number"' : ''}>${escapeHtml(cell)}</td>`).join('')}</tr>`
-    )).join('');
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>General Ledger</title><style>body{font-family:Arial,sans-serif;font-size:10px;margin:24px}h2{margin:0 0 4px;text-align:center}p{color:#666;margin:0 0 16px;text-align:center}table{width:100%;border-collapse:collapse}th{background:#eee;text-align:left;padding:5px;border-bottom:2px solid #bbb}td{padding:4px 5px;border-bottom:1px solid #ddd}.number{text-align:right}</style></head><body><h2>${escapeHtml(businessName)} — General Ledger</h2><p>${escapeHtml(fmtLongDate(report.period_start))} – ${escapeHtml(fmtLongDate(report.period_end))}</p><table><thead><tr>${exportHeaders.map((header, index) => `<th${numericIndexes.has(index) ? ' class="number"' : ''}>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    printWindow.document.close();
   }
 
   if (!businessId) return <div>Pick a business.</div>;
@@ -570,15 +601,13 @@ export default function GeneralLedgerPage() {
               <DateInput
                 className="h-9 w-36"
                 value={draftStart}
-                onChange={event => setDraftStart(event.target.value)}
-                disabled={periodPreset !== 'custom'}
+                onChange={event => handleDateEdit('start', event.target.value)}
               />
               <span className="text-sm text-muted-foreground">to</span>
               <DateInput
                 className="h-9 w-36"
                 value={draftEnd}
-                onChange={event => setDraftEnd(event.target.value)}
-                disabled={periodPreset !== 'custom'}
+                onChange={event => handleDateEdit('end', event.target.value)}
               />
             </div>
           </div>
@@ -740,6 +769,8 @@ export default function GeneralLedgerPage() {
                     <SummaryRow
                       columns={visibleColumns}
                       label="REPORT TOTAL"
+                      debit={reportTotals.debit}
+                      credit={reportTotals.credit}
                       amount={reportTotals.amount}
                       density={preferences.density}
                       className="border-t-2 font-semibold"
@@ -857,7 +888,7 @@ function CustomizationPanel(props: CustomizationPanelProps) {
                 onChange={event => props.onSourceFilterChange(event.target.value)}
               >
                 <option value="all">All transaction types</option>
-                {props.sourceTypes.map(source => <option key={source} value={source}>{fmtSourceLabel(source)}</option>)}
+                {props.sourceTypes.map(source => <option key={source} value={source}>{source}</option>)}
               </AppSelect>
             </div>
             <div>
@@ -995,7 +1026,7 @@ function AccountSection({
           {account.lines.map(line => (
             <tr
               key={line.line_id}
-              onClick={() => navigate(lineDrillThroughPath(line))}
+              onClick={() => navigate(line.transaction_path)}
               className={`cursor-pointer border-b hover:bg-muted/30 ${line.status === 'voided' ? 'text-muted-foreground' : ''}`}
             >
               {columns.map(column => <LedgerLineCell key={column} column={column} line={line} padding={padding} />)}
@@ -1005,7 +1036,9 @@ function AccountSection({
             <SummaryRow
               columns={columns}
               label={`Total for ${preferences.showAccountNumbers ? `${account.account_code} — ` : ''}${account.account_name}`}
-              amount={new Decimal(account.visible_total_debit).minus(account.visible_total_credit).toFixed(4)}
+              debit={account.visible_total_debit}
+              credit={account.visible_total_credit}
+              amount={account.visible_total_amount}
               balance={account.ending_balance}
               density={preferences.density}
               className="border-b-2 font-semibold"
@@ -1020,70 +1053,94 @@ function AccountSection({
 function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumnKey; line: GeneralLedgerLine; padding: string }) {
   let content: ReactNode;
   let className = padding;
+  // Date, name and memo open the transaction too, like the type, number and
+  // amount do. They keep the look of plain text until hovered.
+  const textLink = (text: string) => (
+    <Link className="block truncate hover:text-primary hover:underline" to={line.transaction_path} title={text}>{text}</Link>
+  );
   switch (column) {
     case 'date':
-      content = fmtShortDate(line.entry_date);
+      content = textLink(fmtShortDate(line.entry_date));
       className += ' whitespace-nowrap min-w-[6rem]';
       break;
     case 'transaction':
       content = (
         <>
-          <Link className="font-medium text-primary hover:underline" to={lineDrillThroughPath(line)}>{fmtTransactionLabel(line)}</Link>
+          <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{line.transaction_label}</Link>
           {line.status === 'voided' && <span className="ml-2 text-xs uppercase">Voided</span>}
         </>
       );
       break;
     case 'reference': {
-      const rawRef = line.reference;
-      const displayRef = rawRef ? rawRef.replace(/^AJE-/i, 'JE-') : null;
-      content = displayRef
-        ? <Link className="font-medium text-primary hover:underline" to={lineDrillThroughPath(line)}>{displayRef}</Link>
+      const num = fmtNum(line);
+      content = num
+        ? <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{num}</Link>
         : null;
       className += ' font-mono text-xs whitespace-nowrap';
       break;
     }
     case 'adj':
-      content = line.source_type === 'adjustment'
+      content = line.is_adjusting
         ? <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Yes</span>
         : <span className="text-xs text-muted-foreground">No</span>;
       className += ' text-center';
       break;
     case 'name':
-      content = line.payee_name ?? '';
-      className += ' max-w-[16rem] truncate';
+      content = line.name ? textLink(line.name) : '';
+      className += ' max-w-[16rem]';
       break;
     case 'memo':
-      content = line.memo ?? '';
-      className += ' max-w-[22rem] truncate';
+      content = line.memo ? textLink(line.memo) : '';
+      className += ' max-w-[22rem]';
       break;
     case 'split':
       content = line.split_account ?? '';
       className += ' max-w-[16rem] truncate text-xs text-muted-foreground';
       break;
-    case 'amount': {
-      const isDebit = line.debit !== '0.0000';
-      const isCredit = line.credit !== '0.0000';
-      if (!isDebit && !isCredit) { content = ''; }
-      else {
-        const val = isDebit ? line.debit : line.credit;
-        const display = isDebit ? fmtMoney(val) : `-${fmtMoney(val)}`;
-        const path = lineDrillThroughPath(line);
-        content = <ReportAmountLink to={path} title={line.bank_deposit_id ? 'View this deposit' : 'View this journal entry'}>{display}</ReportAmountLink>;
-      }
+    case 'amount':
+      content = new Decimal(line.amount).isZero()
+        ? ''
+        : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(line.amount)}</ReportAmountLink>;
+      className += ' text-right font-mono';
+      break;
+    case 'debit':
+    case 'credit': {
+      const value = column === 'debit' ? line.debit : line.credit;
+      content = new Decimal(value).isZero()
+        ? ''
+        : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(value)}</ReportAmountLink>;
       className += ' text-right font-mono';
       break;
     }
     case 'balance':
-      content = fmtSigned(line.running_balance);
+      content = fmtAmount(line.running_balance);
       className += ' text-right font-mono';
       break;
+    case 'class':
+      content = line.class_name ?? '';
+      className += ' max-w-[12rem] truncate';
+      break;
+    case 'createDate':
+      content = fmtStamp(line.created_at);
+      className += ' whitespace-nowrap text-xs text-muted-foreground';
+      break;
+    case 'createdBy':
+      content = line.created_by ?? '';
+      className += ' max-w-[12rem] truncate text-xs text-muted-foreground';
+      break;
+    case 'lastModified':
+      content = fmtStamp(line.updated_at);
+      className += ' whitespace-nowrap text-xs text-muted-foreground';
+      break;
   }
-  return <td className={className} title={column === 'memo' ? line.memo ?? undefined : undefined}>{content}</td>;
+  return <td className={className}>{content}</td>;
 }
 
 function SummaryRow({
   columns,
   label,
+  debit,
+  credit,
   amount,
   balance,
   density,
@@ -1091,6 +1148,8 @@ function SummaryRow({
 }: {
   columns: GeneralLedgerColumnKey[];
   label: string;
+  debit?: string;
+  credit?: string;
   amount?: string;
   balance?: string;
   density: GeneralLedgerPreferences['density'];
@@ -1102,8 +1161,10 @@ function SummaryRow({
     <tr className={className}>
       {columns.map(column => {
         let value: ReactNode = column === labelColumn ? label : null;
-        if (column === 'amount' && amount !== undefined) value = fmtSigned(amount);
-        if (column === 'balance' && balance !== undefined) value = fmtSigned(balance);
+        if (column === 'debit' && debit !== undefined) value = fmtAmount(debit);
+        if (column === 'credit' && credit !== undefined) value = fmtAmount(credit);
+        if (column === 'amount' && amount !== undefined) value = fmtAmount(amount);
+        if (column === 'balance' && balance !== undefined) value = fmtAmount(balance);
         const numeric = columnDefinition(column).numeric;
         return <td key={column} className={`${padding} ${numeric ? 'text-right font-mono' : ''}`}>{value}</td>;
       })}

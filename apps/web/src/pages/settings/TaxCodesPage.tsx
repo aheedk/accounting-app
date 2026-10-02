@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { printReport } from '@/lib/reportExport';
 
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null; is_active: boolean };
 type Account = { id: string; code: string; name: string; account_type: string; is_system: boolean; is_active: boolean };
@@ -24,6 +26,7 @@ export default function TaxCodesPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<TaxCode[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', tax_payable_account_id: '', rate: '0.0875', effective_from: '2026-01-01' });
   const [err, setErr] = useState<string | null>(null);
@@ -60,15 +63,11 @@ export default function TaxCodesPage() {
 
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'tax-codes'); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), 'tax-codes', { title: 'Tax Codes' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Tax Codes</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Tax Codes</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    printReport({ title: 'Tax Codes', headers: dlHeaders, rows: dlRows() });
   }
 
   return (
@@ -98,7 +97,7 @@ export default function TaxCodesPage() {
               <div><Label>Code</Label><Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required /></div>
               <div><Label>Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
               <div><Label>Payable account</Label>
-                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.tax_payable_account_id} onChange={e => setForm(f => ({ ...f, tax_payable_account_id: e.target.value }))} required>
+                <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.tax_payable_account_id} onChange={e => setForm(f => ({ ...f, tax_payable_account_id: e.target.value }))} required onAddNew={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, tax_payable_account_id: id })) })} addNewLabel="Add new account">
                   <option value="">Select…</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                 </AppSelect>
               </div>
@@ -121,6 +120,7 @@ export default function TaxCodesPage() {
           </tr>))}</tbody>
         </table>
       </CardContent></Card>
+      {addAccount.drawer}
     </div>
   );
 }

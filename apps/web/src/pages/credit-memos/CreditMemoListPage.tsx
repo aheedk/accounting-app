@@ -12,9 +12,11 @@ import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { printReport } from '@/lib/reportExport';
 
 type CreditMemoSummary = {
   id: string;
+  credit_memo_number: string | null;
   customer_id: string;
   memo_date: string;
   status: string;
@@ -86,6 +88,7 @@ export default function CreditMemoListPage() {
   }, [items]);
 
   const columns: Column<Row>[] = [
+    { key: 'number', header: 'No.', sortable: true, sortValue: r => r.credit_memo_number ?? '', render: r => <span className="whitespace-nowrap font-mono text-xs">{r.credit_memo_number ?? '—'}</span> },
     { key: 'memo_date', header: 'Date', sortable: true, sortValue: r => r.memo_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.memo_date)}</span> },
     { key: 'customer', header: 'Customer', sortable: true, sortValue: r => r.customer_name, render: r => r.customer_name || <span className="text-muted-foreground">—</span> },
     { key: 'memo', header: 'Memo', sortable: false, render: r => r.memo ? <span className="block max-w-[16rem] truncate">{r.memo}</span> : <span className="text-muted-foreground">—</span> },
@@ -101,15 +104,11 @@ export default function CreditMemoListPage() {
 
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'credit-memos'); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), 'credit-memos', { title: 'Credit Memos' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    const rowsHtml = dlRows().map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Credit Memos</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:24px}h2{margin-bottom:4px}p{color:#666;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;text-align:left;padding:5px 7px;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase}td{padding:4px 7px;border-bottom:1px solid #e5e5e5}</style></head><body><h2>Credit Memos</h2><p>Generated ${new Date().toLocaleDateString()}</p><table><thead><tr>${dlHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><script>window.onload=function(){window.print()}</script></body></html>`);
-    win.document.close();
+    printReport({ title: 'Credit Memos', headers: dlHeaders, rows: dlRows() });
   }
 
   return (

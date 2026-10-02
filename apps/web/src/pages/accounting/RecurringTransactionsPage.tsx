@@ -11,6 +11,8 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { downloadAsExcel } from '@/lib/download';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { printReport } from '@/lib/reportExport';
 
 type Account = { id: string; code: string; name: string; account_type: string };
 
@@ -95,6 +97,7 @@ export default function RecurringTransactionsPage() {
   const [bizId] = useActiveBusinessId();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(accounts, (account) => setAccounts((prev) => [...prev, account]));
   const [showForm, setShowForm] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
   const [runErr, setRunErr] = useState<string | null>(null);
@@ -160,58 +163,34 @@ export default function RecurringTransactionsPage() {
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
 
+  // One table for both the Excel export and the printed page.
+  function exportTable() {
+    const headers = ['Template Name', 'Type', 'TXN Type', 'Interval', 'Previous Date', 'Next Date', 'Amount'];
+    const rows = filteredTemplates.map(t => [
+      t.name,
+      'Scheduled',
+      TXN_TYPE_LABELS[t.template_type] ?? t.template_type,
+      INTERVAL_LABELS[t.recurrence] ?? t.recurrence,
+      fmtShortDate(t.last_run_at),
+      fmtShortDate(t.next_run_date),
+      '0.00',
+    ]);
+    return { headers, rows };
+  }
+
   function handleExport() {
     setExcelBusy(true);
     try {
-      const headers = ['Template Name', 'Type', 'TXN Type', 'Interval', 'Previous Date', 'Next Date', 'Amount'];
-      const rows = filteredTemplates.map(t => [
-        t.name,
-        'Scheduled',
-        TXN_TYPE_LABELS[t.template_type] ?? t.template_type,
-        INTERVAL_LABELS[t.recurrence] ?? t.recurrence,
-        fmtShortDate(t.last_run_at),
-        fmtShortDate(t.next_run_date),
-        '0.00',
-      ]);
-      downloadAsExcel(headers, rows, 'recurring-transactions');
+      const { headers, rows } = exportTable();
+      downloadAsExcel(headers, rows, 'recurring-transactions', { title: 'Recurring Transactions' });
     } finally {
       setExcelBusy(false);
     }
   }
 
   function handlePrint() {
-    const rows = filteredTemplates.map(t => `
-      <tr>
-        <td>${t.name}</td>
-        <td>Scheduled</td>
-        <td>${TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
-        <td>${INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
-        <td>${fmtShortDate(t.last_run_at)}</td>
-        <td>${fmtShortDate(t.next_run_date)}</td>
-        <td>—</td>
-        <td style="text-align:right">0.00</td>
-      </tr>`).join('');
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Recurring Transactions</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; margin: 24px; }
-        h2 { margin-bottom: 4px; }
-        p { color: #666; font-size: 10px; margin-bottom: 16px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f0f0f0; text-align: left; padding: 5px 7px; border-bottom: 2px solid #ccc; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-        td { padding: 4px 7px; border-bottom: 1px solid #e5e5e5; }
-        tr:last-child td { border-bottom: none; }
-      </style></head><body>
-      <h2>Recurring Transactions</h2>
-      <p>Generated ${new Date().toLocaleDateString()}</p>
-      <table>
-        <thead><tr><th>Template Name</th><th>Type</th><th>TXN Type</th><th>Interval</th><th>Previous Date</th><th>Next Date</th><th>Customer/Vendor</th><th>Amount</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <script>window.onload = function(){ window.print(); }</script>
-    </body></html>`);
-    win.document.close();
+    const { headers, rows } = exportTable();
+    printReport({ title: 'Recurring Transactions', headers, rows });
   }
 
   function applyFilter() {
@@ -494,6 +473,8 @@ export default function RecurringTransactionsPage() {
                         value={l.account_id}
                         onChange={(e) => updateLine(i, { account_id: e.target.value })}
                         required
+                        onAddNew={() => addAccount.open({ onPick: (id) => updateLine(i, { account_id: id }) })}
+                        addNewLabel="Add new account"
                       >
                         <option value="">Select account…</option>
                         {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
@@ -629,6 +610,7 @@ export default function RecurringTransactionsPage() {
           </div>
         </div>
       )}
+      {addAccount.drawer}
     </div>
   );
 }

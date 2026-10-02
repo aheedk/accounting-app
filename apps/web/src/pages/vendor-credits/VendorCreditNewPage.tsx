@@ -11,6 +11,9 @@ import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Vendor = { id: string; name: string; billing_address: Address | null };
@@ -22,11 +25,14 @@ function fmtAddress(a: Address | null | undefined): string {
   return [a.line1, a.line2, cityLine, a.country].filter(Boolean).join('\n');
 }
 
-export default function VendorCreditNewPage() {
+function VendorCreditNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [offsetAccounts, setOffsetAccounts] = useState<Account[]>([]);
+  const addAccount = useAddAccount(offsetAccounts, account => setOffsetAccounts(prev => [...prev, account]));
+  const addVendor = useAddParty<Vendor>('vendor', vendor => setVendors(prev => [...prev, vendor]));
   const today = todayLocal();
   const [form, setForm] = useState({ vendor_id: '', credit_date: today, amount: '', offset_account_id: '', memo: '' });
   const [err, setErr] = useState<string | null>(null);
@@ -47,7 +53,12 @@ export default function VendorCreditNewPage() {
     try {
       const body = { ...form, amount: parseMoneyInput(form.amount), memo: form.memo || null };
       const r = await api.post(`/businesses/${bizId}/vendor-credits`, body);
-      nav(`/ap/vendor-credits/${r.data.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/vendor-credits/${r.data.id}/post`,
+        detailPath: `/ap/vendor-credits/${r.data.id}`,
+        listPath: '/ap/vendor-credits',
+        label: 'Vendor credit',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -69,7 +80,7 @@ export default function VendorCreditNewPage() {
       <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-3">
         <div>
           <Label className="text-xs text-muted-foreground">Vendor</Label>
-          <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.vendor_id} onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))} required>
+          <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.vendor_id} onChange={e => setForm(f => ({ ...f, vendor_id: e.target.value }))} required onAddNew={() => addVendor.open(id => setForm(f => ({ ...f, vendor_id: id })))} addNewLabel="Add new vendor">
             <option value="">Choose a vendor</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </AppSelect>
           <div className="mt-3">
@@ -106,6 +117,7 @@ export default function VendorCreditNewPage() {
                   onChange={(id) => setForm(f => ({ ...f, offset_account_id: id }))}
                   required
                   placeholder="Search expense account to reverse…"
+                  onCreate={() => addAccount.open({ onPick: id => setForm(f => ({ ...f, offset_account_id: id })) })}
                 />
               </td>
               <td className="p-3">
@@ -133,8 +145,12 @@ export default function VendorCreditNewPage() {
       <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/ap/vendor-credits')}>Cancel</Button>
         <div className="flex-1" />
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</Button>
+        <SaveButtons save={save} busy={busy} />
       </div>
+      {addAccount.drawer}{addVendor.dialog}
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(VendorCreditNewPage);

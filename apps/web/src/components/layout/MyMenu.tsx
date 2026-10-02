@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Bookmark, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 
 const STORAGE_KEY = 'app_bookmarks';
 type BookmarkItem = { id: string; label: string; path: string };
@@ -36,6 +37,7 @@ export function MyMenu() {
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  useArrowKeyMenu(open, panelRef);
 
   useEffect(() => {
     if (open) setBookmarks(loadBookmarks());

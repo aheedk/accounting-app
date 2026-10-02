@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 type Customer = {
   id: string;
@@ -115,6 +116,7 @@ export default function SalesOrderNewPage() {
 
   // Form data
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const addCustomer = useAddParty<Customer>('customer', (customer) => setCustomers((prev) => [...prev, customer]));
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [customerId, setCustomerId] = useState('');
   const [billTo, setBillTo] = useState('');
@@ -257,6 +259,8 @@ export default function SalesOrderNewPage() {
                   value={customerId}
                   onChange={(e) => pickCustomer(e.target.value)}
                   required
+                  onAddNew={() => addCustomer.open((id) => setCustomerId(id))}
+                  addNewLabel="Add new customer"
                 >
                   <option value="">Search and select…</option>
                   {customers.map((c) => (
@@ -621,6 +625,7 @@ export default function SalesOrderNewPage() {
           {busy ? 'Saving…' : 'Save'}
         </Button>
       </div>
+      {addCustomer.dialog}
     </form>
   );
 }

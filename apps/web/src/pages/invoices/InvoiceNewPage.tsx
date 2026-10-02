@@ -11,6 +11,8 @@ import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/P
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { useAddParty } from '@/components/addNew/useAddParty';
+import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string };
@@ -19,10 +21,12 @@ const blank = (): Line => ({ description: '', inventory_item_id: '', amount: '' 
 
 const STANDARD_TERMS = ['Net 30', 'Net 60', 'Net 90', '2/10 Net 30'];
 
-export default function InvoiceNewPage() {
+function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const save = useSaveAndPost();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   const [items, setItems] = useState<ProductServiceItem[]>([]);
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const today = todayLocal();
@@ -105,7 +109,12 @@ export default function InvoiceNewPage() {
         lines: mapped,
       };
       const r = await api.post(`/businesses/${bizId}/invoices`, body);
-      nav(`/invoices/${r.data.invoice.id}`);
+      await save.finish({
+        postUrl: `/businesses/${bizId}/invoices/${r.data.invoice.id}/post`,
+        detailPath: `/invoices/${r.data.invoice.id}`,
+        listPath: '/invoices',
+        label: 'Invoice',
+      });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
       setErr(msg ?? 'Failed');
@@ -120,7 +129,7 @@ export default function InvoiceNewPage() {
       <Card><CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Customer</Label>
-            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required>
+            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required onAddNew={() => addCustomer.open(id => setHdr(h => ({ ...h, customer_id: id })))} addNewLabel="Add new customer">
               <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </AppSelect>
           </div>
@@ -192,7 +201,11 @@ export default function InvoiceNewPage() {
         </CardContent>
       </Card>
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex gap-2"><Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Create draft'}</Button><Button type="button" variant="outline" onClick={() => nav('/invoices')}>Cancel</Button></div>
+      <div className="flex gap-2"><SaveButtons save={save} busy={busy} /><Button type="button" variant="outline" onClick={() => nav('/invoices')}>Cancel</Button></div>
+      {addCustomer.dialog}
     </form>
   );
 }
+
+// Wrapped so "Save and new" can hand back a blank form.
+export default resettable(InvoiceNewPage);

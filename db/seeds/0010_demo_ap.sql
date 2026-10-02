@@ -101,9 +101,11 @@ BEGIN
       v_amt := 220 * i;
       v_exp_code := v_exp_codes[1 + (i % array_length(v_exp_codes, 1))];
       v_vc := gen_random_uuid();
-      INSERT INTO vendor_credits (id, business_id, vendor_id, credit_date, amount, remaining_amount,
+      INSERT INTO numbering_counters (business_id, entity_type, last_value) VALUES (r.id, 'vendor_credit', i)
+        ON CONFLICT (business_id, entity_type) DO UPDATE SET last_value = GREATEST(numbering_counters.last_value, EXCLUDED.last_value);
+      INSERT INTO vendor_credits (id, business_id, vendor_id, vendor_credit_number, credit_date, amount, remaining_amount,
                                   offset_account_id, ap_account_id, status, created_by_user_id, memo)
-      VALUES (v_vc, r.id, v_vend, v_date, v_amt, v_amt,
+      VALUES (v_vc, r.id, v_vend, 'VC-' || (1000 + i), v_date, v_amt, v_amt,
               (SELECT id FROM chart_of_accounts WHERE business_id = r.id AND code = v_exp_code),
               v_ap, 'draft', v_user, 'Vendor credit for returned goods');
       v_je := seed_post_je(r.id, v_date, 'Vendor credit', 'vendor_credit', v_vc,

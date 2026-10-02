@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Copy, Paperclip, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -19,6 +19,7 @@ import {
   journalAccountsForLine,
   journalEntryPayload,
   journalSupportsManualActions,
+  pickJournalLineAccount,
   journalEntryToForm,
   journalEntryTotals,
   newJournalEntryForm,
@@ -31,6 +32,8 @@ import type { JournalEntryDetail } from './journalEntryTypes';
 import RecentJournalEntries from './RecentJournalEntries';
 import JournalRecurringDialog from './JournalRecurringDialog';
 import AccountCreateDrawer from '@/pages/coa/AccountCreateDrawer';
+import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
+import { PostErrorNotice, type SaveWarningState } from '@/components/SaveAndPost';
 import { JournalNumberRequestGate } from './journalNumberPreview';
 import {
   JOURNAL_CLOSE_PATH,
@@ -86,6 +89,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const pendingAccountFocusRef = useRef<number | null>(null);
   const navigate = useNavigate();
+  const attachments = useAttachments('journal_entry', existing?.entry.id ?? null);
   const readOnly = existing !== undefined && !existing.can_correct;
   const supportsManualActions = journalSupportsManualActions(existing);
   const totals = journalEntryTotals(form.lines);
@@ -167,10 +171,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }));
   }
 
+  function pickLineAccount(index: number, accountId: string) {
+    setForm(current => ({ ...current, lines: pickJournalLineAccount(current.lines, index, accountId) }));
+  }
+
   function handleAccountCreated(account: JournalAccount) {
     setAccounts(current => [...current.filter(item => item.id !== account.id), account]);
     if (newAccountLineIndex !== null) {
-      updateLine(newAccountLineIndex, { account_id: account.id });
+      pickLineAccount(newAccountLineIndex, account.id);
     }
     setNewAccountLineIndex(null);
   }
@@ -241,11 +249,21 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         savedId = response.data.id;
       }
 
+      // Files added before the entry existed are uploaded now that it has an id.
+      const attachWarning = existing ? null : await attachments.attachTo(savedId);
+      if (attachWarning) {
+        // Open the saved entry so the missing files can be re-added there.
+        const state: SaveWarningState = { saveWarnings: [attachWarning] };
+        navigate(`/journal/${savedId}`, { state });
+        return;
+      }
+
       if (destination === 'new') {
         if (existing) navigate(journalDestinationPath(destination, savedId));
         else {
           journalNumberRequestGateRef.current.invalidate();
           setForm(newJournalEntryForm(todayLocal()));
+          attachments.reset();
           journalNumberEditedRef.current = false;
           setNumberRefresh(current => current + 1);
         }
@@ -296,6 +314,26 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         {},
       );
       navigate(`/journal/${response.data.reversal.id}`);
+    } catch (requestError: unknown) {
+      setError(pickErr(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteEntry() {
+    if (!businessId || !existing?.can_delete) return;
+    const confirmed = window.confirm(
+      existing.delete_removes_pair
+        ? 'Delete this entry and the entry that reverses it? Both will be removed from the books and reports. This cannot be undone.'
+        : 'Delete this journal entry? It will be removed from the books and reports. This cannot be undone.',
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.delete(`/businesses/${businessId}/journal-entries/${existing.entry.id}`);
+      navigate(JOURNAL_CLOSE_PATH);
     } catch (requestError: unknown) {
       setError(pickErr(requestError));
     } finally {
@@ -464,7 +502,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                       ariaLabel={`Account, line ${index + 1}`}
                       accounts={journalAccountsForLine(accounts, line.account_id)}
                       value={line.account_id}
-                      onChange={accountId => updateLine(index, { account_id: accountId })}
+                      onChange={accountId => pickLineAccount(index, accountId)}
                       placeholder=""
                       disabled={readOnly}
                       className="w-full"
@@ -596,17 +634,11 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
               className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">Attachments</label>
-            <div className="flex h-[108px] flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/20">
-              <Paperclip className="h-5 w-5" />
-              <span>Add attachment</span>
-              <span className="text-xs">Max file size: 20 MB</span>
-            </div>
-          </div>
+          <AttachmentsPanel attachments={attachments} />
         </div>
       </div>
 
+      <PostErrorNotice className="mx-6 mb-2" />
       {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
       {notice && <p className="px-6 pb-2 text-sm text-emerald-700">{notice}</p>}
 
@@ -614,8 +646,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
           {readOnly ? 'Back' : 'Cancel'}
         </Button>
+        {existing?.can_delete && (
+          <Button type="button" variant="destructive" onClick={() => { void deleteEntry(); }} disabled={busy}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        )}
         {existing?.can_correct && (
-          <Button type="button" variant="destructive" onClick={() => { void voidEntry(); }} disabled={busy}>
+          <Button type="button" variant="outline" onClick={() => { void voidEntry(); }} disabled={busy}>
             Void entry
           </Button>
         )}

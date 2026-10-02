@@ -3,6 +3,7 @@ import { ERR } from '@accounting/shared';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
 import { makeAccount, makeBusiness, makeFirm, makeUser, seedYearPeriods } from '../helpers/factories.js';
 import * as ledger from '../../src/services/core/ledgerService.js';
+import * as expenses from '../../src/services/ap/expenseTransactionService.js';
 import * as reportService from '../../src/services/reports/generalLedgerService.js';
 import { BusinessRuleError } from '../../src/lib/errors.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
@@ -90,6 +91,55 @@ describe('general ledger report', () => {
     expect(revenueAccount.normal_balance).toBe('credit');
     expect(revenueAccount.beginning_balance).toBe('100.0000');
     expect(revenueAccount.ending_balance).toBe('150.0000');
+  });
+
+  it('describes each line the way QuickBooks does: type, number, name, and natural-sign amount', async () => {
+    const { biz, ctx, cash, revenue, expense } = await setup();
+    // A check written through the expense form.
+    const draft = await t.db.transaction().execute(trx => expenses.createDraft(trx, ctx, {
+      business_id: biz.id, transaction_date: '2026-03-10', payee_text: 'Staples',
+      expense_account_id: expense.id, payment_account_id: cash.id,
+      payment_method: 'check', check_number: '1042', amount: '40.00',
+    }));
+    await t.db.transaction().execute(trx => expenses.post(trx, ctx, { expense_transaction_id: draft.id }));
+    // A deposit posted from a bank statement import, same day as a sale entered by hand.
+    const deposit = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-03-12', source_type: 'bank_import',
+      source_id: '44444444-4444-4444-8444-444444444444', transaction_type: 'deposit',
+      memo: 'DEPOSIT', lines: [
+        { account_id: cash.id, debit: '300.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '300.0000', memo: null },
+      ],
+    }));
+    const sale = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-03-12', source_type: 'adjustment', memo: 'Accrue revenue',
+      lines: [
+        { account_id: cash.id, debit: '25.0000', credit: '0.0000', memo: null, name: 'Acme Co' },
+        { account_id: revenue.id, debit: '0.0000', credit: '25.0000', memo: null },
+      ],
+    }));
+
+    const report = await reportService.generalLedger(t.db, {
+      business_id: biz.id, period_start: '2026-03-01', period_end: '2026-03-31',
+    });
+    const cashLines = report.accounts.find(account => account.account_id === cash.id)!.lines;
+
+    expect(cashLines.map(line => [line.transaction_label, line.num, line.name, line.is_adjusting, line.amount])).toEqual([
+      ['Check', '1042', 'Staples', false, '-40.0000'],
+      ['Deposit', null, null, false, '300.0000'],
+      ['Journal Entry', sale.journal_number, 'Acme Co', true, '25.0000'],
+    ]);
+    expect(cashLines.map(line => line.transaction_path)).toEqual([
+      `/ap/expenses/${draft.id}`, `/transactions/${deposit.id}`, `/journal/${sale.id}`,
+    ]);
+    // Same-day lines keep posting order, so each balance follows from the one above.
+    expect(cashLines.map(line => line.running_balance)).toEqual(['-40.0000', '260.0000', '285.0000']);
+
+    // Credit-normal account: a sale is a positive amount and raises the balance.
+    const revenueLines = report.accounts.find(account => account.account_id === revenue.id)!.lines;
+    expect(revenueLines.map(line => [line.amount, line.running_balance])).toEqual([
+      ['300.0000', '300.0000'], ['25.0000', '325.0000'],
+    ]);
   });
 
   it('filters to one tenant-owned account and rejects an account from another business', async () => {

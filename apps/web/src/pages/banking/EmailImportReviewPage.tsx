@@ -7,6 +7,8 @@ import { fmtMoney } from '@/lib/money';
 import DocumentUpload from '@/pages/ai/DocumentUpload';
 import ConfidenceBadge, { type SuggestionMeta } from '@/pages/ai/ConfidenceBadge';
 import { AppSelect } from '../../components/ui/select';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -69,10 +71,6 @@ type CoaAccount = { id: string; code: string; name: string; account_type: string
 type Vendor = { id: string; name: string };
 type Customer = { id: string; name: string };
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 function fmtDateTime(iso: string) {
   const d = new Date(iso);
   const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -112,6 +110,9 @@ export default function EmailImportReviewPage() {
   const [accounts, setAccounts] = useState<CoaAccount[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
+  const addVendor = useAddParty<Vendor>('vendor', vendor => setVendors(prev => [...prev, vendor]));
+  const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
@@ -649,6 +650,7 @@ export default function EmailImportReviewPage() {
               <div className="flex items-center gap-3 rounded-lg border p-4 bg-muted/10">
                 <label className="text-sm font-medium whitespace-nowrap">Bank account (this statement)</label>
                 <AppSelect value={bankAccountId} onChange={e => void handleBankAccountChange(e.target.value)}
+                  onAddNew={() => addAccount.open({ accountType: 'asset', onPick: id => { void handleBankAccountChange(id); } })} addNewLabel="Add new account"
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— select —</option>
                   {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
@@ -712,6 +714,7 @@ export default function EmailImportReviewPage() {
                         <td className="px-3 py-2">
                           <AppSelect disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
                             onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
+                            onAddNew={() => addAccount.open({ onPick: id => setOffsets(prev => ({ ...prev, [i]: id })) })} addNewLabel="Add new account"
                             title={tx.suggested_offset ? `AI suggested: ${tx.suggested_offset}` : undefined}
                             className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${offsets[i] ? 'border-emerald-400' : ''}`}>
                             <option value="">— select account —</option>
@@ -1030,6 +1033,7 @@ export default function EmailImportReviewPage() {
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium whitespace-nowrap w-52">Vendor</label>
                     <AppSelect value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)}
+                      onAddNew={() => addVendor.open(id => setSelectedVendorId(id))} addNewLabel="Add new vendor"
                       className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                       <option value="">— select vendor —</option>
                       {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -1039,6 +1043,7 @@ export default function EmailImportReviewPage() {
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium whitespace-nowrap w-52">Customer</label>
                     <AppSelect value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)}
+                      onAddNew={() => addCustomer.open(id => setSelectedCustomerId(id))} addNewLabel="Add new customer"
                       className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                       <option value="">— select customer —</option>
                       {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1086,6 +1091,7 @@ export default function EmailImportReviewPage() {
                         <td className="px-3 py-2">
                           <AppSelect disabled={!lineIncluded[i]} value={lineAccountIds[i] ?? ''}
                             onChange={e => setLineAccountIds(prev => ({ ...prev, [i]: e.target.value }))}
+                            onAddNew={() => addAccount.open({ onPick: id => setLineAccountIds(prev => ({ ...prev, [i]: id })) })} addNewLabel="Add new account"
                             title={li.suggested_account ? `AI suggested: ${li.suggested_account}` : undefined}
                             className={`w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 ${lineAccountIds[i] ? 'border-emerald-400' : ''}`}>
                             <option value="">— select account —</option>
@@ -1158,6 +1164,7 @@ export default function EmailImportReviewPage() {
           )}
         </>
       )}
+      {addAccount.drawer}{addVendor.dialog}{addCustomer.dialog}
     </div>
   );
 }

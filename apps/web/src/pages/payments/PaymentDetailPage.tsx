@@ -11,6 +11,7 @@ import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { PostErrorNotice } from '@/components/SaveAndPost';
 
 type Payment = {
   id: string;
@@ -232,6 +233,7 @@ export default function PaymentDetailPage() {
         </CardContent>
       </Card>
 
+      <PostErrorNotice />
       {err && <p className="text-sm text-destructive">{err}</p>}
       <Button variant="outline" onClick={() => nav('/payments')}>Back to payments</Button>
     </div>

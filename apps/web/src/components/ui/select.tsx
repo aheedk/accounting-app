@@ -33,12 +33,20 @@ function parseOptions(children: React.ReactNode): OptionData[] {
 
 type AppSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> & {
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  /** Shows an "Add new" action pinned under the options. */
+  onAddNew?: () => void;
+  addNewLabel?: string;
 };
 
-export function AppSelect({ value, onChange, className, disabled, children, ...rest }: AppSelectProps) {
+export function AppSelect({
+  value, onChange, className, disabled, children, onAddNew, addNewLabel = 'Add new', ...rest
+}: AppSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  // Index into `filtered` of the option the arrow keys are on.
+  const [activeIdx, setActiveIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -80,11 +88,65 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
   useEffect(() => {
     if (!open) { setQuery(''); return; }
     setTimeout(() => searchRef.current?.focus(), 0);
-    if (listRef.current) {
-      const active = listRef.current.querySelector('[data-selected="true"]') as HTMLElement | null;
-      if (active) active.scrollIntoView({ block: 'nearest' });
-    }
   }, [open]);
+
+  // Start on the current value when the list opens, and on the first match
+  // when the search text changes.
+  const filteredKey = filtered.map(o => o.value).join('\u0000');
+  useEffect(() => {
+    if (!open) return;
+    const current = filtered.findIndex(o => o.value === String(value ?? '') && !o.disabled);
+    setActiveIdx(current >= 0 ? current : filtered.findIndex(o => !o.disabled));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filteredKey stands in for `filtered`
+  }, [open, filteredKey]);
+
+  useEffect(() => {
+    if (!open || activeIdx < 0) return;
+    const item = listRef.current?.children[activeIdx] as HTMLElement | undefined;
+    item?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, activeIdx]);
+
+  // Next enabled option in `direction`, stopping at the ends like a native select.
+  function step(from: number, direction: 1 | -1): number {
+    for (let i = from + direction; i >= 0 && i < filtered.length; i += direction) {
+      if (!filtered[i]?.disabled) return i;
+    }
+    return from;
+  }
+
+  function close(returnFocus: boolean) {
+    setOpen(false);
+    if (returnFocus) triggerRef.current?.focus();
+  }
+
+  function onListKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(i => step(i, 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(i => step(i < 0 ? filtered.length : i, -1));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveIdx(step(-1, 1));
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActiveIdx(step(filtered.length, -1));
+    } else if (e.key === 'Enter') {
+      // Never let Enter submit the surrounding form while the list is open.
+      e.preventDefault();
+      const active = filtered[activeIdx];
+      if (active && !active.disabled) { pick(active.value); triggerRef.current?.focus(); }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+    } else if (e.key === 'Tab') {
+      // Hand focus back to the trigger first so Tab continues from this field
+      // instead of from the top of the page once the search box unmounts.
+      close(true);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -114,9 +176,17 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
       {...(rest as React.HTMLAttributes<HTMLDivElement>)}
     >
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen(prev => !prev)}
+        onKeyDown={e => {
+          // Like a native select: the arrow keys open the list.
+          if (!open && !disabled && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
         className="flex flex-1 items-center justify-between overflow-hidden px-3 py-2 outline-none"
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -140,12 +210,10 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
               onChange={e => setQuery(e.target.value)}
               placeholder="Search…"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              onKeyDown={e => {
-                if (e.key === 'Escape') { setOpen(false); }
-                if (e.key === 'Enter' && filtered.length === 1 && filtered[0]) {
-                  pick(filtered[0].value);
-                }
-              }}
+              onKeyDown={onListKeyDown}
+              role="combobox"
+              aria-expanded
+              aria-autocomplete="list"
             />
           </div>
 
@@ -154,21 +222,25 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
             role="listbox"
             className="max-h-60 overflow-y-auto py-1 focus:outline-none"
           >
-            {filtered.map(opt => {
+            {filtered.map((opt, index) => {
               const isSelected = opt.value === String(value ?? '');
+              const isActive = index === activeIdx;
               return (
                 <li
-                  key={opt.value}
+                  key={`${index}-${opt.value}`}
                   role="option"
                   aria-selected={isSelected}
                   data-selected={isSelected}
+                  data-active={isActive}
                   aria-disabled={opt.disabled}
                   onClick={() => !opt.disabled && pick(opt.value)}
+                  onMouseEnter={() => { if (!opt.disabled) setActiveIdx(index); }}
                   className={cn(
                     'flex cursor-pointer select-none items-center px-3 py-2 text-sm',
-                    'hover:bg-accent hover:text-accent-foreground',
                     opt.disabled && 'cursor-not-allowed opacity-40',
-                    isSelected && 'bg-accent/50 font-medium',
+                    isSelected && 'font-medium',
+                    // One highlight for both mouse and keyboard, so they never disagree.
+                    isActive && 'bg-accent text-accent-foreground',
                   )}
                 >
                   <span className="flex-1 truncate">{opt.label}</span>
@@ -180,6 +252,17 @@ export function AppSelect({ value, onChange, className, disabled, children, ...r
               <li className="px-3 py-2 text-sm text-muted-foreground">No results</li>
             )}
           </ul>
+          {onAddNew && (
+            <div className="border-t p-1">
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onAddNew(); }}
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+              >
+                {addNewLabel}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

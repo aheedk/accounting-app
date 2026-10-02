@@ -300,6 +300,7 @@ export interface CreditMemosTable {
   id: Generated<string>;
   business_id: string;
   customer_id: string;
+  credit_memo_number: string | null;
   memo_date: ColumnType<string, string, string>;
   status: Generated<CreditMemoStatus>;
   amount: ColumnType<string, string | number, string | number>;
@@ -742,6 +743,7 @@ export interface VendorCreditsTable {
   id: Generated<string>;
   business_id: string;
   vendor_id: string;
+  vendor_credit_number: string | null;
   credit_date: ColumnType<string, string, string>;
   amount: ColumnType<string, string | number, string | number>;
   remaining_amount: ColumnType<string, string | number, string | number>;
