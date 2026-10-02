@@ -37,11 +37,34 @@ export const recurringBillPayloadSchema = z.object({
 });
 export type RecurringBillPayload = z.infer<typeof recurringBillPayloadSchema>;
 
+// Deposit templates never carry undeposited-funds lines (payments in Undeposited
+// Funds at materialization time are whatever happens to be there that day) — only
+// the "other funds" lines, which are a fixed, user-edited list on the template.
+export const recurringDepositLineSchema = z.object({
+  received_from: z.string().max(200).nullable().optional(),
+  account_id: z.string().uuid(),
+  description: z.string().max(500).nullable().optional(),
+  payment_method: z.string().max(100).nullable().optional(),
+  ref_no: z.string().max(100).nullable().optional(),
+  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+});
+export const recurringDepositPayloadSchema = z.object({
+  bank_account_id: z.string().uuid(),
+  memo: z.string().max(2000).nullable().optional(),
+  lines: z.array(recurringDepositLineSchema).min(1),
+});
+export type RecurringDepositPayload = z.infer<typeof recurringDepositPayloadSchema>;
+
 export const recurringTemplateCreateSchema = z.object({
   name: z.string().min(1).max(200),
-  template_type: z.enum(['journal_entry', 'invoice', 'bill']),
+  template_type: z.enum(['journal_entry', 'invoice', 'bill', 'deposit']),
   payload: z.record(z.unknown()),
   recurrence: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']),
+  // Deposit-only: scheduled auto-creates on next_run_date; reminder/unscheduled
+  // never auto-fire (no notification channel exists yet) and are materialized
+  // only via the explicit "run now" action. Ignored by other template types.
+  recurrence_type: z.enum(['scheduled', 'reminder', 'unscheduled']).optional(),
+  days_in_advance: z.number().int().min(0).nullable().optional(),
   next_run_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
@@ -51,6 +74,8 @@ export const recurringTemplateUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   payload: z.record(z.unknown()).optional(),
   recurrence: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  recurrence_type: z.enum(['scheduled', 'reminder', 'unscheduled']).optional(),
+  days_in_advance: z.number().int().min(0).nullable().optional(),
   next_run_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   is_active: z.boolean().optional(),

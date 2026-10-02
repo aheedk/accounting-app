@@ -276,6 +276,7 @@ export interface PaymentsTable {
   status: Generated<PaymentStatus>;
   posted_journal_entry_id: string | null;
   memo: string | null;
+  is_deposited: Generated<boolean>;
   posted_at: Timestamp | null;
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;
@@ -398,7 +399,7 @@ export interface PeriodReviewTasksTable {
   updated_at: Generated<Timestamp>;
 }
 
-export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill';
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit';
 export type RecurringTemplateRecurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface RecurringTemplatesTable {
@@ -408,6 +409,8 @@ export interface RecurringTemplatesTable {
   template_type: RecurringTemplateType;
   payload: ColumnType<unknown, unknown, unknown>;
   recurrence: RecurringTemplateRecurrence;
+  recurrence_type: Generated<'scheduled' | 'reminder' | 'unscheduled'>;
+  days_in_advance: number | null;
   next_run_date: ColumnType<string, string, string>;
   end_date: ColumnType<string, string, string> | null;
   last_run_at: Timestamp | null;
@@ -1068,6 +1071,8 @@ export interface BankDepositLinesTable {
   id: Generated<string>;
   deposit_id: string;
   business_id: string;
+  line_type: Generated<'other_funds' | 'undeposited_funds'>;
+  payment_id: string | null;
   received_from: string | null;
   account_id: string | null;
   description: string | null;

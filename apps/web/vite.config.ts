@@ -29,6 +29,20 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       ...(proxy ? { proxy } : {}),
+      // Pre-transform these on server start instead of on first visit. Without
+      // this, Vite dev mode transforms a route's whole module graph lazily on
+      // its first request after every `vite` restart — the actual source of
+      // the "10 second first click" reports, not API or DB latency (both
+      // measured in the single-digit milliseconds, see the debugging that
+      // informed this change).
+      warmup: {
+        clientFiles: [
+          './src/pages/accounting/BankDepositPage.tsx',
+          './src/pages/accounting/BankDepositListPage.tsx',
+          './src/pages/reports/GeneralLedgerPage.tsx',
+          './src/pages/accounting/RecurringTransactionsPage.tsx',
+        ],
+      },
     },
   };
 });

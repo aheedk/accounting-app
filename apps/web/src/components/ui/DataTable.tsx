@@ -26,6 +26,12 @@ export interface DataTableProps<T> {
   onSelectedIdsChange?: (next: Set<string>) => void;
   actions?: (row: T) => ReactNode;
   actionsHeader?: ReactNode;
+  // Makes the whole row clickable (QBO-style list pages) instead of relying
+  // on an explicit actions column. Mutually exclusive in practice with
+  // `selectable`/`actions` — nothing stops combining them, but a row click
+  // target under a checkbox or action link is confusing, so callers doing
+  // that should stop propagation on those inner elements themselves.
+  onRowClick?: (row: T) => void;
   emptyMessage?: ReactNode;
   downloadable?: { filename: string; title: string };
   // QBO-style pager ("‹ Previous 1-75 Next ›"). Slices AFTER sorting so
@@ -44,6 +50,7 @@ export function DataTable<T>({
   onSelectedIdsChange,
   actions,
   actionsHeader,
+  onRowClick,
   emptyMessage = 'No records.',
   downloadable,
   pagination,
@@ -206,7 +213,11 @@ export function DataTable<T>({
         {visibleRows.map(row => {
           const id = getRowId(row);
           return (
-            <tr key={id} className="border-b last:border-b-0 hover:bg-muted/80 transition-colors">
+            <tr
+              key={id}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={`border-b last:border-b-0 hover:bg-muted/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+            >
               {selectable && (
                 <td className="p-3">
                   <input

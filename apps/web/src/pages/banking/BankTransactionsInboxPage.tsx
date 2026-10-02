@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronDown, CreditCard, FileDown, Printer, Search, X } f
 import { Link } from 'react-router-dom';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
+import { cachedGet } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import type { Role } from '@/auth/AuthContext';
@@ -208,8 +209,8 @@ export default function BankTransactionsInboxPage() {
     if (!bizId) return;
     (async () => {
       try {
-        const r = await api.get(`/businesses/${bizId}/bank-accounts`);
-        const list: BankAccount[] = r.data.bank_accounts;
+        const r = await cachedGet<{ bank_accounts: BankAccount[] }>(`/businesses/${bizId}/bank-accounts`);
+        const list: BankAccount[] = r.bank_accounts;
         setBankAccounts(list);
         if (list.length > 0 && !bankAccountId) {
           const first = list[0];
@@ -228,10 +229,10 @@ export default function BankTransactionsInboxPage() {
       try {
         const [je, coa] = await Promise.all([
           api.get(`/businesses/${bizId}/journal-entries`, { params: { limit: 50 } }),
-          api.get(`/businesses/${bizId}/coa`),
+          cachedGet<{ accounts: Account[] }>(`/businesses/${bizId}/coa`),
         ]);
         setJournalEntries(je.data.entries);
-        setAccounts(coa.data.accounts);
+        setAccounts(coa.accounts);
       } catch (e: unknown) {
         setErr(pickErr(e));
       }

@@ -646,8 +646,8 @@ export async function postJournalEntryBatch(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
   inputs: PostJournalEntryInput[],
-): Promise<void> {
-  if (inputs.length === 0) return;
+): Promise<{ id: string }[]> {
+  if (inputs.length === 0) return [];
   for (const input of inputs) assertBalanced(input.lines);
 
   const business_id = inputs[0]!.business_id;
@@ -761,6 +761,10 @@ export async function postJournalEntryBatch(
       user_agent: ctx.user_agent,
     })))
     .execute();
+
+  // createdJEs preserves inputs' order (multi-row INSERT...RETURNING), same
+  // assumption step 5 already relies on to zip entries with their lines.
+  return createdJEs.map(je => ({ id: je.id }));
 }
 
 async function currentSetting(trx: Transaction<DB>, key: string): Promise<string | null> {

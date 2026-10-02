@@ -7,33 +7,46 @@ import { postJournalEntry } from '../core/ledgerService.js';
 import { nextNumber } from '../core/numberingService.js';
 import * as invoiceService from '../ar/invoiceService.js';
 import * as billService from '../ap/billService.js';
+import * as depositService from '../banking/bankDepositService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type RecurringTemplateRow = Selectable<RecurringTemplatesTable>;
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit';
+export type RecurringTemplateRecurrenceType = 'scheduled' | 'reminder' | 'unscheduled';
 
 export type CreateTemplateInput = {
   business_id: string;
   name: string;
-  template_type: 'journal_entry' | 'invoice' | 'bill';
+  template_type: RecurringTemplateType;
   payload: unknown;
   recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  recurrence_type?: RecurringTemplateRecurrenceType;
+  days_in_advance?: number | null;
   next_run_date: string;
   end_date?: string | null;
 };
 
+const PAYLOAD_LABELS: Record<RecurringTemplateType, string> = {
+  journal_entry: 'journal entry',
+  invoice: 'invoice',
+  bill: 'bill',
+  deposit: 'deposit',
+};
+
 /** Validate a payload against the type-specific schema; returns the parsed payload (zod defaults applied). */
 function parsePayload(
-  template_type: 'journal_entry' | 'invoice' | 'bill', payload: unknown,
+  template_type: RecurringTemplateType, payload: unknown,
 ): object {
   const schema = template_type === 'journal_entry' ? schemas.recurringJePayloadSchema
     : template_type === 'invoice' ? schemas.recurringInvoicePayloadSchema
-    : schemas.recurringBillPayloadSchema;
+    : template_type === 'bill' ? schemas.recurringBillPayloadSchema
+    : schemas.recurringDepositPayloadSchema;
   const r = schema.safeParse(payload);
   if (!r.success) {
     const detail = r.error.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
     throw new BusinessRuleError(
       ERR.VALIDATION_FAILED,
-      `invalid recurring ${template_type === 'journal_entry' ? 'journal entry' : template_type} payload: ${detail}`,
+      `invalid recurring ${PAYLOAD_LABELS[template_type]} payload: ${detail}`,
     );
   }
   return r.data;
@@ -44,9 +57,11 @@ export async function create(trx: Transaction<DB>, ctx: ServiceCtx, input: Creat
   const values: {
     business_id: string;
     name: string;
-    template_type: 'journal_entry' | 'invoice' | 'bill';
+    template_type: RecurringTemplateType;
     payload: object;
     recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+    recurrence_type?: RecurringTemplateRecurrenceType;
+    days_in_advance?: number | null;
     next_run_date: string;
     end_date?: string | null;
     created_by_user_id: string;
@@ -60,6 +75,8 @@ export async function create(trx: Transaction<DB>, ctx: ServiceCtx, input: Creat
     created_by_user_id: ctx.user_id,
   };
   if (input.end_date !== undefined) values.end_date = input.end_date;
+  if (input.recurrence_type !== undefined) values.recurrence_type = input.recurrence_type;
+  if (input.days_in_advance !== undefined) values.days_in_advance = input.days_in_advance;
 
   const row = await trx.insertInto('recurring_templates').values(values).returningAll().executeTakeFirstOrThrow();
   await auditRecord(trx, ctx, {
@@ -84,6 +101,8 @@ export type UpdateTemplateInput = {
     name?: string;
     payload?: unknown;
     recurrence?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+    recurrence_type?: RecurringTemplateRecurrenceType;
+    days_in_advance?: number | null;
     next_run_date?: string;
     end_date?: string | null;
     is_active?: boolean;
@@ -99,6 +118,8 @@ export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: Updat
     name?: string;
     payload?: object;
     recurrence?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+    recurrence_type?: RecurringTemplateRecurrenceType;
+    days_in_advance?: number | null;
     next_run_date?: string;
     end_date?: string | null;
     is_active?: boolean;
@@ -106,6 +127,8 @@ export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: Updat
   if (input.patch.name !== undefined) patch.name = input.patch.name;
   if (input.patch.payload !== undefined) patch.payload = parsePayload(before.template_type, input.patch.payload);
   if (input.patch.recurrence !== undefined) patch.recurrence = input.patch.recurrence;
+  if (input.patch.recurrence_type !== undefined) patch.recurrence_type = input.patch.recurrence_type;
+  if (input.patch.days_in_advance !== undefined) patch.days_in_advance = input.patch.days_in_advance;
   if (input.patch.next_run_date !== undefined) patch.next_run_date = input.patch.next_run_date;
   if (input.patch.end_date !== undefined) patch.end_date = input.patch.end_date;
   if (input.patch.is_active !== undefined) patch.is_active = input.patch.is_active;
@@ -206,7 +229,7 @@ async function materializeOnce(
       })),
     });
     await invoiceService.postInvoice(trx, ctx, { invoice_id: created.invoice.id });
-  } else {
+  } else if (t.template_type === 'bill') {
     const payload = parsePayload('bill', t.payload) as schemas.RecurringBillPayload;
     const bill_number = await nextNumber(trx, t.business_id, 'bill', 'BILL');
     const created = await billService.createDraft(trx, ctx, {
@@ -225,6 +248,23 @@ async function materializeOnce(
       })),
     });
     await billService.postBill(trx, ctx, { bill_id: created.bill.id });
+  } else {
+    const payload = parsePayload('deposit', t.payload) as schemas.RecurringDepositPayload;
+    await depositService.createDeposit(trx, ctx, {
+      bank_account_id: payload.bank_account_id,
+      deposit_date: runDate,
+      memo: payload.memo ?? `Recurring: ${t.name}`,
+      lines: payload.lines.map((l, i) => ({
+        line_type: 'other_funds' as const,
+        received_from: l.received_from ?? null,
+        account_id: l.account_id,
+        description: l.description ?? null,
+        payment_method: l.payment_method ?? null,
+        ref_no: l.ref_no ?? null,
+        amount: l.amount,
+        sort_order: i,
+      })),
+    });
   }
 }
 
@@ -245,6 +285,12 @@ export async function materializeDueTemplate(
     .forUpdate()
     .executeTakeFirst();
   if (!locked || !locked.is_active || locked.next_run_date > today) {
+    return { template_id: t.id, runs_created: 0 };
+  }
+  // Deposit templates: only 'scheduled' auto-fires. 'reminder' and 'unscheduled'
+  // sit here forever (next_run_date never advances) until the user invokes
+  // runTemplateNow — there is no notification channel yet to back 'reminder'.
+  if (locked.template_type === 'deposit' && locked.recurrence_type !== 'scheduled') {
     return { template_id: t.id, runs_created: 0 };
   }
 
@@ -298,6 +344,38 @@ export async function runDueForBusiness(
     }
   }
   return results;
+}
+
+/**
+ * Materialize a template immediately at today's date, independent of its
+ * schedule — the only way a 'reminder' or 'unscheduled' template (deposit or
+ * otherwise) ever produces a transaction, and also usable as an ad hoc extra
+ * run of a 'scheduled' one. Does not touch next_run_date.
+ */
+export async function runTemplateNow(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { template_id: string },
+): Promise<{ template_id: string; runs_created: number }> {
+  const t = await trx.selectFrom('recurring_templates').selectAll()
+    .where('id', '=', input.template_id)
+    .where('business_id', '=', ctx.business_id!)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!t) throw new NotFoundError('recurring_template', input.template_id);
+  if (!t.is_active) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'Template is paused');
+
+  const today = new Date().toISOString().slice(0, 10);
+  await materializeOnce(trx, ctx, t, today);
+  await trx.updateTable('recurring_templates')
+    .set({ last_run_at: sql`now()` })
+    .where('id', '=', t.id).execute();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.RECURRING_TEMPLATE_RUN,
+    entity_type: 'recurring_template',
+    entity_id: t.id,
+    before: t,
+    after: { runs_created: 1, advanced_to: t.next_run_date },
+  });
+  return { template_id: t.id, runs_created: 1 };
 }
 
 export async function deleteTemplate(

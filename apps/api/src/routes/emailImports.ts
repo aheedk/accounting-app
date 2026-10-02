@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { postJournalEntryBatch } from '../services/core/ledgerService.js';
+import { wrapImportedDepositJournalEntry } from '../services/banking/bankDepositService.js';
 import { suggestCodingBatch, rememberCoding, learningDecision } from '../services/ai/autoCodingService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
@@ -239,7 +240,23 @@ router.post(
       const posted = jeInputs.length;
       let learned = 0;
       await db.transaction().execute(async trx => {
-        await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+        const createdJEs = await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+
+        for (let i = 0; i < pairs.length; i++) {
+          const { tx, item } = pairs[i]!;
+          const je = createdJEs[i];
+          const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
+          if (je && isDeposit) {
+            await wrapImportedDepositJournalEntry(trx, serviceCtx, {
+              journal_entry_id: je.id,
+              chart_account_id: body.bank_account_id,
+              offset_account_id: item.offset_account_id,
+              entry_date: jeInputs[i]!.entry_date,
+              description: tx.description,
+              amount: parseFloat(tx.amount).toFixed(2),
+            });
+          }
+        }
 
         for (const { tx, item } of pairs) {
           const suggestion = suggestions[item.index] ?? null;
@@ -389,7 +406,24 @@ router.post(
       const remaining = transactions.filter(t => !t.auto_posted).length;
 
       await db.transaction().execute(async trx => {
-        await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+        const createdJEs = await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+
+        for (let i = 0; i < confident.length; i++) {
+          const { tx, accountId } = confident[i]!;
+          const je = createdJEs[i];
+          const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
+          if (je && isDeposit) {
+            await wrapImportedDepositJournalEntry(trx, serviceCtx, {
+              journal_entry_id: je.id,
+              chart_account_id: body.bank_account_id,
+              offset_account_id: accountId,
+              entry_date: jeInputs[i]!.entry_date,
+              description: tx.description,
+              amount: parseFloat(tx.amount).toFixed(2),
+            });
+          }
+        }
+
         await trx.updateTable('email_import_staging')
           .set({
             extracted_transactions: JSON.stringify(transactions),

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, seedCoa } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import * as bankAcctSvc from '../../src/services/banking/bankAccountService.js';
+import { postJournalEntry } from '../../src/services/core/ledgerService.js';
 import { ERR } from '@accounting/shared';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -80,6 +81,37 @@ describe('bankAccountService', () => {
         }),
       ),
     ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+  });
+
+  it('getBankAccount: book_balance reflects posted JE debits minus credits, not the bank feed', async () => {
+    const { biz, ctx, cash } = await setup(t);
+    const currentYear = new Date().getUTCFullYear();
+    await seedYearPeriods(t.db, biz.id, currentYear);
+    const income = await t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('business_id', '=', biz.id).where('code', '=', '4010').executeTakeFirstOrThrow();
+
+    const ba = await t.db.transaction().execute(trx =>
+      bankAcctSvc.createBankAccount(trx, ctx, {
+        business_id: biz.id, name: 'Book Balance Checking', institution: null, account_last_four: null,
+        cash_account_id: cash.id,
+      }),
+    );
+
+    // No bank_transactions rows at all — bank_balance (feed-side) would read 0.
+    const today = new Date().toISOString().slice(0, 10);
+    await t.db.transaction().execute(trx => postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: today,
+      source_type: 'manual',
+      memo: 'Deposit',
+      lines: [
+        { account_id: cash.id, debit: '500.00', credit: '0', memo: null },
+        { account_id: income.id, debit: '0', credit: '500.00', memo: null },
+      ],
+    }));
+
+    const row = await bankAcctSvc.getBankAccount(t.db, biz.id, ba.id);
+    expect(Number(row.book_balance)).toBe(500);
   });
 
   it('listBankAccounts returns active accounts sorted by name', async () => {

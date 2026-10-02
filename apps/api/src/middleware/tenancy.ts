@@ -18,6 +18,13 @@ export async function resolveBusiness(req: Request, _res: Response, next: NextFu
     if (!req.auth) throw new AuthError(ERR.UNAUTHORIZED, 'Not authenticated');
     const business_id = req.params['businessId'];
     if (!business_id) throw new NotFoundError('business');
+    // Every router mounts its own `router.use('/businesses/:businessId', ..., resolveBusiness)`
+    // (50 of them) — Express path-prefix matching means ALL of them fire on a
+    // request to e.g. /businesses/x/bank-deposits, not just the one that ends
+    // up handling it, each paying 2 DB round trips. :businessId is the same
+    // path segment throughout a single request, so once resolved, skip re-
+    // resolving on every subsequent router in the chain.
+    if (req.tenancy?.business_id === business_id) return next();
 
     const business = await db.selectFrom('businesses')
       .select(['id', 'firm_id'])

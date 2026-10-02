@@ -17,6 +17,12 @@ export type GeneralLedgerLine = {
   debit: string;
   credit: string;
   running_balance: string;
+  // Set when a bank_deposits record wraps this entry's JE — true for manually
+  // created deposits (source_type='bank_deposit') and for AI-coded bank-statement
+  // deposits (source_type stays 'bank_import'; see emailImports.ts), which also
+  // get a wrapper so they're viewable the same way. Lets the UI drill through to
+  // the Bank Deposit page instead of the raw journal entry for any such line.
+  bank_deposit_id: string | null;
 };
 
 export type GeneralLedgerAccount = {
@@ -143,6 +149,17 @@ export async function generalLedger(
     }
   }
 
+  const depositByJe = new Map<string, string>();
+  if (jeIds.length > 0) {
+    const deposits = await db.selectFrom('bank_deposits')
+      .select(['id', 'journal_entry_id'])
+      .where('journal_entry_id', 'in', jeIds)
+      .execute();
+    for (const d of deposits) {
+      if (d.journal_entry_id) depositByJe.set(d.journal_entry_id, d.id);
+    }
+  }
+
   let reportDebit = '0.0000';
   let reportCredit = '0.0000';
   const accounts: GeneralLedgerAccount[] = [];
@@ -177,6 +194,7 @@ export async function generalLedger(
         debit,
         credit,
         running_balance: running,
+        bank_deposit_id: depositByJe.get(line.journal_entry_id) ?? null,
       };
     });
 

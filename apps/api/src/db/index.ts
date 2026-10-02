@@ -10,6 +10,16 @@ pg.types.setTypeParser(1700, (val) => val);
 // kysely DB type contract for fiscal_periods.starts_on/ends_on, journal_entries.entry_date, etc.
 pg.types.setTypeParser(1082, (val) => val);
 
+// Tracks the pool behind the most recently created instance (the long-lived
+// singleton below, in practice) so requestTiming can report live utilization
+// — total/idle/waiting — on slow requests without plumbing the pool through
+// every layer. Diagnostic only.
+let lastPool: pg.Pool | null = null;
+export function getPoolStats(): { total: number; idle: number; waiting: number } | null {
+  if (!lastPool) return null;
+  return { total: lastPool.totalCount, idle: lastPool.idleCount, waiting: lastPool.waitingCount };
+}
+
 export function makeDb(connectionString = config.DATABASE_URL): Kysely<DB> {
   const pool = new pg.Pool({
     connectionString,
@@ -18,10 +28,20 @@ export function makeDb(connectionString = config.DATABASE_URL): Kysely<DB> {
     keepAlive: true,
     keepAliveInitialDelayMillis: 10_000,
   });
+  lastPool = pool;
   // Without this listener, Node.js throws idle-client errors as unhandled
   // exceptions and kills the process when the DB server closes a connection.
   pool.on('error', (err) => {
     console.error('[db] idle client error — connection will be replaced:', err.message);
+  });
+  // Diagnostic: pool.waitingCount only reflects callers queued because every
+  // existing client is busy — it does NOT cover a brand-new physical
+  // connection (TCP+TLS handshake to Railway) actively being established.
+  // This times that separately, since totalCount climbing during the slow
+  // requests suggests new-connection setup, not query execution, is where
+  // the time is actually going.
+  pool.on('connect', () => {
+    console.warn(`[db] new physical connection established at ${new Date().toISOString()} (pool total=${pool.totalCount})`);
   });
   return new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
 }

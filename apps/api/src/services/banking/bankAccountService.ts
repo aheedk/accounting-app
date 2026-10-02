@@ -4,6 +4,7 @@ import type { DB } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
+import { computeAccountBalance } from '../core/ledgerService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateBankAccountInput = {
@@ -103,6 +104,14 @@ export async function getBankAccount(db: Kysely<DB>, business_id: string, bank_a
     .where('ba.deleted_at', 'is', null)
     .executeTakeFirst();
   if (!row) throw new NotFoundError('bank_account', bank_account_id);
-  return row;
+  // Book balance (sum of posted journal entry debits minus credits on the
+  // account's GL cash account) — distinct from listBankAccounts' bank_balance,
+  // which sums imported bank-feed transactions and is used for reconciliation.
+  // This is what a user deciding where to deposit money actually needs to see.
+  const book_balance = await computeAccountBalance(db, {
+    account_id: row.cash_account_id,
+    as_of: new Date().toISOString().slice(0, 10),
+  });
+  return { ...row, book_balance };
 }
 

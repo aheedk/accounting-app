@@ -28,6 +28,13 @@ router.get('/businesses/:businessId/bank-deposits', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/businesses/:businessId/bank-deposits/undeposited-payments', async (req, res, next) => {
+  try {
+    const payments = await depositSvc.listUndepositedPayments(db, ctxFromReq(req));
+    res.json(payments);
+  } catch (e) { next(e); }
+});
+
 router.get('/businesses/:businessId/bank-deposits/:id', async (req, res, next) => {
   try {
     const deposit = await depositSvc.getDeposit(db, ctxFromReq(req), req.params['id']!);
@@ -45,6 +52,20 @@ router.post('/businesses/:businessId/bank-deposits',
         depositSvc.createDeposit(trx, ctx, body),
       );
       res.status(201).json(deposit);
+    } catch (e) { next(e); }
+  },
+);
+
+router.patch('/businesses/:businessId/bank-deposits/:id',
+  requireMinRole('staff'),
+  async (req, res, next) => {
+    try {
+      const body = schemas.bankDepositUpdateSchema.parse(req.body) as depositSvc.CreateDepositInput;
+      const ctx = ctxFromReq(req);
+      const deposit = await db.transaction().execute(trx =>
+        depositSvc.updateDeposit(trx, ctx, req.params['id']!, body),
+      );
+      res.json(deposit);
     } catch (e) { next(e); }
   },
 );

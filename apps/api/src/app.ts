@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { corsOrigins } from './config.js';
 import { requestId } from './middleware/requestId.js';
+import { requestTiming } from './middleware/requestTiming.js';
 import { errorHandler } from './middleware/error.js';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
@@ -65,6 +66,7 @@ import bankDepositsRouter from './routes/bankDeposits.js';
 export function makeApp(): Express {
   const app = express();
   app.use(requestId);
+  app.use(requestTiming);
   app.use(cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);

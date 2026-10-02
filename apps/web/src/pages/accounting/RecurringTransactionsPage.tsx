@@ -15,7 +15,7 @@ import { AppSelect } from '../../components/ui/select';
 type Account = { id: string; code: string; name: string; account_type: string };
 
 type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-type TemplateType = 'journal_entry' | 'invoice' | 'bill';
+type TemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit';
 
 type Template = {
   id: string;
@@ -68,12 +68,14 @@ const TXN_TYPE_LABELS: Record<TemplateType, string> = {
   bill: 'Bill',
   invoice: 'Invoice',
   journal_entry: 'Journal Entry',
+  deposit: 'Bank Deposit',
 };
 
 const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; disabled?: boolean; title?: string }> = [
   { value: 'journal_entry', label: 'Journal Entry' },
   { value: 'invoice', label: 'Invoice (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
   { value: 'bill', label: 'Bill (coming soon)', disabled: true, title: 'Coming in a future polish slice.' },
+  { value: 'deposit', label: 'Bank Deposit (create from a deposit)', disabled: true, title: 'Create a recurring deposit template from the Bank Deposit page’s "Make recurring" action.' },
 ];
 
 function fmtShortDate(iso: string | null) {
@@ -257,6 +259,22 @@ export default function RecurringTransactionsPage() {
       reload();
     } catch (e: unknown) {
       setDeleteErr(pickErr(e));
+    }
+  }
+
+  const [runNowBusyId, setRunNowBusyId] = useState<string | null>(null);
+
+  async function runNow(id: string) {
+    if (!bizId) return;
+    setRunNowBusyId(id);
+    setDeleteErr(null);
+    try {
+      await api.post(`/businesses/${bizId}/recurring-templates/${id}/run-now`, {});
+      reload();
+    } catch (e: unknown) {
+      setDeleteErr(pickErr(e));
+    } finally {
+      setRunNowBusyId(null);
     }
   }
 
@@ -546,6 +564,15 @@ export default function RecurringTransactionsPage() {
                     <td className="p-3 text-muted-foreground">—</td>
                     <td className="p-3 text-right font-mono">0.00</td>
                     <td className="p-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary"
+                        disabled={runNowBusyId === t.id}
+                        onClick={() => void runNow(t.id)}
+                      >
+                        {runNowBusyId === t.id ? 'Running…' : 'Run now'}
+                      </Button>
                       <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={() => deleteTemplate(t.id)}>
                         Delete
                       </Button>

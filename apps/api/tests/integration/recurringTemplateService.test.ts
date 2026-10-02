@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeCustomer, makeVendor, seedCoa, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeBankAccount, makeCustomer, makeVendor, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
 import * as rt from '../../src/services/accounting/recurringTemplateService.js';
 
@@ -302,5 +302,62 @@ describe('recurringTemplateService', () => {
         next_run_date: '2026-01-01',
       }),
     )).rejects.toThrow(/invalid recurring invoice payload/);
+  });
+
+  it('runDue materializes a due "scheduled" deposit template as a posted deposit with a JE', async () => {
+    const { biz, ctx } = await bootstrap();
+    const checking = await makeAccount(t.db, biz.id, { name: 'Checking op', account_type: 'asset' });
+    const bankAccount = await makeBankAccount(t.db, biz.id, checking.id);
+    const income = await makeAccount(t.db, biz.id, { name: 'Interest income', account_type: 'revenue' });
+    const today = new Date().toISOString().slice(0, 10);
+
+    await t.db.transaction().execute(trx => rt.create(trx, ctx, {
+      business_id: biz.id,
+      name: 'Weekly interest sweep',
+      template_type: 'deposit',
+      recurrence_type: 'scheduled',
+      payload: {
+        bank_account_id: bankAccount.id,
+        lines: [{ account_id: income.id, amount: '42.00', description: 'Interest' }],
+      },
+      recurrence: 'weekly',
+      next_run_date: today,
+    }));
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
+    expect(results[0]?.runs_created).toBe(1);
+
+    const deposits = await t.db.selectFrom('bank_deposits').selectAll().where('business_id', '=', biz.id).execute();
+    expect(deposits).toHaveLength(1);
+    expect(deposits[0]?.total_amount).toBe('42.00');
+    expect(deposits[0]?.journal_entry_id).toBeTruthy();
+  });
+
+  it('runDue does not auto-fire "unscheduled" or "reminder" deposit templates', async () => {
+    const { biz, ctx } = await bootstrap();
+    const checking = await makeAccount(t.db, biz.id, { name: 'Checking op', account_type: 'asset' });
+    const bankAccount = await makeBankAccount(t.db, biz.id, checking.id);
+    const income = await makeAccount(t.db, biz.id, { name: 'Cash sales', account_type: 'revenue' });
+    const today = new Date().toISOString().slice(0, 10);
+
+    const unscheduled = await t.db.transaction().execute(trx => rt.create(trx, ctx, {
+      business_id: biz.id,
+      name: 'Ad hoc cash deposit',
+      template_type: 'deposit',
+      recurrence_type: 'unscheduled',
+      payload: { bank_account_id: bankAccount.id, lines: [{ account_id: income.id, amount: '10.00' }] },
+      recurrence: 'weekly',
+      next_run_date: today,
+    }));
+
+    const results = await rt.runDueForBusiness(t.db, ctx, biz.id);
+    expect(results.every(r => r.runs_created === 0)).toBe(true);
+    const deposits = await t.db.selectFrom('bank_deposits').selectAll().where('business_id', '=', biz.id).execute();
+    expect(deposits).toHaveLength(0);
+
+    // But it can still be fired on demand regardless of its schedule gating.
+    const run = await t.db.transaction().execute(trx => rt.runTemplateNow(trx, ctx, { template_id: unscheduled.id }));
+    expect(run.runs_created).toBe(1);
+    const afterManualRun = await t.db.selectFrom('bank_deposits').selectAll().where('business_id', '=', biz.id).execute();
+    expect(afterManualRun).toHaveLength(1);
   });
 });

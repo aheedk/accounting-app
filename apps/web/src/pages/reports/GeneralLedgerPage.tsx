@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Decimal } from 'decimal.js';
 import {
   ChevronDown,
@@ -55,7 +55,16 @@ type GeneralLedgerLine = {
   debit: string;
   credit: string;
   running_balance: string;
+  bank_deposit_id: string | null;
 };
+
+/** Deposits (manually entered or AI-coded from a bank statement) drill through
+ * to the Bank Deposit page instead of the raw journal entry when one exists. */
+function lineDrillThroughPath(line: GeneralLedgerLine): string {
+  return line.bank_deposit_id
+    ? `/accounting/bank-deposits/${line.bank_deposit_id}`
+    : `/journal/${line.journal_entry_id}`;
+}
 
 type GeneralLedgerAccount = {
   account_id: string;
@@ -946,6 +955,7 @@ function AccountSection({
   collapsed: boolean;
   onToggle: () => void;
 }) {
+  const navigate = useNavigate();
   const padding = preferences.density === 'compact' ? 'px-3 py-1.5' : 'p-3';
   return (
     <>
@@ -983,7 +993,11 @@ function AccountSection({
             </tr>
           )}
           {account.lines.map(line => (
-            <tr key={line.line_id} className={`border-b hover:bg-muted/30 ${line.status === 'voided' ? 'text-muted-foreground' : ''}`}>
+            <tr
+              key={line.line_id}
+              onClick={() => navigate(lineDrillThroughPath(line))}
+              className={`cursor-pointer border-b hover:bg-muted/30 ${line.status === 'voided' ? 'text-muted-foreground' : ''}`}
+            >
               {columns.map(column => <LedgerLineCell key={column} column={column} line={line} padding={padding} />)}
             </tr>
           ))}
@@ -1014,7 +1028,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
     case 'transaction':
       content = (
         <>
-          <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{fmtTransactionLabel(line)}</Link>
+          <Link className="font-medium text-primary hover:underline" to={lineDrillThroughPath(line)}>{fmtTransactionLabel(line)}</Link>
           {line.status === 'voided' && <span className="ml-2 text-xs uppercase">Voided</span>}
         </>
       );
@@ -1023,7 +1037,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       const rawRef = line.reference;
       const displayRef = rawRef ? rawRef.replace(/^AJE-/i, 'JE-') : null;
       content = displayRef
-        ? <Link className="font-medium text-primary hover:underline" to={`/journal/${line.journal_entry_id}`}>{displayRef}</Link>
+        ? <Link className="font-medium text-primary hover:underline" to={lineDrillThroughPath(line)}>{displayRef}</Link>
         : null;
       className += ' font-mono text-xs whitespace-nowrap';
       break;
@@ -1053,7 +1067,8 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       else {
         const val = isDebit ? line.debit : line.credit;
         const display = isDebit ? fmtMoney(val) : `-${fmtMoney(val)}`;
-        content = <ReportAmountLink to={`/journal/${line.journal_entry_id}`} title="View this journal entry">{display}</ReportAmountLink>;
+        const path = lineDrillThroughPath(line);
+        content = <ReportAmountLink to={path} title={line.bank_deposit_id ? 'View this deposit' : 'View this journal entry'}>{display}</ReportAmountLink>;
       }
       className += ' text-right font-mono';
       break;

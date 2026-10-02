@@ -37,6 +37,8 @@ router.post('/businesses/:businessId/recurring-templates', requireMinRole('accou
       next_run_date: body.next_run_date,
     };
     if (body.end_date !== undefined) input.end_date = body.end_date ?? null;
+    if (body.recurrence_type !== undefined) input.recurrence_type = body.recurrence_type;
+    if (body.days_in_advance !== undefined) input.days_in_advance = body.days_in_advance ?? null;
     const created = await db.transaction().execute(trx => rt.create(trx, ctxFromReq(req), input));
     res.status(201).json(created);
   } catch (e) { next(e); }
@@ -49,6 +51,8 @@ router.patch('/businesses/:businessId/recurring-templates/:id', requireMinRole('
     if (body.name !== undefined) patch.name = body.name;
     if (body.payload !== undefined) patch.payload = body.payload;
     if (body.recurrence !== undefined) patch.recurrence = body.recurrence;
+    if (body.recurrence_type !== undefined) patch.recurrence_type = body.recurrence_type;
+    if (body.days_in_advance !== undefined) patch.days_in_advance = body.days_in_advance ?? null;
     if (body.next_run_date !== undefined) patch.next_run_date = body.next_run_date;
     if (body.end_date !== undefined) patch.end_date = body.end_date ?? null;
     if (body.is_active !== undefined) patch.is_active = body.is_active;
@@ -62,6 +66,15 @@ router.patch('/businesses/:businessId/recurring-templates/:id', requireMinRole('
 router.get('/businesses/:businessId/recurring-templates/:id/runs', async (req, res, next) => {
   try {
     res.json({ runs: await rt.listRuns(db, req.tenancy!.business_id, req.params['id']!) });
+  } catch (e) { next(e); }
+});
+
+router.post('/businesses/:businessId/recurring-templates/:id/run-now', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const result = await db.transaction().execute(trx =>
+      rt.runTemplateNow(trx, ctxFromReq(req), { template_id: req.params['id']! }),
+    );
+    res.json(result);
   } catch (e) { next(e); }
 });
 
