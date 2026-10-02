@@ -265,6 +265,11 @@ export async function updateDeposit(
     await ledger.voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: `Bank deposit ${before.deposit_number} edited`,
+      // Reverse on the original's own date, not today — voidJournalEntry
+      // defaults to today when this is omitted, which strands the reversal
+      // outside any GL view bounded to the original's period and leaves the
+      // voided original's full amount visibly unoffset there.
+      reversal_date: before.deposit_date,
       ...(await voidGuardFor(trx, before.journal_entry_id)),
     });
   }
@@ -529,6 +534,7 @@ export async function deleteDeposit(
     await ledger.voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: `Bank deposit ${before.deposit_number} deleted`,
+      reversal_date: before.deposit_date,
       ...(await voidGuardFor(trx, before.journal_entry_id)),
     });
   }

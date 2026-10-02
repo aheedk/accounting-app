@@ -252,6 +252,9 @@ export async function updateExpense(
     await ledger.voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: `Expense edited`,
+      // Reverse on the original's own date, not today — see the matching
+      // comment in bankDepositService.ts's updateDeposit for why this matters.
+      reversal_date: before.transaction_date,
       ...(await voidGuardFor(trx, before.journal_entry_id)),
     });
   }
@@ -321,6 +324,7 @@ export async function voidExpense(
     await ledger.voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: input.void_reason ?? 'Expense voided',
+      reversal_date: before.transaction_date,
       ...(await voidGuardFor(trx, before.journal_entry_id)),
     });
   }
@@ -363,6 +367,7 @@ export async function deleteExpense(
     await ledger.voidJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,
       void_reason: 'Expense deleted',
+      reversal_date: before.transaction_date,
       ...(await voidGuardFor(trx, before.journal_entry_id)),
     });
   }

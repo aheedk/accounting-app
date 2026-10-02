@@ -140,6 +140,12 @@ describe('expenseTransactionService', () => {
       .where('id', '=', originalJeId).executeTakeFirstOrThrow();
     expect(originalJe.status).toBe('voided');
 
+    // The reversal of the OLD JE reverses on the OLD transaction date
+    // (2026-04-15), not the new one (2026-04-16) and not today.
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', originalJeId).executeTakeFirstOrThrow();
+    expect(reversal.entry_date).toBe('2026-04-15');
+
     const newLines = await t.db.selectFrom('journal_entry_lines').selectAll()
       .where('journal_entry_id', '=', updated.journal_entry_id!).execute();
     expect(newLines.find(l => l.account_id === rent.id)?.debit).toBe('55.0000');
@@ -167,6 +173,14 @@ describe('expenseTransactionService', () => {
     const je = await t.db.selectFrom('journal_entries').select('status')
       .where('id', '=', expense.journal_entry_id!).executeTakeFirstOrThrow();
     expect(je.status).toBe('voided');
+
+    // voidJournalEntry defaults reversal_date to today when omitted — without
+    // passing transaction_date explicitly this would land on today instead of
+    // 2026-04-15, leaving the voided original's amount unoffset in any GL view
+    // bounded to its own period (exactly the bug reported against deposits).
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', expense.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(reversal.entry_date).toBe('2026-04-15');
 
     await expect(t.db.transaction().execute(trx =>
       et.voidExpense(trx, ctx, { expense_transaction_id: expense.id }),
@@ -207,6 +221,10 @@ describe('expenseTransactionService', () => {
     const je = await t.db.selectFrom('journal_entries').select('status')
       .where('id', '=', jeId).executeTakeFirstOrThrow();
     expect(je.status).toBe('voided');
+
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', jeId).executeTakeFirstOrThrow();
+    expect(reversal.entry_date).toBe('2026-04-15');
 
     const audit = await t.db.selectFrom('audit_logs').selectAll()
       .where('action', '=', 'expense_transaction.delete').execute();

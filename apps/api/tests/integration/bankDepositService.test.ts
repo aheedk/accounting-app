@@ -145,6 +145,12 @@ describe('bankDepositService', () => {
     const originalJe = await t.db.selectFrom('journal_entries').select('status').where('id', '=', originalJeId).executeTakeFirstOrThrow();
     expect(originalJe.status).toBe('voided');
 
+    // The reversal of the OLD JE reverses on the OLD date (2026-03-04), not
+    // the new deposit_date (2026-03-05) and not today.
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', originalJeId).executeTakeFirstOrThrow();
+    expect(reversal.entry_date).toBe('2026-03-04');
+
     const full = await depositSvc.getDeposit(t.db, ctx, created.id);
     expect(full.lines.filter(l => l.line_type === 'undeposited_funds')).toHaveLength(1);
     expect(full.lines.filter(l => l.line_type === 'other_funds')).toHaveLength(1);
@@ -171,6 +177,25 @@ describe('bankDepositService', () => {
     const reloaded = await t.db.selectFrom('payments').select('is_deposited').where('id', '=', payment.id).executeTakeFirstOrThrow();
     expect(reloaded.is_deposited).toBe(false);
     await expect(depositSvc.getDeposit(t.db, ctx, deposit.id)).rejects.toThrow();
+  });
+
+  it('deleteDeposit reverses on the original deposit date, not today — so a date-bounded GL view nets to zero', async () => {
+    const { ctx, bankAccount, income } = await bootstrap();
+    const deposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, ctx, {
+      bank_account_id: bankAccount.id,
+      deposit_date: '2026-03-06',
+      lines: [{ line_type: 'other_funds', account_id: income.id, amount: '500.00' }],
+    }));
+
+    await t.db.transaction().execute(trx => depositSvc.deleteDeposit(trx, ctx, deposit.id));
+
+    const reversal = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', deposit.journal_entry_id!).executeTakeFirstOrThrow();
+    // voidJournalEntry defaults reversal_date to today when the caller omits
+    // it — without passing deposit_date explicitly, this would be today's
+    // date instead of 2026-03-06, stranding the voided original's full
+    // amount unoffset in any GL view that doesn't extend to today.
+    expect(reversal.entry_date).toBe('2026-03-06');
   });
 
   it('a normally created deposit is editable', async () => {

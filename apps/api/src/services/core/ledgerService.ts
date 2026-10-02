@@ -255,7 +255,7 @@ export async function voidJournalEntry(
     period_id: reversalPeriod.id,
     entry_date: reversalPeriod.starts_on <= reversalDate && reversalDate <= reversalPeriod.ends_on ? reversalDate : orig.entry_date,
     journal_number: reversalJournalNumber,
-    memo: `Reversal of ${orig.id}: ${input.void_reason}`,
+    memo: `Reversal of JE ${orig.journal_number}: ${input.void_reason}`,
     reference: orig.reference,
     status: 'draft',
     source_type: 'reversal',
