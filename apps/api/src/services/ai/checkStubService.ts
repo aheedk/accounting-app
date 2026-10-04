@@ -48,15 +48,28 @@ function cleanCheckNumber(value: string | null | undefined): string | null {
   return digits || null;
 }
 
-/** "MM/DD/YYYY" or ISO to ISO; anything unreadable to null. */
-function toIsoDate(value: string | null | undefined): string | null {
+/**
+ * "MM/DD/YYYY" or ISO to ISO; anything unreadable to null. Handwritten stubs
+ * often say just "7/1": that is taken as the most recent 7/1 (allowing a month
+ * of post-dating), not a year the model guessed.
+ */
+export function toIsoDate(value: string | null | undefined, today: Date = new Date()): string | null {
   if (!value) return null;
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const us = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(value.trim());
+  const us = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/.exec(value.trim());
   if (!us) return null;
-  const year = us[3]!.length === 2 ? `20${us[3]}` : us[3]!;
-  return `${year}-${us[1]!.padStart(2, '0')}-${us[2]!.padStart(2, '0')}`;
+  const month = us[1]!.padStart(2, '0');
+  const day = us[2]!.padStart(2, '0');
+  let year: number;
+  if (us[3]) {
+    year = Number(us[3].length === 2 ? `20${us[3]}` : us[3]);
+  } else {
+    year = today.getUTCFullYear();
+    const latest = Date.UTC(year, today.getUTCMonth(), today.getUTCDate() + 31);
+    if (Date.UTC(year, Number(month) - 1, Number(day)) > latest) year -= 1;
+  }
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeAccountName(name: string): string {

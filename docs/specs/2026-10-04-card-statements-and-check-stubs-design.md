@@ -99,3 +99,8 @@ example checking and savings, 20 pages, ~160 lines). Two things follow:
   turns that into one inbox statement per account, titled with the account
   (`account_hint`). Emailed files do the same; only the first statement keeps
   the `gmail_message_id`, which is unique and marks the email as seen.
+
+**Stub dates without a year.** Handwritten stubs often say only "7/1". The
+model is told to return MM/DD in that case rather than guess a year (it had
+filled in 2024 for July 2026 stubs), and `checkStubService.toIsoDate` takes
+the most recent such date, allowing a month of post-dating.

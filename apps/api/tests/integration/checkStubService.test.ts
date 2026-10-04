@@ -8,6 +8,7 @@ import {
   listCheckStubs,
   matchStubsToLines,
   saveCheckStubs,
+  toIsoDate,
 } from '../../src/services/ai/checkStubService.js';
 import { postStatementLines, type StatementLine } from '../../src/services/ai/statementImportService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
@@ -56,6 +57,16 @@ describe('check stubs', () => {
       suggested_account_id: data.utilities.id, status: 'unmatched',
     });
     expect(stubs[1]).toMatchObject({ amount: '2500.00', suggested_account_id: data.rent.id });
+  });
+
+  it('reads stub dates, taking a date with no year as the most recent one', () => {
+    const oct4 = new Date('2026-10-04T12:00:00Z');
+    expect(toIsoDate('07/01/2026', oct4)).toBe('2026-07-01');
+    expect(toIsoDate('7/1/26', oct4)).toBe('2026-07-01');
+    expect(toIsoDate('7/1', oct4)).toBe('2026-07-01');
+    expect(toIsoDate('10/30', oct4)).toBe('2026-10-30');  // post-dated a few weeks
+    expect(toIsoDate('12/15', oct4)).toBe('2025-12-15');  // last December
+    expect(toIsoDate('soon', oct4)).toBeNull();
   });
 
   it('matches statement checks by number and amount, or by a unique amount', async () => {

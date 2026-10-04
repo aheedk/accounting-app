@@ -204,7 +204,7 @@ If these are CHECK STUBS, a CHECK REGISTER, or IMAGES OF WRITTEN CHECKS return:
   "checks": [
     {
       "check_number": "e.g. 1042",
-      "date": "MM/DD/YYYY",
+      "date": "MM/DD/YYYY — if the stub shows no year (e.g. a handwritten 7/1), give MM/DD only; never guess the year",
       "payee_name": "who the check was made out to",
       "amount": "positive number e.g. 1250.00",
       "memo": "what the check was for, from the memo or stub notes",
