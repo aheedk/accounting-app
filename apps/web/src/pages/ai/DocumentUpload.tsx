@@ -10,6 +10,22 @@ type Props = {
 
 type UploadState = { busy: boolean; error: string | null; done: string | null };
 
+type UploadResult =
+  | { kind: 'bank_statement' | 'credit_card_statement' | 'invoice'; staging_id: string }
+  | { kind: 'check_stubs'; check_count: number };
+
+const ACCEPTED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+
+/** What the AI recognised, for the confirmation line. */
+function describeResult(result: UploadResult): string {
+  switch (result.kind) {
+    case 'bank_statement': return 'bank statement';
+    case 'credit_card_statement': return 'credit card statement';
+    case 'invoice': return 'invoice';
+    case 'check_stubs': return `${result.check_count} check stub${result.check_count === 1 ? '' : 's'} (see the Check stubs tab)`;
+  }
+}
+
 /**
  * Direct PDF upload, so a statement or bill does not have to be emailed in.
  * Runs the same extraction path as the email route and lands in the same
@@ -23,14 +39,16 @@ export default function DocumentUpload({ onUploaded }: Props) {
 
   async function send(files: FileList | null) {
     if (!bizId || !files || files.length === 0) return;
-    const pdfs = Array.from(files).filter(file => file.type === 'application/pdf');
+    // PDFs, plus images for photographed check stubs.
+    const pdfs = Array.from(files).filter(file => ACCEPTED.includes(file.type));
     if (pdfs.length === 0) {
-      setState({ busy: false, error: 'Only PDF documents are supported.', done: null });
+      setState({ busy: false, error: 'Upload a PDF or an image (PNG, JPEG, WebP).', done: null });
       return;
     }
 
     setState({ busy: true, error: null, done: null });
     let uploaded = 0;
+    const kinds: string[] = [];
     try {
       for (const file of pdfs) {
         const body = new FormData();
@@ -38,13 +56,14 @@ export default function DocumentUpload({ onUploaded }: Props) {
         // Sequential on purpose: each upload runs a model call server-side, and
         // firing a whole folder at once would stack them.
         // eslint-disable-next-line no-await-in-loop
-        await api.post(`/businesses/${bizId}/ai/documents`, body);
+        const res = await api.post<UploadResult>(`/businesses/${bizId}/ai/documents`, body);
+        kinds.push(describeResult(res.data));
         uploaded += 1;
       }
       setState({
         busy: false,
         error: null,
-        done: `${uploaded} document${uploaded === 1 ? '' : 's'} processed.`,
+        done: `${uploaded} document${uploaded === 1 ? '' : 's'} processed: ${kinds.join(', ')}.`,
       });
       await onUploaded();
     } catch (error: unknown) {
@@ -103,7 +122,7 @@ export default function DocumentUpload({ onUploaded }: Props) {
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf"
+          accept="application/pdf,image/png,image/jpeg,image/webp"
           multiple
           className="hidden"
           onChange={event => void send(event.target.files)}

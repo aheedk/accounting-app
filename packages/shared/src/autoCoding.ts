@@ -10,7 +10,9 @@ export type CodingLayerId =
   | 'accounting_rule'
   | 'vendor_default'
   | 'history'
-  | 'ai';
+  | 'ai'
+  // Not an engine layer: a check stub uploaded by the client described the check.
+  | 'check_stub';
 
 /** Default capitalization threshold; overridden per business. */
 export const DEFAULT_CAPITALIZATION_THRESHOLD = 2500;
@@ -88,6 +90,7 @@ export const CODING_LAYERS: readonly CodingLayer[] = [
   { id: 'vendor_default', label: 'Vendor default account' },
   { id: 'history', label: 'Prior coding history' },
   { id: 'ai', label: 'AI confidence' },
+  { id: 'check_stub', label: 'Check stub' },
 ] as const;
 
 export type ConfidenceBand = 'auto_post' | 'preselected' | 'suggested' | 'unclassified';

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, RefreshCw, History, ExternalLink, Sparkles, Info } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, Landmark, RefreshCw, History, ExternalLink, Sparkles, Info, Receipt } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
@@ -9,6 +9,8 @@ import ConfidenceBadge, { type SuggestionMeta } from '@/pages/ai/ConfidenceBadge
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
+import { pickErr } from '@/lib/apiErrors';
+import CheckStubsPanel from './CheckStubsPanel';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -18,11 +20,22 @@ type ExtractedTx = {
   amount: string;
   type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
   balance: string;
+  check_number?: string;
+  /** Credit card statements: what the line is on the card. */
+  card_type?: 'charge' | 'payment' | 'refund';
   suggested_offset?: string;
   suggested_account_id?: string;
   suggestion?: SuggestionMeta | null;
   auto_posted?: boolean;
+  /** An uploaded check stub that describes this check. */
+  check_stub?: {
+    id: string; check_number: string | null; payee_name: string | null; memo: string | null;
+    amount: string; check_date: string | null; suggested_account_id: string | null;
+  } | null;
 };
+
+/** A line whose money movement is already in the books from another document. */
+type AlreadyRecorded = { index: number; journal_entry_id: string; entry_date: string; label: string; path: string };
 
 type StagedImport = {
   id: string;
@@ -34,6 +47,9 @@ type StagedImport = {
   addressed_to: string | null;
   rejection_reason: string | null;
   source: string | null;
+  statement_kind?: 'bank' | 'credit_card';
+  account_hint?: string | null;
+  suggested_statement_account_id?: string | null;
 };
 
 // ── Invoice types ─────────────────────────────────────────────────────────────
@@ -67,7 +83,7 @@ type InvoiceImport = {
   rejection_reason: string | null;
 };
 
-type CoaAccount = { id: string; code: string; name: string; account_type: string };
+type CoaAccount = { id: string; code: string; name: string; account_type: string; detail_type?: string | null };
 type Vendor = { id: string; name: string };
 type Customer = { id: string; name: string };
 
@@ -78,16 +94,39 @@ function fmtDateTime(iso: string) {
   return `${date} at ${time}`;
 }
 
+// Mirrors statementImportService.checkNumberOf on the API.
+const CHECK_NUMBER = /\b(?:check|chk|ck)\s*(?:no\.?|number|num|#)?\s*#?\s*(\d{2,10})\b/i;
+function checkNumberOf(tx: Pick<ExtractedTx, 'check_number' | 'description'>): string | null {
+  const explicit = tx.check_number?.trim().replace(/^#/, '');
+  if (explicit) return explicit;
+  return CHECK_NUMBER.exec(tx.description ?? '')?.[1] ?? null;
+}
+
+/** "2026-03-14" to "3/14/26". */
+function fmtStatementDate(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return y && m && d ? `${Number(m)}/${Number(d)}/${y.slice(2)}` : iso;
+}
+
+function isCard(imp: StagedImport): boolean {
+  return imp.statement_kind === 'credit_card';
+}
+
 function deriveBankTitle(imp: StagedImport): string {
+  const period = derivePeriodTitle(imp);
+  return isCard(imp) && imp.account_hint ? `${imp.account_hint} · ${period}` : period;
+}
+
+function derivePeriodTitle(imp: StagedImport): string {
   const txs = imp.extracted_transactions;
-  if (txs.length === 0) return imp.email_subject ?? 'Bank Statement';
+  if (txs.length === 0) return imp.email_subject ?? (isCard(imp) ? 'Credit Card Statement' : 'Bank Statement');
   const dates = txs.flatMap(tx => {
     const [m, d, y] = tx.date.split('/');
     if (!m || !d || !y) return [];
     const dt = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
     return isNaN(dt.getTime()) ? [] : [dt];
   });
-  if (dates.length === 0) return imp.email_subject ?? 'Bank Statement';
+  if (dates.length === 0) return imp.email_subject ?? (isCard(imp) ? 'Credit Card Statement' : 'Bank Statement');
   const minD = new Date(Math.min(...dates.map(d => d.getTime())));
   const maxD = new Date(Math.max(...dates.map(d => d.getTime())));
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -96,12 +135,17 @@ function deriveBankTitle(imp: StagedImport): string {
 
 function deriveBankSubtitle(imp: StagedImport): string {
   const txs = imp.extracted_transactions as ExtractedTx[];
+  if (isCard(imp)) {
+    const charges = txs.filter(tx => tx.card_type === 'charge').length;
+    const credits = txs.length - charges;
+    return `Credit card · ${txs.length} transactions · ${charges} charges · ${credits} payments & credits`;
+  }
   const deposits = txs.filter(tx => tx.type === 'credit' || tx.type === 'deposit').length;
   const payments = txs.filter(tx => tx.type === 'debit' || tx.type === 'expense' || tx.type === 'check').length;
   return `${txs.length} transactions · ${deposits} deposits · ${payments} payments`;
 }
 
-type TopTab = 'bank' | 'invoice' | 'history';
+type TopTab = 'bank' | 'invoice' | 'stubs' | 'history';
 
 export default function EmailImportReviewPage() {
   const [bizId] = useActiveBusinessId();
@@ -131,6 +175,12 @@ export default function EmailImportReviewPage() {
   const [payees, setPayees] = useState<Record<number, string>>({});
   // Rows where the accountant ticked "use this account next time".
   const [remember, setRemember] = useState<Record<number, boolean>>({});
+  // Check stub accepted per line (cleared when the reviewer says "don't use").
+  const [stubIds, setStubIds] = useState<Record<number, string>>({});
+  const [recorded, setRecorded] = useState<Record<number, AlreadyRecorded>>({});
+  // Lines this screen already unticked for being recorded elsewhere; a reviewer
+  // re-ticking one is a deliberate choice that must not be undone.
+  const autoUntickedRef = useRef<Set<number>>(new Set());
   const [autoPostEnabled, setAutoPostEnabled] = useState(false);
   const [autoPostNote, setAutoPostNote] = useState<string | null>(null);
   const [bankPosting, setBankPosting] = useState(false);
@@ -260,14 +310,23 @@ export default function EmailImportReviewPage() {
   // ── Bank helpers ─────────────────────────────────────────────────────────────
   function openBank(imp: StagedImport) {
     setSelectedBank(imp);
-    setBankAccountId('');
+    // A card statement's card is suggested; a bank statement's account is always
+    // the reviewer's choice (choosing it is what runs auto-post).
+    setBankAccountId(isCard(imp) ? imp.suggested_statement_account_id ?? '' : '');
     setBankError(null);
+    setRecorded({});
+    autoUntickedRef.current = new Set();
     const initIncluded: Record<number, boolean> = {};
     const initOffsets: Record<number, string> = {};
     const initPayees: Record<number, string> = {};
+    const initStubs: Record<number, string> = {};
     imp.extracted_transactions.forEach((tx, i) => {
       initIncluded[i] = true;
-      if (tx.payee_name) initPayees[i] = tx.payee_name;
+      if (tx.check_stub) {
+        initStubs[i] = tx.check_stub.id;
+        if (tx.check_stub.payee_name) initPayees[i] = tx.check_stub.payee_name;
+      }
+      if (tx.payee_name && !initPayees[i]) initPayees[i] = tx.payee_name;
       if (tx.suggested_account_id) {
         initOffsets[i] = tx.suggested_account_id;
       } else if (tx.suggested_offset) {
@@ -281,8 +340,39 @@ export default function EmailImportReviewPage() {
     setIncluded(initIncluded);
     setOffsets(initOffsets);
     setPayees(initPayees);
+    setStubIds(initStubs);
     setRemember({});
   }
+
+  // Lines already in the books from another document (a card payment on both
+  // statements, a transfer between two of the client's accounts). Re-checked
+  // whenever the statement's account or a line's account changes.
+  const offsetsKey = JSON.stringify(offsets);
+  useEffect(() => {
+    if (!bizId || !selectedBank || !bankAccountId) { setRecorded({}); return; }
+    const lines = Object.entries(offsets)
+      .filter(([, accountId]) => accountId)
+      .map(([index, accountId]) => ({ index: Number(index), offset_account_id: accountId }));
+    if (lines.length === 0) { setRecorded({}); return; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.post<{ matches: AlreadyRecorded[] }>(
+        `/businesses/${bizId}/email-imports/${selectedBank.id}/already-recorded`,
+        { bank_account_id: bankAccountId, lines },
+      ).then(res => {
+        if (cancelled) return;
+        setRecorded(Object.fromEntries(res.data.matches.map(m => [m.index, m])));
+        const fresh = res.data.matches.filter(m => !autoUntickedRef.current.has(m.index));
+        if (fresh.length > 0) {
+          fresh.forEach(m => autoUntickedRef.current.add(m.index));
+          setIncluded(prev => ({ ...prev, ...Object.fromEntries(fresh.map(m => [m.index, false])) }));
+        }
+      }).catch(() => { if (!cancelled) setRecorded({}); });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // offsetsKey stands in for `offsets` (a new object on every edit).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bizId, selectedBank?.id, bankAccountId, offsetsKey]);
 
   // Auto-post is opt-in per client. Choosing the bank account is the human step
   // that makes posting possible -- the cash side cannot be inferred from the PDF.
@@ -323,7 +413,7 @@ export default function EmailImportReviewPage() {
   async function handleBankApprove() {
     if (!bizId || !selectedBank) return;
     if (bankPostingRef.current) return;
-    if (!bankAccountId) { setBankError('Select a bank account first.'); return; }
+    if (!bankAccountId) { setBankError(isCard(selectedBank) ? 'Select the credit card account first.' : 'Select a bank account first.'); return; }
     const missing = selectedBank.extracted_transactions.findIndex((_, i) => included[i] && !offsets[i]);
     if (missing !== -1) { setBankError(`Select an offset account for row ${missing + 1}.`); return; }
     bankPostingRef.current = true;
@@ -338,6 +428,7 @@ export default function EmailImportReviewPage() {
           include: included[i] ?? true,
           remember: remember[i] === true,
           payee_name: payees[i] ?? '',
+          check_stub_id: stubIds[i] ?? null,
         })),
       });
       setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
@@ -349,7 +440,7 @@ export default function EmailImportReviewPage() {
         setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
         setSelectedBank(null);
       } else {
-        setBankError(e instanceof Error ? e.message : 'Failed to post journal entries');
+        setBankError(pickErr(e));
       }
     } finally {
       bankPostingRef.current = false;
@@ -465,6 +556,11 @@ export default function EmailImportReviewPage() {
   }
 
   const bankAccounts = accounts.filter(a => a.account_type === 'asset');
+  // Card statements post against a liability: Credit Card accounts first.
+  const cardAccounts = [
+    ...accounts.filter(a => a.account_type === 'liability' && a.detail_type === 'Credit Card'),
+    ...accounts.filter(a => a.account_type === 'liability' && a.detail_type !== 'Credit Card'),
+  ];
   const filteredInvoices = invoiceTab === 'all' ? invoiceImports : invoiceImports.filter(im => im.invoice_type === invoiceTab);
   const totalPending = bankImports.length + invoiceImports.length;
 
@@ -516,8 +612,8 @@ export default function EmailImportReviewPage() {
           <div className="flex gap-0 rounded-xl border overflow-hidden w-fit">
             <button type="button" onClick={() => setTopTab('bank')}
               className={`relative flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors border-r ${topTab === 'bank' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted/30'}`}>
-              <CreditCard className="h-4 w-4" />
-              Bank Statements
+              <Landmark className="h-4 w-4" />
+              Statements
               {topTab === 'bank' && bankImports.length > 0 && (
                 <span className="inline-flex rounded-full bg-white/20 text-white px-1.5 py-0.5 text-[10px] font-semibold">{bankImports.length}</span>
               )}
@@ -539,6 +635,11 @@ export default function EmailImportReviewPage() {
                   {invoiceImports.length}
                 </span>
               )}
+            </button>
+            <button type="button" onClick={() => setTopTab('stubs')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors border-r ${topTab === 'stubs' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted/30'}`}>
+              <Receipt className="h-4 w-4" />
+              Check stubs
             </button>
             <button type="button" onClick={() => setTopTab('history')}
               className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${topTab === 'history' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted/30'}`}>
@@ -562,8 +663,8 @@ export default function EmailImportReviewPage() {
           {bankImports.length === 0 && !selectedBank && (
             <div className="rounded-lg border bg-muted/20 p-12 text-center">
               <CreditCard className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="font-medium">No pending bank statements</p>
-              <p className="text-sm text-muted-foreground mt-1">Email PDFs to the firm inbox and label them <code className="text-xs bg-muted px-1 py-0.5 rounded">bank-statements</code>.</p>
+              <p className="font-medium">No pending statements</p>
+              <p className="text-sm text-muted-foreground mt-1">Drop a bank or credit card statement PDF above, or email it to the firm inbox.</p>
             </div>
           )}
 
@@ -573,8 +674,8 @@ export default function EmailImportReviewPage() {
                 <div key={imp.id} className="px-4 py-3 hover:bg-muted/20">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex items-center gap-3">
-                      <div className="shrink-0 h-9 w-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
-                        <CreditCard className="h-4 w-4" />
+                      <div className={`shrink-0 h-9 w-9 rounded-full flex items-center justify-center ${isCard(imp) ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {isCard(imp) ? <CreditCard className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">{deriveBankTitle(imp)}</p>
@@ -648,14 +749,23 @@ export default function EmailImportReviewPage() {
               )}
 
               <div className="flex items-center gap-3 rounded-lg border p-4 bg-muted/10">
-                <label className="text-sm font-medium whitespace-nowrap">Bank account (this statement)</label>
+                <label className="text-sm font-medium whitespace-nowrap">
+                  {isCard(selectedBank) ? 'Credit card (this statement)' : 'Bank account (this statement)'}
+                </label>
                 <AppSelect value={bankAccountId} onChange={e => void handleBankAccountChange(e.target.value)}
-                  onAddNew={() => addAccount.open({ accountType: 'asset', onPick: id => { void handleBankAccountChange(id); } })} addNewLabel="Add new account"
+                  onAddNew={() => addAccount.open({ accountType: isCard(selectedBank) ? 'liability' : 'asset', onPick: id => { void handleBankAccountChange(id); } })} addNewLabel="Add new account"
                   className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                   <option value="">— select —</option>
-                  {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                  {(isCard(selectedBank) ? cardAccounts : bankAccounts).map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                 </AppSelect>
               </div>
+
+              {isCard(selectedBank) && (
+                <p className="text-xs text-muted-foreground">
+                  Charges post as credit card expenses against this card; payments and refunds reduce what is owed.
+                  A payment already recorded from the bank statement is marked and left out.
+                </p>
+              )}
 
               {bankError && <p className="text-sm text-destructive">{bankError}</p>}
 
@@ -672,7 +782,7 @@ export default function EmailImportReviewPage() {
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[140px]">Name</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Amount</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Type</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[200px]">Offset account</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[200px]">{isCard(selectedBank) ? 'Category / account' : 'Offset account'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -698,16 +808,27 @@ export default function EmailImportReviewPage() {
                           ) : null}
                         </td>
                         <td className={`px-3 py-2 text-right font-mono font-medium ${(tx.type === 'credit' || tx.type === 'deposit') ? 'text-emerald-600' : 'text-destructive'}`}>
-                          {(tx.type === 'credit' || tx.type === 'deposit') ? '+' : '-'}{fmtMoney(tx.amount)}
+                          {isCard(selectedBank) ? '' : (tx.type === 'credit' || tx.type === 'deposit') ? '+' : '-'}{fmtMoney(tx.amount)}
                         </td>
                         <td className="px-3 py-2">
-                          {(tx.type === 'credit' || tx.type === 'deposit') && (
+                          {tx.card_type === 'charge' && (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-red-100 text-red-700">Charge</span>
+                          )}
+                          {tx.card_type === 'payment' && (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700">Payment</span>
+                          )}
+                          {tx.card_type === 'refund' && (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700">Refund</span>
+                          )}
+                          {!tx.card_type && (tx.type === 'credit' || tx.type === 'deposit') && (
                             <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700">Deposit</span>
                           )}
                           {tx.type === 'check' && (
-                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700">Check</span>
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700">
+                              Check{checkNumberOf(tx) ? ` ${checkNumberOf(tx)}` : ''}
+                            </span>
                           )}
-                          {(tx.type === 'expense' || tx.type === 'debit') && (
+                          {!tx.card_type && (tx.type === 'expense' || tx.type === 'debit') && (
                             <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium bg-red-100 text-red-700">Expense</span>
                           )}
                         </td>
@@ -726,6 +847,26 @@ export default function EmailImportReviewPage() {
                                   <CheckCircle className="h-3 w-3" />Auto-posted
                                 </span>
                               : <ConfidenceBadge suggestion={tx.suggestion} />}
+                            {recorded[i] && (
+                              <div className="rounded border border-amber-300 bg-amber-50 px-1.5 py-1 text-[10px] leading-tight text-amber-950">
+                                Already recorded: {recorded[i]!.label} on {fmtStatementDate(recorded[i]!.entry_date)}.{' '}
+                                <Link to={recorded[i]!.path} className="font-medium underline">Open</Link>
+                              </div>
+                            )}
+                            {tx.check_stub && stubIds[i] && (
+                              <div className="rounded border border-sky-200 bg-sky-50 px-1.5 py-1 text-[10px] leading-tight text-sky-950">
+                                From check stub{tx.check_stub.check_number ? ` #${tx.check_stub.check_number}` : ''}
+                                {tx.check_stub.payee_name ? ` · ${tx.check_stub.payee_name}` : ''}
+                                {tx.check_stub.memo ? ` · ${tx.check_stub.memo}` : ''}.{' '}
+                                <button
+                                  type="button"
+                                  className="font-medium underline"
+                                  onClick={() => setStubIds(prev => { const next = { ...prev }; delete next[i]; return next; })}
+                                >
+                                  Don&apos;t use
+                                </button>
+                              </div>
+                            )}
                             {/* Only offer to learn when the accountant overrode
                                 the engine -- accepting a suggestion is not a
                                 signal worth turning into a rule. */}
@@ -770,6 +911,10 @@ export default function EmailImportReviewPage() {
             </div>
           )}
         </>
+      )}
+
+      {!loading && topTab === 'stubs' && !selectedBank && !selectedInvoice && (
+        <CheckStubsPanel accounts={accounts} />
       )}
 
       {/* ── HISTORY TAB ─────────────────────────────────────────────────────── */}
