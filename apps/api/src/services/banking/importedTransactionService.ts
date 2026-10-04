@@ -10,7 +10,12 @@ import * as ledger from '../core/ledgerService.js';
 // row of its own: the journal entry IS the transaction, always two lines with
 // the bank account on line 1 (see routes/emailImports.ts).
 
-export type ImportedTransactionType = 'check' | 'expense' | 'deposit';
+export type ImportedTransactionType =
+  | 'check' | 'expense' | 'deposit'
+  // From a credit card statement: money back onto the card.
+  | 'credit_card_payment' | 'credit_card_credit';
+
+const INFLOW_TYPES: ReadonlySet<ImportedTransactionType> = new Set(['deposit', 'credit_card_payment', 'credit_card_credit']);
 
 export type ImportedTransaction = {
   id: string;
@@ -94,7 +99,7 @@ export async function getImportedTransaction(
     status: entry.status,
     entry_date: entry.entry_date,
     transaction_type: direction === 'in'
-      ? 'deposit'
+      ? (storedType === 'credit_card_payment' || storedType === 'credit_card_credit' ? storedType : 'deposit')
       : storedType === 'check' ? 'check' : 'expense',
     direction,
     payee_name: entry.payee_name,
@@ -117,7 +122,7 @@ export async function updateImportedTransaction(
   const direction = Number(bankLine.debit) > 0 ? 'in' : 'out';
   // Money in stays a deposit and money out stays a check/expense -- flipping
   // direction would be a different transaction, not a correction.
-  if ((direction === 'in') !== (input.transaction_type === 'deposit')) {
+  if ((direction === 'in') !== INFLOW_TYPES.has(input.transaction_type)) {
     throw new PreconditionError(
       direction === 'in'
         ? 'A deposit cannot be changed into a check or expense'

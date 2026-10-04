@@ -7,7 +7,7 @@ const positiveMoney = z.string().regex(/^\d+(\.\d{1,4})?$/, 'must be a positive 
 // Edit form for a Check / Expense / Deposit posted from a bank statement import.
 export const importedTransactionUpdateSchema = z.object({
   entry_date: dateString,
-  transaction_type: z.enum(['check', 'expense', 'deposit']),
+  transaction_type: z.enum(['check', 'expense', 'deposit', 'credit_card_payment', 'credit_card_credit']),
   payee_name: z.string().trim().max(200).nullable().optional(),
   check_number: z.string().trim().max(30).nullable().optional(),
   memo: z.string().max(1000).nullable().optional(),

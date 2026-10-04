@@ -1013,6 +1013,7 @@ export interface DB {
   numbering_counters: NumberingCountersTable;
   bank_import_batches: BankImportBatchesTable;
   email_import_staging: EmailImportStagingTable;
+  check_stubs: CheckStubsTable;
   invoice_import_staging: InvoiceImportStagingTable;
   bank_deposits: BankDepositsTable;
   bank_deposit_lines: BankDepositLinesTable;
@@ -1064,6 +1065,30 @@ export interface EmailImportStagingTable {
   uploaded_by_user_id: string | null;
   original_filename: string | null;
   created_at: Generated<string>;
+  statement_kind: Generated<'bank' | 'credit_card'>;
+  account_hint: string | null;
+}
+
+export interface CheckStubsTable {
+  id: Generated<string>;
+  business_id: string;
+  check_number: string | null;
+  check_date: ColumnType<string | null, string | null | undefined, string | null>;
+  payee_name: string | null;
+  amount: ColumnType<string, string | number, string | number>;
+  memo: string | null;
+  suggested_account_name: string | null;
+  suggested_account_id: string | null;
+  source_file_id: string | null;
+  source_filename: string | null;
+  gmail_message_id: string | null;
+  status: Generated<'unmatched' | 'matched' | 'dismissed'>;
+  matched_journal_entry_id: string | null;
+  matched_at: Timestamp | null;
+  matched_by_user_id: string | null;
+  uploaded_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
 }
 export interface BankDepositsTable {
   id: Generated<string>;

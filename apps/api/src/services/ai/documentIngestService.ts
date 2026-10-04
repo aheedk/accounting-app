@@ -5,16 +5,19 @@ import {
   fetchCoa,
   fetchVendorHistory,
   type ClientContext,
+  type DocumentMediaType,
 } from '../../jobs/gmailWorker.js';
+import { normalizeCardLines, type RawCardLine } from './statementImportService.js';
+import { saveCheckStubs } from './checkStubService.js';
+import { uploadFile } from '../files/fileService.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 import { ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
-export type IngestResult = {
-  kind: 'bank_statement' | 'invoice';
-  staging_id: string;
-};
+export type IngestResult =
+  | { kind: 'bank_statement' | 'credit_card_statement' | 'invoice'; staging_id: string }
+  | { kind: 'check_stubs'; check_count: number };
 
 /**
  * Ingest a PDF the user uploaded directly, using the same extraction path the
@@ -28,7 +31,7 @@ export type IngestResult = {
 export async function ingestUploadedPdf(
   db: Kysely<DB>,
   ctx: ServiceCtx,
-  input: { buffer: Buffer; filename: string },
+  input: { buffer: Buffer; filename: string; media_type?: DocumentMediaType },
 ): Promise<IngestResult> {
   const businessId = ctx.business_id;
   if (!businessId) throw new BusinessRuleError(ERR.NOT_FOUND, 'No business selected');
@@ -47,7 +50,7 @@ export async function ingestUploadedPdf(
 
   let extracted: Awaited<ReturnType<typeof classifyAndExtract>>;
   try {
-    extracted = await classifyAndExtract(input.buffer, clientContext);
+    extracted = await classifyAndExtract(input.buffer, clientContext, input.media_type ?? 'application/pdf');
   } catch (e: unknown) {
     // A rejected key otherwise surfaces as a bare "Internal server error".
     if (e instanceof Anthropic.AuthenticationError) {
@@ -60,7 +63,41 @@ export async function ingestUploadedPdf(
   }
   const receivedAt = new Date().toISOString();
 
-  if (extracted.document_type === 'bank_statement') {
+  if (extracted.document_type === 'unknown') {
+    throw new BusinessRuleError(
+      ERR.VALIDATION_FAILED,
+      `"${input.filename}" was not recognised as a bank or credit card statement, check stubs, or an invoice.`,
+    );
+  }
+
+  if (extracted.document_type === 'check_stubs') {
+    // The stub image is kept so the accountant can look at it later.
+    const checks = extracted.checks ?? [];
+    const count = await db.transaction().execute(async trx => {
+      const file = await uploadFile(trx, ctx, {
+        business_id: businessId,
+        original_name: input.filename,
+        mime_type: input.media_type ?? 'application/pdf',
+        buffer: input.buffer,
+      });
+      const saved = await saveCheckStubs(trx, ctx, {
+        checks,
+        source_file_id: file.id,
+        source_filename: input.filename,
+      });
+      return saved.length;
+    });
+    if (count === 0) {
+      throw new BusinessRuleError(ERR.VALIDATION_FAILED, `No checks could be read from "${input.filename}".`);
+    }
+    return { kind: 'check_stubs', check_count: count };
+  }
+
+  if (extracted.document_type === 'bank_statement' || extracted.document_type === 'credit_card_statement') {
+    const isCard = extracted.document_type === 'credit_card_statement';
+    const lines = isCard
+      ? normalizeCardLines((extracted.transactions ?? []) as unknown as RawCardLine[])
+      : extracted.transactions ?? [];
     const row = await db.insertInto('email_import_staging').values({
       business_id: businessId,
       gmail_message_id: null,
@@ -71,11 +108,13 @@ export async function ingestUploadedPdf(
       email_subject: input.filename,
       received_at: receivedAt,
       addressed_to: extracted.addressed_to ?? null,
-      extracted_transactions: JSON.stringify(extracted.transactions ?? []),
+      extracted_transactions: JSON.stringify(lines),
+      statement_kind: isCard ? 'credit_card' : 'bank',
+      account_hint: isCard ? [extracted.card_name, extracted.card_last4].filter(Boolean).join(' ') || null : null,
       status: 'pending',
       pdf_data: input.buffer,
     }).returning('id').executeTakeFirstOrThrow();
-    return { kind: 'bank_statement', staging_id: row.id };
+    return { kind: isCard ? 'credit_card_statement' : 'bank_statement', staging_id: row.id };
   }
 
   const row = await db.insertInto('invoice_import_staging').values({

@@ -204,6 +204,11 @@ export const AUDIT = {
   BANK_DEPOSIT_UPDATE: 'bank_deposit.update',
   BANK_DEPOSIT_VOID: 'bank_deposit.void',
   BANK_DEPOSIT_DELETE: 'bank_deposit.delete',
+
+  // Check stubs (matched to bank-statement checks)
+  CHECK_STUB_CREATE: 'check_stub.create',
+  CHECK_STUB_MATCH: 'check_stub.match',
+  CHECK_STUB_DISMISS: 'check_stub.dismiss',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

@@ -134,6 +134,35 @@ function findAccount(
   return undefined;
 }
 
+// Issuers a bank line names when it pays a card ("CHASE CREDIT CRD AUTOPAY").
+const CARD_ISSUERS: Array<{ issuer: RegExp; account: RegExp }> = [
+  { issuer: /\bchase\b/i, account: /\bchase\b/i },
+  { issuer: /\bamex\b|american express/i, account: /\bamex\b|american express/i },
+  { issuer: /capital\s?one/i, account: /capital\s?one/i },
+  { issuer: /\bdiscover\b/i, account: /\bdiscover\b/i },
+  { issuer: /\bciti(?:bank|card)?\b/i, account: /\bciti/i },
+  { issuer: /wells\s?fargo/i, account: /wells\s?fargo/i },
+  { issuer: /bank of america|\bboa\b|\bbofa\b/i, account: /bank of america|\bboa\b|\bbofa\b/i },
+  { issuer: /\bus\s?bank\b/i, account: /\bus\s?bank\b/i },
+  { issuer: /\bbrex\b/i, account: /\bbrex\b/i },
+  { issuer: /\bramp\b/i, account: /\bramp\b/i },
+];
+
+/**
+ * The card a payment went to. With one card that is the card; with several,
+ * the one whose name carries the issuer the description names. Several cards
+ * and no issuer match leaves it to the reviewer (null) rather than guessing.
+ */
+export function pickCreditCard(accounts: AccountRow[], description: string): AccountRow | null {
+  const cards = accounts.filter(a => a.account_type === 'liability'
+    && (a.detail_type === 'Credit Card' || /credit\s?card|visa|mastercard|amex|american express|discover/i.test(a.name)));
+  if (cards.length <= 1) return cards[0] ?? null;
+  const issuer = CARD_ISSUERS.find(entry => entry.issuer.test(description));
+  if (!issuer) return null;
+  const named = cards.filter(card => issuer.account.test(card.name));
+  return named.length === 1 ? named[0]! : null;
+}
+
 function accountingRuleSuggestion(
   type: NonNullable<DetectedType>,
   accounts: AccountRow[],
@@ -141,11 +170,7 @@ function accountingRuleSuggestion(
 ): Suggestion | null {
   switch (type) {
     case 'credit_card_payment': {
-      const card = findAccount(accounts, {
-        detailTypes: ['Credit Card'],
-        nameLike: /credit\s?card|visa|mastercard|amex/i,
-        accountType: 'liability',
-      });
+      const card = pickCreditCard(accounts, input.description);
       return card ? build(card.id, input, 96, 'accounting_rule', 'Credit card payment') : null;
     }
     case 'payroll': {
