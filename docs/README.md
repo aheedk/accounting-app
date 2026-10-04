@@ -11,7 +11,6 @@ to run the app.
 | [`specs/`](./specs/) | Design specs: how a feature is meant to work and why. Named `YYYY-MM-DD-<topic>-design.md`. |
 | `plans/` | Step-by-step implementation plans for work in progress (created as needed; removed once the work ships — git history keeps them). |
 | [`qa/`](./qa/) | Testing: the full-app audit (bugs by priority) and the Chart of Accounts test guide. |
-| [`changelogs/`](./changelogs/) | What larger pieces of work changed, e.g. the QuickBooks-style revamp waves. |
 
 ## Specs
 
@@ -19,6 +18,7 @@ to run the app.
 |---|---|
 | [Ledger and AR foundation](./specs/2026-04-20-accounting-app-slice-1-ledger-and-ar-design.md) | Core architecture: tenancy, roles, the ledger, invoices and payments. |
 | [Filling the Coming Soon tabs](./specs/2026-04-24-fill-coming-soon-tabs-design.md) | The slices 2–13 roadmap and the conventions every feature follows. |
+| [Chart of Accounts](./specs/2026-07-20-chart-of-accounts-design.md) | The QuickBooks-style Chart of Accounts: layout, opening balances, locking, batch edit, the register. |
 | [Journal entry editing](./specs/2026-08-25-journal-entry-editing-design.md) | In-place editing of posted journal entries. |
 | [AI auto-coding](./specs/2026-09-24-ai-auto-coding-design.md) | The AI inbox and the layered coding engine. |
 | [General Ledger](./specs/2026-10-04-general-ledger-design.md) | The QuickBooks-style General Ledger report. |

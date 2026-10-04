@@ -1,5 +1,7 @@
 # QBO Chart of Accounts parity — 2026-07-20 (main)
 
+> Kept as the Chart of Accounts design record: it started as the change log for the 2026-07-20 parity work and is the only place its decisions are written down.
+
 Rebuilds **Chart of Accounts** to mirror the QuickBooks Online CoA list
 (user-supplied screenshot as the visual reference) and adds the account
 **register** view behind QBO's "View register" action.
