@@ -2,7 +2,7 @@
 
 Requests taken from the meeting recording transcript, checked against the code.
 Parts of the recording were unclear or not in English, so the last section lists
-what could not be made out. Status as of 2026-10-02.
+what could not be made out. Status as of 2026-10-04.
 
 ## Done
 
@@ -22,6 +22,7 @@ what could not be made out. Status as of 2026-10-02.
 | 12 | ADJ column can be hidden or filtered | already in place |
 | 13 | Name / Memo / Split columns, single signed Amount column | `e92959e` |
 | 14 | Dropdowns no longer use the browser's own look | Riham's AppSelect work, `864592f` |
+| 15 | Bank Deposit form ("+ New > Bank deposit"), with GL drill-through | Riham, `428fb69`, `6f2ecf1` |
 
 ## Open
 
@@ -34,13 +35,11 @@ what could not be made out. Status as of 2026-10-02.
    (`autoCodingService.ts`, "Credit card payment") but only fires when the
    client has an account with the "Credit Card" detail type. Needs testing with
    real statements.
-3. **Bank Deposit form.** QuickBooks has "+ New > Bank deposit". Ours links to
-   the bank transactions page; there is no form to create a deposit.
-4. **Vendor dropdown in the AI inbox.** The Name column is free text. It should
+3. **Vendor dropdown in the AI inbox.** The Name column is free text. It should
    be a dropdown of the client's vendors, with the AI matching the extracted
    name ("Duke Power" to "Duke Energy") and the user able to correct it. Riham
    said "I'll fix that" in the meeting — confirm who owns it.
-5. **Chart of Accounts: everything editable.** The edit-account screen should
+4. **Chart of Accounts: everything editable.** The edit-account screen should
    allow changing every field, including the account number.
 
 ## Bigger items, for later
