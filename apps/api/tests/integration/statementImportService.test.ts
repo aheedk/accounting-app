@@ -9,6 +9,7 @@ import {
   guessCardAccount,
   normalizeCardLines,
   postStatementLines,
+  splitByAccount,
   type StatementLine,
 } from '../../src/services/ai/statementImportService.js';
 import { pickCreditCard } from '../../src/services/ai/autoCodingService.js';
@@ -59,6 +60,24 @@ describe('statement import', () => {
     expect(checkNumberOf({ description: 'Chk #2001 cleared' })).toBe('2001');
     expect(checkNumberOf({ description: 'DUKE ENERGY' })).toBeNull();
     expect(checkNumberOf({ description: 'anything', check_number: '#77' })).toBe('77');
+  });
+
+  it('splits a file holding several accounts into one statement per account', () => {
+    const accounts = [{ name: 'Business Checking', last4: '2553' }, { name: 'Savings', last4: '8344' }];
+    const lines = [
+      { description: 'A', account_last4: '2553' },
+      { description: 'B', account_last4: '8344' },
+      { description: 'C', account_last4: '2553' },
+    ];
+    expect(splitByAccount(lines, accounts)).toEqual([
+      { account_hint: 'Business Checking 2553', lines: [lines[0], lines[2]] },
+      { account_hint: 'Savings 8344', lines: [lines[1]] },
+    ]);
+    // One account: a single statement named after it, whether or not lines are tagged.
+    expect(splitByAccount([{ description: 'A' }], [accounts[0]!])).toEqual([
+      { account_hint: 'Business Checking 2553', lines: [{ description: 'A' }] },
+    ]);
+    expect(splitByAccount([{ description: 'A' }], undefined)).toEqual([{ account_hint: null, lines: [{ description: 'A' }] }]);
   });
 
   it('posts a card statement against the card: charge, refund and payment', async () => {

@@ -81,3 +81,21 @@ Upload those, and fill each check's payee and category automatically.
   chosen, category through the expense service, and marks the stub matched.
 - **Nothing posts from a stub on its own.** Stubs only describe checks that the bank
   statement proves cleared.
+
+## 3. Long statements and several accounts in one file
+
+A bank's monthly PDF is often scanned and holds more than one account (for
+example checking and savings, 20 pages, ~160 lines). Two things follow:
+
+- **Room to read it.** Extraction streams the response with `max_tokens`
+  48000 instead of a fixed 8192 (which cut the JSON off mid-way and made the
+  file read as "unknown"). The per-line running balance is no longer asked
+  for, since nothing used it. If the output still runs out,
+  `ExtractionTooLongError` becomes a clear message asking for the PDF to be
+  split. The API's request timeout is 15 minutes, since a long statement takes
+  ~3 minutes to read.
+- **One statement per account.** The model lists `accounts` (name, last 4) and
+  tags each line with `account_last4`. `statementImportService.splitByAccount`
+  turns that into one inbox statement per account, titled with the account
+  (`account_hint`). Emailed files do the same; only the first statement keeps
+  the `gmail_message_id`, which is unique and marks the email as seen.

@@ -11,7 +11,8 @@ type Props = {
 type UploadState = { busy: boolean; error: string | null; done: string | null };
 
 type UploadResult =
-  | { kind: 'bank_statement' | 'credit_card_statement' | 'invoice'; staging_id: string }
+  | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
+  | { kind: 'invoice'; staging_id: string }
   | { kind: 'check_stubs'; check_count: number };
 
 const ACCEPTED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
@@ -19,7 +20,8 @@ const ACCEPTED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 /** What the AI recognised, for the confirmation line. */
 function describeResult(result: UploadResult): string {
   switch (result.kind) {
-    case 'bank_statement': return 'bank statement';
+    case 'bank_statement':
+      return result.statement_count > 1 ? `${result.statement_count} bank statements (one per account)` : 'bank statement';
     case 'credit_card_statement': return 'credit card statement';
     case 'invoice': return 'invoice';
     case 'check_stubs': return `${result.check_count} check stub${result.check_count === 1 ? '' : 's'} (see the Check stubs tab)`;

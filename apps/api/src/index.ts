@@ -6,9 +6,12 @@ import { startGmailWorker } from './jobs/gmailWorker.js';
 
 const port = Number(process.env.PORT ?? config.API_PORT);
 
-makeApp().listen(port, '::', () => {
+const server = makeApp().listen(port, '::', () => {
   console.log(`api listening on port ${port}`);
   // Started here (not app.ts) so tests and supertest never spin up timers.
   startRecurringScheduler(db);
   startGmailWorker(db);
 });
+// Reading a long scanned statement with the AI can take several minutes;
+// Node's default 5-minute request timeout would cut the upload off.
+server.requestTimeout = 15 * 60 * 1000;

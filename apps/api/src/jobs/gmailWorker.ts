@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import type { Kysely } from 'kysely';
 import type { ExtractedCheck } from '../services/ai/checkStubService.js';
-import { normalizeCardLines, type RawCardLine } from '../services/ai/statementImportService.js';
+import { normalizeCardLines, splitByAccount, type RawCardLine } from '../services/ai/statementImportService.js';
 import { saveCheckStubs } from '../services/ai/checkStubService.js';
 import { systemCtx } from '../lib/ctx.js';
 import type { DB } from '../db/types.js';
@@ -57,10 +57,14 @@ type ExtractedTransaction = {
   description: string;
   amount: string;
   type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
-  balance: string;
+  balance?: string;
   check_number?: string;
+  /** Last four of the account the line is on, when one file holds several accounts. */
+  account_last4?: string;
   suggested_offset?: string;
 };
+
+export type StatementAccount = { name?: string; last4?: string };
 
 type InvoiceLineItem = {
   description: string;
@@ -77,6 +81,8 @@ export type UnifiedResult = {
   // bank_statement (credit_card_statement lines arrive as RawCardLine and are
   // normalized by statementImportService.normalizeCardLines)
   transactions?: ExtractedTransaction[];
+  /** Every account in the file; a bank's PDF often holds checking and savings together. */
+  accounts?: StatementAccount[];
   // credit_card_statement
   card_name?: string;
   card_last4?: string;
@@ -93,6 +99,14 @@ export type UnifiedResult = {
   total?: string;
   line_items?: InvoiceLineItem[];
 };
+
+/** The model ran out of room before finishing the JSON (a very long statement). */
+export class ExtractionTooLongError extends Error {
+  constructor() {
+    super('The document has more lines than can be read in one pass.');
+    this.name = 'ExtractionTooLongError';
+  }
+}
 
 function buildAnthropicClient(): Anthropic {
   const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
@@ -115,10 +129,11 @@ export async function classifyAndExtract(
     ? { type: 'document' as const, source: { type: 'base64' as const, media_type: mediaType, data: base64Pdf } }
     : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType, data: base64Pdf } };
   const accountSection = buildCoaPromptSection(clientContext);
-  const response = await client.messages.create({
+  // Streamed: a month of a busy checking account is ~200 lines, well past what a
+  // non-streaming request may return before it times out.
+  const stream = client.messages.stream({
     model: 'claude-opus-4-5',
-    // Card statements and check registers can run long.
-    max_tokens: 8192,
+    max_tokens: 48000,
     messages: [{
       role: 'user',
       content: [
@@ -145,6 +160,9 @@ If this is a BANK STATEMENT return:
 {
   "document_type": "bank_statement",
   "addressed_to": "exact name of the account holder / company this statement belongs to",
+  "accounts": [
+    { "name": "account name as printed, e.g. Business Checking", "last4": "last four digits of the account number" }
+  ],
   "transactions": [
     {
       "date": "MM/DD/YYYY",
@@ -152,12 +170,14 @@ If this is a BANK STATEMENT return:
       "description": "full transaction description from the statement",
       "amount": "positive number e.g. 1250.00",
       "type": "deposit (money received/inflow), check (outflow paid by physical check), or expense (outflow via card/ACH/wire/cash/EFT)",
-      "balance": "running balance e.g. 42500.00",
       "check_number": "the check number for a check, e.g. 1042 — omit for anything that is not a check",
+      "account_last4": "last four of the account this line is on — only when the document has more than one account",
       "suggested_offset": "one account name from the chart of accounts above"
     }
   ]
 }
+List every account in the document under "accounts" and include every transaction from every account and every page.
+Leave out summary rows (opening/closing balance, totals) and keys you would leave empty.
 
 If this is a CREDIT CARD STATEMENT (a card issuer's statement listing purchases, payments and a new balance) return:
 {
@@ -222,6 +242,9 @@ If the document is none of these (bank statement, credit card statement, check s
       ] as Anthropic.MessageParam['content'],
     }],
   });
+
+  const response = await stream.finalMessage();
+  if (response.stop_reason === 'max_tokens') throw new ExtractionTooLongError();
 
   // Defensive parsing: never trust a raw model output. Regex pulls the JSON block out, try/catch, guards against malformed output,
   // and if anything fails we fall back to 'unknown' instead of crashing. "fail safely, not silently", critical for production agents.
@@ -451,21 +474,30 @@ async function processAnyMessage(
       ...tx,
       suggested_account_id: matchAccount(tx.suggested_offset, coa),
     }));
-    await db.insertInto('email_import_staging').values({    // Human-in-the-loop: the agent never writes to the ledger directly.
-      gmail_message_id: messageId,
-      email_from: from,
-      email_subject: subject,
-      received_at: receivedAt,
-      extracted_transactions: JSON.stringify(enrichedTxs),
-      addressed_to: result.addressed_to ?? null,
-      statement_kind: statementKind,
-      account_hint: accountHint,
-      pdf_data: pdfBuffer,
-      business_id: businessId,
-      status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI 
-                            // before anything is commited. This is the guardrail that makes it safe to point AI to financial records.
-    }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
-    console.log(`[gmail-worker] message ${messageId} → ${statementKind} statement for business ${businessId}: ${enrichedTxs.length} transactions`);
+    // One email can carry several accounts (checking and savings); each is its own statement.
+    const parts = statementKind === 'credit_card'
+      ? [{ account_hint: accountHint, lines: enrichedTxs }]
+      : splitByAccount(enrichedTxs, result.accounts);
+    for (const [n, part] of parts.entries()) {
+      // gmail_message_id is unique: the first part carries it (and marks the email
+      // as seen); the others are linked to it by subject and received time.
+      const inserted = await db.insertInto('email_import_staging').values({    // Human-in-the-loop: the agent never writes to the ledger directly.
+        gmail_message_id: n === 0 ? messageId : null,
+        email_from: from,
+        email_subject: subject,
+        received_at: receivedAt,
+        extracted_transactions: JSON.stringify(part.lines),
+        addressed_to: result.addressed_to ?? null,
+        statement_kind: statementKind,
+        account_hint: part.account_hint,
+        pdf_data: pdfBuffer,
+        business_id: businessId,
+        status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI 
+                              // before anything is commited. This is the guardrail that makes it safe to point AI to financial records.
+      }).onConflict(oc => oc.column('gmail_message_id').doNothing()).returning('id').executeTakeFirst();
+      if (n === 0 && !inserted) return; // this email was already processed
+    }
+    console.log(`[gmail-worker] message ${messageId} → ${parts.length} ${statementKind} statement(s) for business ${businessId}: ${enrichedTxs.length} transactions`);
   } else if (result.document_type === 'invoice') {
     const businessId = earlyResolution?.businessId ?? await resolveByName(db, result.addressed_to);
     if (!businessId) {

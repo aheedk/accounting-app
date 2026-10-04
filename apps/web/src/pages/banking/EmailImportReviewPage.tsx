@@ -114,7 +114,8 @@ function isCard(imp: StagedImport): boolean {
 
 function deriveBankTitle(imp: StagedImport): string {
   const period = derivePeriodTitle(imp);
-  return isCard(imp) && imp.account_hint ? `${imp.account_hint} · ${period}` : period;
+  // The account (card name, or "Checking 2553") when the AI could read it.
+  return imp.account_hint ? `${imp.account_hint} · ${period}` : period;
 }
 
 function derivePeriodTitle(imp: StagedImport): string {

@@ -390,3 +390,28 @@ export async function guessCardAccount(
   }
   return creditCards.length === 1 ? creditCards[0]!.id : null;
 }
+
+export type StatementPart<L> = { account_hint: string | null; lines: L[] };
+
+/**
+ * One file can hold several accounts (a bank's checking and savings for the
+ * month). Each becomes its own statement, since each posts to its own account.
+ */
+export function splitByAccount<L extends { account_last4?: string | undefined }>(
+  lines: L[],
+  accounts: Array<{ name?: string | undefined; last4?: string | undefined }> | undefined,
+): Array<StatementPart<L>> {
+  const known = (accounts ?? []).filter(a => a.name || a.last4);
+  const hintFor = (last4: string | undefined): string | null => {
+    const account = known.find(a => last4 && a.last4 === last4) ?? (known.length === 1 ? known[0] : undefined);
+    const parts = [account?.name, account?.last4 ?? last4].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : null;
+  };
+  const groups = new Map<string, L[]>();
+  for (const line of lines) {
+    const key = line.account_last4?.trim() ?? '';
+    groups.set(key, [...(groups.get(key) ?? []), line]);
+  }
+  if (groups.size <= 1) return [{ account_hint: hintFor(lines[0]?.account_last4), lines }];
+  return [...groups.entries()].map(([last4, group]) => ({ account_hint: hintFor(last4 || undefined), lines: group }));
+}

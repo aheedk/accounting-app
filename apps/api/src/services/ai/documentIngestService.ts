@@ -2,12 +2,13 @@ import type { Kysely } from 'kysely';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   classifyAndExtract,
+  ExtractionTooLongError,
   fetchCoa,
   fetchVendorHistory,
   type ClientContext,
   type DocumentMediaType,
 } from '../../jobs/gmailWorker.js';
-import { normalizeCardLines, type RawCardLine } from './statementImportService.js';
+import { normalizeCardLines, splitByAccount, type RawCardLine } from './statementImportService.js';
 import { saveCheckStubs } from './checkStubService.js';
 import { uploadFile } from '../files/fileService.js';
 import { BusinessRuleError } from '../../lib/errors.js';
@@ -16,7 +17,8 @@ import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type IngestResult =
-  | { kind: 'bank_statement' | 'credit_card_statement' | 'invoice'; staging_id: string }
+  | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
+  | { kind: 'invoice'; staging_id: string }
   | { kind: 'check_stubs'; check_count: number };
 
 /**
@@ -59,6 +61,12 @@ export async function ingestUploadedPdf(
         'AI document processing is unavailable: the Anthropic API key on this server was rejected. Update ANTHROPIC_API_KEY and restart the API.',
       );
     }
+    if (e instanceof ExtractionTooLongError) {
+      throw new BusinessRuleError(
+        ERR.VALIDATION_FAILED,
+        `"${input.filename}" has more transactions than can be read in one pass. Split the PDF (for example one account or half a month per file) and upload the parts.`,
+      );
+    }
     throw e;
   }
   const receivedAt = new Date().toISOString();
@@ -95,26 +103,36 @@ export async function ingestUploadedPdf(
 
   if (extracted.document_type === 'bank_statement' || extracted.document_type === 'credit_card_statement') {
     const isCard = extracted.document_type === 'credit_card_statement';
-    const lines = isCard
-      ? normalizeCardLines((extracted.transactions ?? []) as unknown as RawCardLine[])
-      : extracted.transactions ?? [];
-    const row = await db.insertInto('email_import_staging').values({
-      business_id: businessId,
-      gmail_message_id: null,
-      source: 'upload',
-      uploaded_by_user_id: ctx.user_id,
-      original_filename: input.filename,
-      email_from: null,
-      email_subject: input.filename,
-      received_at: receivedAt,
-      addressed_to: extracted.addressed_to ?? null,
-      extracted_transactions: JSON.stringify(lines),
-      statement_kind: isCard ? 'credit_card' : 'bank',
-      account_hint: isCard ? [extracted.card_name, extracted.card_last4].filter(Boolean).join(' ') || null : null,
-      status: 'pending',
-      pdf_data: input.buffer,
-    }).returning('id').executeTakeFirstOrThrow();
-    return { kind: isCard ? 'credit_card_statement' : 'bank_statement', staging_id: row.id };
+    const parts = isCard
+      ? [{
+          account_hint: [extracted.card_name, extracted.card_last4].filter(Boolean).join(' ') || null,
+          lines: normalizeCardLines((extracted.transactions ?? []) as unknown as RawCardLine[]),
+        }]
+      : splitByAccount(extracted.transactions ?? [], extracted.accounts);
+    const ids = await db.transaction().execute(async trx => {
+      const out: string[] = [];
+      for (const part of parts) {
+        const row = await trx.insertInto('email_import_staging').values({
+          business_id: businessId,
+          gmail_message_id: null,
+          source: 'upload',
+          uploaded_by_user_id: ctx.user_id,
+          original_filename: input.filename,
+          email_from: null,
+          email_subject: input.filename,
+          received_at: receivedAt,
+          addressed_to: extracted.addressed_to ?? null,
+          extracted_transactions: JSON.stringify(part.lines),
+          statement_kind: isCard ? 'credit_card' : 'bank',
+          account_hint: part.account_hint,
+          status: 'pending',
+          pdf_data: input.buffer,
+        }).returning('id').executeTakeFirstOrThrow();
+        out.push(row.id);
+      }
+      return out;
+    });
+    return { kind: isCard ? 'credit_card_statement' : 'bank_statement', staging_id: ids[0]!, statement_count: ids.length };
   }
 
   const row = await db.insertInto('invoice_import_staging').values({
