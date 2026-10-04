@@ -1,19 +1,22 @@
-# Follow-ups
+# Backlog
 
-Non-blocking production-hardening + polish backlog. Originally deferred during
+Non-blocking production-hardening and polish work. Originally deferred during
 the slices 8–13 initiative; the bulk of it shipped in the **2026-07-10/11
-follow-ups batch** (see `docs/superpowers/plans/2026-07-10-follow-ups-batch.md`
-and `HANDOFF.md`). This file now tracks only what is still open, with a ledger
-of what closed and where.
+follow-ups batch** (its plan is in git history). This file tracks only what is
+still open, with a ledger of what closed and where.
+
+Requests from team meetings are tracked separately in [`meetings/`](./meetings/);
+known bugs from the full-app audit are in [`qa/2026-09-28-app-audit.md`](./qa/2026-09-28-app-audit.md).
 
 ---
 
 ## Still open — ops (user-side, no code needed)
 
-### Deploy the batch
-Pushed to `origin/main`. Deploying the API applies migrations `0051`–`0053`
-(numbering counters, pay-run void CHECK, bank import batches) via
-`npm run migrate:prod`.
+### Keep production migrations current
+Deploying the API applies pending migrations via `npm run migrate:prod`.
+Confirm the live database has run everything in `db/migrations/` after each
+deploy. Two pairs share a number (`0073_*`, `0074_*`); the runner tracks them by
+full filename, so both of each pair apply.
 
 ### File storage in prod: Railway volume OR R2 env vars
 Uploads still land in ephemeral container storage until one of:
@@ -117,4 +120,4 @@ All on local `main`; full integration suite green (63 files / 181 tests).
 - Plan-impl drift is real and constant — every slice surfaced 3-5 incorrect assumptions in my plan (column names, function signatures, response shapes). The drift logs at the top of each slice plan are the durable record.
 - After editing anything in `packages/shared`, run `npm -w @accounting/shared run build` — api/web resolve the compiled `dist/`, and a stale dist produces confusing typecheck failures.
 - A `LEFT JOIN ... AND <filter>` never filters rows — twice now a report summed both sides of balanced JEs to zero because the account-type restriction sat in the join condition instead of the aggregate/WHERE.
-- Local dev environment specifics (fixture login recipe, proxy flip, Docker/test flags) live in `HANDOFF.md`.
+- Local dev environment specifics (startup, proxy flip, Docker/test flags, gotchas) live in [`guides/running-locally.md`](./guides/running-locally.md).

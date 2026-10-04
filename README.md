@@ -1,8 +1,9 @@
 # accounting-app
 
-Production-grade accounting system for an accounting firm. See `docs/superpowers/specs/` for the design spec.
+Production-grade accounting system for an accounting firm.
 
-> **Continuing an in-flight work session?** See [`HANDOFF.md`](./HANDOFF.md) — current batch state, environment notes, and the next task to pick up.
+Documentation lives in [`docs/`](./docs/README.md): design specs, the backlog,
+meeting follow-ups, QA reports and how-to guides.
 
 ## Deployed environments
 
@@ -14,7 +15,7 @@ Admin credentials are stored in 1Password. If lost, open a Railway shell and re-
 ## Quickstart
 
 For the exact Windows startup and login troubleshooting steps used on this
-project, see [`LOCALHOST.md`](./LOCALHOST.md).
+project, see [`docs/guides/running-locally.md`](./docs/guides/running-locally.md).
 
 ```bash
 nvm use
@@ -30,7 +31,7 @@ Then visit http://localhost:5173.
 
 ## Status
 
-Slices 1–13 complete. All 23 ComingSoon tabs replaced with real, ledger-posting features. 47 migrations, 157 integration tests passing.
+Slices 1–13 complete: all 23 ComingSoon tabs replaced with real, ledger-posting features. Since then: the QuickBooks-style revamp, AI auto-coding, and QuickBooks parity work across the General Ledger, journal entries, bank deposits and expenses. Open work is in [`docs/backlog.md`](./docs/backlog.md) and [`docs/meetings/`](./docs/meetings/).
 
 **Module coverage:** AR · AP (incl. expense transactions, 1099 contractors with encrypted W-9 tax IDs) · Banking (accounts, txn inbox, reconciliation, rules) · Inventory (items, POs, item receipts, sales orders, shipping labels) · Reports (trial balance, P&L, balance sheet, cash flow, aging, custom reports, management KPIs, performance trends, financial planning + budgets, CSV export hub) · Accounting (CoA, journal entries, fiscal periods + close, books review checklist, recurring transactions, fixed assets, depreciation, receipts, integration inbox, cross-business client overview) · Setup (entity, cost centers, users, tax codes) · Payroll (employees with encrypted SSN, pay runs that post balanced JEs, payroll taxes, compliance checklist).
 
