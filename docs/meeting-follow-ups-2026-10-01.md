@@ -24,6 +24,23 @@ what could not be made out. Status as of 2026-10-04.
 | 14 | Dropdowns no longer use the browser's own look | Riham's AppSelect work, `864592f` |
 | 15 | Bank Deposit form ("+ New > Bank deposit"), with GL drill-through | Riham, `428fb69`, `6f2ecf1` |
 
+### Also completed (not raised in the meeting)
+
+| # | Change | Where |
+|---|---|---|
+| 16 | General Ledger matched to QuickBooks: steady running balance, real transaction types (Expense, Check, Payroll...), numbers and names filled in, correct ADJ column, amounts in the account's natural sign | `e92959e` |
+| 17 | General Ledger follow-ups: credit memo and vendor credit numbers (CM-/VC-), clearer memos, names on payroll rows | `e92959e` |
+| 18 | General Ledger date, name and description are clickable and open the transaction | `5c94d52` |
+| 19 | Expense category can be any account in the chart, not just expense accounts | `864592f` |
+| 20 | "Add new" on account, vendor and customer dropdowns across the app | `864592f` |
+| 21 | Payee box restyled to match the site instead of the browser's own suggestion list | `864592f` |
+| 22 | Arrow keys work in every dropdown and popup menu | `1b6c136` |
+| 23 | Switching company opens that company's dashboard | `a33d169` |
+| 24 | Other tabs left on the old company show a "What happened to this page?" screen | `96ecc52` |
+| 25 | Chart of Accounts page controls at the bottom as well as the top | `f9ccd6f` |
+| 26 | Excel, PDF and print exports with a header (company, report, period), footer, page numbers and proper number formatting | `86ed7a6`, `fe79368` |
+| 27 | Removed 18 implementation plans for work that had already shipped | `78a0ed3` |
+
 ## Open
 
 1. **Credit card statement upload.** In the AI inbox, add a credit card option
