@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   classifyAndExtract,
   fetchCoa,
@@ -44,7 +45,19 @@ export async function ingestUploadedPdf(
     vendorHistory: await fetchVendorHistory(db, businessId, coa),
   };
 
-  const extracted = await classifyAndExtract(input.buffer, clientContext);
+  let extracted: Awaited<ReturnType<typeof classifyAndExtract>>;
+  try {
+    extracted = await classifyAndExtract(input.buffer, clientContext);
+  } catch (e: unknown) {
+    // A rejected key otherwise surfaces as a bare "Internal server error".
+    if (e instanceof Anthropic.AuthenticationError) {
+      throw new BusinessRuleError(
+        ERR.VALIDATION_FAILED,
+        'AI document processing is unavailable: the Anthropic API key on this server was rejected. Update ANTHROPIC_API_KEY and restart the API.',
+      );
+    }
+    throw e;
+  }
   const receivedAt = new Date().toISOString();
 
   if (extracted.document_type === 'bank_statement') {
