@@ -27,7 +27,7 @@ what could not be made out. Status as of 2026-10-04.
 | 17 | Bank statements recognise credit card payments and pick the right card by issuer name | `b624b71` |
 | 18 | Check stubs: upload stubs or photos; checks on a bank statement take their payee and category from the stub, and checks already posted can be filled in from the Check stubs tab | `b624b71`, `dc258f3` |
 
-| 19 | Chart of Accounts: every field on the edit-account screen is editable, including the account number and account type; system accounts (AR, AP, Suspense...) can be renumbered and renamed too | see below |
+| 19 | Chart of Accounts: every field on the edit-account screen is editable, including the account number and account type; system accounts (AR, AP, Suspense...) can be renumbered and renamed too | `12235b3` |
 
 ### Also completed (not raised in the meeting)
 
