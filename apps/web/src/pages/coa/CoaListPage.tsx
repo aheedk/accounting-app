@@ -175,7 +175,7 @@ export default function CoaListPage() {
 
   // Edit slide-over
   const [editAccount, setEditAccount] = useState<Account | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', detail_type: '', description: '', parent_id: null as string | null, is_subaccount: false });
+  const [editForm, setEditForm] = useState({ code: '', name: '', account_type: '', detail_type: '', description: '', parent_id: null as string | null, is_subaccount: false });
   const [editBalance, setEditBalance] = useState<string | null>(null);
   const [editErr, setEditErr] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
@@ -418,7 +418,9 @@ export default function CoaListPage() {
   function openEdit(acct: Account) {
     setEditAccount(acct);
     setEditForm({
+      code: acct.code,
       name: acct.name,
+      account_type: acct.account_type,
       detail_type: acct.detail_type ?? '',
       description: acct.description ?? '',
       parent_id: acct.parent_id,
@@ -440,7 +442,9 @@ export default function CoaListPage() {
     setEditBusy(true);
     try {
       const r = await api.patch(`/businesses/${bizId}/coa/${editAccount.id}`, {
+        code: editForm.code.trim(),
         name: editForm.name,
+        account_type: editForm.account_type,
         detail_type: editForm.detail_type || null,
         description: editForm.description || null,
         parent_id: editForm.is_subaccount ? (editForm.parent_id ?? null) : null,
@@ -568,7 +572,9 @@ export default function CoaListPage() {
   const successImportCount = importRows.filter(r => r.status === 'ok').length;
   const errorImportCount = importRows.filter(r => r.status === 'error').length;
   const allPageChecked = pagedAccounts.length > 0 && pagedAccounts.every(a => checkedIds.has(a.id));
-  const parentChoices = accounts.filter(a => a.id !== editAccount?.id && a.is_active);
+  // A subaccount shares its parent's type, so only same-type parents are offered.
+  const parentChoices = accounts.filter(a => a.id !== editAccount?.id && a.is_active
+    && (!editForm.account_type || a.account_type === editForm.account_type));
 
   if (!bizId) return <div>Pick a business.</div>;
 
@@ -877,7 +883,8 @@ export default function CoaListPage() {
               </tr>
             )}
             {pagedAccounts.map(acct => {
-              const editable = batchEdit && !acct.is_system && !acct.is_locked;
+              // System accounts are found by key, so they can be renumbered too.
+              const editable = batchEdit && !acct.is_locked;
               const d = draftFor(acct);
               return (
               <tr key={acct.id} className={`border-b last:border-b-0 hover:bg-muted/20 group ${!acct.is_active ? 'opacity-60' : ''}`}>
@@ -1058,25 +1065,55 @@ export default function CoaListPage() {
             </div>
             <form className="flex flex-col flex-1 overflow-hidden" onSubmit={e => void saveEdit(e)}>
               <div className="flex-1 overflow-auto p-6 space-y-4">
-                <div>
-                  <Label>Account name <span className="text-destructive">*</span></Label>
-                  <Input
-                    className="mt-1"
-                    value={editForm.name}
-                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                    required
-                    disabled={editAccount.is_system}
-                    autoFocus
-                  />
+                {editAccount.is_locked && (
+                  <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                    This account is locked. Unlock it from the account list before saving changes.
+                  </p>
+                )}
+                <div className="grid grid-cols-[7rem_1fr] gap-3">
+                  <div>
+                    <Label>Number <span className="text-destructive">*</span></Label>
+                    <Input
+                      className="mt-1 font-mono"
+                      value={editForm.code}
+                      onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))}
+                      required
+                      maxLength={20}
+                      pattern="[A-Za-z0-9._-]+"
+                      title="Letters, numbers, dot, dash or underscore"
+                    />
+                  </div>
+                  <div>
+                    <Label>Account name <span className="text-destructive">*</span></Label>
+                    <Input
+                      className="mt-1"
+                      value={editForm.name}
+                      onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                      required
+                      autoFocus
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Account type <span className="text-destructive">*</span></Label>
                     <AppSelect
-                      className="mt-1 h-10 w-full rounded-md border bg-muted/30 px-3 text-sm cursor-not-allowed opacity-70"
-                      value={editAccount.account_type}
-                      disabled
+                      className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70"
+                      value={editForm.account_type}
+                      disabled={editAccount.is_system}
+                      onChange={e => {
+                        const nextType = e.target.value;
+                        setEditForm(f => ({
+                          ...f,
+                          account_type: nextType,
+                          // A detail type belongs to one account type.
+                          detail_type: (DETAIL_TYPES[nextType] ?? []).includes(f.detail_type) ? f.detail_type : '',
+                          // A subaccount must share its parent's type.
+                          ...(f.parent_id && accounts.find(a => a.id === f.parent_id)?.account_type !== nextType
+                            ? { parent_id: null, is_subaccount: false } : {}),
+                        }));
+                      }}
                     >
                       {ACCOUNT_TYPES.map(t => (
                         <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
@@ -1086,17 +1123,34 @@ export default function CoaListPage() {
                   <div>
                     <Label>Detail type</Label>
                     <AppSelect
-                      className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70"
                       value={editForm.detail_type}
+                      disabled={editAccount.is_system}
                       onChange={e => setEditForm(f => ({ ...f, detail_type: e.target.value }))}
                     >
                       <option value="">— select —</option>
-                      {(DETAIL_TYPES[editAccount.account_type] ?? []).map(dt => (
+                      {/* Keep a detail type that is not in the standard list (e.g. Suspense) selectable. */}
+                      {editForm.detail_type && !(DETAIL_TYPES[editForm.account_type] ?? []).includes(editForm.detail_type) && (
+                        <option value={editForm.detail_type}>{editForm.detail_type}</option>
+                      )}
+                      {(DETAIL_TYPES[editForm.account_type] ?? []).map(dt => (
                         <option key={dt} value={dt}>{dt}</option>
                       ))}
                     </AppSelect>
                   </div>
                 </div>
+                {editAccount.is_system && (
+                  <p className="text-xs text-muted-foreground">
+                    System account: the app posts to it on its own, so its type and detail type are fixed. Its number,
+                    name, parent and description can change.
+                  </p>
+                )}
+                {!editAccount.is_system && editForm.account_type !== editAccount.account_type && editBalance !== null && Number(editBalance) !== 0 && (
+                  <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                    This account has a balance of {fmtMoney(editBalance)}. Changing its type moves that balance, and
+                    every past transaction on it, to the {['asset', 'liability', 'equity'].includes(editForm.account_type) ? 'Balance Sheet' : 'Profit and Loss'} under {editForm.account_type}.
+                  </p>
+                )}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1104,7 +1158,6 @@ export default function CoaListPage() {
                       type="checkbox"
                       className="h-4 w-4 rounded border-input cursor-pointer"
                       checked={editForm.is_subaccount}
-                      disabled={editAccount.is_system}
                       onChange={e => setEditForm(f => ({ ...f, is_subaccount: e.target.checked, parent_id: e.target.checked ? f.parent_id : null }))}
                     />
                     <span className="text-sm">Make this a subaccount</span>

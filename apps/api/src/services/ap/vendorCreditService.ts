@@ -21,7 +21,7 @@ export type CreateDraftVendorCreditInput = {
 
 export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateDraftVendorCreditInput) {
   if (parseFloat(input.amount) <= 0) throw new PreconditionError('amount must be > 0');
-  const ap = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, '2010');
+  const ap = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, 'accounts_payable');
   const sequence = await nextCounter(trx, input.business_id, 'vendor_credit');
   const row = await trx.insertInto('vendor_credits').values({
     business_id: input.business_id, vendor_id: input.vendor_id,

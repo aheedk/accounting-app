@@ -4,6 +4,7 @@ import type { DB, BusinessAddress } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { getOrCreateSuspenseAccount } from './chartOfAccountsService.js';
 
 export type BusinessPatch = {
   name?: string;
@@ -70,6 +71,8 @@ export async function createBusiness(
     .execute();
 
   const bizCtx: ServiceCtx = { ...ctx, business_id: created.id };
+  // Where the AI parks what it cannot categorize (docs/specs/2026-10-04-suspense-account-design.md).
+  await getOrCreateSuspenseAccount(trx, bizCtx, created.id);
   await auditRecord(trx, bizCtx, {
     action: AUDIT.BUSINESS_CREATE,
     entity_type: 'business',

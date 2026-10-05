@@ -54,6 +54,7 @@ import BankTransactionsInboxPage from '@/pages/banking/BankTransactionsInboxPage
 import EmailImportReviewPage from '@/pages/banking/EmailImportReviewPage';
 import ImportedTransactionPage from '@/pages/banking/ImportedTransactionPage';
 import CodingRulesPage from '@/pages/ai/CodingRulesPage';
+import SuspensePage from '@/pages/ai/SuspensePage';
 import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage';
 import ReconcilePage from '@/pages/banking/ReconcilePage';
 import RulesPage from '@/pages/accounting/RulesPage';
@@ -180,6 +181,7 @@ export default function App() {
             {/* AI is a top-level area now; the old paths redirect so existing links keep working. */}
             <Route path="/ai/inbox" element={<EmailImportReviewPage />} />
             <Route path="/ai/coding-rules" element={<CodingRulesPage />} />
+            <Route path="/ai/suspense" element={<SuspensePage />} />
             <Route path="/accounting/email-imports" element={<Navigate to="/ai/inbox" replace />} />
             <Route path="/accounting/invoice-imports" element={<Navigate to="/ai/inbox" replace />} />
             <Route path="/accounting/bank-transactions/import" element={<BankTransactionImportPage />} />

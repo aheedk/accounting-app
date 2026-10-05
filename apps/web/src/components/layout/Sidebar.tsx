@@ -71,6 +71,7 @@ const groups: NavGroup[] = [
     children: [
       { to: '/ai/inbox', label: 'Document Inbox' },
       { to: '/ai/coding-rules', label: 'Coding Rules' },
+      { to: '/ai/suspense', label: 'Suspense' },
     ],
   },
   {

@@ -46,9 +46,9 @@ export async function cashFlow(db: Kysely<DB>, q: { business_id: string; period_
   let cashCode = '';
   let cashName = '';
   if (!cashAccountId) {
-    // Default: use system code 1020 (Operating Bank Account)
+    // Default: the Operating Bank Account system account (by key; its number can change)
     const row = await db.selectFrom('chart_of_accounts').selectAll()
-      .where('business_id', '=', q.business_id).where('code', '=', '1020').executeTakeFirstOrThrow();
+      .where('business_id', '=', q.business_id).where('system_key', '=', 'operating_bank').executeTakeFirstOrThrow();
     cashAccountId = row.id;
     cashCode = row.code;
     cashName = row.name;

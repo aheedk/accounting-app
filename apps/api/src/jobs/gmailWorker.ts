@@ -3,7 +3,12 @@ import type { gmail_v1 } from 'googleapis';
 import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
+import { SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
+import type { ExtractedCheck } from '../services/ai/checkStubService.js';
+import { normalizeCardLines, splitByAccount, type RawCardLine } from '../services/ai/statementImportService.js';
+import { saveCheckStubs } from '../services/ai/checkStubService.js';
+import { systemCtx } from '../lib/ctx.js';
 import type { DB } from '../db/types.js';
 import type { OAuth2Client as GAuthClient } from 'google-auth-library';
 
@@ -53,9 +58,14 @@ type ExtractedTransaction = {
   description: string;
   amount: string;
   type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
-  balance: string;
+  balance?: string;
+  check_number?: string;
+  /** Last four of the account the line is on, when one file holds several accounts. */
+  account_last4?: string;
   suggested_offset?: string;
 };
+
+export type StatementAccount = { name?: string; last4?: string };
 
 type InvoiceLineItem = {
   description: string;
@@ -66,11 +76,19 @@ type InvoiceLineItem = {
 };
 
 export type UnifiedResult = {
-  document_type: 'bank_statement' | 'invoice' | 'unknown';
+  document_type: 'bank_statement' | 'credit_card_statement' | 'check_stubs' | 'invoice' | 'unknown';
   // which client business this document belongs to (BILL TO / account holder)
   addressed_to?: string;
-  // bank_statement
+  // bank_statement (credit_card_statement lines arrive as RawCardLine and are
+  // normalized by statementImportService.normalizeCardLines)
   transactions?: ExtractedTransaction[];
+  /** Every account in the file; a bank's PDF often holds checking and savings together. */
+  accounts?: StatementAccount[];
+  // credit_card_statement
+  card_name?: string;
+  card_last4?: string;
+  // check_stubs
+  checks?: ExtractedCheck[];
   // invoice
   invoice_type?: 'ap' | 'ar';
   vendor_customer?: string;
@@ -83,6 +101,14 @@ export type UnifiedResult = {
   line_items?: InvoiceLineItem[];
 };
 
+/** The model ran out of room before finishing the JSON (a very long statement). */
+export class ExtractionTooLongError extends Error {
+  constructor() {
+    super('The document has more lines than can be read in one pass.');
+    this.name = 'ExtractionTooLongError';
+  }
+}
+
 function buildAnthropicClient(): Anthropic {
   const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
   return new Anthropic(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {});
@@ -90,17 +116,29 @@ function buildAnthropicClient(): Anthropic {
 
 // Single Claude call: classify + extract in one pass.
 // If clientContext is provided the AI uses the real chart of accounts instead of a generic fallback list.
-export async function classifyAndExtract(pdfBuffer: Buffer, clientContext?: ClientContext): Promise<UnifiedResult> {
+export type DocumentMediaType = 'application/pdf' | 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+
+export async function classifyAndExtract(
+  pdfBuffer: Buffer,
+  clientContext?: ClientContext,
+  mediaType: DocumentMediaType = 'application/pdf',
+): Promise<UnifiedResult> {
   const client = buildAnthropicClient();
   const base64Pdf = pdfBuffer.toString('base64');
+  // Check stubs are often photographed, so images go in as images.
+  const source = mediaType === 'application/pdf'
+    ? { type: 'document' as const, source: { type: 'base64' as const, media_type: mediaType, data: base64Pdf } }
+    : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType, data: base64Pdf } };
   const accountSection = buildCoaPromptSection(clientContext);
-  const response = await client.messages.create({
+  // Streamed: a month of a busy checking account is ~200 lines, well past what a
+  // non-streaming request may return before it times out.
+  const stream = client.messages.stream({
     model: 'claude-opus-4-5',
-    max_tokens: 4096,
+    max_tokens: 48000,
     messages: [{
       role: 'user',
       content: [
-        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf } },
+        source,
         {
           type: 'text',
           // Deterministic overrides: some things have a right answer (payroll, transfers, capitalizatoin threshold). We hard-code
@@ -123,6 +161,9 @@ If this is a BANK STATEMENT return:
 {
   "document_type": "bank_statement",
   "addressed_to": "exact name of the account holder / company this statement belongs to",
+  "accounts": [
+    { "name": "account name as printed, e.g. Business Checking", "last4": "last four digits of the account number" }
+  ],
   "transactions": [
     {
       "date": "MM/DD/YYYY",
@@ -130,8 +171,45 @@ If this is a BANK STATEMENT return:
       "description": "full transaction description from the statement",
       "amount": "positive number e.g. 1250.00",
       "type": "deposit (money received/inflow), check (outflow paid by physical check), or expense (outflow via card/ACH/wire/cash/EFT)",
-      "balance": "running balance e.g. 42500.00",
+      "check_number": "the check number for a check, e.g. 1042 — omit for anything that is not a check",
+      "account_last4": "last four of the account this line is on — only when the document has more than one account",
       "suggested_offset": "one account name from the chart of accounts above"
+    }
+  ]
+}
+List every account in the document under "accounts" and include every transaction from every account and every page.
+Leave out summary rows (opening/closing balance, totals) and keys you would leave empty.
+
+If this is a CREDIT CARD STATEMENT (a card issuer's statement listing purchases, payments and a new balance) return:
+{
+  "document_type": "credit_card_statement",
+  "addressed_to": "exact name of the cardholder / company this statement belongs to",
+  "card_name": "issuer and card name, e.g. Chase Ink Business Cash",
+  "card_last4": "last four digits of the card or account number, e.g. 1234",
+  "transactions": [
+    {
+      "date": "MM/DD/YYYY (transaction date)",
+      "payee_name": "merchant name only, e.g. Amazon, Shell, Delta Air Lines — omit for payments",
+      "description": "full description from the statement",
+      "amount": "positive number e.g. 89.99",
+      "type": "charge (purchase, fee, interest — adds to the balance), payment (a payment toward the card balance), or refund (return or statement credit)",
+      "suggested_offset": "for a charge or refund: one expense account name from the chart of accounts above; for a payment: the bank account it was paid from, if named"
+    }
+  ]
+}
+
+If these are CHECK STUBS, a CHECK REGISTER, or IMAGES OF WRITTEN CHECKS return:
+{
+  "document_type": "check_stubs",
+  "addressed_to": "the company or account holder writing the checks, if shown",
+  "checks": [
+    {
+      "check_number": "e.g. 1042",
+      "date": "MM/DD/YYYY — if the stub shows no year (e.g. a handwritten 7/1), give MM/DD only; never guess the year",
+      "payee_name": "who the check was made out to",
+      "amount": "positive number e.g. 1250.00",
+      "memo": "what the check was for, from the memo or stub notes",
+      "suggested_account": "one account name from the chart of accounts above that fits what the check paid for"
     }
   ]
 }
@@ -159,12 +237,15 @@ If this is an INVOICE or BILL return:
   ]
 }
 
-If the document is neither a bank statement nor an invoice/bill return:
+If the document is none of these (bank statement, credit card statement, check stubs, invoice/bill) return:
 { "document_type": "unknown" }`,
         },
       ] as Anthropic.MessageParam['content'],
     }],
   });
+
+  const response = await stream.finalMessage();
+  if (response.stop_reason === 'max_tokens') throw new ExtractionTooLongError();
 
   // Defensive parsing: never trust a raw model output. Regex pulls the JSON block out, try/catch, guards against malformed output,
   // and if anything fails we fall back to 'unknown' instead of crashing. "fail safely, not silently", critical for production agents.
@@ -192,6 +273,8 @@ export async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaA
     .select(['id', 'name', 'account_type'])
     .where('business_id', '=', businessId)
     .where('is_active', '=', true)
+    // Not offered to the model: Suspense is the app's answer for "not sure", not the model's.
+    .where(sql<boolean>`coalesce(detail_type, '') <> ${SUSPENSE_DETAIL_TYPE}`)
     .orderBy('account_type')
     .orderBy('name')
     .execute();
@@ -339,7 +422,33 @@ async function processAnyMessage(
   const result = await classifyAndExtract(pdfBuffer, earlyResolution?.ctx);
   const receivedAt = new Date(dateHeader).toISOString();
 
-  if (result.document_type === 'bank_statement') {
+  if (result.document_type === 'check_stubs') {
+    const businessId = earlyResolution?.businessId ?? await resolveByName(db, result.addressed_to);
+    if (!businessId) {
+      console.log(`[gmail-worker] message ${messageId} → check stubs skipped: no business matches "${result.addressed_to ?? ''}"`);
+      return;
+    }
+    const business = await db.selectFrom('businesses').select('firm_id').where('id', '=', businessId).executeTakeFirstOrThrow();
+    await db.transaction().execute(async trx => {
+      const stubs = await saveCheckStubs(trx, systemCtx({ firm_id: business.firm_id, business_id: businessId }), {
+        checks: result.checks ?? [],
+        source_file_id: null,
+        source_filename: subject || null,
+        gmail_message_id: messageId,
+      });
+      console.log(`[gmail-worker] message ${messageId} → ${stubs.length} check stubs for business ${businessId}`);
+    });
+    return;
+  }
+
+  if (result.document_type === 'bank_statement' || result.document_type === 'credit_card_statement') {
+    const statementKind = result.document_type === 'credit_card_statement' ? 'credit_card' as const : 'bank' as const;
+    const accountHint = statementKind === 'credit_card'
+      ? [result.card_name, result.card_last4].filter(Boolean).join(' ') || null
+      : null;
+    if (statementKind === 'credit_card') {
+      result.transactions = normalizeCardLines((result.transactions ?? []) as unknown as RawCardLine[]) as ExtractedTransaction[];
+    }
     const businessId = earlyResolution?.businessId ?? await resolveByName(db, result.addressed_to);
     if (!businessId) {
       const reason = result.addressed_to
@@ -353,11 +462,13 @@ async function processAnyMessage(
         received_at: receivedAt,
         extracted_transactions: JSON.stringify(result.transactions ?? []),
         addressed_to: result.addressed_to ?? null,
+        statement_kind: statementKind,
+        account_hint: accountHint,
         pdf_data: pdfBuffer,
         status: 'rejected',
         rejection_reason: reason,
       }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
-      console.log(`[gmail-worker] message ${messageId} → bank statement auto-rejected: ${reason}`);
+      console.log(`[gmail-worker] message ${messageId} → ${statementKind} statement auto-rejected: ${reason}`);
       return;
     }
     // Reuse CoA already fetched during email routing; only fetch if needed (AI-name fallback path).
@@ -366,19 +477,30 @@ async function processAnyMessage(
       ...tx,
       suggested_account_id: matchAccount(tx.suggested_offset, coa),
     }));
-    await db.insertInto('email_import_staging').values({    // Human-in-the-loop: the agent never writes to the ledger directly.
-      gmail_message_id: messageId,
-      email_from: from,
-      email_subject: subject,
-      received_at: receivedAt,
-      extracted_transactions: JSON.stringify(enrichedTxs),
-      addressed_to: result.addressed_to ?? null,
-      pdf_data: pdfBuffer,
-      business_id: businessId,
-      status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI 
-                            // before anything is commited. This is the guardrail that makes it safe to point AI to financial records.
-    }).onConflict(oc => oc.column('gmail_message_id').doNothing()).execute();
-    console.log(`[gmail-worker] message ${messageId} → bank statement for business ${businessId}: ${enrichedTxs.length} transactions`);
+    // One email can carry several accounts (checking and savings); each is its own statement.
+    const parts = statementKind === 'credit_card'
+      ? [{ account_hint: accountHint, lines: enrichedTxs }]
+      : splitByAccount(enrichedTxs, result.accounts);
+    for (const [n, part] of parts.entries()) {
+      // gmail_message_id is unique: the first part carries it (and marks the email
+      // as seen); the others are linked to it by subject and received time.
+      const inserted = await db.insertInto('email_import_staging').values({    // Human-in-the-loop: the agent never writes to the ledger directly.
+        gmail_message_id: n === 0 ? messageId : null,
+        email_from: from,
+        email_subject: subject,
+        received_at: receivedAt,
+        extracted_transactions: JSON.stringify(part.lines),
+        addressed_to: result.addressed_to ?? null,
+        statement_kind: statementKind,
+        account_hint: part.account_hint,
+        pdf_data: pdfBuffer,
+        business_id: businessId,
+        status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI 
+                              // before anything is commited. This is the guardrail that makes it safe to point AI to financial records.
+      }).onConflict(oc => oc.column('gmail_message_id').doNothing()).returning('id').executeTakeFirst();
+      if (n === 0 && !inserted) return; // this email was already processed
+    }
+    console.log(`[gmail-worker] message ${messageId} → ${parts.length} ${statementKind} statement(s) for business ${businessId}: ${enrichedTxs.length} transactions`);
   } else if (result.document_type === 'invoice') {
     const businessId = earlyResolution?.businessId ?? await resolveByName(db, result.addressed_to);
     if (!businessId) {
@@ -492,11 +614,12 @@ async function pollAllPdfEmails(db: Kysely<DB>, auth: GAuthClient): Promise<void
 
   for (const { id } of messages) {
     if (!id) continue;
-    const [bankSeen, invSeen] = await Promise.all([
+    const [bankSeen, invSeen, stubSeen] = await Promise.all([
       db.selectFrom('email_import_staging').where('gmail_message_id', '=', id).select('id').executeTakeFirst(),
       db.selectFrom('invoice_import_staging').where('gmail_message_id', '=', id).select('id').executeTakeFirst(),
+      db.selectFrom('check_stubs').where('gmail_message_id', '=', id).select('id').executeTakeFirst(),
     ]);
-    if (bankSeen ?? invSeen) continue;
+    if (bankSeen ?? invSeen ?? stubSeen) continue;
     try {
       await processAnyMessage(db, auth, id);
     } catch (e: unknown) {

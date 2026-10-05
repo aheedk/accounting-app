@@ -4,10 +4,20 @@ import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
-import { postJournalEntryBatch } from '../services/core/ledgerService.js';
-import { wrapImportedDepositJournalEntry } from '../services/banking/bankDepositService.js';
-import { wrapImportedExpenseJournalEntry } from '../services/ap/expenseTransactionService.js';
 import { suggestCodingBatch, rememberCoding, learningDecision } from '../services/ai/autoCodingService.js';
+import {
+  cardPaymentSourceAccount,
+  checkNumberOf,
+  findAlreadyRecorded,
+  guessCardAccount,
+  isInflow,
+  postStatementLines,
+  statementDateToIso,
+  type StatementKind,
+  type StatementLine,
+} from '../services/ai/statementImportService.js';
+import { matchStubsToLines } from '../services/ai/checkStubService.js';
+import { findSuspenseAccount, getOrCreateSuspenseAccount } from '../services/core/chartOfAccountsService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
 
@@ -36,7 +46,8 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
       .selectFrom('email_import_staging')
       .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
                'received_at', 'extracted_transactions', 'status', 'addressed_to',
-               'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at', 'source'])
+               'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at', 'source',
+               'statement_kind', 'account_hint'])
       .orderBy('received_at', 'desc');
     // History: this business's own records + any auto-rejected records (no business match)
     // Pending: only this business's own records
@@ -47,30 +58,42 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
         ])).where('status', 'in', ['approved', 'rejected']).limit(100)
       : baseQ.where('business_id', '=', bizId).where('status', '=', 'pending');
     const rows = await q.execute();
-    const imports = rows.map(r => ({
+    const imports: StagedImportRow[] = rows.map(r => ({
       ...r,
       extracted_transactions: (typeof r.extracted_transactions === 'string'
         ? JSON.parse(r.extracted_transactions) as unknown
         : r.extracted_transactions) as StagedTransaction[],
+      suggested_statement_account_id: null,
     }));
 
     // Resolve auto-coding suggestions for everything still awaiting review.
     // History rows are already decided, so there is nothing to suggest.
-    if (!history) await attachSuggestions(ctx(req), imports);
+    if (!history) {
+      await attachSuggestions(ctx(req), imports);
+      await attachCardContext(bizId, imports);
+      await attachCheckStubs(bizId, imports);
+      await attachSuspense(ctx(req), bizId, imports);
+    }
 
     res.json({ imports });
   } catch (e) { next(e); }
 });
 
-type StagedTransaction = {
-  description?: string;
-  amount?: string;
-  type?: 'debit' | 'credit';
-  suggested_offset?: string;
-  suggested_account_id?: string;
+type StagedTransaction = StatementLine & {
   suggestion?: { confidence: number; band: string; source_layer: string } | null;
-  /** Already posted by the auto-post pass; not reviewable again. */
-  auto_posted?: boolean;
+  /** A check stub that describes this check (bank statements only). */
+  check_stub?: {
+    id: string; check_number: string | null; payee_name: string | null; memo: string | null;
+    amount: string; check_date: string | null; suggested_account_id: string | null;
+  } | null;
+};
+
+type StagedImportRow = {
+  statement_kind: StatementKind;
+  account_hint: string | null;
+  extracted_transactions: StagedTransaction[];
+  /** The card account a credit card statement most likely belongs to. */
+  suggested_statement_account_id: string | null;
 };
 
 /**
@@ -80,7 +103,7 @@ type StagedTransaction = {
  */
 async function attachSuggestions(
   serviceCtx: ServiceCtx,
-  imports: Array<{ extracted_transactions: StagedTransaction[] }>,
+  imports: StagedImportRow[],
 ): Promise<void> {
   const flat = imports.flatMap(row => row.extracted_transactions ?? []);
   if (flat.length === 0) return;
@@ -88,7 +111,7 @@ async function attachSuggestions(
   const suggestions = await suggestCodingBatch(db, serviceCtx, flat.map(tx => ({
     description: tx.description ?? '',
     amount: `${Math.abs(Number(tx.amount ?? 0))}`,
-    direction: tx.type === 'credit' ? 'credit' as const : 'debit' as const,
+    direction: isInflow(tx) ? 'credit' as const : 'debit' as const,
     ai_suggested_account: tx.suggested_offset ?? null,
   })));
 
@@ -104,6 +127,53 @@ async function attachSuggestions(
       source_layer: suggestion.source_layer,
     };
   });
+}
+
+/**
+ * Card statements: which card they belong to, and where each payment came
+ * from. The engine's credit-card-payment rule points a payment at the card,
+ * which is this statement's own account, so a card payment is pointed at the
+ * bank account it was paid from instead.
+ */
+async function attachCardContext(businessId: string, imports: StagedImportRow[]): Promise<void> {
+  for (const row of imports) {
+    if (row.statement_kind !== 'credit_card') continue;
+    row.suggested_statement_account_id = await guessCardAccount(db, businessId, row.account_hint);
+    for (const tx of row.extracted_transactions) {
+      if (tx.card_type !== 'payment' || tx.auto_posted) continue;
+      const source = await cardPaymentSourceAccount(db, businessId, tx.description ?? '');
+      if (!source) { delete tx.suggested_account_id; tx.suggestion = null; continue; }
+      tx.suggested_account_id = source.account_id;
+      const confidence = source.confident ? 90 : 72;
+      tx.suggestion = { confidence, band: confidence >= 90 ? 'preselected' : 'suggested', source_layer: 'accounting_rule' };
+    }
+  }
+}
+
+/** Bank statements: pair check lines with uploaded check stubs, and let a stub's category lead. */
+async function attachCheckStubs(businessId: string, imports: StagedImportRow[]): Promise<void> {
+  for (const row of imports) {
+    if (row.statement_kind !== 'bank') continue;
+    const matches = await matchStubsToLines(db, businessId, row.extracted_transactions.map((tx, index) => ({
+      index,
+      check_number: checkNumberOf(tx),
+      amount: tx.amount,
+      date: statementDateToIso(tx.date ?? ''),
+      is_check: !isInflow(tx) && tx.type === 'check',
+    })));
+    for (const [index, stub] of matches) {
+      const tx = row.extracted_transactions[index];
+      if (!tx || tx.auto_posted) continue;
+      tx.check_stub = {
+        id: stub.id, check_number: stub.check_number, payee_name: stub.payee_name, memo: stub.memo,
+        amount: stub.amount, check_date: stub.check_date, suggested_account_id: stub.suggested_account_id,
+      };
+      if (stub.suggested_account_id) {
+        tx.suggested_account_id = stub.suggested_account_id;
+        tx.suggestion = { confidence: 88, band: 'suggested', source_layer: 'check_stub' };
+      }
+    }
+  }
 }
 
 // Combined pending count for both bank statements + invoices — used by the sidebar badge
@@ -148,6 +218,7 @@ router.get(
 );
 
 const approveSchema = z.object({
+  /** The statement's own account: the bank account, or the card for a card statement. */
   bank_account_id: z.string().uuid(),
   transactions: z.array(z.object({
     index: z.number().int().min(0),
@@ -157,10 +228,31 @@ const approveSchema = z.object({
     remember: z.boolean().optional(),
     /** Payee / vendor name edited by the reviewer. */
     payee_name: z.string().optional(),
+    /** A check stub the reviewer accepted for this check. */
+    check_stub_id: z.string().uuid().nullable().optional(),
   })),
 });
 
+function parseLines(raw: unknown): StatementLine[] {
+  return (typeof raw === 'string' ? JSON.parse(raw) : raw) as StatementLine[];
+}
+
 // Approve: post each included transaction as a journal entry
+/**
+ * Whatever is still uncoded waits in Suspense instead of blocking the
+ * statement. Runs last: every real suggestion (engine, card, stub) wins.
+ */
+async function attachSuspense(serviceCtx: ServiceCtx, businessId: string, imports: StagedImportRow[]): Promise<void> {
+  const uncoded = imports.flatMap(row => row.extracted_transactions)
+    .filter(tx => !tx.auto_posted && !tx.suggested_account_id);
+  if (uncoded.length === 0) return;
+  const suspense = await db.transaction().execute(trx => getOrCreateSuspenseAccount(trx, serviceCtx, businessId));
+  for (const tx of uncoded) {
+    tx.suggested_account_id = suspense.id;
+    tx.suggestion = { confidence: 0, band: 'unclassified', source_layer: 'suspense' };
+  }
+}
+
 router.post(
   '/businesses/:businessId/email-imports/:importId/approve',
   requireMinRole('accountant'),
@@ -179,99 +271,40 @@ router.post(
 
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
-      type RawTx = {
-        date: string; payee_name?: string; description: string; amount: string;
-        type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit'; balance: string; auto_posted?: boolean;
-      };
-      const transactions: RawTx[] = (typeof staged.extracted_transactions === 'string'
-        ? JSON.parse(staged.extracted_transactions)
-        : staged.extracted_transactions) as RawTx[];
-
+      const transactions = parseLines(staged.extracted_transactions);
       const included = body.transactions.filter(t => t.include);
-
-      // Build all journal entry inputs up-front, then post as a single batch.
-      // This reduces DB round-trips from ~8N to ~8 for N transactions.
-      type RawTxWithItem = { tx: RawTx; item: typeof included[0] };
-      const pairs: RawTxWithItem[] = [];
-      for (const item of included) {
-        const tx = transactions[item.index];
-        // Rows the auto-post pass already committed must not post twice.
-        if (tx && !tx.auto_posted) pairs.push({ tx, item });
-      }
-
-      const jeInputs = pairs.map(({ tx, item }) => {
-        const amt = parseFloat(tx.amount).toFixed(2);
-        const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
-        const txType = isDeposit ? 'deposit' : tx.type === 'check' ? 'check' : 'expense';
-        const [m, d, y] = tx.date.split('/');
-        const entryDate = `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`;
-        return {
-          business_id: bizId,
-          entry_date: entryDate,
-          source_type: 'bank_import' as const,
-          transaction_type: txType,
-          source_id: staged.id,
-          memo: tx.description,
-          payee_name: isDeposit ? null : (item.payee_name?.trim() || tx.payee_name || null),
-          lines: [
-            {
-              account_id: body.bank_account_id,
-              debit: isDeposit ? amt : '0.00',
-              credit: isDeposit ? '0.00' : amt,
-              memo: tx.description,
-            },
-            {
-              account_id: item.offset_account_id,
-              debit: isDeposit ? '0.00' : amt,
-              credit: isDeposit ? amt : '0.00',
-              memo: tx.description,
-            },
-          ],
-        };
-      });
 
       // Recompute the suggestions server-side rather than trusting what the
       // client says was suggested -- this decides what gets learned.
       const suggestions = await suggestCodingBatch(db, serviceCtx, transactions.map(tx => ({
         description: tx.description ?? '',
         amount: `${Math.abs(Number(tx.amount ?? 0))}`,
-        direction: (tx.type === 'credit' || tx.type === 'deposit') ? 'credit' as const : 'debit' as const,
+        direction: isInflow(tx) ? 'credit' as const : 'debit' as const,
       })));
 
-      const posted = jeInputs.length;
+      // Parking a line in Suspense says nothing about the vendor.
+      const suspenseId = (await findSuspenseAccount(db, bizId))?.id ?? null;
       let learned = 0;
-      await db.transaction().execute(async trx => {
-        const createdJEs = await postJournalEntryBatch(trx, serviceCtx, jeInputs);
+      const created = await db.transaction().execute(async trx => {
+        const entryIds = await postStatementLines(trx, serviceCtx, {
+          staging_id: staged.id,
+          statement_kind: staged.statement_kind,
+          lines: transactions,
+          account_id: body.bank_account_id,
+          items: included.map(item => ({
+            index: item.index,
+            offset_account_id: item.offset_account_id,
+            payee_name: item.payee_name ?? null,
+            check_stub_id: item.check_stub_id ?? null,
+          })),
+        });
 
-        for (let i = 0; i < pairs.length; i++) {
-          const { tx, item } = pairs[i]!;
-          const je = createdJEs[i];
-          if (!je) continue;
-          const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
-          if (isDeposit) {
-            await wrapImportedDepositJournalEntry(trx, serviceCtx, {
-              journal_entry_id: je.id,
-              chart_account_id: body.bank_account_id,
-              offset_account_id: item.offset_account_id,
-              entry_date: jeInputs[i]!.entry_date,
-              description: tx.description,
-              amount: parseFloat(tx.amount).toFixed(2),
-            });
-          } else {
-            await wrapImportedExpenseJournalEntry(trx, serviceCtx, {
-              journal_entry_id: je.id,
-              payment_account_id: body.bank_account_id,
-              category_account_id: item.offset_account_id,
-              payment_method: tx.type === 'check' ? 'check' : 'other',
-              entry_date: jeInputs[i]!.entry_date,
-              description: tx.description,
-              payee_name: item.payee_name?.trim() || tx.payee_name || null,
-              amount: parseFloat(tx.amount).toFixed(2),
-            });
-          }
-        }
-
-        for (const { tx, item } of pairs) {
+        for (let i = 0; i < included.length; i += 1) {
+          const item = included[i]!;
+          const tx = transactions[item.index];
+          // Only lines this approval actually posted teach the engine; card
+          // payments say nothing about a vendor.
+          if (!tx || !entryIds[i] || tx.card_type === 'payment' || item.offset_account_id === suspenseId) continue;
           const suggestion = suggestions[item.index] ?? null;
           const decision = learningDecision({
             suggestedAccountId: suggestion?.lines[0]?.account_id ?? null,
@@ -281,18 +314,18 @@ router.post(
           });
           if (!decision) continue;
 
-          const amt = parseFloat(tx.amount).toFixed(4);
-          const isDeposit = tx.type === 'credit';
+          const amt = Number(tx.amount).toFixed(4);
+          const inflow = isInflow(tx);
           await rememberCoding(trx, serviceCtx, {
             description: tx.description,
-            direction: isDeposit ? 'credit' : 'debit',
+            direction: inflow ? 'credit' : 'debit',
             // Client-wide: the prompt says "future <vendor> transactions",
             // not "future transactions on this bank account".
             bank_account_id: null,
             lines: [{
               account_id: item.offset_account_id,
-              debit: isDeposit ? '0.0000' : amt,
-              credit: isDeposit ? amt : '0.0000',
+              debit: inflow ? '0.0000' : amt,
+              credit: inflow ? amt : '0.0000',
               memo: null,
             }],
             was_correction: decision.wasCorrection,
@@ -310,9 +343,41 @@ router.post(
           })
           .where('id', '=', staged.id)
           .execute();
+        return entryIds;
       });
 
-      res.json({ ok: true, posted, learned });
+      res.json({ ok: true, posted: created.filter(Boolean).length, learned });
+    } catch (e) { next(e); }
+  },
+);
+
+const alreadyRecordedSchema = z.object({
+  bank_account_id: z.string().uuid(),
+  lines: z.array(z.object({ index: z.number().int().min(0), offset_account_id: z.string().uuid() })),
+});
+
+/**
+ * Lines whose money movement is already in the books from another document
+ * (a card payment on both statements, a transfer on both bank statements).
+ */
+router.post(
+  '/businesses/:businessId/email-imports/:importId/already-recorded',
+  async (req, res, next) => {
+    try {
+      const body = alreadyRecordedSchema.parse(req.body);
+      const staged = await db.selectFrom('email_import_staging')
+        .select(['id', 'extracted_transactions'])
+        .where('id', '=', req.params['importId']!)
+        .where('business_id', '=', req.tenancy!.business_id)
+        .executeTakeFirst();
+      if (!staged) { res.status(404).json({ error: 'Import not found' }); return; }
+      const matches = await findAlreadyRecorded(db, ctx(req), {
+        staging_id: staged.id,
+        account_id: body.bank_account_id,
+        lines: parseLines(staged.extracted_transactions),
+        offsets: body.lines,
+      });
+      res.json({ matches });
     } catch (e) { next(e); }
   },
 );
@@ -358,26 +423,21 @@ router.post(
         .executeTakeFirst();
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
-      type AutoTx = {
-        date: string; payee_name?: string; description: string; amount: string;
-        type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit'; balance: string; auto_posted?: boolean;
-      };
-      const transactions: AutoTx[] = (typeof staged.extracted_transactions === 'string'
-        ? JSON.parse(staged.extracted_transactions)
-        : staged.extracted_transactions) as AutoTx[];
+      const transactions = parseLines(staged.extracted_transactions);
 
       const suggestions = await suggestCodingBatch(db, serviceCtx, transactions.map(tx => ({
         description: tx.description ?? '',
         amount: `${Math.abs(Number(tx.amount ?? 0))}`,
-        direction: (tx.type === 'credit' || tx.type === 'deposit') ? 'credit' as const : 'debit' as const,
+        direction: isInflow(tx) ? 'credit' as const : 'debit' as const,
       })));
 
       const confident = transactions.flatMap((tx, index) => {
-        if (tx.auto_posted) return [];
+        // A card payment's suggestion points at the card itself; never auto-post it.
+        if (tx.auto_posted || tx.card_type === 'payment') return [];
         const suggestion = suggestions[index];
         if (!suggestion || suggestion.band !== 'auto_post') return [];
         const accountId = suggestion.lines[0]?.account_id;
-        return accountId ? [{ tx, index, accountId }] : [];
+        return accountId && accountId !== body.bank_account_id ? [{ tx, index, accountId }] : [];
       });
 
       if (confident.length === 0) {
@@ -385,75 +445,21 @@ router.post(
         return;
       }
 
-      const jeInputs = confident.map(({ tx, accountId }) => {
-        const amt = parseFloat(tx.amount).toFixed(2);
-        const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
-        const txType = isDeposit ? 'deposit' : tx.type === 'check' ? 'check' : 'expense';
-        const [m, d, y] = tx.date.split('/');
-        return {
-          business_id: bizId,
-          entry_date: `${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}`,
-          source_type: 'bank_import' as const,
-          transaction_type: txType,
-          source_id: staged.id,
-          memo: tx.description,
-          payee_name: (!isDeposit && tx.payee_name) ? tx.payee_name : null,
-          lines: [
-            {
-              account_id: body.bank_account_id,
-              debit: isDeposit ? amt : '0.00',
-              credit: isDeposit ? '0.00' : amt,
-              memo: tx.description,
-            },
-            {
-              account_id: accountId,
-              debit: isDeposit ? '0.00' : amt,
-              credit: isDeposit ? amt : '0.00',
-              memo: tx.description,
-            },
-          ],
-        };
-      });
-
-      for (const { index } of confident) transactions[index]!.auto_posted = true;
-      const remaining = transactions.filter(t => !t.auto_posted).length;
-
       await db.transaction().execute(async trx => {
-        const createdJEs = await postJournalEntryBatch(trx, serviceCtx, jeInputs);
-
-        for (let i = 0; i < confident.length; i++) {
-          const { tx, accountId } = confident[i]!;
-          const je = createdJEs[i];
-          if (!je) continue;
-          const isDeposit = tx.type === 'deposit' || tx.type === 'credit';
-          if (isDeposit) {
-            await wrapImportedDepositJournalEntry(trx, serviceCtx, {
-              journal_entry_id: je.id,
-              chart_account_id: body.bank_account_id,
-              offset_account_id: accountId,
-              entry_date: jeInputs[i]!.entry_date,
-              description: tx.description,
-              amount: parseFloat(tx.amount).toFixed(2),
-            });
-          } else {
-            await wrapImportedExpenseJournalEntry(trx, serviceCtx, {
-              journal_entry_id: je.id,
-              payment_account_id: body.bank_account_id,
-              category_account_id: accountId,
-              payment_method: tx.type === 'check' ? 'check' : 'other',
-              entry_date: jeInputs[i]!.entry_date,
-              description: tx.description,
-              payee_name: tx.payee_name?.trim() || null,
-              amount: parseFloat(tx.amount).toFixed(2),
-            });
-          }
-        }
-
+        await postStatementLines(trx, serviceCtx, {
+          staging_id: staged.id,
+          statement_kind: staged.statement_kind,
+          lines: transactions,
+          account_id: body.bank_account_id,
+          items: confident.map(({ index, accountId }) => ({ index, offset_account_id: accountId })),
+        });
+        for (const { index } of confident) transactions[index]!.auto_posted = true;
+        const remainingNow = transactions.filter(t => !t.auto_posted).length;
         await trx.updateTable('email_import_staging')
           .set({
             extracted_transactions: JSON.stringify(transactions),
             // Nothing left to review means the document is done.
-            ...(remaining === 0 ? {
+            ...(remainingNow === 0 ? {
               status: 'approved',
               approved_by_user_id: serviceCtx.user_id,
               approved_at: new Date().toISOString(),
@@ -462,6 +468,7 @@ router.post(
           .where('id', '=', staged.id)
           .execute();
       });
+      const remaining = transactions.filter(t => !t.auto_posted).length;
 
       res.json({ ok: true, posted: confident.length, remaining });
     } catch (e) { next(e); }

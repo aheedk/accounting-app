@@ -642,7 +642,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
       {notice && <p className="px-6 pb-2 text-sm text-emerald-700">{notice}</p>}
 
-      <div className="sticky bottom-0 flex items-center gap-3 border-t bg-background px-6 py-3">
+      <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
         <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
           {readOnly ? 'Back' : 'Cancel'}
         </Button>
@@ -677,9 +677,6 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
 
         {!readOnly && (
           <div className="ml-auto flex items-center gap-2">
-            <Button type="button" disabled={!canSave} onClick={() => { void save('detail'); }}>
-              {busy ? 'Saving…' : 'Save'}
-            </Button>
             <div className="relative flex" ref={saveMenuRef}>
               <Button
                 type="button"

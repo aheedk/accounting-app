@@ -18,9 +18,11 @@ function parseOptions(children: React.ReactNode): OptionData[] {
     if (!React.isValidElement(child)) return;
     if (child.type === 'option') {
       const p = child.props as { value?: string; children?: React.ReactNode; disabled?: boolean };
+      const label = childrenToText(p.children);
       opts.push({
-        value: String(p.value ?? ''),
-        label: childrenToText(p.children),
+        // Like a native <select>: an <option> without a value uses its text.
+        value: String(p.value ?? label),
+        label,
         disabled: p.disabled,
       });
     } else if (child.type === 'optgroup') {

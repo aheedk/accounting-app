@@ -21,7 +21,7 @@ export type CreateDraftCreditMemoInput = {
 
 export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateDraftCreditMemoInput) {
   if (parseFloat(input.amount) <= 0) throw new PreconditionError('amount must be > 0');
-  const ar = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, '1100');
+  const ar = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, 'accounts_receivable');
   const sequence = await nextCounter(trx, input.business_id, 'credit_memo');
   const row = await trx.insertInto('credit_memos').values({
     business_id: input.business_id, customer_id: input.customer_id,

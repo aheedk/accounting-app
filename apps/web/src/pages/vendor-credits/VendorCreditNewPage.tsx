@@ -142,7 +142,7 @@ function VendorCreditNewPage() {
       </CardContent></Card>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
+      <div className="flex items-center gap-2 sticky -bottom-4 z-10 lg:-bottom-6 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/ap/vendor-credits')}>Cancel</Button>
         <div className="flex-1" />
         <SaveButtons save={save} busy={busy} />

@@ -167,7 +167,7 @@ function PaymentNewPage() {
             <div><Label className="text-xs text-muted-foreground">{form.payment_method === 'check' ? 'Check no.' : 'Reference no.'}</Label><Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder={form.payment_method === 'check' ? 'e.g. 1042' : 'Transaction ID, confirmation #, etc.'} /></div>
             <div><Label className="text-xs text-muted-foreground">Payment method</Label>
               <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
-                {['cash', 'check', 'ach', 'wire', 'card', 'other'].map(m => <option key={m}>{m}</option>)}
+                {[['cash', 'Cash'], ['check', 'Check'], ['ach', 'ACH'], ['wire', 'Wire'], ['card', 'Card'], ['other', 'Other']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </AppSelect>
             </div>
             <div><Label className="text-xs text-muted-foreground">Deposit to</Label>
@@ -254,7 +254,7 @@ function PaymentNewPage() {
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex items-center gap-2 sticky bottom-0 border-t bg-background py-3">
+      <div className="flex items-center gap-2 sticky -bottom-4 z-10 lg:-bottom-6 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav('/payments')}>Cancel</Button>
         <div className="flex-1" />
         <SaveButtons save={save} busy={busy} />

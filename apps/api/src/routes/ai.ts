@@ -30,6 +30,8 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
  * Upload a PDF directly instead of emailing it in. Same extraction path as the
  * Gmail worker; the open business is the client, so no addressee resolution.
  */
+const UPLOAD_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] as const;
+
 router.post(
   '/businesses/:businessId/ai/documents',
   requireMinRole('accountant'),
@@ -42,15 +44,18 @@ router.post(
         });
         return;
       }
-      if (req.file.mimetype !== 'application/pdf') {
+      // Images are accepted for photographed check stubs and receipts.
+      const mediaType = UPLOAD_TYPES.find(type => type === req.file!.mimetype);
+      if (!mediaType) {
         res.status(400).json({
-          error: { code: 'VALIDATION_FAILED', message: 'only PDF documents are supported' },
+          error: { code: 'VALIDATION_FAILED', message: 'Upload a PDF or an image (PNG, JPEG, WebP).' },
         });
         return;
       }
       const result = await ingestUploadedPdf(db, ctxFromReq(req), {
         buffer: req.file.buffer,
         filename: req.file.originalname,
+        media_type: mediaType,
       });
       res.status(201).json(result);
     } catch (e) { next(e); }

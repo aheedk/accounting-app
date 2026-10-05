@@ -1,5 +1,7 @@
 # QBO Chart of Accounts parity — 2026-07-20 (main)
 
+> Kept as the Chart of Accounts design record: it started as the change log for the 2026-07-20 parity work and is the only place its decisions are written down.
+
 Rebuilds **Chart of Accounts** to mirror the QuickBooks Online CoA list
 (user-supplied screenshot as the visual reference) and adds the account
 **register** view behind QBO's "View register" action.
@@ -65,8 +67,8 @@ prod schema strips the fields (account still created, no JE).
   grid — Number and Name become inputs on every visible row (drafts keyed by
   id survive paging/filtering), checkbox + Action columns hide, Cancel/Save
   replace the tool cluster. Save PATCHes only changed rows and reports
-  per-row failures inline; system and locked rows render read-only with a
-  lock glyph. Create-drawer Lock toggle now maps to `is_locked` (was
+  per-row failures inline; locked rows render read-only with a lock glyph
+  (system rows are editable since 2026-10-04). Create-drawer Lock toggle now maps to `is_locked` (was
   inactive).
 
 ## Unification with the parallel `origin/main` implementation (API layer — still current)
@@ -113,8 +115,8 @@ and deployed to Railway while this work was in flight. The merge unifies them:
   - Row actions: **View register** + chevron menu (**Edit**, **Make
     inactive/active**, **Run report** → register). Edit opens a right-side
     drawer (name, number, **sub-account-of** picker — same type, self and
-    descendants excluded to stay acyclic — and an **Active** checkbox; type
-    immutable; disabled for system accounts).
+    descendants excluded to stay acyclic — and an **Active** checkbox). Every
+    field is editable since 2026-10-04: see "Editing an account" below.
   - **Status** column (Active/Inactive badges) is a gear option, on by
     default; names indent by sub-account depth.
   - QBO pager (`‹ Previous 1-75 Next ›`), client-side.
@@ -142,8 +144,9 @@ and deployed to Railway while this work was in flight. The merge unifies them:
   for the account, ascending, with running balance in natural sign;
   tenancy-checked (404 for foreign accounts).
 - **`PATCH /businesses/:id/coa/:accountId`** now accepts **`code`**
-  (renumbering): duplicate-code check per business, blocked for system
-  accounts. `accountUpdateSchema` extended in `packages/shared`.
+  (renumbering): duplicate-code check per business, allowed for system
+  accounts since 2026-10-04 (they are found by `system_key`), and
+  **`account_type`**. `accountUpdateSchema` extended in `packages/shared`.
 - **`listBankAccounts`** now returns **`bank_balance`** per bank account
   (sum of `bank_transactions.amount` where status ≠ `excluded`).
 
@@ -173,3 +176,31 @@ period-correct. The register shows both legs (voided leg badged "Voided").
    schema.
 2. After deploy: verify View register on an active account, renumber a
    non-system account, and check Bank balance appears for linked accounts.
+
+## Editing an account (2026-10-04)
+
+Meeting request: "the edit-account screen should allow changing every field,
+including the account number."
+
+- **The edit drawer** shows Number, Name, Account type, Detail type,
+  Subaccount/parent and Description, all editable. Opening balance is not on
+  it: once posted, an opening balance is a journal entry and is changed there,
+  as in QuickBooks.
+- **System accounts** (Cash on Hand, Operating Bank Account, Accounts
+  Receivable, Accounts Payable, Sales Tax Payable, Retained Earnings,
+  Suspense) can be renumbered, renamed, moved under a parent and described.
+  The app used to find them by number (`getSystemAccount(..., '1100')`), which
+  is why renumbering was blocked. Migration `0083` adds
+  `chart_of_accounts.system_key` (`accounts_receivable`, `accounts_payable`,
+  `operating_bank`, `suspense`...), set on existing rows and by a
+  `BEFORE INSERT` trigger for new ones; `getSystemAccount` and
+  `findSuspenseAccount` look up by key. Their type and detail type stay fixed,
+  and they still cannot be made inactive.
+- **Changing the account type** (non-system accounts) is allowed, with
+  checks: an account with subaccounts must have them moved first; a
+  subaccount must keep its parent's type (or leave the parent in the same
+  edit); an account linked to a bank or card account stays an asset or a
+  liability. A detail type that does not belong to the new type is cleared.
+  The drawer warns when the account has a balance, since the balance and its
+  history move to another report.
+- **Batch edit** allows renumbering and renaming system accounts too.

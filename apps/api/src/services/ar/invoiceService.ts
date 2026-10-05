@@ -50,7 +50,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     .executeTakeFirst();
   if (dup) throw new BusinessRuleError(ERR.DUPLICATE_RESOURCE, `Invoice ${input.invoice_number} already exists`);
 
-  const arAccount = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, '1100');
+  const arAccount = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, 'accounts_receivable');
 
   let subtotalSum = '0.0000';
   let taxSum = '0.0000';

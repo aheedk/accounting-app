@@ -35,7 +35,7 @@ accounting-app/
 ├── db/
 │   ├── migrations/         Plain SQL files, ordered (e.g. 0001_init.sql)
 │   └── seeds/              SQL seeds (one firm, default COA, demo businesses)
-├── docs/superpowers/specs/ Design docs (this file)
+├── docs/specs/            Design docs (this file)
 └── .github/workflows/      CI: typecheck + unit + integration (ephemeral Postgres via service container)
 ```
 

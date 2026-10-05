@@ -10,7 +10,14 @@ export type CodingLayerId =
   | 'accounting_rule'
   | 'vendor_default'
   | 'history'
-  | 'ai';
+  | 'ai'
+  // Not an engine layer: a check stub uploaded by the client described the check.
+  | 'check_stub'
+  // Not an engine layer: nothing reached "suggested", so the line waits in Suspense.
+  | 'suspense';
+
+/** How the Suspense account is recognised (its name and code can differ per client). */
+export const SUSPENSE_DETAIL_TYPE = 'Suspense';
 
 /** Default capitalization threshold; overridden per business. */
 export const DEFAULT_CAPITALIZATION_THRESHOLD = 2500;
@@ -88,6 +95,8 @@ export const CODING_LAYERS: readonly CodingLayer[] = [
   { id: 'vendor_default', label: 'Vendor default account' },
   { id: 'history', label: 'Prior coding history' },
   { id: 'ai', label: 'AI confidence' },
+  { id: 'check_stub', label: 'Check stub' },
+  { id: 'suspense', label: 'Not sure: parked in Suspense' },
 ] as const;
 
 export type ConfidenceBand = 'auto_post' | 'preselected' | 'suggested' | 'unclassified';

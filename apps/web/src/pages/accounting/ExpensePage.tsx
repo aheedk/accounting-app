@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
+import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { AppSelect } from '@/components/ui/select';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
@@ -339,6 +340,16 @@ export default function ExpensePage() {
   const attachments = useAttachments('expense_transaction', isNew ? null : (id ?? null));
 
   const paymentAccounts = accounts.filter(a => a.account_type === 'asset' || a.account_type === 'liability');
+  // Any account can be a category, but expenses are what you usually want, so they lead
+  // (the list was opening on Cash on Hand with the expense accounts 25 rows down).
+  const categoryAccounts = [
+    ...accounts.filter(a => a.account_type === 'expense'),
+    ...accounts.filter(a => a.account_type !== 'expense'),
+  ];
+  const addAccount = useAddAccount(accounts, account => {
+    setAccounts(prev => [...prev, account]);
+    if (bizId) invalidateReferenceCache(`/businesses/${bizId}/coa`);
+  });
 
   const load = useCallback(async () => {
     if (!bizId) return;
@@ -648,6 +659,7 @@ export default function ExpensePage() {
                 disabled={!canEdit}
                 placeholder="Choose an account"
                 className="w-56"
+                {...(canEdit ? { onCreate: () => addAccount.open({ accountType: 'asset', onPick: setPaymentAccountId }) } : {})}
               />
               {selectedPaymentAccount && bookBalance !== null && (
                 <span className="text-sm text-muted-foreground">Balance {fmtMoney(bookBalance)}</span>
@@ -665,8 +677,8 @@ export default function ExpensePage() {
             </AppSelect>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Ref no.</label>
-            <Input value={reference} onChange={e => setReference(e.target.value)} disabled={!canEdit} className="w-32" />
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">{paymentMethod === 'check' ? 'Check no.' : 'Ref no.'}</label>
+            <Input value={reference} onChange={e => setReference(e.target.value)} disabled={!canEdit} className="w-32" placeholder={paymentMethod === 'check' ? 'e.g. 1042' : undefined} />
           </div>
         </div>
         <div className="text-right">
@@ -698,12 +710,13 @@ export default function ExpensePage() {
                     <td className="px-2 py-1.5 text-xs text-muted-foreground">{idx + 1}</td>
                     <td className="px-2 py-1.5">
                       <AccountSelect
-                        accounts={accounts}
+                        accounts={categoryAccounts}
                         value={line.category_account_id}
                         onChange={v => updateLine(idx, 'category_account_id', v)}
                         disabled={!canEdit}
                         className="w-full"
                         placeholder="Choose a category"
+                        {...(canEdit ? { onCreate: () => addAccount.open({ accountType: 'expense', onPick: id => updateLine(idx, 'category_account_id', id) }) } : {})}
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -774,7 +787,7 @@ export default function ExpensePage() {
       {err && <p className="px-6 pb-2 text-sm text-destructive">{err}</p>}
 
       {/* ── Sticky bottom bar ── */}
-      <div className="sticky bottom-0 flex items-center gap-3 border-t bg-background px-6 py-3">
+      <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
         <Button type="button" variant="outline" onClick={() => nav('/accounting/expense-transactions')}>
           Cancel
         </Button>
@@ -870,6 +883,8 @@ export default function ExpensePage() {
           </div>
         )}
       </div>
+
+      {addAccount.drawer}
 
       {recurringOpen && bizId && (
         <RecurringDialog

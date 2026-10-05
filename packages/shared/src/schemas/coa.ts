@@ -22,9 +22,11 @@ export const accountCreateSchema = z.object({
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 
 export const accountUpdateSchema = z.object({
-  // Same constraints as create; renumbering accounts is allowed for non-system accounts (QBO parity).
+  // Same constraints as create. Every account can be renumbered and renamed (system
+  // accounts are found by system_key, not by number); type changes are checked by the service.
   code: z.string().min(1).max(20).regex(/^[A-Za-z0-9._-]+$/).optional(),
   name: z.string().min(1).max(120).optional(),
+  account_type: accountTypeEnum.optional(),
   parent_id: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional(),
   detail_type: z.string().max(80).nullable().optional(),

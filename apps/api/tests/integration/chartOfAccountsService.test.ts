@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, makeAccount, seedCoa, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, makeAccount, makeBankAccount, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import * as coa from '../../src/services/core/chartOfAccountsService.js';
 import * as ledger from '../../src/services/core/ledgerService.js';
 import { ERR } from '@accounting/shared';
@@ -57,13 +57,18 @@ describe('chartOfAccountsService', () => {
     ).rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
   });
 
-  it('updateAccount on a system account: forbids renaming and deactivating', async () => {
+  it('updateAccount on a system account: renames freely, but type, detail type and deactivating are blocked', async () => {
     const { biz, ctx } = await setup(t);
     await t.db.transaction().execute(trx => coa.seedDefaultCoa(trx, ctx, { business_id: biz.id }));
     const ar = await t.db.selectFrom('chart_of_accounts').selectAll().where('code', '=', '1100').executeTakeFirstOrThrow();
+    const renamed = await t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { name: 'Trade Receivables' } }));
+    expect(renamed.name).toBe('Trade Receivables');
     await expect(
-      t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { name: 'NEW NAME' } })),
-    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+      t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { account_type: 'expense' } })),
+    ).rejects.toThrow(/account type cannot change/);
+    await expect(
+      t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { detail_type: 'Inventory' } })),
+    ).rejects.toThrow(/detail type cannot change/);
     // The ledger needs AP/AR to post bills and invoices, so deactivating a
     // system account is blocked rather than breaking posting later.
     await expect(
@@ -163,14 +168,14 @@ describe('chartOfAccountsService', () => {
   it('getSystemAccount: returns the correct system account', async () => {
     const { biz, ctx } = await setup(t);
     await t.db.transaction().execute(trx => coa.seedDefaultCoa(trx, ctx, { business_id: biz.id }));
-    const ar = await coa.getSystemAccount(t.db, biz.id, '1100');
+    const ar = await coa.getSystemAccount(t.db, biz.id, 'accounts_receivable');
     expect(ar.is_system).toBe(true);
     expect(ar.code).toBe('1100');
   });
 
-  it('getSystemAccount: throws NOT_FOUND for an unknown code', async () => {
+  it('getSystemAccount: throws NOT_FOUND when the business has no such account', async () => {
     const { biz } = await setup(t);
-    await expect(coa.getSystemAccount(t.db, biz.id, '9999')).rejects.toMatchObject({ code: ERR.NOT_FOUND });
+    await expect(coa.getSystemAccount(t.db, biz.id, 'accounts_payable')).rejects.toMatchObject({ code: ERR.NOT_FOUND });
   });
 
   // ── QBO parity: account renumbering ──────────────────────────────────────
@@ -197,16 +202,55 @@ describe('chartOfAccountsService', () => {
     ).rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
   });
 
-  it('updateAccount: system account code change rejected', async () => {
+  it('updateAccount: a system account can be renumbered and is still found by what it is', async () => {
     const { biz, ctx } = await setup(t);
     await t.db.transaction().execute(trx => coa.seedDefaultCoa(trx, ctx, { business_id: biz.id }));
     const ar = await t.db.selectFrom('chart_of_accounts').selectAll()
       .where('business_id', '=', biz.id).where('code', '=', '1100').executeTakeFirstOrThrow();
-    await expect(
-      t.db.transaction().execute(trx =>
-        coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { code: '1199' } }),
-      ),
-    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+    await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: ar.id, patch: { code: '1199' } }),
+    );
+    const found = await coa.getSystemAccount(t.db, biz.id, 'accounts_receivable');
+    expect(found).toMatchObject({ id: ar.id, code: '1199' });
+    const suspense = await coa.findSuspenseAccount(t.db, biz.id);
+    expect(suspense?.system_key).toBe('suspense');
+  });
+
+  it('updateAccount: changes the account type, clearing a detail type that no longer fits', async () => {
+    const { biz, ctx } = await setup(t);
+    const account = await makeAccount(t.db, biz.id, { code: '6100', name: 'Prepaid Rent', account_type: 'expense', detail_type: 'Rent or Lease' });
+    const moved = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: account.id, patch: { account_type: 'asset', code: '1300' } }),
+    );
+    expect(moved).toMatchObject({ account_type: 'asset', code: '1300', detail_type: null });
+    const withDetail = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: account.id, patch: { account_type: 'expense', detail_type: 'Rent or Lease' } }),
+    );
+    expect(withDetail).toMatchObject({ account_type: 'expense', detail_type: 'Rent or Lease' });
+  });
+
+  it('updateAccount: a type change keeps parents, subaccounts and bank links consistent', async () => {
+    const { biz, ctx } = await setup(t);
+    const parent = await makeAccount(t.db, biz.id, { code: '6000', name: 'Office', account_type: 'expense' });
+    const child = await makeAccount(t.db, biz.id, { code: '6001', name: 'Postage', account_type: 'expense' });
+    await t.db.transaction().execute(trx => coa.updateAccount(trx, ctx, { account_id: child.id, patch: { parent_id: parent.id } }));
+    await expect(t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: parent.id, patch: { account_type: 'asset' } }),
+    )).rejects.toThrow(/subaccounts first/);
+    await expect(t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: child.id, patch: { account_type: 'asset' } }),
+    )).rejects.toThrow(/same type as its parent/);
+    // Leaving the parent in the same edit is fine.
+    const freed = await t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: child.id, patch: { account_type: 'asset', parent_id: null } }),
+    );
+    expect(freed).toMatchObject({ account_type: 'asset', parent_id: null });
+
+    const checking = await makeAccount(t.db, biz.id, { code: '1010', name: 'Checking', account_type: 'asset' });
+    await makeBankAccount(t.db, biz.id, checking.id);
+    await expect(t.db.transaction().execute(trx =>
+      coa.updateAccount(trx, ctx, { account_id: checking.id, patch: { account_type: 'expense' } }),
+    )).rejects.toThrow(/bank or card account/);
   });
 
   it('updateAccount: re-submitting the current code is a no-op success (no dup error)', async () => {

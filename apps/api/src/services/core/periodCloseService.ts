@@ -5,6 +5,7 @@ import { NotFoundError } from '../../lib/errors.js';
 import { InvalidStateTransitionError, PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { suspenseBalance } from '../ai/suspenseService.js';
 
 export async function closePeriod(
   trx: Transaction<DB>, ctx: ServiceCtx,
@@ -25,6 +26,15 @@ export async function closePeriod(
     throw new PreconditionError(
       `Cannot close period with ${drafts.length} draft journal entr${drafts.length === 1 ? 'y' : 'ies'} in the date range`,
       { draft_journal_entry_ids: drafts.map(d => d.id) },
+    );
+  }
+
+  // Suspense holds what nobody has categorized yet; closing over it would bury the questions.
+  const suspense = await suspenseBalance(trx, p.business_id, String(p.ends_on).slice(0, 10));
+  if (Number(suspense) !== 0) {
+    throw new PreconditionError(
+      `Cannot close the period while ${Math.abs(Number(suspense)).toFixed(2)} is still in Suspense. Reclassify it from AI → Suspense first.`,
+      { suspense_balance: suspense },
     );
   }
 

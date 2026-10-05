@@ -236,7 +236,7 @@ export default function VendorNewPage() {
       </Section>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex gap-2 sticky bottom-0 bg-background py-3 border-t">
+      <div className="flex gap-2 sticky -bottom-4 z-10 lg:-bottom-6 bg-background py-3 border-t">
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
         <Button type="button" variant="outline" onClick={() => nav('/ap/vendors')}>Cancel</Button>
       </div>

@@ -44,9 +44,8 @@ export function resettable<P extends object>(Form: ComponentType<P>): ComponentT
 
 /**
  * QuickBooks-style saving for forms whose documents are created as drafts and
- * posted in a second step: Save, Save and new, Save and close -- each saves
- * and posts in one go. Posting needs accountant access, so below that the same
- * buttons save a draft, and accountants also get an explicit "Save draft".
+ * posted in a second step: Save and close / Save and new each save and post in
+ * one go. Posting needs accountant access, so below that they save a draft.
  */
 export function useSaveAndPost() {
   const intent = useRef<SaveIntent>({ post: true, then: 'detail' });
@@ -58,8 +57,8 @@ export function useSaveAndPost() {
   const canPost = role !== undefined && hasMinRole(role, 'accountant');
 
   /**
-   * Call once the draft exists. Posts it unless "Save draft" was clicked, then
-   * goes where the clicked button says. If the post (or an earlier after-save
+   * Call once the draft exists. Posts it (accountant and up), then goes where
+   * the clicked button says. If the post (or an earlier after-save
    * step, passed as `warning`) failed, the saved draft is opened instead with
    * the reason shown -- staying on the form would invite a second click and a
    * duplicate.
@@ -99,10 +98,9 @@ export function useSaveAndPost() {
 }
 
 /**
- * The submit buttons for such a form: [Save draft] [Save] [Save and close | v].
- * The split button comes first in the DOM (shown last via row-reverse) so
- * pressing Enter in a field uses it; it remembers which of "Save and close" /
- * "Save and new" was used last.
+ * The submit button for such a form: [Save and close | v] with "Save and new"
+ * under the arrow. It remembers which of the two was used last. A separate
+ * "Save" and "Save draft" were dropped as repetitive (2026-10-04).
  */
 export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAndPost>; busy: boolean }) {
   const [primary, setPrimary] = useState<'new' | 'close'>(
@@ -112,6 +110,11 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
   const menuRef = useRef<HTMLDivElement>(null);
   const other = primary === 'new' ? 'close' : 'new';
   const label = (action: 'new' | 'close') => (action === 'new' ? 'Save and new' : 'Save and close');
+  // QuickBooks has no separate Post button: saving records the document. Say so on hover.
+  const posts = save.canPost ? 'Saves and posts it to the books' : 'Saves it as a draft for an accountant to post';
+  const hint = (action: 'new' | 'close') => (action === 'new'
+    ? `${posts}, then opens a blank form for the next one`
+    : `${posts}, then goes back to the list`);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -127,7 +130,7 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
   return (
     <div className="flex flex-row-reverse items-center gap-2">
       <div className="relative flex" ref={menuRef}>
-        <Button type="submit" disabled={busy} className="rounded-r-none" onClick={choose({ post: true, then: primary })}>
+        <Button type="submit" disabled={busy} className="rounded-r-none" title={hint(primary)} onClick={choose({ post: true, then: primary })}>
           {busy ? 'Saving…' : label(primary)}
         </Button>
         <Button
@@ -147,6 +150,7 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
               type="button"
               role="menuitem"
               className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent"
+              title={hint(other)}
               onClick={e => {
                 // Submitted by hand: closing the menu removes this button, and
                 // a button that has left the page no longer submits its form.
@@ -163,14 +167,6 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
           </div>
         )}
       </div>
-      <Button type="submit" variant="outline" disabled={busy} onClick={choose({ post: true, then: 'detail' })}>
-        Save
-      </Button>
-      {save.canPost && (
-        <Button type="submit" variant="ghost" disabled={busy} onClick={choose({ post: false, then: 'detail' })}>
-          Save draft
-        </Button>
-      )}
     </div>
   );
 }

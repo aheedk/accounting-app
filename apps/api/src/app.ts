@@ -13,6 +13,8 @@ import coaRoutes from './routes/chartOfAccounts.js';
 import periodRoutes from './routes/fiscalPeriods.js';
 import journalEntryRoutes from './routes/journalEntries.js';
 import importedTransactionRoutes from './routes/importedTransactions.js';
+import checkStubRoutes from './routes/checkStubs.js';
+import suspenseRoutes from './routes/suspense.js';
 import trialBalanceRoutes from './routes/trialBalance.js';
 import customerRoutes from './routes/customers.js';
 import taxCodeRoutes from './routes/taxCodes.js';
@@ -86,6 +88,8 @@ export function makeApp(): Express {
   app.use(periodRoutes);
   app.use(journalEntryRoutes);
   app.use(importedTransactionRoutes);
+  app.use(checkStubRoutes);
+  app.use(suspenseRoutes);
   app.use(trialBalanceRoutes);
   app.use(customerRoutes);
   app.use(taxCodeRoutes);

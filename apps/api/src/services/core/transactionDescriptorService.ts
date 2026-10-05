@@ -262,7 +262,7 @@ export async function describeTransactions(
       case 'expense': {
         const doc = sid ? expenseById.get(sid) : undefined;
         described = {
-          label: doc?.payment_method === 'check' ? 'Check' : 'Expense',
+          label: doc?.payment_method === 'check' ? 'Check' : doc?.payment_method === 'credit_card' ? 'Credit Card Expense' : 'Expense',
           num: doc?.reference ?? null,
           name: doc?.vendor_name ?? doc?.customer_name ?? doc?.payee_text ?? null,
           memo: doc?.memo?.trim() || null,
@@ -276,7 +276,8 @@ export async function describeTransactions(
         const wrappedDeposit = wrappedDepositByJe.get(entry.id);
         if (wrappedExpense) {
           described = {
-            label: wrappedExpense.payment_method === 'check' ? 'Check' : 'Expense',
+            label: wrappedExpense.payment_method === 'check' ? 'Check'
+              : wrappedExpense.payment_method === 'credit_card' ? 'Credit Card Expense' : 'Expense',
             num: wrappedExpense.reference, name: wrappedExpense.vendor_name ?? wrappedExpense.customer_name ?? wrappedExpense.payee_text,
             memo: wrappedExpense.memo?.trim() || null,
             path: `/accounting/expenses/${wrappedExpense.id}`,
@@ -292,6 +293,8 @@ export async function describeTransactions(
           const label = entry.transaction_type === 'deposit' ? 'Deposit'
             : entry.transaction_type === 'check' ? 'Check'
             : entry.transaction_type === 'expense' ? 'Expense'
+            : entry.transaction_type === 'credit_card_payment' ? 'Credit Card Payment'
+            : entry.transaction_type === 'credit_card_credit' ? 'Credit Card Credit'
             : 'Bank Import';
           described = {
             label, num: entry.reference, name: entry.payee_name, memo: null,
@@ -318,7 +321,7 @@ export async function describeTransactions(
         const payRun = payRunByEntry.get(entry.id);
         if (expense) {
           described = {
-            label: expense.payment_method === 'check' ? 'Check' : 'Expense',
+            label: expense.payment_method === 'check' ? 'Check' : expense.payment_method === 'credit_card' ? 'Credit Card Expense' : 'Expense',
             num: expense.reference,
             name: expense.vendor_name ?? expense.payee_text,
             memo: expense.memo?.trim() || null,

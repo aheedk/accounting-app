@@ -16,7 +16,7 @@ import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 
-type TransactionType = 'check' | 'expense' | 'deposit';
+type TransactionType = 'check' | 'expense' | 'deposit' | 'credit_card_payment' | 'credit_card_credit';
 
 type ImportedTransaction = {
   id: string;
@@ -62,7 +62,10 @@ type Form = {
   amount: string;
 };
 
-const TITLES: Record<TransactionType, string> = { check: 'Check', expense: 'Expense', deposit: 'Deposit' };
+const TITLES: Record<TransactionType, string> = {
+  check: 'Check', expense: 'Expense', deposit: 'Deposit',
+  credit_card_payment: 'Credit Card Payment', credit_card_credit: 'Credit Card Credit',
+};
 const AMOUNT_RE = /^\d+(\.\d{1,4})?$/;
 
 function toForm(txn: ImportedTransaction): Form {
@@ -286,7 +289,7 @@ export default function ImportedTransactionPage() {
           </div>
         )}
         <div>
-          <Label className="text-xs text-muted-foreground">{moneyIn ? 'Deposit to' : 'Bank account'}</Label>
+          <Label className="text-xs text-muted-foreground">{form.transaction_type.startsWith('credit_card') ? 'Credit card' : moneyIn ? 'Deposit to' : 'Bank account'}</Label>
           <AccountSelect
             accounts={bankAccounts}
             value={form.bank_account_id}
@@ -392,7 +395,7 @@ export default function ImportedTransactionPage() {
 
       {err && <p className="text-sm text-destructive">{err}</p>}
       {notice && <p className="text-sm text-emerald-700">{notice}</p>}
-      <div className="sticky bottom-0 flex items-center gap-2 border-t bg-background py-3">
+      <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-2 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav(-1)}>{readOnly ? 'Back' : 'Cancel'}</Button>
         <Link className="text-sm text-primary hover:underline" to={`/journal/${txn.id}?view=entry`}>View journal entry</Link>
         <div className="flex-1" />
