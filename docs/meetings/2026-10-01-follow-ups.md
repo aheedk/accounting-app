@@ -196,9 +196,6 @@ unmarked is yours.
 29. **Exports.** General Ledger (or any report) → Export to Excel, PDF and
     Print: header with company, report and period, footer with page numbers,
     numbers formatted.
-30. **API key message.** (Explain, no click.) If the AI key is ever rejected,
-    the inbox now says so plainly; production uses a non-expiring service
-    account key.
 31. **Photo uploads.** Drop a phone photo (PNG/JPEG) of a check stub in the
     inbox; the message says what it read.
 32. **Long, multi-account statements.** Drop the July bank PDF (20 scanned
