@@ -2,7 +2,9 @@
 
 Requests taken from the meeting recording transcript, checked against the code.
 Parts of the recording were unclear or not in English, so the last section lists
-what could not be made out. Status as of 2026-10-06.
+what could not be made out. Status as of 2026-10-06. Anything still open here is
+carried into the to-do list in [`2026-10-05-follow-ups.md`](./2026-10-05-follow-ups.md),
+marked **10-01**.
 
 ## Done
 
