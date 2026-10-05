@@ -17,6 +17,7 @@ import {
   type StatementLine,
 } from '../services/ai/statementImportService.js';
 import { matchStubsToLines } from '../services/ai/checkStubService.js';
+import { findSuspenseAccount, getOrCreateSuspenseAccount } from '../services/core/chartOfAccountsService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
 
@@ -71,6 +72,7 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
       await attachSuggestions(ctx(req), imports);
       await attachCardContext(bizId, imports);
       await attachCheckStubs(bizId, imports);
+      await attachSuspense(ctx(req), bizId, imports);
     }
 
     res.json({ imports });
@@ -236,6 +238,21 @@ function parseLines(raw: unknown): StatementLine[] {
 }
 
 // Approve: post each included transaction as a journal entry
+/**
+ * Whatever is still uncoded waits in Suspense instead of blocking the
+ * statement. Runs last: every real suggestion (engine, card, stub) wins.
+ */
+async function attachSuspense(serviceCtx: ServiceCtx, businessId: string, imports: StagedImportRow[]): Promise<void> {
+  const uncoded = imports.flatMap(row => row.extracted_transactions)
+    .filter(tx => !tx.auto_posted && !tx.suggested_account_id);
+  if (uncoded.length === 0) return;
+  const suspense = await db.transaction().execute(trx => getOrCreateSuspenseAccount(trx, serviceCtx, businessId));
+  for (const tx of uncoded) {
+    tx.suggested_account_id = suspense.id;
+    tx.suggestion = { confidence: 0, band: 'unclassified', source_layer: 'suspense' };
+  }
+}
+
 router.post(
   '/businesses/:businessId/email-imports/:importId/approve',
   requireMinRole('accountant'),
@@ -265,6 +282,8 @@ router.post(
         direction: isInflow(tx) ? 'credit' as const : 'debit' as const,
       })));
 
+      // Parking a line in Suspense says nothing about the vendor.
+      const suspenseId = (await findSuspenseAccount(db, bizId))?.id ?? null;
       let learned = 0;
       const created = await db.transaction().execute(async trx => {
         const entryIds = await postStatementLines(trx, serviceCtx, {
@@ -285,7 +304,7 @@ router.post(
           const tx = transactions[item.index];
           // Only lines this approval actually posted teach the engine; card
           // payments say nothing about a vendor.
-          if (!tx || !entryIds[i] || tx.card_type === 'payment') continue;
+          if (!tx || !entryIds[i] || tx.card_type === 'payment' || item.offset_account_id === suspenseId) continue;
           const suggestion = suggestions[item.index] ?? null;
           const decision = learningDecision({
             suggestedAccountId: suggestion?.lines[0]?.account_id ?? null,

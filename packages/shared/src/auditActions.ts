@@ -209,6 +209,7 @@ export const AUDIT = {
   CHECK_STUB_CREATE: 'check_stub.create',
   CHECK_STUB_MATCH: 'check_stub.match',
   CHECK_STUB_DISMISS: 'check_stub.dismiss',
+  SUSPENSE_RECLASSIFY: 'suspense.reclassify',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

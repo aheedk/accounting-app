@@ -1014,6 +1014,7 @@ export interface DB {
   bank_import_batches: BankImportBatchesTable;
   email_import_staging: EmailImportStagingTable;
   check_stubs: CheckStubsTable;
+  suspense_reclassifications: SuspenseReclassificationsTable;
   invoice_import_staging: InvoiceImportStagingTable;
   bank_deposits: BankDepositsTable;
   bank_deposit_lines: BankDepositLinesTable;
@@ -1089,6 +1090,18 @@ export interface CheckStubsTable {
   uploaded_by_user_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
+}
+
+export interface SuspenseReclassificationsTable {
+  id: Generated<string>;
+  business_id: string;
+  journal_entry_id: string;
+  method: 'edited' | 'journal_entry';
+  result_journal_entry_id: string | null;
+  to_account_id: string;
+  amount: ColumnType<string, string | number, string | number>;
+  created_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
 }
 export interface BankDepositsTable {
   id: Generated<string>;

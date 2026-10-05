@@ -6,6 +6,7 @@ import {
   isCapitalizable,
   confidenceBand,
   DEFAULT_CAPITALIZATION_THRESHOLD,
+  SUSPENSE_DETAIL_TYPE,
   ERR,
 } from '@accounting/shared';
 import { BusinessRuleError } from '../../lib/errors.js';
@@ -75,6 +76,8 @@ export async function loadInvoiceCodingContext(
     .where('business_id', '=', businessId)
     .where('is_active', '=', true)
     .where('is_locked', '=', false)
+    // Suspense is where unknowns go, never a choice the engine makes.
+    .where(sql<boolean>`coalesce(detail_type, '') <> ${SUSPENSE_DETAIL_TYPE}`)
     .execute();
   const accountIds = new Set(accounts.map(a => a.id));
 

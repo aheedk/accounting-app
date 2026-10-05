@@ -1,5 +1,5 @@
 import { Kysely, sql, type Transaction } from 'kysely';
-import { AUDIT, ERR, addMoney, subMoney, toMoneyString, isZero } from '@accounting/shared';
+import { AUDIT, ERR, SUSPENSE_DETAIL_TYPE, addMoney, subMoney, toMoneyString, isZero } from '@accounting/shared';
 import type { DB, AccountType } from '../../db/types.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
@@ -177,8 +177,49 @@ export async function updateAccount(
   return updated;
 }
 
+/** This client's Suspense account, recognised by detail type (its name and code can be changed per client). */
+export async function findSuspenseAccount(db: Kysely<DB> | Transaction<DB>, business_id: string) {
+  return db.selectFrom('chart_of_accounts').selectAll()
+    .where('business_id', '=', business_id)
+    .where('detail_type', '=', SUSPENSE_DETAIL_TYPE)
+    .orderBy('created_at')
+    .executeTakeFirst();
+}
+
+/**
+ * Where the AI parks what it cannot code. Every business gets one (migration
+ * 0082 and seedDefaultCoa); this also covers a business created some other way.
+ * 1999, or the first free 199x code.
+ */
+export async function getOrCreateSuspenseAccount(trx: Transaction<DB>, ctx: ServiceCtx, business_id: string) {
+  const existing = await findSuspenseAccount(trx, business_id);
+  if (existing) return existing;
+  const taken = new Set(
+    (await trx.selectFrom('chart_of_accounts').select('code')
+      .where('business_id', '=', business_id)
+      .where('code', 'like', '199%')
+      .execute()).map(r => r.code),
+  );
+  const code = ['1999', '1998', '1997', '1996', '1995', '1994', '1993', '1992', '1991', '1990'].find(c => !taken.has(c));
+  if (!code) throw new PreconditionError('No free 199x code for the Suspense account');
+  const row = await trx.insertInto('chart_of_accounts').values({
+    business_id, code, name: 'Suspense', account_type: 'asset', parent_id: null,
+    detail_type: SUSPENSE_DETAIL_TYPE, is_system: true,
+    description: 'Transactions waiting to be categorized. Should be zero before a period is closed.',
+  }).returningAll().executeTakeFirstOrThrow();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.COA_CREATE, entity_type: 'chart_of_account', entity_id: row.id, before: null, after: row,
+  });
+  return row;
+}
+
 export async function seedDefaultCoa(trx: Transaction<DB>, ctx: ServiceCtx, input: { business_id: string }) {
   await sql`SELECT seed_default_coa(${input.business_id}::uuid)`.execute(trx);
+  await trx.insertInto('chart_of_accounts').values({
+    business_id: input.business_id, code: '1999', name: 'Suspense', account_type: 'asset', parent_id: null,
+    detail_type: SUSPENSE_DETAIL_TYPE, is_system: true,
+    description: 'Transactions waiting to be categorized. Should be zero before a period is closed.',
+  }).onConflict(oc => oc.columns(['business_id', 'code']).doNothing()).execute();
   const inserted = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('business_id', '=', input.business_id).execute();
   for (const row of inserted) {

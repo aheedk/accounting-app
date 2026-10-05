@@ -22,3 +22,5 @@ to run the app.
 | [Journal entry editing](./specs/2026-08-25-journal-entry-editing-design.md) | In-place editing of posted journal entries. |
 | [AI auto-coding](./specs/2026-09-24-ai-auto-coding-design.md) | The AI inbox and the layered coding engine. |
 | [General Ledger](./specs/2026-10-04-general-ledger-design.md) | The QuickBooks-style General Ledger report. |
+| [Card statements and check stubs](./specs/2026-10-04-card-statements-and-check-stubs-design.md) | Credit card statements in the AI inbox, card payments on bank statements, check stubs, long multi-account PDFs. |
+| [Suspense](./specs/2026-10-04-suspense-account-design.md) | Where the AI parks what it cannot categorize, and clearing it. |

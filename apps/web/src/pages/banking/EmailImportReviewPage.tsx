@@ -6,6 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import DocumentUpload from '@/pages/ai/DocumentUpload';
 import ConfidenceBadge, { type SuggestionMeta } from '@/pages/ai/ConfidenceBadge';
+import { SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
@@ -556,7 +557,8 @@ export default function EmailImportReviewPage() {
     }
   }
 
-  const bankAccounts = accounts.filter(a => a.account_type === 'asset');
+  // Suspense is an asset too, but never the account a statement belongs to.
+  const bankAccounts = accounts.filter(a => a.account_type === 'asset' && a.detail_type !== SUSPENSE_DETAIL_TYPE);
   // Card statements post against a liability: Credit Card accounts first.
   const cardAccounts = [
     ...accounts.filter(a => a.account_type === 'liability' && a.detail_type === 'Credit Card'),

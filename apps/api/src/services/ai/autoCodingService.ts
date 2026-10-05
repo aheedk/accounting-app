@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import {
   normalizeVendor,
   confidenceBand,
+  SUSPENSE_DETAIL_TYPE,
   type CodingLayerId,
   type ConfidenceBand,
   ERR,
@@ -115,6 +116,8 @@ async function activeAccounts(db: Kysely<DB> | Transaction<DB>, businessId: stri
     .where('business_id', '=', businessId)
     .where('is_active', '=', true)
     .where('is_locked', '=', false)
+    // Suspense is where unknowns go, never a choice the engine makes.
+    .where(sql<boolean>`coalesce(detail_type, '') <> ${SUSPENSE_DETAIL_TYPE}`)
     .execute();
 }
 

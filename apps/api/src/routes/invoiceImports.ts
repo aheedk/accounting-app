@@ -8,6 +8,7 @@ import { requireMinRole } from '../middleware/rbac.js';
 import { createDraft as createDraftBill, postBill } from '../services/ap/billService.js';
 import { createDraft as createDraftInvoice, postInvoice } from '../services/ar/invoiceService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
+import { findSuspenseAccount, getOrCreateSuspenseAccount } from '../services/core/chartOfAccountsService.js';
 import type { Request } from 'express';
 
 const router = Router();
@@ -87,6 +88,16 @@ router.get('/businesses/:businessId/invoice-imports', async (req, res, next) => 
             source_layer: suggestion.source_layer,
           };
         });
+      }
+
+      // Lines nothing could code wait in Suspense instead of blocking the invoice.
+      const uncoded = imports.flatMap(imp => imp.line_items ?? []).filter(li => !li.suggested_account_id);
+      if (uncoded.length > 0) {
+        const suspense = await db.transaction().execute(trx => getOrCreateSuspenseAccount(trx, serviceCtx, bizId));
+        for (const li of uncoded) {
+          li.suggested_account_id = suspense.id;
+          li.suggestion = { confidence: 0, band: 'unclassified', source_layer: 'suspense' };
+        }
       }
     }
 
@@ -176,6 +187,7 @@ router.post(
         amount: `${Math.abs(Number(li.amount ?? 0))}`,
       })));
 
+      const suspenseId = (await findSuspenseAccount(db, bizId))?.id ?? null;
       await db.transaction().execute(async trx => {
         const totalTax = staged.tax_amount ? parseFloat(staged.tax_amount) : 0;
         // Use staged subtotal; fall back to summing included line amounts
@@ -227,6 +239,8 @@ router.post(
           for (const item of included) {
             const li = lineItems[item.index];
             if (!li) continue;
+            // Parking a line in Suspense says nothing about the vendor.
+            if (item.account_id === suspenseId) continue;
             const suggested = lineSuggestions[item.index]?.lines[0]?.account_id ?? null;
             const changed = suggested !== item.account_id;
             const layer = lineSuggestions[item.index]?.source_layer ?? null;

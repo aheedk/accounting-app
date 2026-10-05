@@ -29,6 +29,18 @@ export default function ConfidenceBadge({ suggestion }: { suggestion: Suggestion
     );
   }
 
+  // Parked, not guessed: say so plainly rather than show "0%".
+  if (suggestion.source_layer === 'suspense') {
+    return (
+      <span
+        className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-900"
+        title="Nothing could tell what this is, so it goes to Suspense. Pick the right account now, or post it and clear it later from AI → Suspense."
+      >
+        Suspense · not sure
+      </span>
+    );
+  }
+
   const style = BAND_STYLE[suggestion.band];
   const label = layerLabel(suggestion.source_layer);
   const pct = `${suggestion.confidence}%`;

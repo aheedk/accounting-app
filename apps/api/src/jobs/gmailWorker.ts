@@ -3,7 +3,8 @@ import type { gmail_v1 } from 'googleapis';
 import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs';
 import path from 'path';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
+import { SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
 import type { ExtractedCheck } from '../services/ai/checkStubService.js';
 import { normalizeCardLines, splitByAccount, type RawCardLine } from '../services/ai/statementImportService.js';
 import { saveCheckStubs } from '../services/ai/checkStubService.js';
@@ -272,6 +273,8 @@ export async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaA
     .select(['id', 'name', 'account_type'])
     .where('business_id', '=', businessId)
     .where('is_active', '=', true)
+    // Not offered to the model: Suspense is the app's answer for "not sure", not the model's.
+    .where(sql<boolean>`coalesce(detail_type, '') <> ${SUSPENSE_DETAIL_TYPE}`)
     .orderBy('account_type')
     .orderBy('name')
     .execute();
