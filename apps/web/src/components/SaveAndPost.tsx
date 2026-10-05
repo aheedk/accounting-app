@@ -112,6 +112,11 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
   const menuRef = useRef<HTMLDivElement>(null);
   const other = primary === 'new' ? 'close' : 'new';
   const label = (action: 'new' | 'close') => (action === 'new' ? 'Save and new' : 'Save and close');
+  // QuickBooks has no separate Post button: saving records the document. Say so on hover.
+  const posts = save.canPost ? 'Saves and posts it to the books' : 'Saves it as a draft for an accountant to post';
+  const hint = (action: 'new' | 'close') => (action === 'new'
+    ? `${posts}, then opens a blank form for the next one`
+    : `${posts}, then goes back to the list`);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -127,7 +132,7 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
   return (
     <div className="flex flex-row-reverse items-center gap-2">
       <div className="relative flex" ref={menuRef}>
-        <Button type="submit" disabled={busy} className="rounded-r-none" onClick={choose({ post: true, then: primary })}>
+        <Button type="submit" disabled={busy} className="rounded-r-none" title={hint(primary)} onClick={choose({ post: true, then: primary })}>
           {busy ? 'Saving…' : label(primary)}
         </Button>
         <Button
@@ -147,6 +152,7 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
               type="button"
               role="menuitem"
               className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent"
+              title={hint(other)}
               onClick={e => {
                 // Submitted by hand: closing the menu removes this button, and
                 // a button that has left the page no longer submits its form.
@@ -163,11 +169,11 @@ export function SaveButtons({ save, busy }: { save: ReturnType<typeof useSaveAnd
           </div>
         )}
       </div>
-      <Button type="submit" variant="outline" disabled={busy} onClick={choose({ post: true, then: 'detail' })}>
+      <Button type="submit" variant="outline" disabled={busy} title={`${posts}, and stays on it`} onClick={choose({ post: true, then: 'detail' })}>
         Save
       </Button>
       {save.canPost && (
-        <Button type="submit" variant="ghost" disabled={busy} onClick={choose({ post: false, then: 'detail' })}>
+        <Button type="submit" variant="ghost" disabled={busy} title="Saves it without posting; nothing reaches the books until it is posted" onClick={choose({ post: false, then: 'detail' })}>
           Save draft
         </Button>
       )}

@@ -121,7 +121,9 @@ in. The client needs a Credit Card account for item 16.
 5. **Save and post.** Create a new bill or invoice and use Save and post: it
    is posted in one click, no separate Post step.
 6. **Save / Save and new / Save and close.** On the same form, open the arrow
-   next to Save and show the three choices.
+   next to Save and show the three choices. As in QuickBooks there is no
+   separate Post button: every Save posts (hover a button to see what it
+   does), and **Save draft** is the only one that keeps it unposted.
 7. **Journal line autofill.** + New → Journal entry. Type a description and a
    debit on line 1, then move to line 2: the description is copied and the
    balancing credit is filled in.
