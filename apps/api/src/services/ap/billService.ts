@@ -40,7 +40,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     .executeTakeFirst();
   if (dup) throw new BusinessRuleError(ERR.DUPLICATE_RESOURCE, `Bill ${input.bill_number} already exists`);
 
-  const apAccount = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, '2010');
+  const apAccount = await getSystemAccount(trx as unknown as Kysely<DB>, input.business_id, 'accounts_payable');
 
   let subtotalSum = '0.0000';
   const computed: Array<{ line: BillLineInput; subtotal: string }> = [];

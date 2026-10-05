@@ -67,7 +67,7 @@ export async function postBillPayment(trx: Transaction<DB>, ctx: ServiceCtx, inp
   if (!payment) throw new NotFoundError('bill_payment', input.bill_payment_id);
   if (payment.status !== 'draft') throw new InvalidStateTransitionError('bill_payment', payment.id, payment.status, 'posted');
 
-  const apAccount = await getSystemAccount(trx as unknown as Kysely<DB>, payment.business_id, '2010');
+  const apAccount = await getSystemAccount(trx as unknown as Kysely<DB>, payment.business_id, 'accounts_payable');
 
   const je = await postJournalEntry(trx, ctx, {
     business_id: payment.business_id,

@@ -117,9 +117,20 @@ export async function createAccount(trx: Transaction<DB>, ctx: ServiceCtx, input
   return row;
 }
 
+export type AccountPatch = {
+  code?: string;
+  name?: string;
+  account_type?: AccountType;
+  parent_id?: string | null;
+  is_active?: boolean;
+  detail_type?: string | null;
+  description?: string | null;
+  is_locked?: boolean;
+};
+
 export async function updateAccount(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { account_id: string; patch: { code?: string; name?: string; parent_id?: string | null; is_active?: boolean; detail_type?: string | null; description?: string | null; is_locked?: boolean } },
+  input: { account_id: string; patch: AccountPatch },
 ) {
   const row = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', input.account_id).executeTakeFirst();
@@ -130,9 +141,14 @@ export async function updateAccount(
     throw new PreconditionError('Account is locked — unlock it before making changes', { code: row.code });
   }
 
+  // System accounts are found by system_key, so their number, name and parent are
+  // free to change. What they are (type, detail type) and being active are not.
   if (row.is_system) {
-    if (input.patch.name !== undefined || input.patch.parent_id !== undefined || input.patch.code !== undefined) {
-      throw new PreconditionError('System accounts cannot have code, name, or parent changed', { code: row.code });
+    if (input.patch.account_type !== undefined && input.patch.account_type !== row.account_type) {
+      throw new PreconditionError(`${row.name} is a system account; its account type cannot change`, { code: row.code });
+    }
+    if (input.patch.detail_type !== undefined && (input.patch.detail_type ?? null) !== (row.detail_type ?? null)) {
+      throw new PreconditionError(`${row.name} is a system account; its detail type cannot change`, { code: row.code });
     }
     if (input.patch.is_active === false) {
       throw new PreconditionError(`System account ${row.code} — ${row.name} cannot be deactivated`, { code: row.code });
@@ -141,6 +157,30 @@ export async function updateAccount(
 
   if (input.patch.parent_id === input.account_id) {
     throw new PreconditionError('parent_id cannot equal account id (self-reference)');
+  }
+
+  const newType = input.patch.account_type ?? row.account_type;
+  const typeChanges = newType !== row.account_type;
+  if (typeChanges) {
+    const child = await trx.selectFrom('chart_of_accounts').select('code')
+      .where('parent_id', '=', row.id).executeTakeFirst();
+    if (child) {
+      throw new PreconditionError(`Move this account's subaccounts first (${child.code}); a parent and its subaccounts share one type`, { code: row.code });
+    }
+    const bank = await trx.selectFrom('bank_accounts').select('id')
+      .where('cash_account_id', '=', row.id).executeTakeFirst();
+    if (bank && newType !== 'asset' && newType !== 'liability') {
+      throw new PreconditionError('This account is linked to a bank or card account, so it must stay an asset or a liability', { code: row.code });
+    }
+  }
+  const parentId = input.patch.parent_id !== undefined ? input.patch.parent_id : row.parent_id;
+  if (parentId && (typeChanges || input.patch.parent_id !== undefined)) {
+    const parent = await trx.selectFrom('chart_of_accounts').select(['account_type', 'name'])
+      .where('id', '=', parentId).where('business_id', '=', row.business_id).executeTakeFirst();
+    if (!parent) throw new BusinessRuleError(ERR.NOT_FOUND, 'Parent account not found');
+    if (parent.account_type !== newType) {
+      throw new PreconditionError(`A subaccount must be the same type as its parent (${parent.name} is ${parent.account_type})`, { code: row.code });
+    }
   }
 
   if (input.patch.code !== undefined && input.patch.code !== row.code) {
@@ -157,9 +197,13 @@ export async function updateAccount(
     .set({
       ...(input.patch.code !== undefined ? { code: input.patch.code } : {}),
       ...(input.patch.name !== undefined ? { name: input.patch.name } : {}),
+      ...(typeChanges ? { account_type: newType } : {}),
       ...(input.patch.parent_id !== undefined ? { parent_id: input.patch.parent_id } : {}),
       ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
-      ...(input.patch.detail_type !== undefined ? { detail_type: input.patch.detail_type } : {}),
+      // A detail type belongs to its account type: a type change without one clears it.
+      ...(input.patch.detail_type !== undefined
+        ? { detail_type: input.patch.detail_type }
+        : typeChanges ? { detail_type: null } : {}),
       ...(input.patch.description !== undefined ? { description: input.patch.description } : {}),
       ...(input.patch.is_locked !== undefined ? { is_locked: input.patch.is_locked } : {}),
     })
@@ -177,11 +221,14 @@ export async function updateAccount(
   return updated;
 }
 
-/** This client's Suspense account, recognised by detail type (its name and code can be changed per client). */
+/** This client's Suspense account, by its system key (its name and number can be changed per client). */
 export async function findSuspenseAccount(db: Kysely<DB> | Transaction<DB>, business_id: string) {
   return db.selectFrom('chart_of_accounts').selectAll()
     .where('business_id', '=', business_id)
-    .where('detail_type', '=', SUSPENSE_DETAIL_TYPE)
+    .where(eb => eb.or([
+      eb('system_key', '=', 'suspense'),
+      eb.and([eb('system_key', 'is', null), eb('detail_type', '=', SUSPENSE_DETAIL_TYPE)]),
+    ]))
     .orderBy('created_at')
     .executeTakeFirst();
 }
@@ -321,14 +368,19 @@ export async function listAccountRegister(
   return { account, rows, ending_balance: running };
 }
 
-export async function getSystemAccount(db: Kysely<DB>, business_id: string, code: string) {
+/** The system accounts the app posts to on its own (migration 0083 keys them). */
+export type SystemAccountKey =
+  | 'cash_on_hand' | 'operating_bank' | 'accounts_receivable' | 'accounts_payable'
+  | 'sales_tax_payable' | 'retained_earnings' | 'suspense';
+
+/** Found by key, not number: an accountant can renumber Accounts Payable without breaking bills. */
+export async function getSystemAccount(db: Kysely<DB>, business_id: string, key: SystemAccountKey) {
   const row = await db.selectFrom('chart_of_accounts')
     .selectAll()
     .where('business_id', '=', business_id)
-    .where('code', '=', code)
-    .where('is_system', '=', true)
+    .where('system_key', '=', key)
     .executeTakeFirst();
-  if (!row) throw new BusinessRuleError(ERR.NOT_FOUND, `System account ${code} not found for business ${business_id}`);
-  if (!row.is_active) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `Account ${code} — ${row.name} is inactive. Reactivate it from Chart of Accounts before posting.`);
+  if (!row) throw new BusinessRuleError(ERR.NOT_FOUND, `System account ${key} not found for business ${business_id}`);
+  if (!row.is_active) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `Account ${row.code} — ${row.name} is inactive. Reactivate it from Chart of Accounts before posting.`);
   return row;
 }

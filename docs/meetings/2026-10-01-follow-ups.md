@@ -27,25 +27,27 @@ what could not be made out. Status as of 2026-10-04.
 | 17 | Bank statements recognise credit card payments and pick the right card by issuer name | `b624b71` |
 | 18 | Check stubs: upload stubs or photos; checks on a bank statement take their payee and category from the stub, and checks already posted can be filled in from the Check stubs tab | `b624b71`, `dc258f3` |
 
+| 19 | Chart of Accounts: every field on the edit-account screen is editable, including the account number and account type; system accounts (AR, AP, Suspense...) can be renumbered and renamed too | see below |
+
 ### Also completed (not raised in the meeting)
 
 | # | Change | Where |
 |---|---|---|
-| 19 | General Ledger matched to QuickBooks: steady running balance, real transaction types (Expense, Check, Payroll...), numbers and names filled in, correct ADJ column, amounts in the account's natural sign | `e92959e` |
-| 20 | General Ledger follow-ups: credit memo and vendor credit numbers (CM-/VC-), clearer memos, names on payroll rows | `e92959e` |
-| 21 | General Ledger date, name and description are clickable and open the transaction | `5c94d52` |
-| 22 | Expense category can be any account in the chart, not just expense accounts | `864592f` |
-| 23 | "Add new" on account, vendor and customer dropdowns across the app | `864592f` |
-| 24 | Arrow keys work in every dropdown and popup menu | `1b6c136` |
-| 25 | Switching company opens that company's dashboard | `a33d169` |
-| 26 | Other tabs left on the old company show a "What happened to this page?" screen | `96ecc52` |
-| 27 | Chart of Accounts page controls at the bottom as well as the top | `f9ccd6f` |
-| 28 | Excel, PDF and print exports with a header (company, report, period), footer, page numbers and proper number formatting | `86ed7a6`, `fe79368` |
-| 29 | Clear message in the AI inbox when the Anthropic API key is rejected, instead of "Internal server error"; production now uses a service account key that does not expire | `2f8c736` |
-| 30 | AI inbox upload takes photos (PNG, JPEG, WebP) as well as PDFs, and says what it read | `dc258f3` |
-| 31 | Long scanned bank statements (20 pages, ~160 lines) are read in full, and a PDF with several accounts (checking and savings) becomes one statement per account | `b862b50` |
-| 32 | Handwritten check stubs with no year ("7/1") get the right year instead of one the AI guessed | `d3030e2` |
-| 33 | Suspense (asked for by the firm after the meeting): what the AI cannot categorize goes to a Suspense account instead of being left blank or guessed; AI → Suspense lists it and reclassifies it, optionally teaching the AI; a period cannot close while Suspense has a balance | `456aa80` |
+| 20 | General Ledger matched to QuickBooks: steady running balance, real transaction types (Expense, Check, Payroll...), numbers and names filled in, correct ADJ column, amounts in the account's natural sign | `e92959e` |
+| 21 | General Ledger follow-ups: credit memo and vendor credit numbers (CM-/VC-), clearer memos, names on payroll rows | `e92959e` |
+| 22 | General Ledger date, name and description are clickable and open the transaction | `5c94d52` |
+| 23 | Expense category can be any account in the chart, not just expense accounts | `864592f` |
+| 24 | "Add new" on account, vendor and customer dropdowns across the app | `864592f` |
+| 25 | Arrow keys work in every dropdown and popup menu | `1b6c136` |
+| 26 | Switching company opens that company's dashboard | `a33d169` |
+| 27 | Other tabs left on the old company show a "What happened to this page?" screen | `96ecc52` |
+| 28 | Chart of Accounts page controls at the bottom as well as the top | `f9ccd6f` |
+| 29 | Excel, PDF and print exports with a header (company, report, period), footer, page numbers and proper number formatting | `86ed7a6`, `fe79368` |
+| 30 | Clear message in the AI inbox when the Anthropic API key is rejected, instead of "Internal server error"; production now uses a service account key that does not expire | `2f8c736` |
+| 31 | AI inbox upload takes photos (PNG, JPEG, WebP) as well as PDFs, and says what it read | `dc258f3` |
+| 32 | Long scanned bank statements (20 pages, ~160 lines) are read in full, and a PDF with several accounts (checking and savings) becomes one statement per account | `b862b50` |
+| 33 | Handwritten check stubs with no year ("7/1") get the right year instead of one the AI guessed | `d3030e2` |
+| 34 | Suspense (asked for by the firm after the meeting): what the AI cannot categorize goes to a Suspense account instead of being left blank or guessed; AI → Suspense lists it and reclassifies it, optionally teaching the AI; a period cannot close while Suspense has a balance | `456aa80` |
 
 ## Open
 
@@ -62,8 +64,6 @@ what could not be made out. Status as of 2026-10-04.
    be a dropdown of the client's vendors, with the AI matching the extracted
    name ("Duke Power" to "Duke Energy") and the user able to correct it. Riham
    said "I'll fix that" in the meeting — confirm who owns it.
-3. **Chart of Accounts: everything editable.** The edit-account screen should
-   allow changing every field, including the account number.
 
 ## Bigger items, for later
 

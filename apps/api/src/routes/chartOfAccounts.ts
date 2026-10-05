@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as coa from '../services/core/chartOfAccountsService.js';
+import type { AccountType } from '../db/types.js';
 import * as ledger from '../services/core/ledgerService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
@@ -87,6 +88,7 @@ router.patch('/businesses/:businessId/coa/:accountId', requireMinRole('accountan
     const patch: {
       code?: string;
       name?: string;
+      account_type?: AccountType;
       parent_id?: string | null;
       is_active?: boolean;
       detail_type?: string | null;
@@ -95,6 +97,7 @@ router.patch('/businesses/:businessId/coa/:accountId', requireMinRole('accountan
     } = {};
     if (parsed.code !== undefined) patch.code = parsed.code;
     if (parsed.name !== undefined) patch.name = parsed.name;
+    if (parsed.account_type !== undefined) patch.account_type = parsed.account_type;
     if (parsed.parent_id !== undefined) patch.parent_id = parsed.parent_id;
     if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;
     if (parsed.detail_type !== undefined) patch.detail_type = parsed.detail_type;

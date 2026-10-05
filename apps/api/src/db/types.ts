@@ -104,6 +104,8 @@ export interface ChartOfAccountsTable {
   detail_type: string | null;
   description: string | null;
   is_system: Generated<boolean>;
+  /** What a system account is ('accounts_receivable', 'suspense'...); its number can change, this cannot. */
+  system_key: string | null;
   is_active: Generated<boolean>;
   is_locked: Generated<boolean>;
   created_at: Generated<Timestamp>;
