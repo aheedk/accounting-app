@@ -35,7 +35,7 @@ what could not be made out. Status as of 2026-10-04.
 | 20 | General Ledger matched to QuickBooks: steady running balance, real transaction types (Expense, Check, Payroll...), numbers and names filled in, correct ADJ column, amounts in the account's natural sign | `e92959e` |
 | 21 | General Ledger follow-ups: credit memo and vendor credit numbers (CM-/VC-), clearer memos, names on payroll rows | `e92959e` |
 | 22 | General Ledger date, name and description are clickable and open the transaction | `5c94d52` |
-| 23 | Expense category can be any account in the chart, not just expense accounts | `864592f` |
+| 23 | Expense category can be any account in the chart, not just expense accounts; expense accounts listed first, with Add new account | `864592f`, see below |
 | 24 | "Add new" on account, vendor and customer dropdowns across the app | `864592f` |
 | 25 | Arrow keys work in every dropdown and popup menu | `1b6c136` |
 | 26 | Switching company opens that company's dashboard | `a33d169` |
@@ -178,8 +178,11 @@ unmarked is yours.
     credits and names on payroll rows.
 22. **Clickable date, name and description.** In the General Ledger, click a
     date, a name and a description: each opens the transaction.
-23. **Any account as an expense category.** New expense → Category: asset and
-    liability accounts are offered as well as expenses.
+23. **Any account as an expense category.** Accounts Payable → Expense
+    Transactions → New. Open Category: expense accounts come first, then
+    every other account (assets, liabilities...) below them, and **Add new
+    account** at the bottom creates one without leaving the form. Payment
+    account has Add new too.
 24. **Add new from dropdowns.** In an account, vendor or customer dropdown,
     choose "Add new" and create one without leaving the form.
 25. **Arrow keys.** Open a dropdown or a ⋯ menu and move with the arrow keys,
