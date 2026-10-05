@@ -13,7 +13,7 @@ what could not be made out. Status as of 2026-10-04.
 | 3 | Delete a journal entry (QuickBooks "More > Delete") | `1f1382c` |
 | 4 | Attachments on entries | `9dd25e2` |
 | 5 | Save and post in one step | `f5b200b` |
-| 6 | Save and close / Save and new, like QuickBooks (the extra Save and Save draft buttons were later dropped as repetitive) | `0b4947d`, see below |
+| 6 | Save and close / Save and new, like QuickBooks (the extra Save and Save draft buttons were later dropped as repetitive) | `0b4947d`, `4bd6a99` |
 | 7 | Next journal line copies the description above and fills the balancing amount | `4380b5c` |
 | 8 | Typing 26 for the year becomes 2026; ledger dates editable on any preset | `0c6a779`, `96b5a86` |
 | 9 | Ledger keeps its date range when you go Back from a transaction | `9c3a8bc` |
