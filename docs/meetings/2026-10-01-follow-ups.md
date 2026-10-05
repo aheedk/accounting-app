@@ -36,18 +36,28 @@ what could not be made out. Status as of 2026-10-04.
 | 21 | General Ledger date, name and description are clickable and open the transaction | `5c94d52` |
 | 22 | Expense category can be any account in the chart, not just expense accounts | `864592f` |
 | 23 | "Add new" on account, vendor and customer dropdowns across the app | `864592f` |
-| 24 | Payee box restyled to match the site instead of the browser's own suggestion list | `864592f` |
-| 25 | Arrow keys work in every dropdown and popup menu | `1b6c136` |
-| 26 | Switching company opens that company's dashboard | `a33d169` |
-| 27 | Other tabs left on the old company show a "What happened to this page?" screen | `96ecc52` |
-| 28 | Chart of Accounts page controls at the bottom as well as the top | `f9ccd6f` |
-| 29 | Excel, PDF and print exports with a header (company, report, period), footer, page numbers and proper number formatting | `86ed7a6`, `fe79368` |
-| 30 | Removed 18 implementation plans for work that had already shipped | `78a0ed3` |
+| 24 | Arrow keys work in every dropdown and popup menu | `1b6c136` |
+| 25 | Switching company opens that company's dashboard | `a33d169` |
+| 26 | Other tabs left on the old company show a "What happened to this page?" screen | `96ecc52` |
+| 27 | Chart of Accounts page controls at the bottom as well as the top | `f9ccd6f` |
+| 28 | Excel, PDF and print exports with a header (company, report, period), footer, page numbers and proper number formatting | `86ed7a6`, `fe79368` |
+| 29 | Clear message in the AI inbox when the Anthropic API key is rejected, instead of "Internal server error"; production now uses a service account key that does not expire | `2f8c736` |
+| 30 | AI inbox upload takes photos (PNG, JPEG, WebP) as well as PDFs, and says what it read | `dc258f3` |
+| 31 | Long scanned bank statements (20 pages, ~160 lines) are read in full, and a PDF with several accounts (checking and savings) becomes one statement per account | `b862b50` |
+| 32 | Handwritten check stubs with no year ("7/1") get the right year instead of one the AI guessed | `d3030e2` |
+| 33 | Suspense (asked for by the firm after the meeting): what the AI cannot categorize goes to a Suspense account instead of being left blank or guessed; AI → Suspense lists it and reclassifies it, optionally teaching the AI; a period cannot close while Suspense has a balance | `456aa80` |
 
 ## Open
 
-1. **Test card statements and check stubs with real documents** once the
-   Anthropic key works (spec: `docs/specs/2026-10-04-card-statements-and-check-stubs-design.md`).
+1. **Finish testing with real documents** (spec:
+   `docs/specs/2026-10-04-card-statements-and-check-stubs-design.md`).
+   - Bank statement upload: tested with the July statement (checking and savings), works.
+   - Check stubs: upload works. The July stubs (#5359–5398, payroll) are drawn on an
+     account whose statement has not been uploaded yet (likely CHK 5180), so matching
+     still needs that statement.
+   - Credit card statement: test with the sample Amex statement, or a real one,
+     after adding a Credit Card account to the client.
+   - Suspense: try reclassifying a few lines from AI → Suspense.
 2. **Vendor dropdown in the AI inbox.** The Name column is free text. It should
    be a dropdown of the client's vendors, with the AI matching the extracted
    name ("Duke Power" to "Duke Energy") and the user able to correct it. Riham
