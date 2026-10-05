@@ -665,8 +665,8 @@ export default function ExpensePage() {
             </AppSelect>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Ref no.</label>
-            <Input value={reference} onChange={e => setReference(e.target.value)} disabled={!canEdit} className="w-32" />
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">{paymentMethod === 'check' ? 'Check no.' : 'Ref no.'}</label>
+            <Input value={reference} onChange={e => setReference(e.target.value)} disabled={!canEdit} className="w-32" placeholder={paymentMethod === 'check' ? 'e.g. 1042' : undefined} />
           </div>
         </div>
         <div className="text-right">

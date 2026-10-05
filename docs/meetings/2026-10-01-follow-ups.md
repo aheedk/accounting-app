@@ -48,6 +48,7 @@ what could not be made out. Status as of 2026-10-04.
 | 33 | Handwritten check stubs with no year ("7/1") get the right year instead of one the AI guessed | `d3030e2` |
 | 34 | Suspense (asked for by the firm after the meeting): what the AI cannot categorize goes to a Suspense account instead of being left blank or guessed; AI → Suspense lists it and reclassifies it, optionally teaching the AI; a period cannot close while Suspense has a balance | `456aa80` |
 | 35 | Bottom action bar (Save, Delete, Void...) sits flush at the bottom of the window on every form; content no longer shows underneath it or gets cut off above it | `556f53b` |
+| 36 | Check no. box: on payments and bill payments it no longer turns into "Ref no." after picking a payment method (the dropdown was losing the choice); the Expense form now says "Check no." when paying by check too | see below |
 
 ## Open
 
@@ -211,3 +212,6 @@ unmarked is yours.
     payment) and scroll: the Save / Delete / Void bar stays pinned to the very
     bottom of the window, with nothing showing underneath it, and the last
     section (Memo, Attachments) scrolls fully into view above it.
+36. **Check no. box.** Payments → New (or a bill payment): pick Cash, then
+    Check. The box goes "Ref no." → "Check no." and the method stays Check.
+    On an expense, choosing Check also turns "Ref no." into "Check no.".
