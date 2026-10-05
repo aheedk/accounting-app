@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { History, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
@@ -43,6 +44,12 @@ type Account = {
 };
 
 type Vendor = { id: string; name: string };
+type RecentItem = { id: string; date: string; label: string; amount: string; path: string };
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  return y && m && d ? `${Number(m)}/${Number(d)}/${y.slice(2)}` : iso;
+}
 
 type Form = {
   entry_date: string;
@@ -88,6 +95,8 @@ export default function ImportedTransactionPage() {
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   // The transaction is its journal entry, so that is what files attach to.
   const attachments = useAttachments('journal_entry', id ?? null);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const [recentItems, setRecentItems] = useState<RecentItem[] | null>(null);
 
   useEffect(() => {
     if (!bizId || !id) return;
@@ -108,6 +117,32 @@ export default function ImportedTransactionPage() {
   const categoryAccounts = useMemo(() => accounts.filter(a =>
     a.is_active || a.id === form?.category_account_id,
   ), [accounts, form?.category_account_id]);
+
+  // Recent deposits / expenses — a navigation shortcut, not an edit feature,
+  // so it stays available even on a read-only (voided) transaction. Which
+  // list to pull from depends on this transaction's own type.
+  async function toggleRecent() {
+    if (recentOpen) { setRecentOpen(false); return; }
+    setRecentOpen(true);
+    if (recentItems !== null || !bizId || !form) return;
+    try {
+      if (form.transaction_type === 'deposit') {
+        const res = await api.get<Array<{ id: string; deposit_date: string; deposit_number: string; total_amount: string }>>(`/businesses/${bizId}/bank-deposits`);
+        setRecentItems((Array.isArray(res.data) ? res.data : []).slice(0, 10).map(d => ({
+          id: d.id, date: d.deposit_date, label: d.deposit_number, amount: d.total_amount,
+          path: `/accounting/bank-deposits/${d.id}`,
+        })));
+      } else {
+        const res = await api.get<{ expense_transactions: Array<{ id: string; transaction_date: string; payee_name: string | null; total_amount: string }> }>(`/businesses/${bizId}/expense-transactions`);
+        setRecentItems((res.data.expense_transactions ?? []).slice(0, 10).map(e => ({
+          id: e.id, date: e.transaction_date, label: e.payee_name ?? 'Expense', amount: e.total_amount,
+          path: `/accounting/expenses/${e.id}`,
+        })));
+      }
+    } catch {
+      setRecentItems([]);
+    }
+  }
 
   if (!bizId) return <div>Pick a business.</div>;
   if (loadError) {
@@ -159,19 +194,75 @@ export default function ImportedTransactionPage() {
   return (
     <form className="space-y-6" onSubmit={submit}>
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {TITLES[form.transaction_type]}
-            {form.transaction_type === 'check' && form.check_number ? ` #${form.check_number}` : ''}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Imported from a bank statement · Journal no. {txn.journal_number}
-            {txn.status === 'voided' && <span className="ml-2 uppercase">Voided</span>}
-          </p>
+        <div className="flex items-start gap-2">
+          <div className="relative mt-0.5">
+            <button
+              type="button"
+              onClick={() => { void toggleRecent(); }}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={form.transaction_type === 'deposit' ? 'Recent deposits' : 'Recent expenses'}
+            >
+              <History className="h-5 w-5" />
+            </button>
+            {recentOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setRecentOpen(false)} />
+                <div className="absolute left-0 top-9 z-50 w-96 rounded-lg border bg-card shadow-xl">
+                  <div className="flex items-center justify-between border-b px-4 py-3">
+                    <p className="text-sm font-semibold">{form.transaction_type === 'deposit' ? 'Recent Deposits' : 'Recent Expenses'}</p>
+                    <button type="button" onClick={() => setRecentOpen(false)} className="rounded p-1 text-muted-foreground hover:bg-muted">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto py-1">
+                    {recentItems === null ? (
+                      <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>
+                    ) : recentItems.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-muted-foreground">Nothing yet.</p>
+                    ) : (
+                      recentItems.map(item => (
+                        <button
+                          type="button"
+                          key={item.id}
+                          onClick={() => { setRecentOpen(false); nav(item.path); }}
+                          className="grid w-full grid-cols-[1fr_5.5rem_6rem] items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
+                        >
+                          <span className="truncate text-primary">{item.label}</span>
+                          <span className="whitespace-nowrap text-muted-foreground">{fmtShortDate(item.date)}</span>
+                          <span className="text-right font-mono tabular-nums">{fmtMoney(item.amount)}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setRecentOpen(false); nav(form.transaction_type === 'deposit' ? '/accounting/bank-deposits' : '/accounting/expense-transactions'); }}
+                    className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
+                  >
+                    View More
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold">
+              {TITLES[form.transaction_type]}
+              {form.transaction_type === 'check' && form.check_number ? ` #${form.check_number}` : ''}
+            </h1>
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Imported from a bank statement · Journal no. {txn.journal_number}</span>
+              {txn.status === 'voided' && (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium uppercase text-red-800">Voided</span>
+              )}
+            </p>
+          </div>
         </div>
         <div className="text-right">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Amount</div>
-          <div className="text-3xl font-semibold font-mono">{fmtMoney(String(amountNum))}</div>
+          <div className={`text-3xl font-semibold font-mono ${txn.status === 'voided' ? 'text-muted-foreground line-through decoration-2' : ''}`}>
+            {fmtMoney(String(amountNum))}
+          </div>
         </div>
       </div>
 
