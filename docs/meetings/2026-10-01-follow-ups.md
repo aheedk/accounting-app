@@ -13,7 +13,7 @@ what could not be made out. Status as of 2026-10-04.
 | 3 | Delete a journal entry (QuickBooks "More > Delete") | `1f1382c` |
 | 4 | Attachments on entries | `9dd25e2` |
 | 5 | Save and post in one step | `f5b200b` |
-| 6 | Save / Save and new / Save and close, like QuickBooks | `0b4947d` |
+| 6 | Save and close / Save and new, like QuickBooks (the extra Save and Save draft buttons were later dropped as repetitive) | `0b4947d`, see below |
 | 7 | Next journal line copies the description above and fills the balancing amount | `4380b5c` |
 | 8 | Typing 26 for the year becomes 2026; ledger dates editable on any preset | `0c6a779`, `96b5a86` |
 | 9 | Ledger keeps its date range when you go Back from a transaction | `9c3a8bc` |
@@ -118,12 +118,12 @@ in. The client needs a Credit Card account for item 16.
    is gone from the General Ledger.
 4. **Attachments.** On a journal entry or an expense, add a file in the
    Attachments area, then open it again from the same place.
-5. **Save and post.** Create a new bill or invoice and use Save and post: it
-   is posted in one click, no separate Post step.
-6. **Save / Save and new / Save and close.** On the same form, open the arrow
-   next to Save and show the three choices. As in QuickBooks there is no
-   separate Post button: every Save posts (hover a button to see what it
-   does), and **Save draft** is the only one that keeps it unposted.
+5. **Save and post.** Create a new bill or invoice and click Save and close:
+   it is saved and posted in one click, no separate Post step.
+6. **Save and close / Save and new.** On the same form there is one button:
+   Save and close, with Save and new under the arrow (it remembers the last
+   one used). As in QuickBooks there is no separate Post button; saving posts.
+   Hover the button to see what it does. Same on journal entries.
 7. **Journal line autofill.** + New → Journal entry. Type a description and a
    debit on line 1, then move to line 2: the description is copied and the
    balancing credit is filled in.

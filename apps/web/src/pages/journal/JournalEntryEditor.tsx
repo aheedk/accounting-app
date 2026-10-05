@@ -677,9 +677,6 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
 
         {!readOnly && (
           <div className="ml-auto flex items-center gap-2">
-            <Button type="button" disabled={!canSave} onClick={() => { void save('detail'); }}>
-              {busy ? 'Saving…' : 'Save'}
-            </Button>
             <div className="relative flex" ref={saveMenuRef}>
               <Button
                 type="button"
