@@ -26,7 +26,6 @@ what could not be made out. Status as of 2026-10-04.
 | 16 | Credit card statement upload: charges post as credit card expenses, payments and refunds reduce the card, a payment already on the bank statement is spotted and left out | `b624b71`, `dc258f3` |
 | 17 | Bank statements recognise credit card payments and pick the right card by issuer name | `b624b71` |
 | 18 | Check stubs: upload stubs or photos; checks on a bank statement take their payee and category from the stub, and checks already posted can be filled in from the Check stubs tab | `b624b71`, `dc258f3` |
-
 | 19 | Chart of Accounts: every field on the edit-account screen is editable, including the account number and account type; system accounts (AR, AP, Suspense...) can be renumbered and renamed too | `12235b3` |
 
 ### Also completed (not raised in the meeting)
@@ -97,3 +96,107 @@ what could not be made out. Status as of 2026-10-04.
 - **"Import… first numbers… due to/from"**: something about importing a chart of
   accounts and its account numbers.
 - **Acumatica ERP** was named, most likely as a product to look at for reference.
+
+## Demo for the next meeting
+
+Everything above, in the same order and numbering, with where it lives in the
+app and what to click to show it. Before the meeting: open a client with some
+posted activity, and have a bank statement PDF, a check stub PDF or photo, and
+the sample Amex statement (`SAMPLE Amex statement Jul 2026.pdf`) ready to drop
+in. The client needs a Credit Card account for item 16.
+
+### Asked for in the meeting
+
+1. **General Ledger opens each entry's own form.** Reports → General Ledger.
+   Click a Check, a Deposit, an Expense and a Journal Entry row in turn; each
+   opens its own form, not a generic journal page.
+2. **Source transactions open the source.** In the General Ledger, click an
+   invoice, bill or payment line. It goes straight to that invoice, bill or
+   payment instead of a greyed-out journal entry.
+3. **Delete a journal entry.** Open any journal entry → More → Delete. Show it
+   is gone from the General Ledger.
+4. **Attachments.** On a journal entry or an expense, add a file in the
+   Attachments area, then open it again from the same place.
+5. **Save and post.** Create a new bill or invoice and use Save and post: it
+   is posted in one click, no separate Post step.
+6. **Save / Save and new / Save and close.** On the same form, open the arrow
+   next to Save and show the three choices.
+7. **Journal line autofill.** + New → Journal entry. Type a description and a
+   debit on line 1, then move to line 2: the description is copied and the
+   balancing credit is filled in.
+8. **Two-digit year.** In any date box type `3/15/26` → it becomes 3/15/2026.
+   In the General Ledger, pick a preset (This Month) and show the dates are
+   still editable.
+9. **Ledger keeps its period.** General Ledger → set a custom date range →
+   click a transaction → Back. The same range is still there.
+10. **Debit / Credit columns.** General Ledger → Customize → turn on Debit and
+    Credit (also Class, Create Date, Created By, Last Modified).
+11. **Check number.** New expense (Accounts Payable → Expense Transactions →
+    New) with payment method Check: the Check no. field appears. Same on a
+    bill payment by check.
+12. **ADJ column.** General Ledger → Customize: hide or show ADJ, and filter on
+    it.
+13. **Name / Memo / Split, single Amount.** General Ledger: point out the Name,
+    Memo and Split columns and the one signed Amount column.
+14. **Dropdowns.** Open any dropdown (account, vendor): it is the app's own
+    styled list, not the browser's.
+15. **Bank deposit.** + New → Bank deposit, save one, then find it in the
+    General Ledger and click it to open the deposit.
+16. **Credit card statement upload.** AI → Document Inbox → drop the Amex
+    statement. It appears under Statements with a card icon and the card name.
+    Open it: the card account is preselected, each line is marked Charge,
+    Payment or Refund. Pick categories and approve. In the General Ledger the
+    lines read Credit Card Expense / Credit Card Credit / Credit Card Payment.
+17. **Card payments on bank statements.** Open the July checking statement in
+    the inbox: the 7/17 American Express payment ($9,443.41) is coded to the
+    Amex card, not an expense, and shows **Already recorded** because the card
+    statement posted it.
+18. **Check stubs.** Drop a check stub PDF or a photo in the inbox; the message
+    says how many checks were read. Open the **Check stubs** tab to see them.
+    On a bank statement with those checks, the line shows "From check stub"
+    with payee and category filled in; after approving, the stub shows Used.
+    (Needs the statement of the account the checks are written on.)
+19. **Chart of Accounts fully editable.** Accounting → Chart of Accounts →
+    Edit on Accounts Receivable: change its number (1100 → 1150) and name, save.
+    Create an invoice to show it still posts to AR. Edit a normal account and
+    change its type; the drawer warns if it has a balance.
+
+### Also done (not raised in the meeting)
+
+20. **General Ledger matches QuickBooks.** Show the running balance, the real
+    transaction types (Expense, Check, Payroll), numbers and names filled in,
+    amounts in the account's natural sign.
+21. **Ledger details.** Point out CM-/VC- numbers on credit memos and vendor
+    credits and names on payroll rows.
+22. **Clickable date, name and description.** In the General Ledger, click a
+    date, a name and a description: each opens the transaction.
+23. **Any account as an expense category.** New expense → Category: asset and
+    liability accounts are offered as well as expenses.
+24. **Add new from dropdowns.** In an account, vendor or customer dropdown,
+    choose "Add new" and create one without leaving the form.
+25. **Arrow keys.** Open a dropdown or a ⋯ menu and move with the arrow keys,
+    Enter to pick.
+26. **Company switch opens the dashboard.** Switch company from the top bar:
+    you land on that company's Dashboard.
+27. **Stale tabs.** With two tabs open, switch company in one; the other shows
+    "What happened to this page?" instead of the old company's data.
+28. **Chart of Accounts pager at the bottom.** Scroll to the bottom of the
+    Chart of Accounts: the page controls are there too.
+29. **Exports.** General Ledger (or any report) → Export to Excel, PDF and
+    Print: header with company, report and period, footer with page numbers,
+    numbers formatted.
+30. **API key message.** (Explain, no click.) If the AI key is ever rejected,
+    the inbox now says so plainly; production uses a non-expiring service
+    account key.
+31. **Photo uploads.** Drop a phone photo (PNG/JPEG) of a check stub in the
+    inbox; the message says what it read.
+32. **Long, multi-account statements.** Drop the July bank PDF (20 scanned
+    pages, checking and savings). Wait ~3 minutes: it becomes two statements,
+    "…Checking 2553" (155 lines) and "…Savings 8344" (6 lines).
+33. **Stub dates.** In the Check stubs tab, the handwritten "7/1" stubs show
+    7/1/2026, not a guessed year.
+34. **Suspense.** In a statement, lines the AI could not place show the amber
+    "Suspense · not sure" badge and can be approved as they are. AI → Suspense
+    lists them: pick the right account, tick "Remember for this payee",
+    Reclassify. Then show that closing the month is refused while Suspense has
+    a balance.
