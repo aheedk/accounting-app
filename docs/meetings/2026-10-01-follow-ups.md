@@ -19,9 +19,9 @@ what could not be made out. Status as of 2026-10-04.
 | 9 | Ledger keeps its date range when you go Back from a transaction | `9c3a8bc` |
 | 10 | Debit and Credit columns available in the ledger (plus Class, Create Date, Created By, Last Modified) under Customize | `9c3a8bc` |
 | 11 | Check number field | `eaed249` |
-| 12 | ADJ column can be hidden or filtered | already in place |
-| 13 | Name / Memo / Split columns, single signed Amount column | `e92959e` |
-| 14 | Dropdowns no longer use the browser's own look | Riham's AppSelect work, `864592f` |
+| 12 | ADJ column can be hidden or filtered | Riham, `e335777` |
+| 13 | Name / Memo / Split columns, single signed Amount column | Riham `8a3d269` (Name/Split), `e92959e` |
+| 14 | Dropdowns no longer use the browser's own look | Riham `09685fa` (dropdowns), `864592f` (payee box) |
 | 15 | Bank Deposit form ("+ New > Bank deposit"), with GL drill-through | Riham, `428fb69`, `6f2ecf1` |
 | 16 | Credit card statement upload: charges post as credit card expenses, payments and refunds reduce the card, a payment already on the bank statement is spotted and left out | `b624b71`, `dc258f3` |
 | 17 | Bank statements recognise credit card payments and pick the right card by issuer name | `b624b71` |
@@ -106,6 +106,10 @@ posted activity, and have a bank statement PDF, a check stub PDF or photo, and
 the sample Amex statement (`SAMPLE Amex statement Jul 2026.pdf`) ready to drop
 in. The client needs a Credit Card account for item 16.
 
+Items marked **(Riham, pulled)** are Riham's work that came in with a pull;
+**(Riham + you)** means she built part of it and you finished it. Everything
+unmarked is yours.
+
 ### Asked for in the meeting
 
 1. **General Ledger opens each entry's own form.** Reports → General Ledger.
@@ -137,13 +141,13 @@ in. The client needs a Credit Card account for item 16.
 11. **Check number.** New expense (Accounts Payable → Expense Transactions →
     New) with payment method Check: the Check no. field appears. Same on a
     bill payment by check.
-12. **ADJ column.** General Ledger → Customize: hide or show ADJ, and filter on
+12. **(Riham, pulled)** **ADJ column.** General Ledger → Customize: hide or show ADJ, and filter on
     it.
-13. **Name / Memo / Split, single Amount.** General Ledger: point out the Name,
+13. **(Riham + you)** **Name / Memo / Split, single Amount.** General Ledger: point out the Name,
     Memo and Split columns and the one signed Amount column.
-14. **Dropdowns.** Open any dropdown (account, vendor): it is the app's own
+14. **(Riham + you)** **Dropdowns.** Open any dropdown (account, vendor): it is the app's own
     styled list, not the browser's.
-15. **Bank deposit.** + New → Bank deposit, save one, then find it in the
+15. **(Riham, pulled)** **Bank deposit.** + New → Bank deposit, save one, then find it in the
     General Ledger and click it to open the deposit.
 16. **Credit card statement upload.** AI → Document Inbox → drop the Amex
     statement. It appears under Statements with a card icon and the card name.
