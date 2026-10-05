@@ -39,6 +39,9 @@ const NUMBER_LIKE = /^\(?-?\$?\d[\d,]*(\.\d+)?\)?%?$/;
 // Judged by the heading's last word, so "Account Balance" is still money and "Tax ID" is not.
 const IDENTIFIER_HEADER = /(^|\s)(no\.?|num|number|#|code|id|sku|ref|reference|check|zip|phone|year|account|acct|ein|ssn|tin)\.?$/i;
 const MONEY_HEADER = /(amount|total|balance|debit|credit|price|cost|paid|due|open|remaining|subtotal|tax|value|current|net|gross|income|expense|payment|\d+\s*[-–+]\s*\d*)/i;
+// A narrow date column (e.g. "8/3/26" or "08/03/2026") otherwise wraps on the
+// slash in a print layout, splitting the year onto its own line.
+const DATE_HEADER = /(^|\s)date$/i;
 
 /** "1,234.50", "(1,234.50)", "$12" -> number; anything else -> null. */
 export function parseAmount(text: string): number | null {
@@ -102,11 +105,13 @@ export function buildPrintHtml(input: PrintReportInput, now: Date = new Date()):
   const company = getExportCompany();
   const rows = input.rows.filter(row => row.some(cell => cell.trim() !== ''));
   const amounts = amountColumns(input.headers, rows);
+  const dates = input.headers.map(header => DATE_HEADER.test(header));
+  const cellClass = (index: number) => amounts[index] ? 'num' : dates[index] ? 'nowrap' : '';
   const landscape = input.headers.length > 6;
   const running = [company, input.title].filter(Boolean).join(' · ');
 
   const head = input.headers
-    .map((header, index) => `<th class="${amounts[index] ? 'num' : ''}">${escapeHtml(header)}</th>`)
+    .map((header, index) => `<th class="${cellClass(index)}">${escapeHtml(header)}</th>`)
     .join('');
   const body = rows.map(row => {
     const kind = rowKind(row);
@@ -114,7 +119,7 @@ export function buildPrintHtml(input: PrintReportInput, now: Date = new Date()):
       const raw = (row[index] ?? '').trim();
       const amount = amounts[index] ? parseAmount(raw) : null;
       const text = amount !== null ? fmtExportAmount(amount) : raw;
-      return `<td class="${amounts[index] ? 'num' : ''}">${escapeHtml(text)}</td>`;
+      return `<td class="${cellClass(index)}">${escapeHtml(text)}</td>`;
     }).join('');
     return `<tr class="${kind}">${cells}</tr>`;
   }).join('');
@@ -133,6 +138,7 @@ thead { display: table-header-group; }
 th { text-align: left; padding: 5px 7px; border-top: 1px solid #111; border-bottom: 1px solid #111; font-size: 9px; text-transform: uppercase; letter-spacing: .03em; }
 td { padding: 4px 7px; border-bottom: 1px solid #e3e3e3; vertical-align: top; }
 .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
 tr { page-break-inside: avoid; }
 tr.total td { font-weight: 700; border-top: 1px solid #111; border-bottom: 1px solid #111; }
 tr.section td { font-weight: 700; background: #f3f3f3; }

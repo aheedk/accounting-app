@@ -57,6 +57,16 @@ describe('report export layout', () => {
     expect(html.match(/<tr class=/g)).toHaveLength(4);
   });
 
+  it('keeps a Date column from wrapping mid-value', () => {
+    const html = buildPrintHtml({
+      title: 'General Ledger',
+      headers: ['Date', 'Transaction Type', 'Amount'],
+      rows: [['8/3/26', 'Deposit', '14,500.00']],
+    });
+    expect(html).toContain('<th class="nowrap">Date</th>');
+    expect(html).toContain('<td class="nowrap">8/3/26</td>');
+  });
+
   it('writes Excel with a title block, numeric amounts and a generated line', () => {
     let sheet: XLSX.WorkSheet | undefined;
     let file = '';

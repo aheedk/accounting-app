@@ -323,12 +323,16 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     const expensesType = Array.from(typeMenu!.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent?.trim() === 'Expenses');
     await click(expensesType!);
-    const detailType = document.querySelector<HTMLSelectElement>('#new-account-detail-type')!;
     await act(async () => {
       setFieldValue(code, '6990');
       setFieldValue(name, 'Miscellaneous Expense');
-      setFieldValue(detailType, 'Other Business Expenses');
     });
+    // AppSelect is a custom combobox, not a native <select> -- drive it the
+    // same way select.test.tsx does: open via its trigger, click the option.
+    await click(document.querySelector<HTMLButtonElement>('#new-account-detail-type button[aria-haspopup="listbox"]')!);
+    const detailOption = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+      .find(option => option.textContent?.trim() === 'Other Business Expenses');
+    await click(detailOption!);
     await act(async () => document.querySelector<HTMLFormElement>('#coa-create-form')!
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
 
@@ -376,9 +380,12 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     await click(addAccount!);
 
     const accountType = document.querySelector<HTMLButtonElement>('#new-account-type')!;
-    const detailType = document.querySelector<HTMLSelectElement>('#new-account-detail-type')!;
+    // AppSelect is a custom combobox: its id lands on the outer wrapper, and
+    // the actual trigger/options render fresh on every call, so re-query them
+    // rather than caching a reference across opens and closes.
+    const detailTypeTrigger = () => document.querySelector<HTMLButtonElement>('#new-account-detail-type button[aria-haspopup="listbox"]')!;
     expect(accountType.textContent?.trim()).toBe('Select account type');
-    expect(detailType.disabled).toBe(true);
+    expect(detailTypeTrigger().disabled).toBe(true);
 
     for (const [typeLabel, details] of Object.entries(expectedDetails)) {
       await click(accountType);
@@ -387,9 +394,16 @@ describe('JournalEntryEditor line keyboard navigation', () => {
       )).find(button => button.textContent?.trim() === typeLabel);
       await click(choice!);
 
-      expect(detailType.disabled).toBe(false);
-      expect(detailType.value).toBe('');
-      expect(Array.from(detailType.options).slice(1).map(option => option.textContent)).toEqual(details);
+      const trigger = detailTypeTrigger();
+      expect(trigger.disabled).toBe(false);
+      expect(trigger.textContent?.trim()).toBe('— select —');
+
+      await click(trigger);
+      const optionTexts = Array.from(document.querySelectorAll('[role="option"]'))
+        .map(option => option.textContent?.trim())
+        .filter(text => text !== '— select —');
+      expect(optionTexts).toEqual(details);
+      await click(detailTypeTrigger()); // close, so the next iteration opens fresh
     }
   });
 });

@@ -739,7 +739,7 @@ export default function GeneralLedgerPage() {
           ) : (
             <div className="w-full overflow-x-auto">
               <table
-                className="w-full text-sm"
+                className="w-full text-xs"
                 style={{ minWidth: `${Math.max(520, visibleColumns.length * 135)}px` }}
               >
                 <thead className="border-b">
@@ -747,7 +747,7 @@ export default function GeneralLedgerPage() {
                     {visibleColumns.map(column => {
                       const definition = columnDefinition(column);
                       return (
-                        <th key={column} className={`${preferences.density === 'compact' ? 'px-3 py-2' : 'p-3'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}>
+                        <th key={column} className={`whitespace-nowrap ${preferences.density === 'compact' ? 'px-2.5 py-1.5' : 'px-2.5 py-2.5'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}>
                           {definition.label}
                         </th>
                       );
@@ -987,7 +987,7 @@ function AccountSection({
   onToggle: () => void;
 }) {
   const navigate = useNavigate();
-  const padding = preferences.density === 'compact' ? 'px-3 py-1.5' : 'p-3';
+  const padding = preferences.density === 'compact' ? 'px-2.5 py-1' : 'px-2.5 py-1.5';
   return (
     <>
       <tr className="border-y bg-muted/50">
@@ -1156,7 +1156,7 @@ function SummaryRow({
   className: string;
 }) {
   const labelColumn = summaryLabelColumn(columns);
-  const padding = density === 'compact' ? 'px-3 py-1.5' : 'p-3';
+  const padding = density === 'compact' ? 'px-2.5 py-1' : 'px-2.5 py-1.5';
   return (
     <tr className={className}>
       {columns.map(column => {
