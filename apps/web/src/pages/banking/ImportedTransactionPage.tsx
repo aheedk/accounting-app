@@ -304,7 +304,7 @@ export default function ImportedTransactionPage() {
 
       {err && <p className="text-sm text-destructive">{err}</p>}
       {notice && <p className="text-sm text-emerald-700">{notice}</p>}
-      <div className="sticky bottom-0 flex items-center gap-2 border-t bg-background py-3">
+      <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-2 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav(-1)}>{readOnly ? 'Back' : 'Cancel'}</Button>
         <Link className="text-sm text-primary hover:underline" to={`/journal/${txn.id}?view=entry`}>View journal entry</Link>
         <div className="flex-1" />

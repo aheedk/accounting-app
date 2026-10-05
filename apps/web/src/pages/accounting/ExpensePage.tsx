@@ -774,7 +774,7 @@ export default function ExpensePage() {
       {err && <p className="px-6 pb-2 text-sm text-destructive">{err}</p>}
 
       {/* ── Sticky bottom bar ── */}
-      <div className="sticky bottom-0 flex items-center gap-3 border-t bg-background px-6 py-3">
+      <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
         <Button type="button" variant="outline" onClick={() => nav('/accounting/expense-transactions')}>
           Cancel
         </Button>

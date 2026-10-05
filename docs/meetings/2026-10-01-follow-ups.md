@@ -47,6 +47,7 @@ what could not be made out. Status as of 2026-10-04.
 | 32 | Long scanned bank statements (20 pages, ~160 lines) are read in full, and a PDF with several accounts (checking and savings) becomes one statement per account | `b862b50` |
 | 33 | Handwritten check stubs with no year ("7/1") get the right year instead of one the AI guessed | `d3030e2` |
 | 34 | Suspense (asked for by the firm after the meeting): what the AI cannot categorize goes to a Suspense account instead of being left blank or guessed; AI → Suspense lists it and reclassifies it, optionally teaching the AI; a period cannot close while Suspense has a balance | `456aa80` |
+| 35 | Bottom action bar (Save, Delete, Void...) sits flush at the bottom of the window on every form; content no longer shows underneath it or gets cut off above it | see below |
 
 ## Open
 
@@ -200,3 +201,7 @@ in. The client needs a Credit Card account for item 16.
     lists them: pick the right account, tick "Remember for this payee",
     Reclassify. Then show that closing the month is refused while Suspense has
     a balance.
+35. **Bottom action bar.** Open a journal entry (or any expense, bill, deposit,
+    payment) and scroll: the Save / Delete / Void bar stays pinned to the very
+    bottom of the window, with nothing showing underneath it, and the last
+    section (Memo, Attachments) scrolls fully into view above it.
