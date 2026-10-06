@@ -95,6 +95,48 @@ function fmtDateTime(iso: string) {
   return `${date} at ${time}`;
 }
 
+const BUSINESS_SUFFIX = /\b(incorporated|inc|llc|l l c|corp|corporation|co|company|ltd|limited)\b\.?/g;
+
+function nameTokens(name: string): Set<string> {
+  return new Set(
+    name.toLowerCase()
+      .replace(BUSINESS_SUFFIX, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean),
+  );
+}
+
+/** Token-overlap similarity (0-1), ignoring word order and common suffixes
+ * like "Inc"/"LLC" -- close enough to catch a rename ("Duke Power" ->
+ * "Duke Energy") without pulling in a real string-distance library. */
+function nameSimilarity(a: string, b: string): number {
+  const ta = nameTokens(a);
+  const tb = nameTokens(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let shared = 0;
+  for (const token of ta) if (tb.has(token)) shared++;
+  return shared / Math.max(ta.size, tb.size);
+}
+
+/** The known vendor whose name best matches a name the AI pulled off a
+ * statement, so the reviewer sees "Duke Energy" preselected instead of the
+ * raw "Duke Power" the bank printed -- still free text, so they can correct
+ * it either way. */
+export function bestVendorMatch(extracted: string, vendors: Vendor[]): string | null {
+  const trimmed = extracted.trim();
+  if (!trimmed || vendors.length === 0) return null;
+  const exact = vendors.find(v => v.name.toLowerCase() === trimmed.toLowerCase());
+  if (exact) return exact.name;
+  let best: { name: string; score: number } | null = null;
+  for (const vendor of vendors) {
+    const score = nameSimilarity(trimmed, vendor.name);
+    if (score > (best?.score ?? 0)) best = { name: vendor.name, score };
+  }
+  return best && best.score >= 0.5 ? best.name : null;
+}
+
 // Mirrors statementImportService.checkNumberOf on the API.
 const CHECK_NUMBER = /\b(?:check|chk|ck)\s*(?:no\.?|number|num|#)?\s*#?\s*(\d{2,10})\b/i;
 function checkNumberOf(tx: Pick<ExtractedTx, 'check_number' | 'description'>): string | null {
@@ -329,6 +371,12 @@ export default function EmailImportReviewPage() {
         if (tx.check_stub.payee_name) initPayees[i] = tx.check_stub.payee_name;
       }
       if (tx.payee_name && !initPayees[i]) initPayees[i] = tx.payee_name;
+      // Prefer the known vendor's own name over whatever the bank printed,
+      // when they're close enough to be the same vendor (e.g. a rename).
+      if (initPayees[i]) {
+        const matched = bestVendorMatch(initPayees[i]!, vendors);
+        if (matched) initPayees[i] = matched;
+      }
       if (tx.suggested_account_id) {
         initOffsets[i] = tx.suggested_account_id;
       } else if (tx.suggested_offset) {
@@ -772,6 +820,13 @@ export default function EmailImportReviewPage() {
 
               {bankError && <p className="text-sm text-destructive">{bankError}</p>}
 
+              {/* Shared across every row's Name field: the client's vendors as
+                  suggestions, while the field itself stays free text so a
+                  payee not yet on file can still be typed and corrected. */}
+              <datalist id="bank-review-vendor-names">
+                {vendors.map(v => <option key={v.id} value={v.name} />)}
+              </datalist>
+
               <div className="rounded-lg border overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
@@ -802,6 +857,7 @@ export default function EmailImportReviewPage() {
                           {(tx.type === 'expense' || tx.type === 'check' || tx.type === 'debit') ? (
                             <input
                               type="text"
+                              list="bank-review-vendor-names"
                               value={payees[i] ?? ''}
                               onChange={e => setPayees(prev => ({ ...prev, [i]: e.target.value }))}
                               disabled={!included[i] || tx.auto_posted}
