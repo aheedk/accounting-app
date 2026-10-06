@@ -136,7 +136,11 @@ function correctionBlockReason(
       : 'Only posted journal entries can be corrected.';
   }
   if (sourceGenerated) {
-    return 'This entry was created by a source transaction. Correct the source transaction instead.';
+    // A reversing entry has no "source transaction" page to send someone to --
+    // the generic message below is misleading for it specifically.
+    return entry.source_type === 'reversal'
+      ? 'This is a reversing entry and cannot be edited directly.'
+      : 'This entry was created by a source transaction. Correct the source transaction instead.';
   }
   if (hasReversal) {
     return 'This journal entry has already been reversed.';

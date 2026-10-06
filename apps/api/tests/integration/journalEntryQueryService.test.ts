@@ -149,7 +149,9 @@ describe('journalEntryQueryService', () => {
 
     const generatedDetail = await journalQueries.getJournalEntryDetail(t.db, data.ctx, reversal.id);
     expect(generatedDetail.can_correct).toBe(false);
-    expect(generatedDetail.correction_block_reason).toMatch(/source transaction/i);
+    // A reversing entry gets its own specific message, not the generic
+    // "source transaction" one -- there's no source transaction page for it.
+    expect(generatedDetail.correction_block_reason).toMatch(/reversing entry/i);
     expect(generatedDetail.can_reverse).toBe(false);
     expect(generatedDetail.reversal_block_reason).toMatch(/source transaction/i);
     expect(generatedDetail.is_standalone_manual).toBe(false);
