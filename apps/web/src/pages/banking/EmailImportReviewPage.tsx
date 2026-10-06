@@ -199,8 +199,17 @@ export default function EmailImportReviewPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
-  const addVendor = useAddParty<Vendor>('vendor', vendor => setVendors(prev => [...prev, vendor]));
+  // Set synchronously inside onCreated, so the pick() callback below -- called
+  // right after it, in the same synchronous save() -- can read the vendor's
+  // name without waiting on the setVendors state update to land.
+  const lastCreatedVendorRef = useRef<Vendor | null>(null);
+  const addVendor = useAddParty<Vendor>('vendor', vendor => {
+    lastCreatedVendorRef.current = vendor;
+    setVendors(prev => [...prev, vendor]);
+  });
   const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
+  // Which bank-review row's payee suggestion dropdown is open, if any.
+  const [payeeDropdownRow, setPayeeDropdownRow] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
@@ -820,13 +829,6 @@ export default function EmailImportReviewPage() {
 
               {bankError && <p className="text-sm text-destructive">{bankError}</p>}
 
-              {/* Shared across every row's Name field: the client's vendors as
-                  suggestions, while the field itself stays free text so a
-                  payee not yet on file can still be typed and corrected. */}
-              <datalist id="bank-review-vendor-names">
-                {vendors.map(v => <option key={v.id} value={v.name} />)}
-              </datalist>
-
               <div className="rounded-lg border overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
@@ -855,15 +857,64 @@ export default function EmailImportReviewPage() {
                         <td className="px-3 py-2 max-w-[220px] truncate">{tx.description}</td>
                         <td className="px-3 py-2">
                           {(tx.type === 'expense' || tx.type === 'check' || tx.type === 'debit') ? (
-                            <input
-                              type="text"
-                              list="bank-review-vendor-names"
-                              value={payees[i] ?? ''}
-                              onChange={e => setPayees(prev => ({ ...prev, [i]: e.target.value }))}
-                              disabled={!included[i] || tx.auto_posted}
-                              placeholder="Payee…"
-                              className="w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={payees[i] ?? ''}
+                                onChange={e => setPayees(prev => ({ ...prev, [i]: e.target.value }))}
+                                onFocus={() => setPayeeDropdownRow(i)}
+                                // Delayed so a click on a dropdown item (below) registers
+                                // before the dropdown unmounts out from under it.
+                                onBlur={() => setTimeout(
+                                  () => setPayeeDropdownRow(current => (current === i ? null : current)), 150,
+                                )}
+                                disabled={!included[i] || tx.auto_posted}
+                                placeholder="Payee…"
+                                className="w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                              {payeeDropdownRow === i && (() => {
+                                const needle = (payees[i] ?? '').trim().toLowerCase();
+                                const matches = needle
+                                  ? vendors.filter(v => v.name.toLowerCase().includes(needle))
+                                  : vendors;
+                                return (
+                                  <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border bg-white text-left shadow-lg dark:bg-zinc-900">
+                                    <div className="max-h-48 overflow-y-auto py-1">
+                                      {matches.length === 0 && (
+                                        <p className="px-3 py-2 text-xs text-muted-foreground">No matching vendors</p>
+                                      )}
+                                      {matches.map(v => (
+                                        <button
+                                          key={v.id}
+                                          type="button"
+                                          onMouseDown={e => e.preventDefault()}
+                                          onClick={() => { setPayees(prev => ({ ...prev, [i]: v.name })); setPayeeDropdownRow(null); }}
+                                          className="block w-full truncate px-3 py-1.5 text-left text-xs hover:bg-accent"
+                                        >
+                                          {v.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div className="border-t p-1">
+                                      <button
+                                        type="button"
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => {
+                                          setPayeeDropdownRow(null);
+                                          addVendor.open(() => {
+                                            const created = lastCreatedVendorRef.current;
+                                            if (created) setPayees(prev => ({ ...prev, [i]: created.name }));
+                                          });
+                                        }}
+                                        className="w-full rounded-sm px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-accent"
+                                      >
+                                        + Add new vendor
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           ) : null}
                         </td>
                         <td className={`px-3 py-2 text-right font-mono font-medium ${(tx.type === 'credit' || tx.type === 'deposit') ? 'text-emerald-600' : 'text-destructive'}`}>
