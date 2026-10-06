@@ -2,7 +2,7 @@
 
 Requests taken from the meeting recording transcript, checked against the code.
 Parts of the recording were unclear or not in English, so the last section lists
-what could not be made out. Status as of 2026-10-04.
+what could not be made out. Status as of 2026-10-06.
 
 ## Done
 
@@ -49,6 +49,8 @@ what could not be made out. Status as of 2026-10-04.
 | 34 | Suspense (asked for by the firm after the meeting): what the AI cannot categorize goes to a Suspense account instead of being left blank or guessed; AI → Suspense lists it and reclassifies it, optionally teaching the AI; a period cannot close while Suspense has a balance | `456aa80` |
 | 35 | Bottom action bar (Save, Delete, Void...) sits flush at the bottom of the window on every form; content no longer shows underneath it or gets cut off above it | `556f53b` |
 | 36 | Check no. box: on payments and bill payments it no longer turns into "Ref no." after picking a payment method (the dropdown was losing the choice); the Expense form now says "Check no." when paying by check too | `83ef128` |
+| 37 | Vendor dropdown in the AI inbox: the Name column on a bank statement review suggests the client's vendors and matches a renamed payee ("Duke Power" to "Duke Energy") by shared words, while staying free text for an unlisted or corrected payee | `40d1214` |
+| 38 | Report period presets: This/Last Fiscal Year (and their to-date variants) now use the business's own fiscal year start month instead of duplicating the calendar-year presets | `e9acc5a` |
 
 ## Open
 
@@ -61,10 +63,7 @@ what could not be made out. Status as of 2026-10-04.
    - Credit card statement: test with the sample Amex statement, or a real one,
      after adding a Credit Card account to the client.
    - Suspense: try reclassifying a few lines from AI → Suspense.
-2. **Vendor dropdown in the AI inbox.** The Name column is free text. It should
-   be a dropdown of the client's vendors, with the AI matching the extracted
-   name ("Duke Power" to "Duke Energy") and the user able to correct it. Riham
-   said "I'll fix that" in the meeting — confirm who owns it.
+2. ~~**Vendor dropdown in the AI inbox.**~~ Done, see `40d1214` in the table above.
 
 ## Bigger items, for later
 
@@ -74,8 +73,7 @@ what could not be made out. Status as of 2026-10-04.
 - **Pay stubs.** Promised for the next meeting. Nothing in the code yet.
 - **Reconciliation.** Mentioned in passing; left as something that will follow
   once bank linking exists.
-- **Report period presets.** Riham noted the presets were not tested and their
-  definitions still need filling in.
+- ~~**Report period presets.**~~ Done, see `e9acc5a` in the table above.
 
 ## Not code
 
@@ -215,3 +213,11 @@ unmarked is yours.
 36. **Check no. box.** Payments → New (or a bill payment): pick Cash, then
     Check. The box goes "Ref no." → "Check no." and the method stays Check.
     On an expense, choosing Check also turns "Ref no." into "Check no.".
+37. **Vendor dropdown in the AI inbox.** AI → Document Inbox → open a bank
+    statement. The Name column suggests the client's vendors as you type, and
+    a renamed payee the bank prints differently (e.g. an old name for a
+    vendor already on file) comes in preselected to the vendor's real name —
+    still editable either way.
+38. **Report period presets.** On a client with a non-January fiscal year
+    start (Setup → Entity), General Ledger → This Fiscal Year: the range
+    reflects that start month, not January–December.
