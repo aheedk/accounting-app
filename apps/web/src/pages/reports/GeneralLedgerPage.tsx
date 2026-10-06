@@ -104,7 +104,7 @@ type AdjFilter = 'all' | 'regular' | 'adjustments';
 const DEFAULT_PREFERENCES = defaultGeneralLedgerPreferences();
 const NON_NUMERIC_COLUMNS: GeneralLedgerColumnKey[] = ['date', 'transaction', 'reference', 'adj', 'name', 'memo', 'split'];
 
-type DateRangePreset =
+export type DateRangePreset =
   | 'all-dates' | 'custom'
   | 'today' | 'yesterday'
   | 'this-week' | 'this-week-to-date' | 'last-week' | 'last-week-to-date'
@@ -151,8 +151,17 @@ function monthStart(d: Date): Date { return new Date(d.getFullYear(), d.getMonth
 function monthEnd(d: Date): Date { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
 function quarterStart(d: Date): Date { return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1); }
 function quarterEnd(d: Date): Date { const q = Math.floor(d.getMonth() / 3); return new Date(d.getFullYear(), q * 3 + 3, 0); }
+// The fiscal year "containing" d, for a business whose year starts in `startMonth`
+// (1-12, from businesses.fiscal_year_start_month). startMonth 1 reduces to the
+// calendar year, so this is a strict generalization of the calendar-year presets.
+function fiscalYearStart(d: Date, startMonth: number): Date {
+  const m = startMonth - 1;
+  const year = d.getMonth() >= m ? d.getFullYear() : d.getFullYear() - 1;
+  return new Date(year, m, 1);
+}
+function fiscalYearEnd(start: Date): Date { return new Date(start.getFullYear() + 1, start.getMonth(), 0); }
 
-function computePresetRange(preset: DateRangePreset): { start: string; end: string } {
+export function computePresetRange(preset: DateRangePreset, fiscalYearStartMonth: number): { start: string; end: string } {
   const today = new Date();
   const iso = (d: Date) => dateToLocalIso(d);
   const t = iso(today);
@@ -177,10 +186,10 @@ function computePresetRange(preset: DateRangePreset): { start: string; end: stri
     case 'this-year-to-date':         return { start: `${today.getFullYear()}-01-01`, end: t };
     case 'last-year':                 return { start: `${today.getFullYear() - 1}-01-01`, end: `${today.getFullYear() - 1}-12-31` };
     case 'last-year-to-date':         { const ly = today.getFullYear() - 1; return { start: `${ly}-01-01`, end: iso(new Date(ly, today.getMonth(), today.getDate())) }; }
-    case 'this-fiscal-year':          return { start: `${today.getFullYear()}-01-01`, end: `${today.getFullYear()}-12-31` };
-    case 'this-fiscal-year-to-date':  return { start: `${today.getFullYear()}-01-01`, end: t };
-    case 'last-fiscal-year':          return { start: `${today.getFullYear() - 1}-01-01`, end: `${today.getFullYear() - 1}-12-31` };
-    case 'last-fiscal-year-to-date':  { const lfy = today.getFullYear() - 1; return { start: `${lfy}-01-01`, end: iso(new Date(lfy, today.getMonth(), today.getDate())) }; }
+    case 'this-fiscal-year':          { const fys = fiscalYearStart(today, fiscalYearStartMonth); return { start: iso(fys), end: iso(fiscalYearEnd(fys)) }; }
+    case 'this-fiscal-year-to-date':  return { start: iso(fiscalYearStart(today, fiscalYearStartMonth)), end: t };
+    case 'last-fiscal-year':          { const thisFys = fiscalYearStart(today, fiscalYearStartMonth); const lastFys = fiscalYearStart(shiftDays(thisFys, -1), fiscalYearStartMonth); return { start: iso(lastFys), end: iso(fiscalYearEnd(lastFys)) }; }
+    case 'last-fiscal-year-to-date':  { const thisFys = fiscalYearStart(today, fiscalYearStartMonth); const lastFys = fiscalYearStart(shiftDays(thisFys, -1), fiscalYearStartMonth); const dayOffset = Math.floor((today.getTime() - thisFys.getTime()) / 86400000); return { start: iso(lastFys), end: iso(shiftDays(lastFys, dayOffset)) }; }
     case 'last-7-days':               return { start: iso(shiftDays(today, -6)), end: t };
     case 'last-30-days':              return { start: iso(shiftDays(today, -29)), end: t };
     case 'last-90-days':              return { start: iso(shiftDays(today, -89)), end: t };
@@ -311,13 +320,17 @@ export default function GeneralLedgerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { businesses } = useAuth();
   const businessName = businesses.find(business => business.id === businessId)?.name ?? '';
+  // Defaults to the calendar year (month 1) until the business's own setting
+  // loads; "This/Last Fiscal Year" below only differ from the calendar-year
+  // presets once this is known.
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
   // The period lives in the URL, so coming Back from a transaction returns to
   // the same report rather than to the default year-to-date.
   const savedPreset = searchParams.get('range');
   const initPreset: DateRangePreset = DATE_RANGE_OPTIONS.some(option => option.value === savedPreset)
     ? savedPreset as DateRangePreset
     : searchParams.get('period_start') ? 'custom' : 'this-year-to-date';
-  const initRange = computePresetRange(initPreset);
+  const initRange = computePresetRange(initPreset, fiscalYearStartMonth);
   const [periodPreset, setPeriodPreset] = useState<DateRangePreset>(initPreset);
   const [draftStart, setDraftStart] = useState(() => searchParams.get('period_start') ?? initRange.start);
   const [draftEnd, setDraftEnd] = useState(() => searchParams.get('period_end') ?? initRange.end);
@@ -338,6 +351,13 @@ export default function GeneralLedgerPage() {
   const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(() => new Set());
 
   useEffect(() => { saveGeneralLedgerPreferences(preferences); }, [preferences]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    api.get<{ fiscal_year_start_month: number }>(`/businesses/${businessId}`)
+      .then(response => setFiscalYearStartMonth(response.data.fiscal_year_start_month ?? 1))
+      .catch(() => setFiscalYearStartMonth(1));
+  }, [businessId]);
 
   useEffect(() => {
     if (!businessId) return;
@@ -509,7 +529,7 @@ export default function GeneralLedgerPage() {
     setPeriodPreset(preset);
     // "Custom" means "these dates, as typed" -- keep whatever is in the boxes.
     if (preset === 'custom') return;
-    const range = computePresetRange(preset);
+    const range = computePresetRange(preset, fiscalYearStartMonth);
     setDraftStart(range.start);
     setDraftEnd(range.end);
   }
