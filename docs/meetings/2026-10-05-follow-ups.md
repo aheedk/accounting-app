@@ -20,9 +20,9 @@ Owner is who was asked or who volunteered; "open" means nobody was named.
 
 | # | What | Where it stands | Owner |
 |---|---|---|---|
-| 1 | **Journal entry amounts with commas and two decimals** (9,000.00), like the rest of the app | The debit and credit boxes are plain number inputs (`JournalEntryEditor.tsx:514`, `:526`), so they show `9000`. Totals underneath are already formatted. | Aheed |
+| 1 | **Journal entry amounts with commas and two decimals** (9,000.00), like the rest of the app | Half done. A posted, read-only entry now shows formatted amounts (Riham, `7dd3df1`). While editing, the debit and credit boxes are still plain number inputs (`JournalEntryEditor.tsx:529`, `:544`), so they show `9000`. | Aheed |
 | 2 | **Typing 9 becomes 9.00** when you tab out of an amount box. Asked for on the journal entry; apply to every amount box | Not done. Same inputs as item 1, so do both together. | Aheed |
-| 3 | **Journal entry: put Delete under a "More" button**, as QuickBooks does. The "are you sure" prompt stays | Delete is its own button in the bottom bar (`JournalEntryEditor.tsx:652`). Bank Deposit already has a More menu to copy. | Aheed |
+| 3 | **Journal entry: put Delete under a "More" button**, as QuickBooks does. The "are you sure" prompt stays | **Done** by Riham after the meeting (`7dd3df1`): the bottom bar has a More menu with Delete in it. Its Audit history entry still says "coming soon". | Riham, done |
 | 4 | **Attachments on bank deposits do not work** (Faizan; they work on checks) | An Attachments area is on the form (`BankDepositPage.tsx:946`), so this is a bug to reproduce, not a missing feature. Not reproduced yet. | Aheed |
 | 5 | **Statement review: the bank account picker should list only bank accounts**, not most of the chart | It lists every asset account except Suspense (`EmailImportReviewPage.tsx:561`). Should be accounts whose type is Bank (Checking, Savings, Money Market, Cash on hand, Trust...). | Aheed |
 | 6 | **Card statement: the payment line should not go to the bank account.** See "The card payment decision" below | Payment lines are coded to the client's bank account (`cardPaymentSourceAccount`), with a check for the same payment already posted from the bank statement. | Aheed |
@@ -75,7 +75,7 @@ None of these exist in the code yet.
 
 ### Suggested split
 
-- **Aheed:** 1–8, then 17 and 18.
+- **Aheed:** 1–8 (3 is already done), then 17 and 18.
 - **Riham:** 9–13 and 19.
 - **Faizan:** files for 14, expected behaviour for 11, testing for 15 and 16.
 - **Needs a decision from the firm before work starts:** 22, 24, 25, 26–28, and
