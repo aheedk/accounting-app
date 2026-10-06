@@ -78,10 +78,12 @@ const detail: JournalEntryDetail = {
   can_delete: true,
   delete_block_reason: null,
   delete_removes_pair: false,
+  reversed_entry_journal_number: null,
+  corrected_from_entry_journal_number: null,
 };
 
 describe('journal entry form mappings', () => {
-  it('maps API detail into the shared editor and pads to eight rows', () => {
+  it('maps API detail into the shared editor and pads with two blank rows', () => {
     const form = journalEntryToForm(detail);
 
     expect(form).toMatchObject({
@@ -91,7 +93,7 @@ describe('journal entry form mappings', () => {
       isAdjusting: true,
       memo: 'Adjustment',
     });
-    expect(form.lines).toHaveLength(8);
+    expect(form.lines).toHaveLength(4);
     expect(form.lines[0]).toMatchObject({
       account_id: CASH_ID,
       debit: '50.0000',
@@ -100,7 +102,10 @@ describe('journal entry form mappings', () => {
       name: 'Patient A',
       class_name: 'Clinic',
     });
-    expect(form.lines[7]).toEqual({
+    expect(form.lines[2]).toEqual({
+      account_id: '', debit: '', credit: '', description: '', name: '', class_name: '',
+    });
+    expect(form.lines[3]).toEqual({
       account_id: '', debit: '', credit: '', description: '', name: '', class_name: '',
     });
   });
@@ -184,11 +189,11 @@ describe('journal entry form mappings', () => {
     })))).toEqual({ debit: '50.0000', credit: '50.0000', balanced: true });
   });
 
-  it('creates a blank eight-row form for the supplied local date', () => {
+  it('creates a blank two-row form for the supplied local date', () => {
     const form = newJournalEntryForm('2026-08-25');
     expect(form.date).toBe('2026-08-25');
     expect(form.isAdjusting).toBe(false);
-    expect(form.lines).toHaveLength(8);
+    expect(form.lines).toHaveLength(2);
   });
 
   it('does not overwrite a journal number the user entered while a suggestion was loading', () => {

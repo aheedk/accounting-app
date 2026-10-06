@@ -52,6 +52,10 @@ export type JournalEntryDetail = {
   is_standalone_manual: boolean;
   /** Web path of the transaction that generated this entry, when it has a page. */
   source_path: string | null;
+  /** Journal number of the entry `reversed_entry_id` points at, for display (not the raw id). */
+  reversed_entry_journal_number: string | null;
+  /** Journal number of the entry `corrected_from_entry_id` points at, for display. */
+  corrected_from_entry_journal_number: string | null;
 };
 
 async function readLines(db: Kysely<DB>, journalEntryIds: string[]): Promise<JournalEntryLineRead[]> {
@@ -204,6 +208,19 @@ export async function getJournalEntryDetail(
     reversalNumberConflict !== undefined,
   );
   const deletePlan = await planJournalEntryDelete(db, ctx, entry);
+
+  // Human-readable labels for the reversal/correction backlinks -- the ids
+  // themselves are opaque UUIDs and must never reach the page.
+  const referencedIds = [entry.reversed_entry_id, entry.corrected_from_entry_id]
+    .filter((id): id is string => id !== null);
+  const referenced = referencedIds.length > 0
+    ? await db.selectFrom('journal_entries').select(['id', 'journal_number'])
+      .where('id', 'in', referencedIds)
+      .where('business_id', '=', ctx.business_id)
+      .execute()
+    : [];
+  const journalNumberOf = (id: string | null) => referenced.find(row => row.id === id)?.journal_number ?? null;
+
   return {
     entry,
     lines,
@@ -222,5 +239,7 @@ export async function getJournalEntryDetail(
     source_path: sourceGenerated
       ? (await describeTransactions(db, [entry])).get(entry.id)?.path ?? null
       : null,
+    reversed_entry_journal_number: journalNumberOf(entry.reversed_entry_id),
+    corrected_from_entry_journal_number: journalNumberOf(entry.corrected_from_entry_id),
   };
 }

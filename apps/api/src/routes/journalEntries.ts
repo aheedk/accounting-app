@@ -138,7 +138,7 @@ router.post('/businesses/:businessId/journal-entries/:id/void', requireMinRole('
   } catch (e) { next(e); }
 });
 
-router.delete('/businesses/:businessId/journal-entries/:id', requireMinRole('accountant'), async (req, res, next) => {
+router.delete('/businesses/:businessId/journal-entries/:id', requireMinRole('firm_admin'), async (req, res, next) => {
   try {
     const ctx = ctxFromReq(req);
     const force = req.query['admin_override'] === 'true';

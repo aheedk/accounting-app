@@ -265,6 +265,25 @@ describe('ledgerService.postJournalEntry', () => {
     expect(orig.void_reason).toBe('data entry error');
   });
 
+  it('voidJournalEntry defaults the reversal date to the original entry date, not today', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const je = await t.db.transaction().execute(trx =>
+      ledger.postJournalEntry(trx, ctx, {
+        business_id: biz.id, entry_date: '2026-04-15', source_type: 'manual', memo: 'orig',
+        lines: [
+          { account_id: cash.id,    debit: '100.0000', credit: '0.0000',   memo: null },
+          { account_id: revenue.id, debit: '0.0000',   credit: '100.0000', memo: null },
+        ],
+      }),
+    );
+    // No reversal_date passed -- the only call site left without one is the
+    // manual journal entry page's own "Reverse" button.
+    const reversal = await t.db.transaction().execute(trx =>
+      ledger.voidJournalEntry(trx, ctx, { journal_entry_id: je.id, void_reason: 'data entry error' }),
+    );
+    expect(reversal.entry_date).toBe('2026-04-15');
+  });
+
   it('voidJournalEntry rejects voiding an already-voided entry', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const je = await t.db.transaction().execute(trx =>

@@ -45,10 +45,16 @@ export type JournalEntryPayload = {
   }>;
 };
 
-const DEFAULT_ROWS = 8;
+// QBO shows only the populated lines plus a couple of blank ones to grow
+// into -- not a fixed row count regardless of how many lines are in use.
+export const MIN_BLANK_ROWS = 2;
 
 export function blankJournalLine(): JournalEntryFormLine {
   return { account_id: '', debit: '', credit: '', description: '', name: '', class_name: '' };
+}
+
+function withBlankRows(lines: JournalEntryFormLine[], count = MIN_BLANK_ROWS): JournalEntryFormLine[] {
+  return [...lines, ...Array.from({ length: count }, blankJournalLine)];
 }
 
 export function shouldAppendJournalLines(input: {
@@ -69,7 +75,7 @@ export function newJournalEntryForm(date: string): JournalEntryFormValues {
     reference: '',
     isAdjusting: false,
     memo: '',
-    lines: Array.from({ length: DEFAULT_ROWS }, blankJournalLine),
+    lines: withBlankRows([]),
   };
 }
 
@@ -95,14 +101,13 @@ export function journalEntryToForm(detail: JournalEntryDetail): JournalEntryForm
     name: line.name ?? '',
     class_name: line.class_name ?? '',
   }));
-  while (lines.length < DEFAULT_ROWS) lines.push(blankJournalLine());
   return {
     date: detail.entry.entry_date,
     journalNo: detail.entry.journal_number,
     reference: detail.entry.reference ?? '',
     isAdjusting: detail.entry.source_type === 'adjustment',
     memo: detail.entry.memo ?? '',
-    lines,
+    lines: withBlankRows(lines),
   };
 }
 

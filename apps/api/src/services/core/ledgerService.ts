@@ -240,8 +240,11 @@ export async function voidJournalEntry(
   const lines = await trx.selectFrom('journal_entry_lines').selectAll()
     .where('journal_entry_id', '=', orig.id).orderBy('line_number').execute();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const reversalDate = input.reversal_date ?? today;
+  // Default to the original entry's own date, not today -- a void always nets
+  // against the transaction it is undoing, regardless of when the void is
+  // clicked. Callers may still override (e.g. a source service with its own
+  // date field), but the fallback itself is now always the safe one.
+  const reversalDate = input.reversal_date ?? orig.entry_date;
   const reversalPeriod = await findPeriodForDate(trx as unknown as Kysely<DB>, orig.business_id, reversalDate)
                        ?? await findPeriodForDate(trx as unknown as Kysely<DB>, orig.business_id, orig.entry_date);
   if (!reversalPeriod) throw new PreconditionError('No fiscal period available for reversal');
@@ -642,8 +645,10 @@ export async function planJournalEntryDelete(
   opts: { allowClosedPeriods?: boolean; source_guard?: JournalEntrySourceGuard } = {},
 ): Promise<JournalEntryDeletePlan> {
   const blocked = (block_reason: string): JournalEntryDeletePlan => ({ block_reason, entry_ids: [], removes_pair: false });
-  if (!hasMinRole(ctx.effective_role, 'accountant')) {
-    return blocked('Accountant access is required to delete journal entries.');
+  // Delete is a hard, unrecoverable removal (QBO parity) -- firm_admin only,
+  // one level above the accountant+ bar that voiding and correcting use.
+  if (!hasMinRole(ctx.effective_role, 'firm_admin')) {
+    return blocked('Firm admin access is required to delete journal entries.');
   }
   const sourceMessage = 'This entry was created by a source transaction. Void or delete the source transaction instead.';
 

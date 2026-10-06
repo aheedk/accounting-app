@@ -10,9 +10,10 @@ import type { JournalEntryDetail } from './journalEntryTypes';
 const CASH_ID = '11111111-1111-4111-8111-111111111111';
 const NEW_ACCOUNT_ID = '99999999-9999-4999-8999-999999999999';
 
-const { apiGet, apiPost, periodState } = vi.hoisted(() => ({
+const { apiGet, apiPost, apiDelete, periodState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
+  apiDelete: vi.fn(),
   periodState: { include2024: false },
 }));
 
@@ -28,6 +29,7 @@ vi.mock('@/lib/apiClient', () => ({
   api: {
     get: apiGet,
     post: apiPost,
+    delete: apiDelete,
   },
 }));
 
@@ -77,6 +79,27 @@ const readOnlyEntry = {
   delete_removes_pair: false,
   is_standalone_manual: true,
   source_path: null,
+  reversed_entry_journal_number: null,
+  corrected_from_entry_journal_number: null,
+} satisfies JournalEntryDetail;
+
+const sourceGeneratedEntry = {
+  ...readOnlyEntry,
+  entry: { ...readOnlyEntry.entry, status: 'posted' as const, voided_at: null, voided_by_user_id: null, void_reason: null },
+  correction_block_reason: 'This entry was created by a source transaction. Correct the source transaction instead.',
+  is_standalone_manual: false,
+  source_path: '/accounting/expenses/88888888-8888-4888-8888-888888888888',
+} satisfies JournalEntryDetail;
+
+const editableEntry = {
+  ...readOnlyEntry,
+  entry: { ...readOnlyEntry.entry, status: 'posted' as const, voided_at: null, voided_by_user_id: null, void_reason: null },
+  can_correct: true,
+  correction_block_reason: null,
+  can_reverse: true,
+  reversal_block_reason: null,
+  can_delete: true,
+  delete_block_reason: null,
 } satisfies JournalEntryDetail;
 
 describe('JournalEntryEditor line keyboard navigation', () => {
@@ -92,6 +115,9 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     periodState.include2024 = false;
     apiGet.mockReset();
     apiPost.mockReset();
+    apiDelete.mockReset();
+    apiPost.mockResolvedValue({ data: {} });
+    apiDelete.mockResolvedValue({ data: {} });
     apiGet.mockImplementation((url: string) => {
       if (url.endsWith('/coa')) {
         return Promise.resolve({
@@ -181,12 +207,13 @@ describe('JournalEntryEditor line keyboard navigation', () => {
 
   it('adds one row and focuses the labelled Account field after forward Tab on the final Class field', async () => {
     await renderEditor();
-    const event = await pressTab(classField(dataRows()[7]!));
+    expect(dataRows()).toHaveLength(2);
+    const event = await pressTab(classField(dataRows()[1]!));
 
     expect(event.defaultPrevented).toBe(true);
-    expect(dataRows()).toHaveLength(9);
-    const firstNewAccount = container.querySelector<HTMLButtonElement>('#journal-account-8');
-    expect(firstNewAccount?.getAttribute('aria-label')).toBe('Account, line 9');
+    expect(dataRows()).toHaveLength(3);
+    const firstNewAccount = container.querySelector<HTMLButtonElement>('#journal-account-2');
+    expect(firstNewAccount?.getAttribute('aria-label')).toBe('Account, line 3');
     expect(document.activeElement).toBe(firstNewAccount);
   });
 
@@ -222,20 +249,22 @@ describe('JournalEntryEditor line keyboard navigation', () => {
   it('does not add rows on Shift+Tab or from a non-final Class field', async () => {
     await renderEditor();
 
-    expect((await pressTab(classField(dataRows()[7]!), true)).defaultPrevented).toBe(false);
-    expect((await pressTab(classField(dataRows()[6]!))).defaultPrevented).toBe(false);
-    expect(dataRows()).toHaveLength(8);
+    expect((await pressTab(classField(dataRows()[1]!), true)).defaultPrevented).toBe(false);
+    expect((await pressTab(classField(dataRows()[0]!))).defaultPrevented).toBe(false);
+    expect(dataRows()).toHaveLength(2);
   });
 
   it('does not add rows to a read-only journal entry', async () => {
     await renderEditor(readOnlyEntry);
-    const finalClass = classField(dataRows()[7]!);
+    // One populated line plus two blanks (QBO shows only populated + 2, not a fixed count).
+    expect(dataRows()).toHaveLength(3);
+    const finalClass = classField(dataRows()[2]!);
 
     expect(container.querySelector('#journal-account-0')?.getAttribute('aria-label'))
       .toBe('Account, line 1: 1010 Cash');
     expect(finalClass.disabled).toBe(true);
     expect((await pressTab(finalClass)).defaultPrevented).toBe(false);
-    expect(dataRows()).toHaveLength(8);
+    expect(dataRows()).toHaveLength(3);
   });
 
   it('lets a firm admin create periods for an uncovered journal date', async () => {
@@ -405,5 +434,90 @@ describe('JournalEntryEditor line keyboard navigation', () => {
       expect(optionTexts).toEqual(details);
       await click(detailTypeTrigger()); // close, so the next iteration opens fresh
     }
+  });
+
+  function findButton(text: string) {
+    return Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent?.trim() === text);
+  }
+
+  function findLink(text: string) {
+    return Array.from(container.querySelectorAll('a'))
+      .find(anchor => anchor.textContent?.trim() === text);
+  }
+
+  it('wires Reverse to the void endpoint, passing the typed reason', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Entered twice');
+    await renderEditor(editableEntry);
+
+    const reverseButton = findButton('Reverse');
+    expect(reverseButton).toBeDefined();
+    await click(reverseButton!);
+
+    expect(promptSpy).toHaveBeenCalledWith('Reason for reversing this entry?');
+    expect(apiPost).toHaveBeenCalledWith(
+      '/businesses/44444444-4444-4444-8444-444444444444/journal-entries/33333333-3333-4333-8333-333333333333/void',
+      { void_reason: 'Entered twice' },
+    );
+  });
+
+  it('does not reverse when the reason prompt is dismissed', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue(null);
+    await renderEditor(editableEntry);
+
+    await click(findButton('Reverse')!);
+
+    expect(apiPost).not.toHaveBeenCalledWith(expect.stringContaining('/void'), expect.anything());
+  });
+
+  it('shows Copy, Delete and Audit history (not Transaction journal) in More for an editable standalone entry', async () => {
+    await renderEditor(editableEntry);
+
+    await click(findButton('More')!);
+
+    expect(findLink('Copy')).toBeDefined();
+    expect(findButton('Delete')).toBeDefined();
+    expect(findButton('Audit history')).toBeDefined();
+    expect(findLink('Transaction journal')).toBeUndefined();
+  });
+
+  it('shows only Transaction journal and Audit history in More for a source-generated entry, and hides Reverse/Make recurring', async () => {
+    await renderEditor(sourceGeneratedEntry);
+
+    expect(findButton('Reverse')).toBeUndefined();
+    expect(findButton('Make recurring')).toBeUndefined();
+
+    await click(findButton('More')!);
+
+    const transactionJournal = findLink('Transaction journal');
+    expect(transactionJournal).toBeDefined();
+    expect(transactionJournal?.getAttribute('href')).toBe('/accounting/expenses/88888888-8888-4888-8888-888888888888');
+    expect(findButton('Audit history')).toBeDefined();
+    expect(findLink('Copy')).toBeUndefined();
+    expect(findButton('Delete')).toBeUndefined();
+  });
+
+  it('formats read-only line amounts as plain money text, not raw four-decimal inputs', async () => {
+    await renderEditor(readOnlyEntry);
+
+    const row = dataRows()[0]!;
+    expect(row.querySelectorAll('input[type="number"]')).toHaveLength(0);
+    expect(row.textContent).toContain('10.00');
+    expect(row.textContent).not.toContain('10.0000');
+  });
+
+  it('shows the human-readable journal number on a reversal backlink, not the raw entry id', async () => {
+    const reversal = {
+      ...readOnlyEntry,
+      entry: {
+        ...readOnlyEntry.entry,
+        reversed_entry_id: '22222222-2222-4222-8222-222222222222',
+      },
+      reversed_entry_journal_number: '82',
+    } satisfies JournalEntryDetail;
+    await renderEditor(reversal);
+
+    expect(container.textContent).toContain('Reversal of Journal Entry #82');
+    expect(container.textContent).not.toContain('22222222');
   });
 });

@@ -12,9 +12,11 @@ import type { ServiceCtx } from '../../src/lib/ctx.js';
 async function setup(t: TestDb) {
   const firm = await makeFirm(t.db);
   const business = await makeBusiness(t.db, firm.id, 'Delete JE Biz');
-  const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+  // firm_admin, not just accountant: Delete is a hard, unrecoverable removal
+  // and requires the higher bar (see planJournalEntryDelete).
+  const user = await makeUser(t.db, firm.id, { role: 'firm_admin' });
   const ctx: ServiceCtx = {
-    user_id: user.id, firm_id: firm.id, business_id: business.id, effective_role: 'accountant',
+    user_id: user.id, firm_id: firm.id, business_id: business.id, effective_role: 'firm_admin',
     request_id: '00000000-0000-0000-0000-00000000ab14', ip_address: '127.0.0.1', user_agent: 'vitest',
   };
   await seedYearPeriods(t.db, business.id, 2026);
@@ -130,7 +132,11 @@ describe('deleting journal entries', () => {
     const entry = await postManual(t, data);
     await expect(t.db.transaction().execute(trx =>
       ledger.deleteJournalEntry(trx, { ...data.ctx, effective_role: 'staff' }, { journal_entry_id: entry.id }),
-    )).rejects.toThrow(/Accountant access/);
+    )).rejects.toThrow(/Firm admin access/);
+    // Accountant alone is not enough -- Delete requires firm_admin specifically.
+    await expect(t.db.transaction().execute(trx =>
+      ledger.deleteJournalEntry(trx, { ...data.ctx, effective_role: 'accountant' }, { journal_entry_id: entry.id }),
+    )).rejects.toThrow(/Firm admin access/);
 
     const other = await setup(t);
     await expect(t.db.transaction().execute(trx =>

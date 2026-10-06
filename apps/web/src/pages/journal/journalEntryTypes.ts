@@ -66,4 +66,6 @@ export type JournalEntryDetail = {
   delete_removes_pair: boolean;
   is_standalone_manual: boolean;
   source_path: string | null;
+  reversed_entry_journal_number: string | null;
+  corrected_from_entry_journal_number: string | null;
 };

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Copy, RotateCcw, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, Clock, Copy, GripVertical, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -24,6 +24,7 @@ import {
   journalEntryTotals,
   newJournalEntryForm,
   shouldAppendJournalLines,
+  MIN_BLANK_ROWS,
   type JournalEntryFormLine,
   type JournalEntryFormValues,
   type JournalAccount,
@@ -86,6 +87,9 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     () => (localStorage.getItem('je_primarySaveAction') === 'close' ? 'close' : 'new'),
   );
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const pendingAccountFocusRef = useRef<number | null>(null);
   const navigate = useNavigate();
@@ -198,7 +202,21 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   }
 
   function clearLines() {
-    setForm(current => ({ ...current, lines: Array.from({ length: 8 }, blankJournalLine) }));
+    setForm(current => ({ ...current, lines: Array.from({ length: MIN_BLANK_ROWS }, blankJournalLine) }));
+  }
+
+  function moveLine(targetIndex: number) {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null); setOverIndex(null); return;
+    }
+    setForm(current => {
+      const lines = [...current.lines];
+      const moved = lines.splice(dragIndex, 1)[0];
+      if (!moved) return current;
+      lines.splice(targetIndex, 0, moved);
+      return { ...current, lines };
+    });
+    setDragIndex(null); setOverIndex(null);
   }
 
   function handleLastLineTab(event: React.KeyboardEvent<HTMLInputElement>, rowIndex: number) {
@@ -300,20 +318,20 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }
   }
 
+  // QBO calls this "Reverse" on a journal entry (distinct from "Void" on
+  // deposits/expenses), but it's the same same-day reversing-entry logic:
+  // ledger.voidJournalEntry, flipping the original to voided.
   async function reverseEntry() {
-    if (!businessId || !existing?.can_reverse) return;
-    const confirmed = window.confirm(
-      'Reverse this entry on the first day of the next month? The original entry will remain posted.',
-    );
-    if (!confirmed) return;
+    if (!businessId || !existing?.can_correct) return;
+    const reason = window.prompt('Reason for reversing this entry?');
+    if (!reason) return;
     setBusy(true);
     setError(null);
     try {
-      const response = await api.post<{ reversal: { id: string } }>(
-        `/businesses/${businessId}/journal-entries/${existing.entry.id}/reverse`,
-        {},
-      );
-      navigate(`/journal/${response.data.reversal.id}`);
+      await api.post(`/businesses/${businessId}/journal-entries/${existing.entry.id}/void`, {
+        void_reason: reason,
+      });
+      navigate(JOURNAL_CLOSE_PATH);
     } catch (requestError: unknown) {
       setError(pickErr(requestError));
     } finally {
@@ -341,24 +359,6 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }
   }
 
-  async function voidEntry() {
-    if (!businessId || !existing?.can_correct) return;
-    const reason = window.prompt('Reason for voiding?');
-    if (!reason) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.post(`/businesses/${businessId}/journal-entries/${existing.entry.id}/void`, {
-        void_reason: reason,
-      });
-      navigate(JOURNAL_CLOSE_PATH);
-    } catch (requestError: unknown) {
-      setError(pickErr(requestError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (!businessId) return <div>Pick a business.</div>;
 
   return (
@@ -378,14 +378,8 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           </span>
         )}
         <div className="ml-auto flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {existing && supportsManualActions && (
-            <Button asChild type="button" variant="ghost" size="sm">
-              <Link to={`/journal/new?copy=${existing.entry.id}`}>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy
-              </Link>
-            </Button>
-          )}
+          {/* Copy for an existing entry moves to the More menu below (QBO layout);
+              an unsaved draft has nothing to put there yet, so it keeps this button. */}
           {!existing && (
             <Button type="button" variant="ghost" size="sm" onClick={copyUnsavedEntry} disabled={busy}>
               <Copy className="mr-2 h-4 w-4" />
@@ -394,12 +388,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           )}
           {existing?.entry.corrected_from_entry_id && (
             <Link className="text-primary hover:underline" to={`/journal/${existing.entry.corrected_from_entry_id}`}>
-              Correction of JE {existing.entry.corrected_from_entry_id.slice(0, 8)}
+              Correction of Journal Entry #{existing.corrected_from_entry_journal_number}
             </Link>
           )}
           {existing?.entry.reversed_entry_id && (
             <Link className="text-primary hover:underline" to={`/journal/${existing.entry.reversed_entry_id}`}>
-              Reversal of JE {existing.entry.reversed_entry_id.slice(0, 8)}
+              Reversal of Journal Entry #{existing.reversed_entry_journal_number}
             </Link>
           )}
         </div>
@@ -494,8 +488,26 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
             </thead>
             <tbody>
               {form.lines.map((line, index) => (
-                <tr key={index} className="group border-b transition-colors hover:bg-muted/40">
-                  <td className="px-2 py-1.5 text-xs text-muted-foreground">{index + 1}</td>
+                <tr
+                  key={index}
+                  onDragOver={event => { if (!readOnly) { event.preventDefault(); setOverIndex(index); } }}
+                  onDrop={() => { if (!readOnly) moveLine(index); }}
+                  onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                  className={[
+                    'group border-b transition-colors hover:bg-muted/40',
+                    dragIndex === index ? 'opacity-40' : '',
+                    overIndex === index && dragIndex !== index ? 'border-t-2 border-primary' : '',
+                  ].join(' ')}
+                >
+                  <td
+                    className={`px-2 py-1.5 text-xs text-muted-foreground ${!readOnly ? 'cursor-grab active:cursor-grabbing select-none' : ''}`}
+                    {...(!readOnly ? { draggable: true, onDragStart: () => setDragIndex(index) } : {})}
+                  >
+                    <span className="flex items-center gap-1">
+                      {!readOnly && <GripVertical className="h-3.5 w-3.5 shrink-0" />}
+                      {index + 1}
+                    </span>
+                  </td>
                   <td className="px-2 py-1.5">
                     <AccountSelect
                       id={`journal-account-${index}`}
@@ -510,28 +522,34 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={line.debit}
-                      onChange={event => updateLine(index, { debit: event.target.value, credit: '' })}
-                      placeholder="0.00"
-                      disabled={readOnly}
-                      className="w-full text-right font-mono"
-                    />
+                    {readOnly ? (
+                      <div className="w-full px-3 py-2 text-right font-mono">{line.debit ? fmtMoney(line.debit) : ''}</div>
+                    ) : (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={line.debit}
+                        onChange={event => updateLine(index, { debit: event.target.value, credit: '' })}
+                        placeholder="0.00"
+                        className="w-full text-right font-mono"
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-1.5">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={line.credit}
-                      onChange={event => updateLine(index, { credit: event.target.value, debit: '' })}
-                      placeholder="0.00"
-                      disabled={readOnly}
-                      className="w-full text-right font-mono"
-                    />
+                    {readOnly ? (
+                      <div className="w-full px-3 py-2 text-right font-mono">{line.credit ? fmtMoney(line.credit) : ''}</div>
+                    ) : (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={line.credit}
+                        onChange={event => updateLine(index, { credit: event.target.value, debit: '' })}
+                        placeholder="0.00"
+                        className="w-full text-right font-mono"
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-1.5">
                     <Input
@@ -646,34 +664,77 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
           {readOnly ? 'Back' : 'Cancel'}
         </Button>
-        {existing?.can_delete && (
-          <Button type="button" variant="destructive" onClick={() => { void deleteEntry(); }} disabled={busy}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        {existing?.can_correct && (
-          <Button type="button" variant="outline" onClick={() => { void voidEntry(); }} disabled={busy}>
-            Void entry
-          </Button>
-        )}
-        {existing?.can_reverse && (
-          <Button type="button" variant="outline" onClick={() => { void reverseEntry(); }} disabled={busy}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Reverse
-          </Button>
-        )}
 
-        {supportsManualActions && (
-          <button
-            type="button"
-            onClick={() => setRecurringOpen(true)}
-            disabled={!totals.balanced || filledLineCount < 2}
-            className="mx-auto text-sm font-medium text-emerald-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
-          >
-            Make recurring
-          </button>
-        )}
+        <div className="mx-auto flex items-center gap-4">
+          {existing?.can_correct && (
+            <Button type="button" variant="outline" size="sm" onClick={() => { void reverseEntry(); }} disabled={busy}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reverse
+            </Button>
+          )}
+          {supportsManualActions && (
+            <button
+              type="button"
+              onClick={() => setRecurringOpen(true)}
+              disabled={!totals.balanced || filledLineCount < 2}
+              className="text-sm font-medium text-emerald-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+            >
+              Make recurring
+            </button>
+          )}
+          {existing && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOpen(current => !current)}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                More
+              </button>
+              {moreOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
+                  <div className="absolute bottom-8 left-1/2 z-50 w-56 -translate-x-1/2 rounded-lg border bg-card shadow-xl">
+                    {!readOnly && supportsManualActions && (
+                      <Link
+                        to={`/journal/new?copy=${existing.entry.id}`}
+                        onClick={() => setMoreOpen(false)}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
+                      >
+                        <Copy className="h-4 w-4" /> Copy
+                      </Link>
+                    )}
+                    {!readOnly && existing.can_delete && (
+                      <button
+                        type="button"
+                        onClick={() => { setMoreOpen(false); void deleteEntry(); }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-destructive hover:bg-accent"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </button>
+                    )}
+                    {existing.source_path && (
+                      <Link
+                        to={existing.source_path}
+                        onClick={() => setMoreOpen(false)}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
+                      >
+                        <BookOpen className="h-4 w-4" /> Transaction journal
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setMoreOpen(false); alert('Audit history — coming soon'); }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
+                    >
+                      <Clock className="h-4 w-4" /> Audit history
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {!readOnly && (
           <div className="ml-auto flex items-center gap-2">

@@ -153,6 +153,8 @@ describe('journalEntryQueryService', () => {
     expect(generatedDetail.can_reverse).toBe(false);
     expect(generatedDetail.reversal_block_reason).toMatch(/source transaction/i);
     expect(generatedDetail.is_standalone_manual).toBe(false);
+    // The backlink shows the original's journal number, not its raw id.
+    expect(generatedDetail.reversed_entry_journal_number).toBe(original.journal_number);
 
     const replacement = await postEntry(t, data, '2026-05-02', 'Staff cannot edit');
     const staffDetail = await journalQueries.getJournalEntryDetail(
