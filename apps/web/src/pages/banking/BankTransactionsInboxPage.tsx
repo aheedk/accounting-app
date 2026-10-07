@@ -104,12 +104,6 @@ function fmtShortDate(iso: string) {
 }
 
 
-function defaultOffsetType(amount: string): 'revenue' | 'expense' {
-  const n = parseFloat(amount);
-  if (Number.isFinite(n) && n >= 0) return 'revenue';
-  return 'expense';
-}
-
 const DATE_PRESETS = [
   { value: 'all', label: 'All dates' },
   { value: 'custom', label: 'Custom' },
@@ -272,13 +266,12 @@ export default function BankTransactionsInboxPage() {
 
   function openAction(t: BankTransaction, mode: ActionMode) {
     setErr(null);
-    const defaultType = defaultOffsetType(t.amount);
-    const defaultAcct = accounts.find(a => a.account_type === defaultType && a.is_active)?.id ?? '';
     setAction({
       txnId: t.id,
       mode,
       journal_entry_id: '',
-      offset_account_id: defaultAcct,
+      // Blank on purpose: a pre-filled account gets submitted without being read.
+      offset_account_id: '',
       memo: '',
       excluded_reason: '',
     });
