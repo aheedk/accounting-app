@@ -11,7 +11,7 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 
 | # | What | Owner |
 |---|---|---|
-| 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): every bug and wrong number is fixed. What is left is inventory, which waits on the firm's answers, and features not yet built; see "Audit: what is left" below **(10-01)** | Aheed, firm |
+| 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): done, apart from emailing an invoice, Estimate, and three decisions for the firm; see "Audit: what is left" below **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm. They are all up and agree with each other; see "Reports" below | Aheed, firm |
 | 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
@@ -46,16 +46,13 @@ vendor.
 
 **Audit: what is left (item 17)**
 
-- **Inventory never reaches the ledger.** The last serious one. It needs three
-  answers first (how receipts post, average cost or first-in-first-out, what to do
-  with stock already entered): `docs/specs/2026-10-07-inventory-ledger-design.md`.
-- **Features, each a job of its own:** run payroll from the app, editing posted
-  invoices, emailing an invoice or saving it as a PDF, cost centers, Transfer and
-  Estimate, paying several vendors' bills at once, AI suggestions on Integration
-  Transactions.
-- **Look and naming:** unstyled Fixed Asset, Purchase Order and Employee pages, a
-  fuller dashboard, mixed table header capitals, the two Contractors pages, the two
-  rule systems, and the name "Spreadsheet Sync".
+Every bug, wrong number and missing feature in the audit is done, except:
+
+- **Emailing an invoice.** It needs a mail service to send from. Save as PDF works.
+- **Estimate.** Not built; a job of its own.
+- **Three decisions for the firm:** which of the two Contractors pages to keep,
+  whether to merge the two rule systems (Accounting → Rules and AI → Coding Rules),
+  and a better name for "Spreadsheet Sync".
 
 **Questions for the firm**
 
@@ -66,10 +63,15 @@ vendor.
 - **1099 and card payments.** Payments made to a contractor by card are now left
   off the 1099, because the card processor reports them on a 1099-K. Confirm that
   is how the firm files.
-- **Pay stubs (22) and payroll.** Are pay stubs still wanted, and does Payroll
-  stay in the sidebar?
-- **Inventory.** The three answers in the inventory proposal, if inventory is to be
-  used for clients at all this year.
+- **Pay stubs (22) and payroll.** Payroll can now be run from the app. Are pay
+  stubs still wanted, and does Payroll stay in the sidebar?
+- **Inventory.** It now posts to the ledger. Three choices were made without the
+  firm and need a yes or no: stock leaves at average cost (QuickBooks uses
+  first-in-first-out), receiving stock posts through its bill, and shrinkage goes
+  to cost of goods sold. `docs/specs/2026-10-07-inventory-ledger-design.md`.
+- **Correcting a posted invoice.** The original is voided and the corrected one is
+  posted as INV-1042-R1. QuickBooks changes the invoice in place and keeps its
+  number. Is a new number acceptable to clients?
 
 ## Later (January or after)
 
@@ -136,11 +138,28 @@ Audit bugs fixed (part of item 17), all Aheed:
 | The search box finds customers, vendors, invoices and bills | `e6e6bb4` |
 | Bank Transactions → Categorize shows the coding engine's suggestion | `7eb3667` |
 
+Features the audit listed as missing (part of item 17), all Aheed:
+
+| What | Where |
+|---|---|
+| Integration Transactions → Categorize shows the coding engine's suggestion | `722854f` |
+| An invoice saves as a PDF | `af20355` |
+| Transfer between two accounts | `f029fb5` |
+| Pay Bills: every unpaid bill, several vendors at once | `f09908a` |
+| Run payroll from the app | `20582eb` |
+| Inventory reaches the ledger: cost of goods sold, opening stock, adjustments | `a85d9cd` |
+| A journal entry's Class column picks a cost center | `7bf3fec` |
+| Edit an employee, a recurring template, a tax code, a learned coding rule | `bf16625`, `f988164`, `7d397b4`, `dfc6204` |
+| Correct a posted invoice | `8bab211` |
+| No ids on shipping labels, Receipts or Fixed Assets | `e905dcb`, `bf1debe` |
+| Dashboard shows cash, owed to you, you owe, and profit this month | `3c1ec9d` |
+| Table headers all in capitals; Employee, Fixed Asset and Purchase Order pages restyled | `306bf09`, `bf1debe` |
+
 Also added by Riham since the meeting: Write Check (Accounts Payable → Checks),
 the Transactions page, the table-settings gear on list pages, vendor batch
 actions with active / inactive, and a fuller add-vendor popup in the AI inbox.
 
-After pulling, run `npm run db:migrate` (migrations `0084`–`0088`).
+After pulling, run `npm run db:migrate` (migrations `0084`–`0090`).
 
 ## Decided — no work
 
@@ -242,6 +261,33 @@ click. Item 3 and the other Riham items are hers to show.
   Earnings.
 - **The check itself.** In a terminal: `npm -w @accounting/api run report:tie-out`.
   Every line reads OK.
+
+### New features (item 17)
+
+- **Dashboard.** The home page opens with four figures for the client: cash in the
+  bank, owed to you, you owe, and profit this month. Each one opens the page behind it.
+- **Transfer.** + New → Transfer. Move 500.00 from Operating Bank Account to another
+  bank account and save: it opens as a journal entry labelled Transfer.
+- **Pay Bills.** Accounts Payable → Pay Bills. Every unpaid bill is listed. Tick
+  bills from two vendors, pick the bank account, and pay: one payment per vendor.
+- **Run payroll.** Payroll → Pay Runs → Run payroll. Enter hours for the employees,
+  check the totals at the bottom, and save. This is the answer to "there is no
+  payroll module".
+- **Inventory in the ledger.** Inventory → Overview has an amber note that stock
+  worth 16,058.65 is not in the ledger. Click Post opening balance, then open
+  Reports → Balance Sheet: Inventory is 16,058.65. Ask the inventory question from
+  "Questions for the firm" here.
+- **Invoice PDF.** Open any invoice → ⋯ → Save as PDF.
+- **Correct an invoice.** Open a posted invoice with nothing paid on it → ⋯ →
+  Correct invoice. Change an amount and save: the original shows Voided and the
+  new one is posted with -R1 on its number. Ask the invoice question here.
+- **Cost centers.** + New → Journal entry: the Class column lists the cost centers
+  from Setup → Cost Centers.
+- **Editing.** Payroll → Employees → open one → Edit. Accounting → Recurring
+  Transactions → Edit on a row. Setup → Tax Codes → Edit (a new rate starts on a
+  date and leaves earlier invoices alone). AI → Coding Rules → the pencil on a rule.
+- **Integration Transactions.** Accounting → Integration Transactions → Categorize
+  shows the same suggestion as Bank Transactions.
 
 ### Other fixes worth a minute
 
