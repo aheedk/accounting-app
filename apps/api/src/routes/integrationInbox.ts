@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as inboxSvc from '../services/accounting/integrationInboxService.js';
+import { suggestCoding } from '../services/ai/autoCodingService.js';
 import type { IntegrationInboxStatus, IntegrationSource } from '../db/types.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
@@ -80,6 +81,31 @@ router.post('/businesses/:businessId/integration-inbox/:id/match', requireMinRol
       }),
     );
     res.json(updated);
+  } catch (e) { next(e); }
+});
+
+// What the auto-coding engine would code this row to; null when it has no view.
+router.get('/businesses/:businessId/integration-inbox/:id/suggestion', async (req, res, next) => {
+  try {
+    const row = await db.selectFrom('integration_inbox')
+      .select(['description', 'amount'])
+      .where('id', '=', req.params['id']!)
+      .where('business_id', '=', req.tenancy!.business_id)
+      .executeTakeFirst();
+    if (!row) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Integration transaction not found' } }); return; }
+    const amount = Number(row.amount);
+    const suggestion = await suggestCoding(db, ctxFromReq(req), {
+      description: row.description,
+      amount: `${Math.abs(amount)}`,
+      // Money in is offset by a credit (income); money out by a debit (an expense).
+      direction: amount >= 0 ? 'credit' : 'debit',
+    });
+    const accountId = suggestion?.lines[0]?.account_id;
+    res.json({
+      suggestion: suggestion && accountId
+        ? { account_id: accountId, confidence: suggestion.confidence, band: suggestion.band, source_layer: suggestion.source_layer }
+        : null,
+    });
   } catch (e) { next(e); }
 });
 

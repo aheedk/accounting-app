@@ -16,7 +16,7 @@ import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
-import { CODING_LAYERS } from '@accounting/shared';
+import { CodingSuggestionHint, PREFILL_CONFIDENCE, type CodingSuggestion } from '@/components/CodingSuggestion';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
 type StatusFilter = BankTransactionStatus | 'all';
@@ -52,8 +52,6 @@ type JournalEntry = {
   source_type: string;
   reference: string | null;
 };
-
-type CodingSuggestion = { account_id: string; confidence: number; band: string; source_layer: string };
 
 type Account = {
   id: string;
@@ -289,7 +287,7 @@ export default function BankTransactionsInboxPage() {
         if (!found) return;
         setSuggestion(found);
         // 90 and up is filled in (a rule the client taught, a vendor default); below that it is only offered.
-        if (found.confidence >= 90) {
+        if (found.confidence >= PREFILL_CONFIDENCE) {
           setAction(a => (a && a.txnId === t.id && a.offset_account_id === '' ? { ...a, offset_account_id: found.account_id } : a));
         }
       })
@@ -843,22 +841,12 @@ export default function BankTransactionsInboxPage() {
                                   );
                                 })}
                               </AppSelect>
-                              {suggestion && (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {CODING_LAYERS.find(layer => layer.id === suggestion.source_layer)?.label ?? 'Suggested'}:{' '}
-                                  <span className="font-medium text-foreground">
-                                    {accounts.find(a => a.id === suggestion.account_id)?.name ?? 'an account'}
-                                  </span>{' '}
-                                  ({suggestion.confidence}%)
-                                  {action.offset_account_id !== suggestion.account_id && (
-                                    <>{' '}<button
-                                      type="button"
-                                      className="font-medium text-primary underline"
-                                      onClick={() => setAction(a => (a ? { ...a, offset_account_id: suggestion.account_id } : a))}
-                                    >Use</button></>
-                                  )}
-                                </p>
-                              )}
+                              <CodingSuggestionHint
+                                suggestion={suggestion}
+                                accounts={accounts}
+                                selectedId={action.offset_account_id}
+                                onUse={id => setAction(a => (a ? { ...a, offset_account_id: id } : a))}
+                              />
                             </div>
                             <div className="col-span-4">
                               <Label>Memo (optional)</Label>

@@ -13,6 +13,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
+import { CodingSuggestionHint, PREFILL_CONFIDENCE, type CodingSuggestion } from '@/components/CodingSuggestion';
 
 type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
 type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
@@ -178,12 +179,6 @@ function parseCsvText(text: string): ImportRowInput[] {
   return rows;
 }
 
-function defaultOffsetType(amount: string): 'revenue' | 'expense' {
-  const n = parseFloat(amount);
-  if (Number.isFinite(n) && n >= 0) return 'revenue';
-  return 'expense';
-}
-
 export default function IntegrationInboxPage() {
   const [bizId] = useActiveBusinessId();
 
@@ -235,23 +230,37 @@ export default function IntegrationInboxPage() {
 
   useEffect(() => { reload(); }, [reload]);
 
+  // What the auto-coding engine would pick for the row being categorized.
+  const [suggestion, setSuggestion] = useState<CodingSuggestion | null>(null);
+
   function openAction(t: IntegrationInboxRow, mode: ActionMode) {
     setErr(null);
-    const defaultType = defaultOffsetType(t.amount);
-    const defaultOffset = accounts.find(a => a.account_type === defaultType && a.is_active)?.id ?? '';
-    const defaultCash = accounts.find(a => a.account_type === 'asset' && a.is_active)?.id ?? '';
+    setSuggestion(null);
     setAction({
       rowId: t.id,
       mode,
       journal_entry_id: '',
-      cash_account_id: defaultCash,
-      offset_account_id: defaultOffset,
+      // Only chosen for you when there is one to choose; the first account in the list is not a default.
+      cash_account_id: cashAccounts.length === 1 ? cashAccounts[0]!.id : '',
+      // Blank unless the engine is confident: a pre-filled account gets submitted without being read.
+      offset_account_id: '',
       memo: '',
       excluded_reason: '',
     });
+    if (mode !== 'categorize' || !bizId) return;
+    api.get<{ suggestion: CodingSuggestion | null }>(`/businesses/${bizId}/integration-inbox/${t.id}/suggestion`)
+      .then(r => {
+        const found = r.data.suggestion;
+        if (!found) return;
+        setSuggestion(found);
+        if (found.confidence >= PREFILL_CONFIDENCE) {
+          setAction(a => (a && a.rowId === t.id && a.offset_account_id === '' ? { ...a, offset_account_id: found.account_id } : a));
+        }
+      })
+      .catch(() => { /* a suggestion is a convenience; categorizing works without it */ });
   }
 
-  function closeAction() { setAction(null); setErr(null); }
+  function closeAction() { setAction(null); setErr(null); setSuggestion(null); }
 
   async function submitMatch(e: React.FormEvent) {
     e.preventDefault();
@@ -570,6 +579,12 @@ export default function IntegrationInboxPage() {
                                   );
                                 })}
                               </AppSelect>
+                              <CodingSuggestionHint
+                                suggestion={suggestion}
+                                accounts={accounts}
+                                selectedId={action.offset_account_id}
+                                onUse={id => setAction(a => (a ? { ...a, offset_account_id: id } : a))}
+                              />
                             </div>
                             <div className="col-span-2">
                               <Label>Memo (optional)</Label>
