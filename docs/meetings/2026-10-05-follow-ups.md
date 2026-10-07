@@ -1,226 +1,97 @@
 # Meeting follow-ups — 2026-10-05
 
-Requests taken from the meeting recording transcript, checked against the code on
-`main`. Everything that still needs doing is in one list, numbered straight
-through so it can be divided up ("I'll take 1–8, you take 9–13"). Items left over
-from the 2026-10-01 meeting are in the same list, marked **10-01**. Parts of the
-recording were unclear or not in English; the last section lists what could not
-be made out.
-
-Work finished after the meeting is in "Since the meeting", updated 2026-10-07.
-
-**Dates set in the meeting**
+What was asked for in the meeting, checked against the code. Updated 2026-10-07.
+Item numbers are fixed so they can be divided up; **(10-01)** marks items left
+over from the previous meeting.
 
 - **November 1, 2026** — Faizan's team starts using the app for actual clients.
 - **January 1, 2027** — planned launch to outside customers.
 
-## To do
-
-Owner is who was asked or who volunteered; "open" means nobody was named.
-
-### Fixes and small changes (before November 1)
-
-| # | What | Where it stands | Owner |
-|---|---|---|---|
-| 1 | **Journal entry amounts with commas and two decimals** (9,000.00), like the rest of the app | **Done** (`896e7bb`). The debit and credit boxes show 9,000.00; a posted, read-only entry already did (Riham, `7dd3df1`). | Aheed, done |
-| 2 | **Typing 9 becomes 9.00** when you tab out of an amount box. Asked for on the journal entry; apply to every amount box | **Done** (`896e7bb`). One shared amount box, used on the journal entry and 25 other forms: expenses, checks, deposits, invoices, bills, payments, credits, reconcile, opening balances, prices. Quantities, percentages and filter boxes are left as they were. | Aheed, done |
-| 3 | **Journal entry: put Delete under a "More" button**, as QuickBooks does. The "are you sure" prompt stays | **Done** by Riham after the meeting (`7dd3df1`): the bottom bar has a More menu with Delete in it. Its Audit history entry still says "coming soon". Checked on 2026-10-07: Bank Deposit, Expense and Check also keep Delete under More; no other transaction form has a Delete. The Vendor page has its own Delete button, which Riham placed there on purpose. | Riham, done |
-| 4 | **Attachments on bank deposits do not work** (Faizan; they work on checks) | **Done** (`9c6edcb`). The box on the deposit form was a placeholder with nothing behind it. It now works like expenses and checks. Needs migration `0088`. | Aheed, done |
-| 5 | **Statement review: the bank account picker should list only bank accounts**, not most of the chart | It lists every asset account except Suspense (`EmailImportReviewPage.tsx:561`). Should be accounts whose type is Bank (Checking, Savings, Money Market, Cash on hand, Trust...). | Aheed |
-| 6 | **Card statement: the payment line should not go to the bank account.** See "The card payment decision" below | Payment lines are coded to the client's bank account (`cardPaymentSourceAccount`), with a check for the same payment already posted from the bank statement. | Aheed |
-| 7 | **Checks on a bank statement should get their category from the stub's description** ("food" on the stub means a food account), not land in Suspense | Partly done. A matched stub fills payee and memo, but the category only fills when the AI's suggested account name matched an account in the chart (`emailImports.ts:171`). Fix: run the stub's payee and memo through the coding engine when there is no direct match. | Aheed |
-| 8 | **New account panel leaves a sliver at the top** instead of reaching the top of the window | Small layout bug in `AccountCreateDrawer.tsx`. | Aheed |
-| 9 | **Vendor dropdown in the AI inbox.** The Name column should be a dropdown of the client's vendors, with the AI matching the name it read ("Duke Power" to "Duke Energy") — **10-01** | **Done** by Riham after the meeting (`40d1214`, `ddc2b41`, `6ba32c8`): the Name column suggests the client's vendors and matches a renamed payee, and still takes free text. | Riham, done |
-| 10 | **Bank deposit print should open a preview first**, as QuickBooks does | Three print options exist (slip and summary, summary only, alignment test). No preview step. | Riham |
-| 11 | **Make recurring on a bank deposit is untested.** Riham built the popup but has not seen what a recurring deposit should look like | Popup is on `main`. Needs Faizan to say what is expected, then a test. | Riham, Faizan |
-| 12 | **"+ New" menu: copy QuickBooks completely** ("pretty much, yes") | Riham kept the older entries and added the missing ones. Remove whatever QuickBooks does not have. | Riham |
-| 13 | **Bank Deposit → More: Copy and Audit history** | Both show a "coming soon" message (`BankDepositPage.tsx:1072`, `:1105`). Not raised aloud, but visible in the menu that was demoed. | Riham |
-
-### Testing, reports and known bugs (before November 1)
-
-| # | What | Where it stands | Owner |
-|---|---|---|---|
-| 14 | **Test check stubs against the statement they belong to** — **10-01** | The stubs and the statement used so far are from different companies, so every stub shows Unmatched. Blocked until the files arrive. | Faizan sends a statement and its stubs; Aheed tests |
-| 15 | **Suspense: reclassify a few real lines** from AI → Suspense — **10-01** | Not done. Shown today only in passing. | Faizan |
-| 16 | **Credit card statement with a real statement** — **10-01** | Only the sample Amex statements have been used. Do after item 6. | Faizan |
-| 17 | **QA audit fixes** (`docs/qa/2026-09-28-app-audit.md`) — **10-01** | Aheed has read it but not worked on any. 8 are marked "wrong numbers or broken behaviour", including invoice due dates, the 1099 report and Profit & Loss net operating income. The plain-English walkthrough asked for on 10-01 has not happened either. | Aheed |
-| 18 | **Put every report up, then review them together** | Reports in the app: Trial Balance, General Ledger, Aging, Profit & Loss, Balance Sheet, Cash Flow, 1099, Custom, Management, Performance. The audit says Management Reports shows $0 revenue and P&L net operating income is wrong, so do item 17 first. | Aheed |
-| 19 | **Report period presets** — **10-01** | **Done** by Riham after the meeting (`e9acc5a`): the fiscal-year presets on the General Ledger use the client's own fiscal year start. Other reports are worth a glance during item 18. | Riham, done |
-
-### Bigger features (January or later)
-
-None of these exist in the code yet.
-
-| # | What | Notes | Owner |
-|---|---|---|---|
-| 20 | **Bank account connection** so transactions arrive on their own — **10-01** | Confirmed again today ("we should have that too"). Needs an outside service and an account with it before any code. | open |
-| 21 | **Reconciliation** — **10-01** | Waiting on item 20. | open |
-| 22 | **Pay stubs** — **10-01** | Promised on 10-01 for this meeting; not mentioned today. Ask whether still wanted. | open |
-| 23 | **Purchase order upload → sales invoice.** Upload a customer's purchase order in the AI inbox and it becomes an accounts receivable invoice | New document type alongside statements, invoices and stubs. | open |
-| 24 | **Stripe, two separate uses.** (a) Clients pay their vendors from the app instead of writing checks. (b) We get paid by customers for the software | Needs a Stripe account first. Paying vendors on a client's behalf moves other people's money, so check what Stripe requires for that before designing it. | open |
-| 25 | **Modules per client, priced separately.** Bookkeeping at one price; Accounts Receivable, Accounts Payable and the rest at another | Needs a per-company list of enabled modules that hides sidebar sections and blocks their routes. | open |
-| 26 | **Sign in with Microsoft 365 or Google** | Login is email and password. (The Google connection that exists is only for reading the firm's Gmail inbox.) | open |
-| 27 | **One login with the practice management software.** Staff signed in there should reach the accounting app without a second login | Design together with item 26. | open |
-| 28 | **Security review and testing.** Nobody can see another company's data; one person can have several companies; database encryption was mentioned; "various levels of security" | Company separation and four roles exist. No dedicated security test pass has been done. The firm: needed before selling outside, less so for internal use. Aheed: do it anyway. | Aheed |
-| 29 | **Mobile app** | Agreed to leave for last. | open |
-| 30 | **Moving the practice management software off Base44.** Some of its database and backend features are Base44's own, so everything has to be confirmed working before Base44 is dropped | Separate project from this repo. Someone said "I'll work on that" and described cloning the code; the speaker is not clear. | unclear |
-
-### Not code
-
-- **Faizan:** thorough testing, and keep sending findings; he has many points and
-  will record a video or send them (also promised on 10-01).
-- **Sample checks for the "Timeout" client** — **10-01**.
-- **Clean test entries out of the real company** — **10-01**; the Delete button
-  now allows it.
-- **Get the product / company name in writing** and check it is available (see
-  "Could not make out").
-
-### Suggested split
-
-- **Aheed:** 5–8 (1–4 are done), then 17 and 18.
-- **Riham:** 10–13 (9 and 19 are already done), plus 31–33 from "Since the
-  meeting" below.
-- **Faizan:** files for 14, expected behaviour for 11, testing for 15 and 16.
-- **Needs a decision from the firm before work starts:** 22, 24, 25, 26–28, and
-  whether payroll stays (see Decided).
-
-For November 1 the list that matters is 1–19. Items 20–30 are January work or
-later.
-
-## Since the meeting (as of 2026-10-07)
-
-Riham's work pulled into `main` after the meeting. All of it is hers.
-
-### To-do items it finished
-
-| Item | What changed | Where |
-|---|---|---|
-| 3 | Journal entry bottom bar matches QuickBooks: Cancel on the left, Reverse · Make recurring · More in the middle, Save on the right. Copy, Delete, Transaction journal and Audit history are under More. Delete now needs a firm admin (it was accountant). | `7dd3df1` |
-| 1 (half) | A posted, read-only journal entry shows formatted amounts instead of four decimals. The boxes you type into are unchanged, so items 1 and 2 stay open. | `7dd3df1` |
-| 9 | AI inbox Name column: a dropdown of the client's vendors that filters as you type, with Add new vendor at the bottom. The AI is now given the client's vendor list when it reads a document, so "Duke Power" comes back as "Duke Energy". Applies to bank and card statements, check stubs and invoices. | `40d1214`, `ddc2b41`, `6ba32c8` |
-| 19 | General Ledger: This / Last Fiscal Year use the client's own fiscal year start month. | `e9acc5a` |
-
-### Other changes (not on the list)
-
-| What | Detail | Where |
-|---|---|---|
-| **Write Check** | Its own form and list (Accounts Payable → Checks), like Bank Deposits and Expenses: payee, bank account with book balance, check number assigned automatically, Print later, category lines, memo, attachments, Make recurring, More (Copy, Void, Delete), and a printable check with the amount in words. Opens from the General Ledger. | `b1f3bd3` |
-| **Older checks show in the Checks list** | Checks entered before as an Expense paid by check appear in the list tagged "(Expense)", and the next check number continues the client's real sequence instead of restarting at 1. | `a74731f` |
-| **Transactions page** | One page (Accounting → Transactions) listing deposits, expenses, checks, journal entries, bills, payments and credit memos, filterable by type, date, reference, contact and amount. "View more" on the deposit, expense and check forms goes here. | `69f680f` |
-| **Table settings** | A gear on Bank Deposits, Expense Transactions, Checks, Vendors and Customers to choose sort, rows per page, columns and filters. Remembered per user in that browser. | `69f680f` |
-| **Vendors list** | Checkboxes with batch Make inactive, a "Show inactive vendors" switch, and a row menu matching QuickBooks (Create expense, Write check, Make inactive). Inactive vendors drop out of every vendor dropdown. Delete moved to the vendor's own page and only works when the vendor has no transactions. | `2f0e4ab`, `99156e8` |
-| **Add vendor from the AI inbox** | A fuller popup: company and display name, contact name, email, phone, address. | `b1f8f4d` |
-| **Journal entry details** | Reversing entries have their own read-only message, reversal links show the journal number, lines can be dragged to reorder, and Reverse dates the reversal on the original entry's date. | `7dd3df1`, `d89c639` |
-| **Voided imported transactions** | Red "Voided" pill, amount struck through, and the recent-items popup. | `18cb523` |
-| **General Ledger print** | Transaction Type header no longer wraps and dates are no longer cut off. | `93f41a0` |
-
-### What that work left open
-
-Written up by Riham in [`../backlog.md`](../backlog.md); numbered on from the to-do list.
+## To do before November 1
 
 | # | What | Owner |
 |---|---|---|
-| 31 | **Customers need the same treatment as Vendors**: batch actions, active / inactive, delete only when there are no transactions. | Riham |
-| 32 | **Transactions page**: invoices, bill payments and vendor credits are not in it yet; sorting from the gear only sorts the 25 rows on screen; the saved filter order is not used. | Riham |
-| 33 | **Vendor menu stubs**: batch Email and "Ask vendor for info" only show a "coming soon" message. | Riham |
+| 5 | Statement review: the bank account picker lists only bank accounts, not every asset | Aheed |
+| 6 | Card statement: the payment line must not post to the bank account (see note below) | Aheed |
+| 7 | Checks on a bank statement take their category from the stub's memo ("food") instead of going to Suspense | Aheed |
+| 8 | New account panel: close the gap at the top of the window | Aheed |
+| 17 | Fix the QA audit bugs (`docs/qa/2026-09-28-app-audit.md`). 8 are serious: invoice due dates, the 1099 report, Profit & Loss **(10-01)** | Aheed |
+| 18 | Put every report up and review them together, after 17 | Aheed |
+| 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
+| 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
+| 12 | "+ New" menu: match QuickBooks exactly | Riham |
+| 13 | More menu: Copy and Audit history on Bank Deposit, and Audit history on Journal Entry, still say "coming soon" | Riham |
+| 31 | Customers: the same batch actions, inactive switch and delete rule as Vendors | Riham |
+| 32 | Transactions page: add invoices, bill payments and vendor credits; sorting only covers the rows on screen | Riham |
+| 33 | Vendor menu: Email and "Ask vendor for info" still say "coming soon" | Riham |
+| 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Faizan sends files, Aheed tests |
+| 15 | Suspense: reclassify some real lines **(10-01)** | Faizan |
+| 16 | Test a real credit card statement, after 6 **(10-01)** | Faizan |
 
-After pulling, the local database needs the new migrations (`0084`–`0088`):
-`npm run db:migrate`.
+**Item 6, the card payment.** Today the payment line on a card statement posts
+debit card, credit bank. The firm wants it to show the card account instead,
+because the bank statement already records the payment. Build it so the payment
+line on a card statement does not post at all and links to the bank statement's
+entry. To confirm with the firm: if that bank statement is never uploaded, the
+card balance stays too high, so show those payments as "waiting for the bank
+statement".
 
-## The card payment decision (item 6)
+## Later (January or after)
 
-This took the longest in the meeting and ended with "Aheed, make that change", so
-the reasoning is written out.
+None of these are in the code yet. Most need a decision from the firm first.
 
-- **Today:** on a card statement the payment line (`PAYMENT RECEIVED 3,671.29`) is
-  coded to the operating bank account: debit the card, credit the bank.
-- **The firm's point:** the bank statement already records that payment as debit
-  Amex payable, credit cash. The charges on the card statement credit Amex
-  payable. So the card account is already complete from those two documents, and
-  the card statement should not touch the bank account at all.
-- **Faizan's worry:** recording the payment from both statements counts it twice.
-  The firm's answer was that it only doubles if the card statement posts to the
-  bank, which is exactly what should stop.
-- **What was asked, literally:** the payment line should show the card account
-  chosen at the top of the statement (the test account created in the meeting was
-  "Amex Payable 9001", type Credit Card), and the bank statement's payment should
-  go to that same account.
-- **How to build it:** a line that debits and credits the same account does
-  nothing, so the payment line on a card statement should simply not post. It
-  shows the card account, is marked as recorded from the bank statement, links to
-  that bank entry once it exists, and is unticked. The "already recorded" check
-  that exists today becomes the normal case instead of the exception.
-- **One thing to confirm with the firm:** if the bank statement for that month is
-  never uploaded, the card balance stays too high by the payment. Suggested
-  answer: show such payments as "waiting for the bank statement" so they are
-  visible. Update `docs/specs/2026-10-04-card-statements-and-check-stubs-design.md`
-  in the same change.
+| # | What |
+|---|---|
+| 20 | Bank account connection, so transactions arrive on their own. Needs an outside service **(10-01)** |
+| 21 | Reconciliation, after 20 **(10-01)** |
+| 22 | Pay stubs. Not mentioned this time; ask if still wanted **(10-01)** |
+| 23 | Upload a customer's purchase order and turn it into a sales invoice |
+| 24 | Stripe: (a) clients pay their vendors from the app, (b) we get paid for the software |
+| 25 | Modules per client, priced separately (bookkeeping vs. AR, AP and the rest) |
+| 26 | Sign in with Microsoft 365 or Google |
+| 27 | One login shared with the practice management software |
+| 28 | Security review and testing |
+| 29 | Mobile app, last |
+| 30 | Moving the practice management software off Base44 (separate project) |
 
-## Decided in the meeting — no work
+## Not code
 
-- **Keep our sidebar layout.** QuickBooks shows a section's pages as tabs across
-  the top; ours opens one full page. Riham raised switching; the group kept ours.
-- **Keep the Check stubs tab** in the AI inbox (Statements, Invoices, Check stubs,
-  History). It was asked whether it is needed; nobody wanted it removed.
-- **"Memo" stays "Memo"** on check stubs; no rename to Description.
-- **Payroll stays in the sidebar for now** and "will end up being taken off". The
-  reason given was that there is no payroll module, but the app does have one
-  (Overview, Employees, Contractors, Taxes, Compliance, with manual tax entry).
-  Worth showing the firm before anyone removes it.
-- **Clicking anywhere on a General Ledger row opens the transaction.** Aheed
-  offered to undo it; the answer was to keep it.
-- **A few wrong letters on handwritten stubs are acceptable.**
-- **The "Due from Employees" account was not treated as a system problem.** Riham
-  said the AI created accounts while reading a made-up bank statement. On `main`
-  the only place an account can be created is the Chart of Accounts screen and
-  the Add new account option, so the AI inbox did not create it. If it happens
-  again, note which screen was open.
+- Faizan: keep testing and send findings (video is fine).
+- Sample checks for the "Timeout" client **(10-01)**.
+- Clean the test entries out of the real company **(10-01)**.
+- Get the product / company name in writing and check it is available.
 
-## Shown and accepted
+## Done
 
-Demonstrated and accepted with no further request: opening entries from the
-General Ledger, journal entry delete with its confirmation, Save and close / Save
-and new, description and amount carried to the next journal line, two-digit
-years, the ledger keeping its date range, Debit and Credit columns, check number,
-memo and attachments on expenses, check stub upload and reading, editing an
-account's number, Add new in dropdowns, arrow keys, company switch opening the
-dashboard, the stale-tab screen, the Chart of Accounts pager, the PDF export
-matching the page, Suspense, and the credit card statement upload itself (apart
-from item 6).
+| # | What | Who |
+|---|---|---|
+| 1 | Journal entry amounts show commas and two decimals | Aheed, `896e7bb` |
+| 2 | Typing 9 becomes 9.00, on every amount box in the app | Aheed, `896e7bb` |
+| 3 | Delete is under More on Journal Entry, Bank Deposit, Expense and Check | Riham, `7dd3df1` |
+| 4 | Attachments work on bank deposits | Aheed, `9c6edcb` |
+| 9 | Vendor dropdown in the AI inbox, with the AI matching renamed payees **(10-01)** | Riham, `40d1214` |
+| 19 | General Ledger fiscal-year presets use the client's fiscal year **(10-01)** | Riham, `e9acc5a` |
 
-From Riham: bank deposit More menu with separate Void and Delete, print options,
-the history panel, "View more" with date range and type filters, the search bar
-update, and the fix for pages that took 10–15 seconds to load.
+Also added by Riham since the meeting: Write Check (Accounts Payable → Checks),
+the Transactions page, the table-settings gear on list pages, vendor batch
+actions with active / inactive, and a fuller add-vendor popup in the AI inbox.
 
-## Working together
+After pulling, run `npm run db:migrate` (migrations `0084`–`0088`).
 
-- **The same work was done twice.** Aheed and Riham both built the expense
-  click-through from the General Ledger and both worked on bank deposits. Agreed:
-  split the work by item number from this list.
-- **Riham's "vanished" changes.** She said several of her changes disappeared
-  after a merge and her localhost had an error after pulling. What the repo shows:
-  her branch `origin/riham` and `origin/main` are the same commit, so nothing of
-  hers is waiting on GitHub. Her bank deposit More menu, print options and Make
-  recurring popup are on `main`. Anything still missing exists only on her
-  machine, or was overwritten in a merge and has to be found in her local history
-  before it is redone.
-- **Speak English in meetings** so the transcript can be used.
+## Decided — no work
 
-## Could not make out
+- Keep our sidebar layout; no QuickBooks-style tabs across the top.
+- Keep the Check stubs tab in the AI inbox, and keep the label "Memo".
+- Clicking anywhere on a General Ledger row opens the transaction.
+- Payroll stays in the sidebar for now. The firm believes there is no payroll
+  module, but the app has one, so show it before anyone removes it.
 
-- **"What is the VIA for"** on the purchase order line of the weekend list. Nobody
-  in the meeting knew either.
-- **The product or company name.** Spelled out letter by letter, then heard as
-  "Mathematica" and "amatica". It was said the same name could serve for the
-  product and the company, and someone will check whether it is available. On
-  10-01 "Acumatica" was heard, which is an existing accounting product.
-- **"You can host Azure"**, said during the mobile app item.
-- **"Should be updated because in banks it shows account and for other assets it
-  shows other assets"**, about the bank account type. The firm could not recall
-  the original point; the discussion ended at item 5, which may be all of it.
-- **Riham's QuickBooks rules.** She described giving Claude a lot of QuickBooks
-  material through an add-on and getting "a bunch of rules" that she cannot
-  explain and wants Faizan to test. It is not clear what these rules changed or
-  where they live.
-- **Sections not in English** during the check stub and credit card discussions.
-  Items 6 and 7 are built from the English parts on either side.
+## Unclear
+
+- **The product name.** Heard as "Mathematica" / "amatica"; "Acumatica" was heard
+  on 10-01 and is an existing accounting product.
+- **"VIA"** on the purchase order line of the weekend list. Nobody knew.
+- **Riham's QuickBooks rules** from Claude: what they changed and where they live.
+- **Riham's missing changes.** Her branch and `main` are identical on GitHub, so
+  anything missing is only on her machine.
+- **Who is doing the Base44 move** (item 30).
