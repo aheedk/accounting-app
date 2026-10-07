@@ -19,6 +19,8 @@ export const businessUpdateSchema = z.object({
   import_email: z.string().email().max(254).nullable().optional(),
   /** Opt in to posting high-confidence AI suggestions without review. */
   ai_auto_post_enabled: z.boolean().optional(),
+  /** Invoice lines at or above this amount are capitalized instead of expensed. */
+  capitalization_threshold: z.coerce.number().min(0).max(10_000_000).optional(),
 });
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
 

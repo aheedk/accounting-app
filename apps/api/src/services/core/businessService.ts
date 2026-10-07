@@ -14,6 +14,8 @@ export type BusinessPatch = {
   address?: BusinessAddress | null;
   import_email?: string | null;
   ai_auto_post_enabled?: boolean;
+  /** Invoice lines at or above this amount are coded to a fixed asset, not expensed. */
+  capitalization_threshold?: string;
 };
 
 export type BusinessCreateInput = {
@@ -26,7 +28,8 @@ export type BusinessCreateInput = {
 
 const BUSINESS_COLUMNS = [
   'id', 'firm_id', 'name', 'legal_name', 'tax_id',
-  'fiscal_year_start_month', 'address', 'import_email', 'created_at', 'updated_at',
+  'fiscal_year_start_month', 'address', 'import_email',
+  'ai_auto_post_enabled', 'capitalization_threshold', 'created_at', 'updated_at',
 ] as const;
 
 // Creates a new client business under the caller's firm, seeds it with the
@@ -91,12 +94,9 @@ export async function createBusiness(
   return created;
 }
 
-export async function getBusiness(db: Kysely<DB>, business_id: string) {
+export async function getBusiness(db: Kysely<DB> | Transaction<DB>, business_id: string) {
   const row = await db.selectFrom('businesses')
-    .select([
-      'id', 'firm_id', 'name', 'legal_name', 'tax_id',
-      'fiscal_year_start_month', 'address', 'created_at', 'updated_at',
-    ])
+    .select(BUSINESS_COLUMNS)
     .where('id', '=', business_id)
     .where('deleted_at', 'is', null)
     .executeTakeFirst();
@@ -122,6 +122,8 @@ export async function updateBusiness(
     fiscal_year_start_month?: number;
     address?: string | null;
     import_email?: string | null;
+    ai_auto_post_enabled?: boolean;
+    capitalization_threshold?: string;
   } = {};
   if (input.patch.name !== undefined) updateSet.name = input.patch.name;
   if (input.patch.legal_name !== undefined) updateSet.legal_name = input.patch.legal_name;
@@ -133,14 +135,16 @@ export async function updateBusiness(
     updateSet.address = input.patch.address === null ? null : JSON.stringify(input.patch.address);
   }
   if (input.patch.import_email !== undefined) updateSet.import_email = input.patch.import_email;
+  // These two were accepted by the route and then dropped here, so the auto-post
+  // switch never saved (and an update of nothing else failed outright).
+  if (input.patch.ai_auto_post_enabled !== undefined) updateSet.ai_auto_post_enabled = input.patch.ai_auto_post_enabled;
+  if (input.patch.capitalization_threshold !== undefined) updateSet.capitalization_threshold = input.patch.capitalization_threshold;
+  if (Object.keys(updateSet).length === 0) return getBusiness(trx, input.business_id);
 
   const updated = await trx.updateTable('businesses')
     .set(updateSet)
     .where('id', '=', input.business_id)
-    .returning([
-      'id', 'firm_id', 'name', 'legal_name', 'tax_id',
-      'fiscal_year_start_month', 'address', 'import_email', 'created_at', 'updated_at',
-    ])
+    .returning(BUSINESS_COLUMNS)
     .executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {

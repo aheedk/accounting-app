@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
 import { makeFirm, makeUser } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
-import { createBusiness } from '../../src/services/core/businessService.js';
+import { createBusiness, getBusiness, updateBusiness } from '../../src/services/core/businessService.js';
 
 let t: TestDb;
 beforeAll(async () => { t = await startTestDb(); });
@@ -69,5 +69,39 @@ describe('businessService.createBusiness', () => {
       .execute();
     expect(rows.map(r => r.user_id)).toEqual([creator.id]);
     expect(rows.map(r => r.user_id)).not.toContain(other.id);
+  });
+});
+
+// The auto-post switch was accepted by the route and dropped by the service, so it
+// never saved; reading the business did not return it either.
+describe('businessService.updateBusiness', () => {
+  it('saves and returns the AI settings', async () => {
+    const firm = await makeFirm(t.db);
+    const user = await makeUser(t.db, firm.id, { role: 'firm_admin' });
+    const ctx = systemCtx({ firm_id: firm.id, business_id: null, user_id: user.id, effective_role: 'firm_admin' });
+    const created = await t.db.transaction().execute(trx => createBusiness(trx, ctx, { name: 'Settings Co.' }));
+    const bizCtx = { ...ctx, business_id: created.id };
+
+    const fresh = await getBusiness(t.db, created.id);
+    expect(fresh.ai_auto_post_enabled).toBe(false);
+    expect(Number(fresh.capitalization_threshold)).toBe(2500);
+
+    // The switch on its own: this used to fail, as an update with nothing to set.
+    const on = await t.db.transaction().execute(trx =>
+      updateBusiness(trx, bizCtx, { business_id: created.id, patch: { ai_auto_post_enabled: true } }));
+    expect(on.ai_auto_post_enabled).toBe(true);
+
+    const raised = await t.db.transaction().execute(trx =>
+      updateBusiness(trx, bizCtx, { business_id: created.id, patch: { capitalization_threshold: '5000.00' } }));
+    expect(Number(raised.capitalization_threshold)).toBe(5000);
+
+    const read = await getBusiness(t.db, created.id);
+    expect(read.ai_auto_post_enabled).toBe(true);
+    expect(Number(read.capitalization_threshold)).toBe(5000);
+
+    // An update of nothing is not an error.
+    const same = await t.db.transaction().execute(trx =>
+      updateBusiness(trx, bizCtx, { business_id: created.id, patch: {} }));
+    expect(same.name).toBe('Settings Co.');
   });
 });

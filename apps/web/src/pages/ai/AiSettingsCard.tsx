@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { MoneyInput } from '@/components/ui/money-input';
 
-type Business = { id: string; name: string; ai_auto_post_enabled?: boolean };
+type Business = { id: string; name: string; ai_auto_post_enabled?: boolean; capitalization_threshold?: string };
 
 /**
  * Auto-post opt-in. Off by default and per client, because posting to the
@@ -15,6 +16,9 @@ export default function AiSettingsCard({ onChange }: { onChange?: (enabled: bool
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [allowed, setAllowed] = useState(true);
+  // Invoice lines at or above this are coded to a fixed asset instead of an expense.
+  const [threshold, setThreshold] = useState('');
+  const [savedThreshold, setSavedThreshold] = useState('');
 
   const load = useCallback(async () => {
     if (!bizId) return;
@@ -22,6 +26,9 @@ export default function AiSettingsCard({ onChange }: { onChange?: (enabled: bool
       const response = await api.get<Business>(`/businesses/${bizId}`);
       setEnabled(response.data.ai_auto_post_enabled === true);
       onChange?.(response.data.ai_auto_post_enabled === true);
+      const current = Number(response.data.capitalization_threshold ?? 0).toFixed(2);
+      setThreshold(current);
+      setSavedThreshold(current);
     } catch {
       setError('Could not read the auto-post setting.');
     }
@@ -47,6 +54,22 @@ export default function AiSettingsCard({ onChange }: { onChange?: (enabled: bool
       } else {
         setError('Could not save the setting.');
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveThreshold() {
+    if (!bizId || busy || threshold === '' || Number(threshold) === Number(savedThreshold)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patch(`/businesses/${bizId}`, { capitalization_threshold: Number(threshold) });
+      setSavedThreshold(threshold);
+    } catch (e: unknown) {
+      setThreshold(savedThreshold);
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      setError(status === 403 ? 'Only a firm admin can change this setting.' : 'Could not save the setting.');
     } finally {
       setBusy(false);
     }
@@ -81,6 +104,20 @@ export default function AiSettingsCard({ onChange }: { onChange?: (enabled: bool
           )}
         </div>
       </label>
+      <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+        <label htmlFor="capitalization-threshold" className="text-sm font-medium">Capitalize purchases of at least</label>
+        <MoneyInput
+          id="capitalization-threshold"
+          className="h-9 w-32 text-right font-mono"
+          value={threshold}
+          onChange={event => setThreshold(event.target.value)}
+          onBlur={() => { void saveThreshold(); }}
+          disabled={busy || !allowed}
+        />
+        <p className="basis-full text-xs text-muted-foreground">
+          An invoice line at or above this amount is coded to a fixed asset instead of an expense. Saved when you leave the box.
+        </p>
+      </div>
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
     </div>
   );

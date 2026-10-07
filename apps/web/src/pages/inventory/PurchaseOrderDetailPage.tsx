@@ -145,7 +145,7 @@ export default function PurchaseOrderDetailPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 text-sm">
           <div>
-            Status: <span className={statusBadgeClass(data.status)}>{data.status}</span>
+            Status: <span className={`${statusBadgeClass(data.status)} capitalize`}>{data.status}</span>
           </div>
           <div>Vendor: {vendor?.name ?? '—'}</div>
           <div>Order date: {data.order_date}</div>
