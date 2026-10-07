@@ -1056,7 +1056,7 @@ export default function CoaListPage() {
 
       {/* ── Edit slide-over ── */}
       {editAccount && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 !mt-0 flex">
           <div className="flex-1 bg-black/20" onClick={() => setEditAccount(null)} />
           <div className="w-[420px] bg-background shadow-xl flex flex-col border-l" role="dialog" aria-modal="true" aria-label="Edit account">
             <div className="flex items-center justify-between border-b px-6 py-4">

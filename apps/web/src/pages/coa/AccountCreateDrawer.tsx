@@ -183,7 +183,8 @@ export default function AccountCreateDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    // !mt-0: a page that spaces its rows (space-y-*) would push this down and leave a gap on top.
+    <div className="fixed inset-0 z-50 !mt-0 flex">
       <div className="flex-1 bg-black/20" onClick={onClose} />
       <div className="flex w-[420px] flex-col border-l bg-background shadow-xl" role="dialog" aria-modal="true" aria-label="New account">
         <div className="flex items-center justify-between border-b px-6 py-4">
