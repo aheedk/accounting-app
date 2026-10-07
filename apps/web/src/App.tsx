@@ -63,6 +63,7 @@ import FixedAssetListPage from '@/pages/accounting/FixedAssetListPage';
 import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
 import FixedAssetDetailPage from '@/pages/accounting/FixedAssetDetailPage';
 import BankDepositPage from '@/pages/accounting/BankDepositPage';
+import TransferNewPage from '@/pages/accounting/TransferNewPage';
 import BankDepositListPage from '@/pages/accounting/BankDepositListPage';
 import ExpensePage from '@/pages/accounting/ExpensePage';
 import CheckListPage from '@/pages/accounting/CheckListPage';
@@ -180,6 +181,7 @@ export default function App() {
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />
             <Route path="/accounting/bank-deposits" element={<BankDepositListPage />} />
             <Route path="/accounting/bank-deposits/new" element={<BankDepositPage />} />
+            <Route path="/accounting/transfers/new" element={<TransferNewPage />} />
             <Route path="/accounting/bank-deposits/:id" element={<BankDepositPage />} />
             <Route path="/accounting/expense-transactions" element={<ExpenseListPage />} />
             <Route path="/accounting/expenses/new" element={<ExpensePage />} />

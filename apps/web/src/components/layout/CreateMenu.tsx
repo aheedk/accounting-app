@@ -40,6 +40,7 @@ const CATEGORIES: CreateCategory[] = [
     items: [
       { label: 'Journal entry', to: '/journal/new' },
       { label: 'Bank deposit', to: '/accounting/bank-deposits/new' },
+      { label: 'Transfer', to: '/accounting/transfers/new' },
       { label: 'Fixed asset', to: '/accounting/fixed-assets/new' },
       { label: 'Sales order', to: '/inventory/sales-orders/new' },
       { label: 'Purchase order', to: '/inventory/purchase-orders/new' },

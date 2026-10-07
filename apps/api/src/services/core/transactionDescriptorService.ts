@@ -368,6 +368,9 @@ export async function describeTransactions(
           described = { ...journal, label, num: entry.reference, path: '/accounting/bank-transactions' };
         } else if (inboxEntries.has(entry.id)) {
           described = { ...journal, path: '/accounting/bank-transactions' };
+        } else if (entry.transaction_type === 'transfer') {
+          // Made on the Transfer form; it is still a journal entry, opened and changed as one.
+          described = { ...journal, label: 'Transfer' };
         } else {
           described = { ...journal, is_adjusting: entry.source_type === 'adjustment' };
         }
