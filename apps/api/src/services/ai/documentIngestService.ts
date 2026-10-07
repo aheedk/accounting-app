@@ -5,6 +5,7 @@ import {
   ExtractionTooLongError,
   fetchCoa,
   fetchVendorHistory,
+  fetchVendors,
   type ClientContext,
   type DocumentMediaType,
 } from '../../jobs/gmailWorker.js';
@@ -48,6 +49,7 @@ export async function ingestUploadedPdf(
   const clientContext: ClientContext = {
     coa,
     vendorHistory: await fetchVendorHistory(db, businessId, coa),
+    vendors: await fetchVendors(db, businessId),
   };
 
   let extracted: Awaited<ReturnType<typeof classifyAndExtract>>;

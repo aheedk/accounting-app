@@ -130,6 +130,7 @@ export async function classifyAndExtract(
     ? { type: 'document' as const, source: { type: 'base64' as const, media_type: mediaType, data: base64Pdf } }
     : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType, data: base64Pdf } };
   const accountSection = buildCoaPromptSection(clientContext);
+  const vendorSection = buildVendorPromptSection(clientContext);
   // Streamed: a month of a busy checking account is ~200 lines, well past what a
   // non-streaming request may return before it times out.
   const stream = client.messages.stream({
@@ -156,6 +157,7 @@ ACCOUNT SELECTION RULES — follow in this order:
 4. Otherwise: choose the best-matching expense, revenue, or liability account from the list below.
 
 ${accountSection}
+${vendorSection}
 
 If this is a BANK STATEMENT return:
 {
@@ -167,7 +169,7 @@ If this is a BANK STATEMENT return:
   "transactions": [
     {
       "date": "MM/DD/YYYY",
-      "payee_name": "vendor or payee name only (e.g. IRS, Duke Energy, Action Lawn Maintenance) — omit for deposits with no clear payee",
+      "payee_name": "vendor or payee name only (e.g. IRS, Duke Energy, Action Lawn Maintenance) — use the matching name from KNOWN VENDORS below when there is one; omit for deposits with no clear payee",
       "description": "full transaction description from the statement",
       "amount": "positive number e.g. 1250.00",
       "type": "deposit (money received/inflow), check (outflow paid by physical check), or expense (outflow via card/ACH/wire/cash/EFT)",
@@ -189,7 +191,7 @@ If this is a CREDIT CARD STATEMENT (a card issuer's statement listing purchases,
   "transactions": [
     {
       "date": "MM/DD/YYYY (transaction date)",
-      "payee_name": "merchant name only, e.g. Amazon, Shell, Delta Air Lines — omit for payments",
+      "payee_name": "merchant name only, e.g. Amazon, Shell, Delta Air Lines — use the matching name from KNOWN VENDORS below when there is one; omit for payments",
       "description": "full description from the statement",
       "amount": "positive number e.g. 89.99",
       "type": "charge (purchase, fee, interest — adds to the balance), payment (a payment toward the card balance), or refund (return or statement credit)",
@@ -206,7 +208,7 @@ If these are CHECK STUBS, a CHECK REGISTER, or IMAGES OF WRITTEN CHECKS return:
     {
       "check_number": "e.g. 1042",
       "date": "MM/DD/YYYY — if the stub shows no year (e.g. a handwritten 7/1), give MM/DD only; never guess the year",
-      "payee_name": "who the check was made out to",
+      "payee_name": "who the check was made out to — use the matching name from KNOWN VENDORS below when there is one",
       "amount": "positive number e.g. 1250.00",
       "memo": "what the check was for, from the memo or stub notes",
       "suggested_account": "one account name from the chart of accounts above that fits what the check paid for"
@@ -219,7 +221,7 @@ If this is an INVOICE or BILL return:
   "document_type": "invoice",
   "addressed_to": "exact name from the BILL TO / SOLD TO / Ship To field — the company receiving / paying this document",
   "invoice_type": "ap (we are paying this bill) or ar (customer owes us)",
-  "vendor_customer": "vendor name for AP, customer name for AR",
+  "vendor_customer": "vendor name for AP, customer name for AR — for AP, use the matching name from KNOWN VENDORS below when there is one",
   "invoice_number": "string",
   "invoice_date": "MM/DD/YYYY",
   "due_date": "MM/DD/YYYY",
@@ -266,6 +268,10 @@ type VendorMapping = { description: string; account_name: string };
 export type ClientContext = {
   coa: CoaAccount[];
   vendorHistory: VendorMapping[];
+  /** The client's own vendor names, so the model can match a payee on a
+   * statement to the vendor already on file instead of inventing a new
+   * spelling of the same vendor. */
+  vendors: string[];
 };
 
 export async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaAccount[]> {
@@ -278,6 +284,21 @@ export async function fetchCoa(db: Kysely<DB>, businessId: string): Promise<CoaA
     .orderBy('account_type')
     .orderBy('name')
     .execute();
+}
+
+// Capped well above what any real client has on file -- this only guards
+// against an unbounded prompt, not a realistic vendor count.
+const MAX_PROMPT_VENDORS = 300;
+
+export async function fetchVendors(db: Kysely<DB>, businessId: string): Promise<string[]> {
+  const rows = await db.selectFrom('vendors')
+    .select('name')
+    .where('business_id', '=', businessId)
+    .where('deleted_at', 'is', null)
+    .orderBy('name')
+    .limit(MAX_PROMPT_VENDORS)
+    .execute();
+  return rows.map(r => r.name);
 }
 
 // Pull the last 60 approved bank-statement transactions for this business and build a
@@ -337,7 +358,8 @@ async function resolveByEmail(db: Kysely<DB>, toHeader: string): Promise<{ busin
   if (!byEmail) return null;
   const coa = await fetchCoa(db, byEmail.id);
   const vendorHistory = await fetchVendorHistory(db, byEmail.id, coa);
-  return { businessId: byEmail.id, ctx: { coa, vendorHistory } };
+  const vendors = await fetchVendors(db, byEmail.id);
+  return { businessId: byEmail.id, ctx: { coa, vendorHistory, vendors } };
 }
 
 // Fall back to AI-extracted name matching when no import_email matched.
@@ -385,6 +407,19 @@ Other: Accounts Receivable, Accounts Payable, Notes Payable, Owner Draws`;
   }
 
   return `Use ONLY account names from the client's chart of accounts below. Do NOT invent names.\n\n${sections}${history}`;
+}
+
+// Same grounding idea as the chart of accounts above, but for payee names:
+// without this the model only ever sees the statement's own spelling (e.g.
+// "Duke Power" after a utility's rename), never the name the client's vendor
+// is actually filed under, so every statement coins a new variant.
+export function buildVendorPromptSection(ctx: ClientContext | undefined): string {
+  if (!ctx || ctx.vendors.length === 0) return '';
+  return `\n\nKNOWN VENDORS — this client's existing vendor list. When a payee on the document is clearly one of these ` +
+    `(even if printed differently — a different legal suffix, a rebrand, an abbreviation, a store location), use the vendor's ` +
+    `name exactly as it appears here instead of the document's own wording. If a payee does not match any of these, extract ` +
+    `its name as printed; it is likely a new vendor, not a reason to force a match.\n` +
+    ctx.vendors.join(', ');
 }
 
 // Process a single message: download PDF → classify → match business → insert to correct staging table
