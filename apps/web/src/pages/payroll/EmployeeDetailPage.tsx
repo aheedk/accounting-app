@@ -3,8 +3,17 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
+import { hasMinRole } from '@accounting/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
+import { DateInput } from '@/components/ui/date-input';
+import { Label } from '@/components/ui/label';
+import { AppSelect } from '../../components/ui/select';
+import { pickErr } from '@/lib/apiErrors';
+import { fmtLongDate } from '@/lib/dates';
+import { humanizeCode } from '@/lib/labels';
 
 type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
@@ -45,6 +54,52 @@ export default function EmployeeDetailPage() {
   const [reveal, setReveal] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const canEdit = user?.role !== undefined && hasMinRole(user.role, 'accountant');
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    full_name: '', email: '', phone: '', pay_rate: '', default_pay_frequency: 'biweekly' as PayFrequency,
+    w4_filing_status: '' as W4FilingStatus | '', termination_date: '', is_active: true,
+  });
+
+  function startEdit(employee: Employee) {
+    setForm({
+      full_name: employee.full_name,
+      email: employee.email ?? '',
+      phone: employee.phone ?? '',
+      pay_rate: (Number(employee.default_pay_rate_cents) / 100).toFixed(2),
+      default_pay_frequency: employee.default_pay_frequency,
+      w4_filing_status: employee.w4_filing_status ?? '',
+      termination_date: employee.termination_date ?? '',
+      is_active: employee.is_active,
+    });
+    setActionErr(null);
+    setEditing(true);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bizId || !id) return;
+    setSaving(true); setActionErr(null);
+    try {
+      await api.patch(`/businesses/${bizId}/employees/${id}`, {
+        full_name: form.full_name.trim(),
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        default_pay_rate_cents: Math.round((Number(form.pay_rate) || 0) * 100),
+        default_pay_frequency: form.default_pay_frequency,
+        w4_filing_status: form.w4_filing_status || null,
+        termination_date: form.termination_date || null,
+        is_active: form.is_active,
+      });
+      setEditing(false);
+      await reload();
+    } catch (err: unknown) {
+      setActionErr(pickErr(err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const reload = useCallback(async () => {
     if (!bizId || !id) return;
@@ -105,7 +160,7 @@ export default function EmployeeDetailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{data.full_name}</h1>
-          <p className="text-sm text-muted-foreground">Hired {data.hire_date}</p>
+          <p className="text-sm text-muted-foreground">Hired {fmtLongDate(data.hire_date)}</p>
         </div>
         <span
           className={
@@ -114,25 +169,82 @@ export default function EmployeeDetailPage() {
               : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
           }
         >
-          {data.is_active ? 'active' : 'inactive'}
+          {data.is_active ? 'Active' : 'Inactive'}
         </span>
       </div>
 
       {actionErr && <p className="text-sm text-destructive">{actionErr}</p>}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Details</CardTitle>
+          {canEdit && !editing && <Button size="sm" variant="outline" onClick={() => startEdit(data)}>Edit</Button>}
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>Email: {data.email ?? '—'}</div>
-          <div>Phone: {data.phone ?? '—'}</div>
-          <div>Hire date: {data.hire_date}</div>
-          <div>Termination date: {data.termination_date ?? '—'}</div>
-          <div>Pay rate: <span className="font-mono">{fmtRate(data.default_pay_rate_cents)}</span></div>
-          <div>Pay frequency: {data.default_pay_frequency}</div>
-          <div className="col-span-2">W-4 filing status: {data.w4_filing_status ?? '—'}</div>
-        </CardContent>
+        {editing ? (
+          <CardContent>
+            <form className="grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={saveEdit}>
+              <div>
+                <Label>Full name</Label>
+                <Input value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} required />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Pay rate (per hour)</Label>
+                <MoneyInput className="text-right font-mono" value={form.pay_rate} onChange={e => setForm(f => ({ ...f, pay_rate: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Pay frequency</Label>
+                <AppSelect
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={form.default_pay_frequency}
+                  onChange={e => setForm(f => ({ ...f, default_pay_frequency: e.target.value as PayFrequency }))}
+                >
+                  {(['weekly', 'biweekly', 'semimonthly', 'monthly'] as const).map(v => <option key={v} value={v}>{humanizeCode(v)}</option>)}
+                </AppSelect>
+              </div>
+              <div>
+                <Label>W-4 filing status</Label>
+                <AppSelect
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={form.w4_filing_status}
+                  onChange={e => setForm(f => ({ ...f, w4_filing_status: e.target.value as W4FilingStatus | '' }))}
+                >
+                  <option value="">Not set</option>
+                  {(['single', 'married_jointly', 'married_separately', 'head_of_household'] as const).map(v => <option key={v} value={v}>{humanizeCode(v)}</option>)}
+                </AppSelect>
+              </div>
+              <div>
+                <Label>Termination date</Label>
+                <DateInput value={form.termination_date} onChange={e => setForm(f => ({ ...f, termination_date: e.target.value }))} />
+              </div>
+              <label className="flex items-center gap-2 self-end pb-2 text-sm">
+                <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
+                Active (included when payroll is run)
+              </label>
+              <div className="flex gap-2 md:col-span-2">
+                <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                <Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+              </div>
+            </form>
+          </CardContent>
+        ) : (
+          <CardContent className="grid grid-cols-2 gap-2 text-sm">
+            <div>Email: {data.email ?? '—'}</div>
+            <div>Phone: {data.phone ?? '—'}</div>
+            <div>Hire date: {fmtLongDate(data.hire_date)}</div>
+            <div>Termination date: {data.termination_date ? fmtLongDate(data.termination_date) : '—'}</div>
+            <div>Pay rate: <span className="font-mono">{fmtRate(data.default_pay_rate_cents)}</span> an hour</div>
+            <div>Pay frequency: {humanizeCode(data.default_pay_frequency)}</div>
+            <div className="col-span-2">W-4 filing status: {data.w4_filing_status ? humanizeCode(data.w4_filing_status) : '—'}</div>
+          </CardContent>
+        )}
       </Card>
 
       <Card>
