@@ -266,13 +266,13 @@ export default function VendorListPage() {
                     >
                       Create Expense
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => { setOpenActionRow(null); alert('Check writing coming soon.'); }}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                    <Link
+                      to={`/accounting/checks/new?vendorId=${r.id}`}
+                      onClick={() => setOpenActionRow(null)}
+                      className="block w-full px-3 py-2 text-sm hover:bg-accent"
                     >
                       Write check
-                    </button>
+                    </Link>
                     <button
                       type="button"
                       disabled={!canMakeInactive || !r.is_active}

@@ -72,9 +72,25 @@ export const recurringExpensePayloadSchema = z.object({
 });
 export type RecurringExpensePayload = z.infer<typeof recurringExpensePayloadSchema>;
 
+export const recurringCheckLineSchema = z.object({
+  account_id: z.string().uuid(),
+  description: z.string().max(500).nullable().optional(),
+  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+});
+export const recurringCheckPayloadSchema = z.object({
+  payee_text: z.string().max(200).nullable().optional(),
+  payee_id: z.string().uuid().nullable().optional(),
+  payee_type: z.enum(['vendor', 'customer', 'other']).nullable().optional(),
+  bank_account_id: z.string().uuid(),
+  mailing_address: z.string().max(1000).nullable().optional(),
+  memo: z.string().max(2000).nullable().optional(),
+  lines: z.array(recurringCheckLineSchema).min(1),
+});
+export type RecurringCheckPayload = z.infer<typeof recurringCheckPayloadSchema>;
+
 export const recurringTemplateCreateSchema = z.object({
   name: z.string().min(1).max(200),
-  template_type: z.enum(['journal_entry', 'invoice', 'bill', 'deposit', 'expense']),
+  template_type: z.enum(['journal_entry', 'invoice', 'bill', 'deposit', 'expense', 'check']),
   payload: z.record(z.unknown()),
   recurrence: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']),
   // Deposit/Expense-only: scheduled auto-creates on next_run_date; reminder/

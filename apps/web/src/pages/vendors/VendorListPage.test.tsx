@@ -127,17 +127,21 @@ describe('VendorListPage', () => {
     expect(labels).not.toContain('Delete');
   });
 
-  it('stubs Write check and Ask vendor for info with a coming-soon alert', async () => {
+  it('stubs Ask vendor for info with a coming-soon alert', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     await render();
 
     await openRowMenu('Clean Vendor');
-    await click(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Write check')!);
-    expect(alertSpy).toHaveBeenCalledWith('Check writing coming soon.');
-
-    await openRowMenu('Clean Vendor');
     await click(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Ask vendor for info')!);
     expect(alertSpy).toHaveBeenCalledWith('Vendor info request coming soon.');
+  });
+
+  it('"Write check" links to the check form with this vendor pre-selected', async () => {
+    await render();
+    await openRowMenu('Clean Vendor');
+
+    const link = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'Write check')!;
+    expect(link.getAttribute('href')).toBe('/accounting/checks/new?vendorId=v2');
   });
 
   it('"Create Expense" links to the expense form with this vendor pre-selected', async () => {

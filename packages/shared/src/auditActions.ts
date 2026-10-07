@@ -137,6 +137,11 @@ export const AUDIT = {
   EXPENSE_TRANSACTION_POST: 'expense_transaction.post',
   EXPENSE_TRANSACTION_VOID: 'expense_transaction.void',
   EXPENSE_TRANSACTION_DELETE: 'expense_transaction.delete',
+
+  CHECK_CREATE: 'check.create',
+  CHECK_UPDATE: 'check.update',
+  CHECK_VOID: 'check.void',
+  CHECK_DELETE: 'check.delete',
   VENDOR_TAX_ID_REVEAL: 'vendor.tax_id_reveal',
 
   // Slice 9 — Period review tasks

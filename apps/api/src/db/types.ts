@@ -92,7 +92,7 @@ export type JournalEntrySourceType =
   | 'manual' | 'invoice' | 'payment' | 'credit_memo'
   | 'bill' | 'bill_payment' | 'vendor_credit'
   | 'reversal' | 'adjustment' | 'bank_import' | 'invoice_import'
-  | 'bank_deposit' | 'expense';
+  | 'bank_deposit' | 'expense' | 'check';
 
 export interface ChartOfAccountsTable {
   id: Generated<string>;
@@ -397,6 +397,45 @@ export interface ExpenseTransactionLinesTable {
   created_at: Generated<Timestamp>;
 }
 
+export type CheckStatus = 'draft' | 'posted' | 'void';
+export type CheckPayeeType = 'vendor' | 'customer' | 'other';
+
+export interface ChecksTable {
+  id: Generated<string>;
+  business_id: string;
+  check_number: string;
+  payee_id: string | null;
+  payee_type: CheckPayeeType | null;
+  payee_text: string | null;
+  bank_account_id: string;
+  payment_date: ColumnType<string, string, string>;
+  mailing_address: string | null;
+  memo: string | null;
+  total_amount: ColumnType<string, string | number | undefined, string | number>;
+  print_later: Generated<boolean>;
+  is_printed: Generated<boolean>;
+  status: Generated<CheckStatus>;
+  journal_entry_id: string | null;
+  created_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  posted_at: Timestamp | null;
+  posted_by_user_id: string | null;
+  voided_at: Timestamp | null;
+  voided_by_user_id: string | null;
+}
+
+export interface CheckLinesTable {
+  id: Generated<string>;
+  check_id: string;
+  business_id: string;
+  line_number: Generated<number>;
+  account_id: string;
+  description: string | null;
+  amount: ColumnType<string, string | number | undefined, string | number>;
+  created_at: Generated<Timestamp>;
+}
+
 export type PeriodReviewTaskKey = 'reconcile_bank' | 'post_adjustments' | 'review_unreviewed_txns' | 'close_period';
 export type PeriodReviewTaskStatus = 'todo' | 'in_progress' | 'done';
 
@@ -414,7 +453,7 @@ export interface PeriodReviewTasksTable {
   updated_at: Generated<Timestamp>;
 }
 
-export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense';
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense' | 'check';
 export type RecurringTemplateRecurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface RecurringTemplatesTable {
@@ -446,7 +485,7 @@ export interface FilesTable {
   created_at: Generated<Timestamp>;
 }
 
-export type ReceiptLinkedEntityType = 'bank_transaction' | 'bill' | 'expense_transaction' | 'invoice' | 'journal_entry' | 'unlinked';
+export type ReceiptLinkedEntityType = 'bank_transaction' | 'bill' | 'expense_transaction' | 'invoice' | 'journal_entry' | 'check' | 'unlinked';
 
 export interface ReceiptsTable {
   id: Generated<string>;
@@ -994,6 +1033,8 @@ export interface DB {
   stock_movements: StockMovementsTable;
   expense_transactions: ExpenseTransactionsTable;
   expense_transaction_lines: ExpenseTransactionLinesTable;
+  checks: ChecksTable;
+  check_lines: CheckLinesTable;
   period_review_tasks: PeriodReviewTasksTable;
   recurring_templates: RecurringTemplatesTable;
   files: FilesTable;

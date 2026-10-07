@@ -9,11 +9,12 @@ import * as invoiceService from '../ar/invoiceService.js';
 import * as billService from '../ap/billService.js';
 import * as depositService from '../banking/bankDepositService.js';
 import * as expenseService from '../ap/expenseTransactionService.js';
+import * as checkService from '../ap/checkService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
-import type { PaymentMethod } from '../../db/types.js';
+import type { PaymentMethod, CheckPayeeType } from '../../db/types.js';
 
 export type RecurringTemplateRow = Selectable<RecurringTemplatesTable>;
-export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense';
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense' | 'check';
 export type RecurringTemplateRecurrenceType = 'scheduled' | 'reminder' | 'unscheduled';
 
 export type CreateTemplateInput = {
@@ -34,6 +35,7 @@ const PAYLOAD_LABELS: Record<RecurringTemplateType, string> = {
   bill: 'bill',
   deposit: 'deposit',
   expense: 'expense',
+  check: 'check',
 };
 
 /** Validate a payload against the type-specific schema; returns the parsed payload (zod defaults applied). */
@@ -44,6 +46,7 @@ function parsePayload(
     : template_type === 'invoice' ? schemas.recurringInvoicePayloadSchema
     : template_type === 'bill' ? schemas.recurringBillPayloadSchema
     : template_type === 'expense' ? schemas.recurringExpensePayloadSchema
+    : template_type === 'check' ? schemas.recurringCheckPayloadSchema
     : schemas.recurringDepositPayloadSchema;
   const r = schema.safeParse(payload);
   if (!r.success) {
@@ -269,6 +272,22 @@ async function materializeOnce(
         sort_order: i,
       })),
     });
+  } else if (t.template_type === 'check') {
+    const payload = parsePayload('check', t.payload) as schemas.RecurringCheckPayload;
+    await checkService.createCheck(trx, ctx, {
+      payment_date: runDate,
+      payee_text: payload.payee_text ?? null,
+      payee_id: payload.payee_id ?? null,
+      payee_type: (payload.payee_type ?? null) as CheckPayeeType | null,
+      bank_account_id: payload.bank_account_id,
+      mailing_address: payload.mailing_address ?? null,
+      memo: payload.memo ?? `Recurring: ${t.name}`,
+      lines: payload.lines.map(l => ({
+        account_id: l.account_id,
+        description: l.description ?? null,
+        amount: l.amount,
+      })),
+    });
   } else {
     const payload = parsePayload('expense', t.payload) as schemas.RecurringExpensePayload;
     await expenseService.createExpense(trx, ctx, {
@@ -312,7 +331,10 @@ export async function materializeDueTemplate(
   // Deposit/Expense templates: only 'scheduled' auto-fires. 'reminder' and
   // 'unscheduled' sit here forever (next_run_date never advances) until the
   // user invokes runTemplateNow — there is no notification channel yet to back 'reminder'.
-  if ((locked.template_type === 'deposit' || locked.template_type === 'expense') && locked.recurrence_type !== 'scheduled') {
+  if (
+    (locked.template_type === 'deposit' || locked.template_type === 'expense' || locked.template_type === 'check')
+    && locked.recurrence_type !== 'scheduled'
+  ) {
     return { template_id: t.id, runs_created: 0 };
   }
 

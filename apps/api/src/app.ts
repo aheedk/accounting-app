@@ -40,6 +40,7 @@ import inventoryItemsRoutes from './routes/inventoryItems.js';
 import purchaseOrdersRoutes from './routes/purchaseOrders.js';
 import itemReceiptsRoutes from './routes/itemReceipts.js';
 import expenseTransactionsRouter from './routes/expenseTransactions.js';
+import checksRouter from './routes/checks.js';
 import apOverviewRouter from './routes/apOverview.js';
 import firmOverviewRouter from './routes/firmOverview.js';
 import periodReviewRouter from './routes/periodReview.js';
@@ -115,6 +116,7 @@ export function makeApp(): Express {
   app.use(purchaseOrdersRoutes);
   app.use(itemReceiptsRoutes);
   app.use(expenseTransactionsRouter);
+  app.use(checksRouter);
   app.use(apOverviewRouter);
   app.use(firmOverviewRouter);
   app.use(periodReviewRouter);

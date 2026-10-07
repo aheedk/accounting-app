@@ -445,3 +445,149 @@ export function previewDepositAlignmentTest(target?: Window | null): void {
 
   openPdfPreview(doc, target);
 }
+
+// ── Write Check printing ────────────────────────────────────────────────────
+
+const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+function threeDigitsToWords(n: number): string {
+  const parts: string[] = [];
+  if (n >= 100) { parts.push(`${ONES[Math.floor(n / 100)]} hundred`); n %= 100; }
+  if (n >= 20) { parts.push(TENS[Math.floor(n / 10)]!); n %= 10; }
+  if (n > 0) parts.push(ONES[n]!);
+  return parts.join(' ');
+}
+
+/** "Six hundred ninety and 20/100" — the check-writing convention of whole
+ * dollars spelled out, cents as a fraction. Caps at the highest scale a
+ * check would realistically need; anything larger just reads oddly, not
+ * incorrectly. */
+export function amountInWords(amount: string | number): string {
+  const value = Math.abs(Number(amount));
+  const dollars = Math.floor(value);
+  const cents = Math.round((value - dollars) * 100);
+  const scales: Array<[number, string]> = [[1_000_000_000, 'billion'], [1_000_000, 'million'], [1_000, 'thousand']];
+  let remaining = dollars;
+  const parts: string[] = [];
+  for (const [scale, name] of scales) {
+    if (remaining >= scale) {
+      parts.push(`${threeDigitsToWords(Math.floor(remaining / scale))} ${name}`);
+      remaining %= scale;
+    }
+  }
+  if (remaining > 0 || parts.length === 0) parts.push(threeDigitsToWords(remaining));
+  const words = parts.join(' ').trim() || 'zero';
+  const capitalized = words.charAt(0).toUpperCase() + words.slice(1);
+  return `${capitalized} and ${String(cents).padStart(2, '0')}/100`;
+}
+
+export type CheckDocInput = {
+  checkNumber: string;
+  paymentDate: string;
+  payeeName: string;
+  mailingAddress: string[];
+  amount: string;
+  bankAccountName: string;
+  bankAccountLastFour: string | null;
+  memo: string | null;
+  lines: Array<{ accountLabel: string; description: string; amount: string }>;
+  businessName: string;
+};
+
+// Caller pre-formats money (fmtMoney) — this stays a pure layout concern,
+// same convention as the deposit slip/summary above. A plain single-check
+// layout for now (not the 3-per-page QuickBooks voucher stock); the stub
+// content below the check line is the "voucher" QBO prints for the payee's
+// and the business's own records.
+function drawCheckPage(doc: jsPDF, input: CheckDocInput): void {
+  const marginX = 14;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 16;
+
+  // ── Check portion ──
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(input.businessName, marginX, y);
+  doc.setFont('helvetica', 'normal');
+  const accountLabel = input.bankAccountLastFour
+    ? `${input.bankAccountName} (...${input.bankAccountLastFour})`
+    : input.bankAccountName;
+  doc.setFontSize(9);
+  doc.text(accountLabel, marginX, y + 5);
+
+  doc.setFontSize(10);
+  doc.text(`Date: ${input.paymentDate}`, pageWidth - marginX, y, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.text(`No. ${input.checkNumber}`, pageWidth - marginX, y + 5, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  y += 16;
+
+  doc.setFontSize(10);
+  doc.text('Pay to the order of:', marginX, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text(input.payeeName, marginX + 36, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`$ ${input.amount}`, pageWidth - marginX, y, { align: 'right' });
+  y += 7;
+
+  doc.setFontSize(9);
+  doc.text(amountInWords(input.amount.replace(/,/g, '')), marginX, y);
+  doc.setDrawColor(0);
+  doc.line(marginX, y + 1.5, pageWidth - marginX, y + 1.5);
+  y += 10;
+
+  doc.setFontSize(9);
+  for (const line of input.mailingAddress) {
+    doc.text(line, marginX, y);
+    y += 4.5;
+  }
+  y += 8;
+
+  if (input.memo) {
+    doc.setFontSize(8);
+    doc.setTextColor(90);
+    doc.text(`Memo: ${input.memo}`, marginX, y);
+    doc.setTextColor(0);
+    y += 6;
+  }
+
+  doc.setDrawColor(150);
+  doc.setLineDashPattern([2, 1], 0);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  doc.setLineDashPattern([], 0);
+  y += 10;
+
+  // ── Voucher stub: the line-item detail, for the payer's or payee's records ──
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Check ${input.checkNumber}`, marginX, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(input.paymentDate, pageWidth - marginX, y, { align: 'right' });
+  y += 6;
+
+  autoTable(doc, {
+    head: [['Category', 'Description', 'Amount']],
+    body: input.lines.map(l => [l.accountLabel, l.description, l.amount]),
+    startY: y,
+    margin: { left: marginX, right: marginX },
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [235, 235, 235], textColor: [0, 0, 0], fontStyle: 'bold' },
+    columnStyles: { 2: { halign: 'right' } },
+  });
+  y = lastAutoTableFinalY(doc) + 6;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total', pageWidth - marginX - 40, y);
+  doc.text(input.amount, pageWidth - marginX, y, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+}
+
+/** "Print check" — opened for preview, same pattern as the deposit slip/summary. */
+export function previewCheck(input: CheckDocInput, target?: Window | null): void {
+  const doc = new jsPDF({ orientation: 'portrait', format: 'letter' });
+  doc.setProperties({ title: `Check-${input.checkNumber}.pdf` });
+  drawCheckPage(doc, input);
+  openPdfPreview(doc, target);
+}

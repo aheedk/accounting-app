@@ -76,6 +76,7 @@ export async function describeTransactions(
   const billPaymentIds = idsOf(entries, 'bill_payment');
   const vendorCreditIds = idsOf(entries, 'vendor_credit');
   const expenseIds = idsOf(entries, 'expense');
+  const checkIds = idsOf(entries, 'check');
   const bankImportIds = entries.filter(entry => entry.source_type === 'bank_import').map(entry => entry.id);
   // Older services post as unlinked manual/adjustment rows and point back from
   // their own table, so those are found by journal entry id instead.
@@ -84,7 +85,7 @@ export async function describeTransactions(
     .map(entry => entry.id);
 
   const [
-    invoices, payments, creditMemos, bills, billPayments, vendorCredits, dedicatedExpenses,
+    invoices, payments, creditMemos, bills, billPayments, vendorCredits, dedicatedExpenses, dedicatedChecks,
     bankImportLines, wrappedImportExpenses, wrappedImportDeposits,
     expenses, depreciation, payRuns, taxPayments, bankMatches, inboxMatches,
     invoiceLines, billLines, paymentApplications, billPaymentApplications, payRunEmployees,
@@ -118,6 +119,11 @@ export async function describeTransactions(
       .leftJoin('customers as c', 'c.id', 'e.customer_id')
       .select(['e.id', 'e.reference', 'e.payment_method', 'e.memo', 'e.payee_text', 'v.name as vendor_name', 'c.name as customer_name'])
       .where('e.id', 'in', expenseIds).execute(),
+    checkIds.length === 0 ? [] : db.selectFrom('checks as ch')
+      .leftJoin('vendors as v', 'v.id', 'ch.payee_id')
+      .leftJoin('customers as c', 'c.id', 'ch.payee_id')
+      .select(['ch.id', 'ch.check_number', 'ch.memo', 'ch.payee_text', 'v.name as vendor_name', 'c.name as customer_name'])
+      .where('ch.id', 'in', checkIds).execute(),
     bankImportIds.length === 0 ? [] : db.selectFrom('journal_entry_lines')
       .select(({ fn }) => ['journal_entry_id', fn.countAll<string>().as('line_count')])
       .where('journal_entry_id', 'in', bankImportIds)
@@ -182,6 +188,7 @@ export async function describeTransactions(
   const billPaymentById = byId(billPayments);
   const vendorCreditById = byId(vendorCredits);
   const expenseById = byId(dedicatedExpenses);
+  const checkById = byId(dedicatedChecks);
   const importLineCount = new Map(bankImportLines.map(row => [row.journal_entry_id, Number(row.line_count)]));
   const wrappedExpenseByJe = new Map(wrappedImportExpenses.map(row => [row.journal_entry_id, row]));
   const wrappedDepositByJe = new Map(wrappedImportDeposits.map(row => [row.journal_entry_id, row]));
@@ -267,6 +274,18 @@ export async function describeTransactions(
           name: doc?.vendor_name ?? doc?.customer_name ?? doc?.payee_text ?? null,
           memo: doc?.memo?.trim() || null,
           path: sid ? `/accounting/expenses/${sid}` : null,
+          is_adjusting: false,
+        };
+        break;
+      }
+      case 'check': {
+        const doc = sid ? checkById.get(sid) : undefined;
+        described = {
+          label: 'Check',
+          num: doc?.check_number ?? null,
+          name: doc?.vendor_name ?? doc?.customer_name ?? doc?.payee_text ?? null,
+          memo: doc?.memo?.trim() || null,
+          path: sid ? `/accounting/checks/${sid}` : null,
           is_adjusting: false,
         };
         break;
