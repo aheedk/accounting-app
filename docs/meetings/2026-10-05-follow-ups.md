@@ -28,7 +28,7 @@ Owner is who was asked or who volunteered; "open" means nobody was named.
 | 6 | **Card statement: the payment line should not go to the bank account.** See "The card payment decision" below | Payment lines are coded to the client's bank account (`cardPaymentSourceAccount`), with a check for the same payment already posted from the bank statement. | Aheed |
 | 7 | **Checks on a bank statement should get their category from the stub's description** ("food" on the stub means a food account), not land in Suspense | Partly done. A matched stub fills payee and memo, but the category only fills when the AI's suggested account name matched an account in the chart (`emailImports.ts:171`). Fix: run the stub's payee and memo through the coding engine when there is no direct match. | Aheed |
 | 8 | **New account panel leaves a sliver at the top** instead of reaching the top of the window | Small layout bug in `AccountCreateDrawer.tsx`. | Aheed |
-| 9 | **Vendor dropdown in the AI inbox.** The Name column should be a dropdown of the client's vendors, with the AI matching the name it read ("Duke Power" to "Duke Energy") — **10-01** | Still free text. Riham said "I'll fix that" on 10-01; not raised today, owner still unconfirmed. | Riham? |
+| 9 | **Vendor dropdown in the AI inbox.** The Name column should be a dropdown of the client's vendors, with the AI matching the name it read ("Duke Power" to "Duke Energy") — **10-01** | **Done** by Riham after the meeting (`40d1214`, `ddc2b41`, `6ba32c8`): the Name column suggests the client's vendors and matches a renamed payee, and still takes free text. | Riham, done |
 | 10 | **Bank deposit print should open a preview first**, as QuickBooks does | Three print options exist (slip and summary, summary only, alignment test). No preview step. | Riham |
 | 11 | **Make recurring on a bank deposit is untested.** Riham built the popup but has not seen what a recurring deposit should look like | Popup is on `main`. Needs Faizan to say what is expected, then a test. | Riham, Faizan |
 | 12 | **"+ New" menu: copy QuickBooks completely** ("pretty much, yes") | Riham kept the older entries and added the missing ones. Remove whatever QuickBooks does not have. | Riham |
@@ -43,7 +43,7 @@ Owner is who was asked or who volunteered; "open" means nobody was named.
 | 16 | **Credit card statement with a real statement** — **10-01** | Only the sample Amex statements have been used. Do after item 6. | Faizan |
 | 17 | **QA audit fixes** (`docs/qa/2026-09-28-app-audit.md`) — **10-01** | Aheed has read it but not worked on any. 8 are marked "wrong numbers or broken behaviour", including invoice due dates, the 1099 report and Profit & Loss net operating income. The plain-English walkthrough asked for on 10-01 has not happened either. | Aheed |
 | 18 | **Put every report up, then review them together** | Reports in the app: Trial Balance, General Ledger, Aging, Profit & Loss, Balance Sheet, Cash Flow, 1099, Custom, Management, Performance. The audit says Management Reports shows $0 revenue and P&L net operating income is wrong, so do item 17 first. | Aheed |
-| 19 | **Report period presets** — **10-01** | Riham said they were untested and their definitions unfinished. Check as part of item 18. | Riham |
+| 19 | **Report period presets** — **10-01** | **Done** by Riham after the meeting (`e9acc5a`): the fiscal-year presets on the General Ledger use the client's own fiscal year start. Other reports are worth a glance during item 18. | Riham, done |
 
 ### Bigger features (January or later)
 
@@ -76,7 +76,7 @@ None of these exist in the code yet.
 ### Suggested split
 
 - **Aheed:** 1–8 (3 is already done), then 17 and 18.
-- **Riham:** 9–13 and 19.
+- **Riham:** 10–13 (9 and 19 are already done).
 - **Faizan:** files for 14, expected behaviour for 11, testing for 15 and 16.
 - **Needs a decision from the firm before work starts:** 22, 24, 25, 26–28, and
   whether payroll stays (see Decided).
