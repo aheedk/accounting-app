@@ -28,5 +28,12 @@ export const stockAdjustSchema = z.object({
     .refine(v => parseFloat(v) !== 0, 'must be non-zero'),
   reason: z.enum(['adjustment', 'opening_balance', 'manual_in', 'manual_out', 'write_off']),
   memo: z.string().max(500).nullable().optional(),
+  /** Cost per unit of stock being added. Stock being removed leaves at its average cost. */
+  unit_cost: z.string().regex(/^\d+(\.\d+)?$/).nullable().optional(),
+});
+
+/** Record, as of a date, the stock that was entered before inventory posted to the ledger. */
+export const postOpeningInventorySchema = z.object({
+  entry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 export type StockAdjust = z.infer<typeof stockAdjustSchema>;

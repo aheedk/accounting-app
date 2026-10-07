@@ -978,6 +978,12 @@ export interface StockMovementsTable {
   memo: string | null;
   posted_by_user_id: string | null;
   created_at: Generated<Timestamp>;
+  /** Cost per unit of this movement; null only on rows older than migration 0090 with no item cost. */
+  unit_cost: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  /** Signed like quantity_delta: what this movement added to, or took from, the value of stock. */
+  total_cost: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  /** The journal entry that recorded it; null until posted (see "Post opening balance"). */
+  journal_entry_id: string | null;
 }
 
 export interface DepreciationEntriesTable {

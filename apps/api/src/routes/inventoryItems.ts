@@ -106,9 +106,27 @@ router.post('/businesses/:businessId/inventory-items/:id/adjust-stock', requireM
         quantity_delta: body.quantity_delta,
         reason: body.reason,
         memo: body.memo ?? null,
+        ...(body.unit_cost != null ? { unit_cost: body.unit_cost } : {}),
       }),
     );
     res.status(201).json(created);
+  } catch (e) { next(e); }
+});
+
+// Stock entered before inventory posted to the ledger: how much, and posting it.
+router.get('/businesses/:businessId/inventory/unposted-stock', async (req, res, next) => {
+  try { res.json({ value: await stockSvc.unpostedStockValue(db, req.tenancy!.business_id) }); }
+  catch (e) { next(e); }
+});
+
+router.post('/businesses/:businessId/inventory/post-opening-balance', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const body = schemas.postOpeningInventorySchema.parse(req.body);
+    const result = await db.transaction().execute(trx => stockSvc.postOpeningInventory(trx, ctxFromReq(req), {
+      business_id: req.tenancy!.business_id,
+      entry_date: body.entry_date,
+    }));
+    res.status(201).json(result ?? { journal_entry_id: null, movement_count: 0, value: '0.0000' });
   } catch (e) { next(e); }
 });
 

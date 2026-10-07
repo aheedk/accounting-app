@@ -1,6 +1,7 @@
 // Read-only: runs every financial report for each business and checks that the
 // figures that should agree do. Usage, from apps/api:
 //   npx tsx --env-file=../../.env scripts/report-tie-out.ts [as_of YYYY-MM-DD]
+import { sql } from 'kysely';
 import { db, destroyDbSingleton } from '../src/db/index.js';
 import * as ledger from '../src/services/core/ledgerService.js';
 import { balanceSheet } from '../src/services/reports/balanceSheetService.js';
@@ -28,6 +29,34 @@ async function controlBalance(businessId: string, systemKey: string, sign: 1 | -
   return sign * (Number(row?.debit ?? 0) - Number(row?.credit ?? 0));
 }
 
+/** Stock of ledger-tracked items that has been posted, and the balance of the accounts it sits in. */
+async function inventoryPosition(businessId: string) {
+  const stock = await db.selectFrom('stock_movements as sm')
+    .innerJoin('inventory_items as i', 'i.id', 'sm.inventory_item_id')
+    .select(({ fn }) => [
+      fn.sum<string>(sql<string>`CASE WHEN sm.journal_entry_id IS NOT NULL THEN sm.total_cost ELSE 0 END`).as('posted'),
+      fn.sum<string>(sql<string>`CASE WHEN sm.journal_entry_id IS NULL THEN sm.total_cost ELSE 0 END`).as('unposted'),
+    ])
+    .where('i.business_id', '=', businessId)
+    .where('i.inventory_asset_account_id', 'is not', null)
+    .where('sm.movement_date', '<=', asOf)
+    .executeTakeFirst();
+  const ledger = await db.selectFrom('journal_entry_lines as l')
+    .innerJoin('journal_entries as je', 'je.id', 'l.journal_entry_id')
+    .select(({ fn }) => [fn.sum<string>('l.debit').as('debit'), fn.sum<string>('l.credit').as('credit')])
+    .where('je.business_id', '=', businessId)
+    .where('je.status', 'in', ['posted', 'voided'])
+    .where('je.entry_date', '<=', asOf)
+    .where('l.account_id', 'in', db.selectFrom('inventory_items').select('inventory_asset_account_id')
+      .where('business_id', '=', businessId).where('inventory_asset_account_id', 'is not', null))
+    .executeTakeFirst();
+  return {
+    posted: Number(stock?.posted ?? 0),
+    unposted: Number(stock?.unposted ?? 0),
+    ledger: Number(ledger?.debit ?? 0) - Number(ledger?.credit ?? 0),
+  };
+}
+
 async function main() {
   const businesses = await db.selectFrom('businesses').select(['id', 'name']).orderBy('name').execute();
   let failures = 0;
@@ -41,6 +70,7 @@ async function main() {
     const scf = await statementOfCashFlows(db, { ...q, period_start: yearStart, period_end: asOf });
     const ar = await customerAging(db, { ...q, as_of: asOf });
     const ap = await vendorAging(db, { ...q, as_of: asOf });
+    const inventory = await inventoryPosition(business.id);
     const tbRows = (tb as { rows?: Array<{ total_debit?: string; total_credit?: string; debit?: string; credit?: string }> }).rows ?? [];
 
     const checks: Check[] = [
@@ -79,6 +109,11 @@ async function main() {
         left: sum(ap.map(r => r.total)), leftLabel: 'aging',
         right: await controlBalance(business.id, 'accounts_payable', -1), rightLabel: 'ledger',
       },
+      {
+        name: 'Stock on hand = Inventory in the ledger',
+        left: inventory.posted, leftLabel: 'stock',
+        right: inventory.ledger, rightLabel: 'ledger',
+      },
     ];
 
     console.log(`\n${business.name}  (as of ${asOf})`);
@@ -87,6 +122,10 @@ async function main() {
       if (!ok) failures += 1;
       console.log(`  ${ok ? 'OK  ' : 'DIFF'}  ${check.name}: ${check.leftLabel} ${money(check.left)}, ${check.rightLabel} ${money(check.right)}`
         + (ok ? '' : `  (off by ${money(check.left - check.right)})`));
+    }
+    if (Math.abs(inventory.unposted) >= 0.005) {
+      console.log(`        ${money(inventory.unposted)} of stock was entered before inventory posted to the ledger; `
+        + 'post it from Inventory > Overview.');
     }
     console.log(`        cash ${money(Number(scf.cash_ending))}, net income YTD ${money(Number(pnl.net_income))}, `
       + `net operating income ${money(Number(pnl.operating_income))}`);

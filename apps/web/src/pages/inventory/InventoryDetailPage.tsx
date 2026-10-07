@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
+import { MoneyInput } from '@/components/ui/money-input';
 import { AppSelect } from '../../components/ui/select';
 
 type StockMovementReason = 'adjustment' | 'opening_balance' | 'manual_in' | 'manual_out' | 'write_off';
@@ -88,6 +89,7 @@ export default function InventoryDetailPage() {
     quantity_delta: '',
     reason: 'adjustment' as StockMovementReason,
     memo: '',
+    unit_cost: '',
   });
   const [adjErr, setAdjErr] = useState<string | null>(null);
   const [adjMsg, setAdjMsg] = useState<string | null>(null);
@@ -128,10 +130,12 @@ export default function InventoryDetailPage() {
         quantity_delta: adjForm.quantity_delta,
         reason: adjForm.reason,
         memo: adjForm.memo.trim() === '' ? null : adjForm.memo,
+        // Only stock coming in has a cost to state; stock going out leaves at its average cost.
+        ...(Number(adjForm.quantity_delta) > 0 && adjForm.unit_cost.trim() !== '' ? { unit_cost: adjForm.unit_cost } : {}),
       };
       await api.post(`/businesses/${bizId}/inventory-items/${id}/adjust-stock`, body);
       setAdjMsg(`Stock adjusted by ${adjForm.quantity_delta} on ${fmtLongDate(adjForm.movement_date)}.`);
-      setAdjForm({ movement_date: today(), quantity_delta: '', reason: 'adjustment', memo: '' });
+      setAdjForm({ movement_date: today(), quantity_delta: '', reason: 'adjustment', memo: '', unit_cost: '' });
       await reload();
     } catch (e: unknown) {
       const msg =
@@ -289,6 +293,22 @@ export default function InventoryDetailPage() {
                 onChange={(e) => setAdjForm((f) => ({ ...f, memo: e.target.value }))}
               />
             </div>
+            {Number(adjForm.quantity_delta) > 0 && (
+              <div>
+                <Label>Unit cost (optional)</Label>
+                <MoneyInput
+                  value={adjForm.unit_cost}
+                  onChange={(e) => setAdjForm((f) => ({ ...f, unit_cost: e.target.value }))}
+                  placeholder={data.purchase_cost ? Number(data.purchase_cost).toFixed(2) : '0.00'}
+                  className="text-right font-mono"
+                />
+              </div>
+            )}
+            <p className="md:col-span-2 text-xs text-muted-foreground">
+              {data.inventory_asset_account_id
+                ? 'This posts to the ledger: stock coming in debits the inventory account, stock going out moves its average cost to the expense account. An opening balance is offset to Opening Balance Equity.'
+                : 'This item has no inventory asset account, so its stock is counted but not kept in the ledger.'}
+            </p>
             <div className="md:col-span-2 flex gap-2">
               <Button type="submit" disabled={busy || !data.is_active}>
                 {busy ? 'Saving...' : 'Adjust stock'}

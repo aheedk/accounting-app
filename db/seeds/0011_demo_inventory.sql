@@ -103,3 +103,13 @@ BEGIN
 
   END LOOP;
 END $$;
+
+-- Cost the demo stock (stock_movements.unit_cost / total_cost, migration 0090) at
+-- each item's purchase cost. It has no journal entry, like stock a client entered
+-- before inventory posted to the ledger: Inventory > Overview offers to post it.
+UPDATE stock_movements sm
+   SET unit_cost = COALESCE(i.purchase_cost, 0),
+       total_cost = ROUND(sm.quantity_delta * COALESCE(i.purchase_cost, 0), 4)
+  FROM inventory_items i
+ WHERE i.id = sm.inventory_item_id
+   AND sm.unit_cost IS NULL;

@@ -24,7 +24,7 @@ export type CreateAccountInput = {
 
 // QBO auto-creates "Opening Balance Equity" the first time an opening balance
 // is entered. Find it by name, else create it at the first free 39xx code.
-async function getOrCreateOpeningBalanceEquity(trx: Transaction<DB>, ctx: ServiceCtx, business_id: string) {
+export async function getOrCreateOpeningBalanceEquity(trx: Transaction<DB>, ctx: ServiceCtx, business_id: string) {
   const existing = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('business_id', '=', business_id)
     .where('name', '=', 'Opening Balance Equity')

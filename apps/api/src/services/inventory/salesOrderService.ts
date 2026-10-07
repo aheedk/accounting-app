@@ -136,6 +136,8 @@ export async function fulfill(trx: Transaction<DB>, ctx: ServiceCtx, input: { so
       quantity_delta: `-${line.quantity}`,
       reason: 'manual_out',
       memo: `Fulfillment of ${before.so_number}`,
+      // Posts the cost side of the sale: debit cost of goods sold, credit Inventory.
+      purpose: 'sale',
     });
   }
 

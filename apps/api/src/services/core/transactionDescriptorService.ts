@@ -181,6 +181,13 @@ export async function describeTransactions(
       .where('r.journal_entry_id', 'in', looseIds).orderBy('e.full_name').execute(),
   ]);
 
+  // Entries posted by a stock movement (cost of goods sold, an adjustment).
+  const stockMovements = looseIds.length === 0 ? [] : await db.selectFrom('stock_movements as sm')
+    .innerJoin('inventory_items as i', 'i.id', 'sm.inventory_item_id')
+    .select(['sm.id', 'sm.journal_entry_id', 'sm.inventory_item_id', 'i.name as item_name'])
+    .where('sm.journal_entry_id', 'in', looseIds).execute();
+  const stockByMovement = new Map(stockMovements.map(row => [row.id, row]));
+
   const invoiceById = byId(invoices);
   const paymentById = byId(payments);
   const creditMemoById = byId(creditMemos);
@@ -368,6 +375,9 @@ export async function describeTransactions(
           described = { ...journal, label, num: entry.reference, path: '/accounting/bank-transactions' };
         } else if (inboxEntries.has(entry.id)) {
           described = { ...journal, path: '/accounting/bank-transactions' };
+        } else if (sid && stockByMovement.has(sid)) {
+          const movement = stockByMovement.get(sid)!;
+          described = { ...journal, label: 'Inventory', name: movement.item_name, path: `/inventory/items/${movement.inventory_item_id}` };
         } else if (entry.transaction_type === 'transfer') {
           // Made on the Transfer form; it is still a journal entry, opened and changed as one.
           described = { ...journal, label: 'Transfer' };

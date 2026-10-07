@@ -1,49 +1,76 @@
-# Inventory in the ledger — Proposal
+# Inventory in the ledger — Design Spec
 
-**Status:** Proposed 2026-10-07. **Not built.** It needs three answers from the firm
-first, because each one changes the numbers on the balance sheet and the P&L.
-This is the one serious item left from the 2026-09-28 audit (P0 item 7).
+**Status:** Implemented 2026-10-07 (migration `0090`). The last serious item from the
+2026-09-28 audit (P0 item 7). Three choices in here were made without the firm and are
+marked **to confirm**.
 
-## The problem
+## What was actually wrong
 
-Inventory is tracked by quantity and cost, but nothing it does reaches the books:
+The audit said inventory never reached the books. Half of that was already not true:
 
-- The Inventory page values stock (16,058.65 on the demo client); the Inventory
-  account in the ledger is 0.00.
-- Receiving stock creates no payable.
-- Selling stock records no cost of goods sold, so gross profit is overstated.
+- **Receiving stock did post.** An item receipt raises and posts a bill: debit the
+  item's Inventory account, credit Accounts Payable, at the purchase order's cost.
+- **Selling stock posted only the revenue.** Fulfilling a sales order made the invoice
+  and reduced the count, but nothing moved the cost out of Inventory, so there was no
+  Cost of Goods Sold and gross profit was overstated.
+- **Stock entered or changed by hand posted nothing**: opening balances, adjustments,
+  write-offs. That is why the demo client's 16,058.65 of stock was 0.00 in the ledger.
 
-No inventory service posts a journal entry today.
+## Decisions
 
-## What has to be decided
+- **One place posts.** Every change in stock already goes through
+  `stockMovementService.adjustStock`. That function now costs the movement and posts it.
+- **Every movement is costed** (`stock_movements.unit_cost`, `total_cost`).
+  - Stock coming in takes the cost given (a purchase order's unit cost, or the Unit
+    cost box on the item page), else the average cost on hand, else the item's
+    purchase cost.
+  - Stock going out leaves at the **average cost** of what is on hand. *To confirm:*
+    QuickBooks Online uses first-in-first-out; average cost was chosen because it needs
+    no record of purchase layers and can be checked by hand.
+  - Taking the last of an item takes all of its remaining value, so rounding never
+    leaves cents in Inventory.
+- **What each movement posts**, for an item that has an Inventory asset account:
+  - a receipt: nothing new. Its bill already debited Inventory; the movement is linked
+    to that entry so it is not counted twice. (*To confirm:* receipts go through the
+    bill, as before, not through a "received not billed" account.)
+  - a sale: debit the item's expense (cost of goods sold) account, credit Inventory;
+  - an opening balance: debit Inventory, credit Opening Balance Equity;
+  - an adjustment, write-off, or stock added or removed by hand: Inventory against the
+    item's expense account. (*To confirm:* shrinkage goes to cost of goods sold, not to
+    a separate adjustment account.)
+- **An item with no Inventory asset account posts nothing.** Its stock is counted but
+  not kept in the ledger, as before.
+- **An item that is in the ledger needs an expense account** before its stock can be
+  sold or adjusted; the error says so.
+- **The entries belong to their movement** (`source_id` is the movement). They read
+  "Inventory" in the General Ledger, open the item, and cannot be edited on the journal
+  entry page. Stock is corrected with another movement.
+- **Stock value on the Inventory page** is now the sum of the movements' costs, which
+  is the same figure the ledger carries, instead of quantity × the item's current
+  purchase cost.
 
-1. **How a receipt reaches the books.**
-   - *Recommended: through the bill.* A bill line can name an inventory item; posting
-     the bill debits Inventory (not an expense) and credits Accounts Payable. This is
-     how QuickBooks Online works and needs no new account.
-   - *Alternative: on the item receipt,* crediting a "received not billed" liability,
-     with the bill clearing it later. More accurate when goods arrive before the bill,
-     but every bill then has to be matched to a receipt.
-2. **How cost is worked out when stock is sold.**
-   - *Recommended: average cost.* One running cost per item; simple to explain and to
-     check.
-   - *Alternative: first in, first out,* which QuickBooks Online uses. It needs a
-     record of every purchase layer and is harder to audit by hand.
-3. **What to do with stock already on hand.** The quantities and costs entered so far
-   were never posted. Either post one opening entry per client (debit Inventory,
-   credit Opening Balance Equity) on a chosen date, or start from zero and re-enter.
+## Stock entered before this
 
-## What would be built once those are answered
+Migration `0090` costs existing movements: receipts at their purchase order's cost and
+linked to their bill; everything else at the item's purchase cost, with no journal
+entry. Nothing is posted to a client's books automatically.
 
-- Invoice and bill lines carry the inventory item and quantity (today an invoice line
-  only borrows the item's income account).
-- Posting a bill with item lines: debit Inventory, credit Accounts Payable.
-- Posting an invoice with item lines: the usual revenue entry, plus debit Cost of
-  Goods Sold, credit Inventory at the item's cost.
-- A stock adjustment: debit or credit Inventory against an adjustment account.
-- Voiding or deleting any of these reverses its stock and its cost.
-- A check, like the report tie-out, that the Inventory page's value equals the
-  Inventory account.
+Inventory → Overview shows what is not yet in the ledger and a **Post opening balance**
+button: one journal entry, dated as chosen, debit each Inventory account, credit
+Opening Balance Equity. It is an ordinary adjusting entry; deleting it puts the stock
+back to "not yet posted".
 
-It touches invoices, bills, the ledger and three inventory services, so it is a slice
-of its own, not a fix.
+Past sales in that stock are part of the opening figure rather than restated as cost of
+goods sold in their own months.
+
+## Checking it
+
+`npm -w @accounting/api run report:tie-out` has a line for it: posted stock value equals
+the balance of the Inventory accounts, and it reports any stock still waiting to be
+posted.
+
+## Not built
+
+- Invoices typed in by hand do not move stock; only fulfilling a sales order does.
+- Voiding a fulfilled sales order or an item receipt does not put the stock back.
+- First-in-first-out costing.

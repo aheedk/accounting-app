@@ -98,6 +98,11 @@ export async function createReceipt(
       quantity_delta: line.quantity,
       reason: 'manual_in',
       memo: `Item receipt for ${po.po_number}`,
+      // Costed at what the purchase order paid. The bill above already debited
+      // Inventory for it, so the movement points at that entry and posts no other.
+      unit_cost: line.unit_cost,
+      recorded_by_journal_entry_id: posted.posted_journal_entry_id,
+      purpose: 'receipt',
     });
   }
 
