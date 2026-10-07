@@ -102,6 +102,7 @@ export default function CustomerListPage() {
           columns={columns}
           defaultSortKey="name"
           defaultSortDir="asc"
+          tableSettingsPageId="customers"
           actions={r => {
             const hasBalance = Number(r.open_balance ?? 0) > 0;
             return (

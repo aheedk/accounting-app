@@ -189,9 +189,14 @@ export default function CheckListPage() {
         </div>
       </div>
 
+      {/* This page is a pre-filtered shortcut onto the unified Transactions
+          view, not its own standalone type-specific list — clearing the
+          filter chip goes there instead of trying to show "all types" here. */}
       <span className="inline-flex h-8 items-center gap-2 rounded-full border bg-muted/40 px-3 text-sm">
         Transaction type: <span className="font-medium">Check</span>
-        <X className="h-3.5 w-3.5 text-muted-foreground/50" />
+        <button type="button" onClick={() => nav('/accounting/transactions')} aria-label="Clear transaction type filter">
+          <X className="h-3.5 w-3.5 text-muted-foreground/70 hover:text-foreground" />
+        </button>
       </span>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
@@ -205,6 +210,7 @@ export default function CheckListPage() {
           defaultSortDir="desc"
           pagination={{ pageSize: 25 }}
           selectable={false}
+          tableSettingsPageId="checks"
           onRowClick={r => nav(r.path)}
           emptyMessage={<EmptyState title="No checks found" hint="Adjust the filters above, or write a check." actionLabel="Write check" actionTo="/accounting/checks/new" />}
         />

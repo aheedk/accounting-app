@@ -244,6 +244,7 @@ export default function VendorListPage() {
           defaultSortDir="asc"
           selectedIds={selectedIds}
           onSelectedIdsChange={setSelectedIds}
+          tableSettingsPageId="vendors"
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="relative inline-flex items-center gap-2">

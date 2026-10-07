@@ -666,7 +666,7 @@ export default function BankDepositPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setRecentOpen(false); nav('/accounting/bank-deposits'); }}
+                  onClick={() => { setRecentOpen(false); nav('/accounting/transactions?type=deposit'); }}
                   className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
                 >
                   View More

@@ -693,7 +693,7 @@ export default function CheckPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setRecentOpen(false); nav('/accounting/checks'); }}
+                  onClick={() => { setRecentOpen(false); nav('/accounting/transactions?type=check'); }}
                   className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
                 >
                   View More

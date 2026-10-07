@@ -8,6 +8,7 @@ import {
   ChevronRight,
   FileBarChart,
   LayoutDashboard,
+  ListChecks,
   Package,
   Settings,
   Users,
@@ -36,6 +37,12 @@ const groups: NavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     to: '/',
+  },
+  {
+    id: 'transactions',
+    label: 'Transactions',
+    icon: ListChecks,
+    to: '/accounting/transactions',
   },
   {
     id: 'ar',

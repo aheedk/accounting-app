@@ -602,7 +602,7 @@ export default function ExpensePage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setRecentOpen(false); nav('/accounting/expense-transactions'); }}
+                  onClick={() => { setRecentOpen(false); nav('/accounting/transactions?type=expense'); }}
                   className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
                 >
                   View More

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadAsExcel, downloadAsPdf } from '@/lib/download';
+import { useAuth } from '@/auth/useAuth';
+import { TableSettingsDrawer, TableSettingsGearButton, type TableColumnDef } from '@/components/ui/TableSettingsDrawer';
+import { loadTableSettings, saveTableSettings, ROW_HEIGHT_CLASS } from '@/lib/tableSettings';
 
 export type Column<T> = {
   key: string;
@@ -37,6 +40,11 @@ export interface DataTableProps<T> {
   // QBO-style pager ("‹ Previous 1-75 Next ›"). Slices AFTER sorting so
   // column sorts operate on the full data set.
   pagination?: { pageSize: number };
+  // Opts this table into the gear-icon "Table settings" drawer (sort/rows/
+  // columns, persisted per user per page). Give every list page that shares
+  // this component its own stable pageId ("vendors", "checks", ...).
+  tableSettingsPageId?: string;
+  availableFilters?: TableColumnDef[];
 }
 
 export function DataTable<T>({
@@ -54,10 +62,44 @@ export function DataTable<T>({
   emptyMessage = 'No records.',
   downloadable,
   pagination,
+  tableSettingsPageId,
+  availableFilters,
 }: DataTableProps<T>) {
+  const { user } = useAuth();
+  const allColumnKeys = useMemo(() => columns.map(c => c.key), [columns]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tableSettings, setTableSettings] = useState(() => (
+    tableSettingsPageId && user ? loadTableSettings(user.id, tableSettingsPageId, allColumnKeys) : null
+  ));
+  useEffect(() => {
+    if (tableSettingsPageId && user) setTableSettings(loadTableSettings(user.id, tableSettingsPageId, allColumnKeys));
+    else setTableSettings(null);
+    // allColumnKeys is derived fresh each render from `columns`; comparing by
+    // identity would reload on every render, so key off the page instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableSettingsPageId, user?.id]);
+  function updateTableSettings(next: NonNullable<typeof tableSettings>) {
+    setTableSettings(next);
+    if (tableSettingsPageId && user) saveTableSettings(user.id, tableSettingsPageId, next);
+  }
+
+  const effectiveColumns = useMemo(() => {
+    if (!tableSettings) return columns;
+    const byKey = new Map(columns.map(c => [c.key, c]));
+    return tableSettings.columnOrder
+      .filter(k => tableSettings.visibleColumns.includes(k))
+      .map(k => byKey.get(k))
+      .filter((c): c is Column<T> => !!c);
+  }, [columns, tableSettings]);
+
   const firstSortable = columns.find(c => c.sortable);
-  const [sortKey, setSortKey] = useState<string>(defaultSortKey ?? firstSortable?.key ?? '');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSortDir);
+  const settingsSort = tableSettings?.sort[0];
+  const [sortKey, setSortKey] = useState<string>(settingsSort?.columnKey ?? defaultSortKey ?? firstSortable?.key ?? '');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(settingsSort?.direction ?? defaultSortDir);
+  useEffect(() => {
+    if (settingsSort) { setSortKey(settingsSort.columnKey); setSortDir(settingsSort.direction); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsSort?.columnKey, settingsSort?.direction]);
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
   const selected = selectedIds ?? internalSelected;
   const setSelected = onSelectedIdsChange ?? setInternalSelected;
@@ -85,7 +127,7 @@ export function DataTable<T>({
   }, [rows, columns, sortKey, sortDir]);
 
   // Clamp the page when the row set shrinks (filters, deletions).
-  const pageSize = pagination?.pageSize ?? 0;
+  const pageSize = tableSettings?.pageSize ?? pagination?.pageSize ?? 0;
   const pageCount = pagination ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
   useEffect(() => { if (page > pageCount - 1) setPage(Math.max(0, pageCount - 1)); }, [page, pageCount]);
   const visibleRows = pagination ? sortedRows.slice(page * pageSize, (page + 1) * pageSize) : sortedRows;
@@ -132,7 +174,8 @@ export function DataTable<T>({
     </div>
   );
 
-  const colSpan = (selectable ? 1 : 0) + columns.length + (actions ? 1 : 0);
+  const colSpan = (selectable ? 1 : 0) + effectiveColumns.length + (actions ? 1 : 0);
+  const rowPadding = ROW_HEIGHT_CLASS[tableSettings?.rowHeight ?? 'comfortable'];
 
   function exportCell(row: T, col: Column<T>): string {
     const explicit = col.exportValue?.(row);
@@ -166,15 +209,32 @@ export function DataTable<T>({
 
   return (
     <>
-      {downloadable && (
+      {(downloadable || tableSettingsPageId) && (
         <div className="flex justify-end gap-2 border-b px-3 py-2">
-          <Button size="sm" variant="outline" disabled={excelBusy} onClick={() => handleDownload('excel')}>
-            {excelBusy ? 'Downloading…' : 'Download Excel'}
-          </Button>
-          <Button size="sm" variant="outline" disabled={pdfBusy} onClick={() => handleDownload('pdf')}>
-            {pdfBusy ? 'Downloading…' : 'Download PDF'}
-          </Button>
+          {downloadable && (
+            <>
+              <Button size="sm" variant="outline" disabled={excelBusy} onClick={() => handleDownload('excel')}>
+                {excelBusy ? 'Downloading…' : 'Download Excel'}
+              </Button>
+              <Button size="sm" variant="outline" disabled={pdfBusy} onClick={() => handleDownload('pdf')}>
+                {pdfBusy ? 'Downloading…' : 'Download PDF'}
+              </Button>
+            </>
+          )}
+          {tableSettingsPageId && tableSettings && (
+            <TableSettingsGearButton onClick={() => setSettingsOpen(true)} />
+          )}
         </div>
+      )}
+      {tableSettingsPageId && tableSettings && (
+        <TableSettingsDrawer
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          columns={columns.map(c => ({ key: c.key, label: c.header }))}
+          {...(availableFilters ? { availableFilters } : {})}
+          settings={tableSettings}
+          onChange={updateTableSettings}
+        />
       )}
     {pagination && <div className="border-b px-3 py-1.5">{pager}</div>}
     {/* Wrap in a horizontal scroll container so dense tables stay usable on
@@ -188,7 +248,7 @@ export function DataTable<T>({
               <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
             </th>
           )}
-          {columns.map(c => (
+          {effectiveColumns.map(c => (
             <th key={c.key} className={`p-3 ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
               {c.sortable ? (
                 <button
@@ -210,16 +270,17 @@ export function DataTable<T>({
         </tr>
       </thead>
       <tbody>
-        {visibleRows.map(row => {
+        {visibleRows.map((row, rowIndex) => {
           const id = getRowId(row);
+          const alt = tableSettings?.alternateRowColor && rowIndex % 2 === 1;
           return (
             <tr
               key={id}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-b last:border-b-0 hover:bg-muted/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+              className={`border-b last:border-b-0 hover:bg-muted/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${alt ? 'bg-muted/30' : ''}`}
             >
               {selectable && (
-                <td className="p-3">
+                <td className={`px-3 ${rowPadding}`}>
                   <input
                     type="checkbox"
                     checked={selected.has(id)}
@@ -228,8 +289,8 @@ export function DataTable<T>({
                   />
                 </td>
               )}
-              {columns.map(c => (
-                <td key={c.key} className={`p-3 ${c.align === 'right' ? 'text-right' : ''}`}>
+              {effectiveColumns.map(c => (
+                <td key={c.key} className={`px-3 ${rowPadding} ${c.align === 'right' ? 'text-right' : ''}`}>
                   {c.render(row)}
                 </td>
               ))}

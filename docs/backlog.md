@@ -94,6 +94,26 @@ actually have a `customer_id` FK) instead of the AP tables.
 
 **Priority:** medium — raised alongside the Vendors work, not implemented.
 
+### Unified Transactions page: follow-up scope
+`/accounting/transactions` (`transactionsService.ts` on the API, `TransactionsPage.tsx`
++ `TableSettingsDrawer.tsx`/`tableSettings.ts` on the web) covers 7 types —
+deposit, expense, check (merging the real `checks` table with legacy
+expense-paid-by-check rows), standalone journal entry, bill, payment,
+credit memo. Invoices, bill payments, and vendor credits aren't included yet;
+adding one is the same UNION ALL branch pattern as any existing type in
+`transactionsService.ts`. Two pieces of the spec are intentionally partial:
+- The Table Settings drawer's Filters section is drag-reorderable and
+  persists an order, but the Transactions page's actual filter bar doesn't
+  read that order yet — it's always rendered in a fixed sequence.
+- Table Settings' Sort section drives the DataTable's client-side sort, but
+  on the Transactions page specifically that only re-sorts the current
+  server page (25 rows), not the full filtered result set — true server-side
+  sorting would mean threading a `sort_key`/`sort_dir` pair from the drawer
+  into the `/transactions` query params, which isn't wired up yet.
+
+**Priority:** low — both are visible-but-inert in the UI rather than broken;
+flagged here rather than fixed without being asked, per scope discipline.
+
 ### Third-party integrations (out of scope until a client needs them)
 - **Payroll tax engine** (Symmetry, ADP API, …) — slice 13 ships manual
   tax-table entry per pay run line; integrate at the point of needing filings.

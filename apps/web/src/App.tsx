@@ -65,6 +65,7 @@ import BankDepositPage from '@/pages/accounting/BankDepositPage';
 import BankDepositListPage from '@/pages/accounting/BankDepositListPage';
 import ExpensePage from '@/pages/accounting/ExpensePage';
 import CheckListPage from '@/pages/accounting/CheckListPage';
+import TransactionsPage from '@/pages/accounting/TransactionsPage';
 import CheckPage from '@/pages/accounting/CheckPage';
 import ExpenseListPage from '@/pages/accounting/ExpenseListPage';
 import EntityPage from '@/pages/setup/EntityPage';
@@ -180,6 +181,7 @@ export default function App() {
             <Route path="/accounting/expense-transactions" element={<ExpenseListPage />} />
             <Route path="/accounting/expenses/new" element={<ExpensePage />} />
             <Route path="/accounting/expenses/:id" element={<ExpensePage />} />
+            <Route path="/accounting/transactions" element={<TransactionsPage />} />
             <Route path="/accounting/checks" element={<CheckListPage />} />
             <Route path="/accounting/checks/new" element={<CheckPage />} />
             <Route path="/accounting/checks/:id" element={<CheckPage />} />
