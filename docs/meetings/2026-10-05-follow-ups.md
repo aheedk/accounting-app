@@ -11,7 +11,7 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 
 | # | What | Owner |
 |---|---|---|
-| 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): every bug and wrong number is fixed. What is left is listed under "Audit: what is left" below, and all of it needs a decision before it is built **(10-01)** | Aheed, firm |
+| 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): every bug and wrong number is fixed. What is left is inventory, which waits on the firm's answers, and features not yet built; see "Audit: what is left" below **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm. They are all up and agree with each other; see "Reports" below | Aheed, firm |
 | 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
