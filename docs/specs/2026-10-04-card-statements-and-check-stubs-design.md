@@ -24,28 +24,35 @@ side, the same way bank statements post against the bank account.
 - **Stored in the bank-statement shape.** At ingest a charge becomes an outflow and a
   payment or refund an inflow (`type` `expense` / `deposit`), with the card meaning kept in
   `card_type`. The account side of every entry is the card (a liability), so a charge
-  credits the card and debits the category; a payment or refund debits the card.
+  credits the card and debits the category; a refund debits the card.
 - **What each line becomes once posted:**
   - charge → an Expense paid by credit card (`payment_method = 'credit_card'`), shown in
     the ledger as **Credit Card Expense**;
   - refund → a **Credit Card Credit** (card debited, category credited);
-  - payment → a **Credit Card Payment** (card debited, bank account credited).
+  - payment → nothing. See "Payments are not posted from the card statement" below.
 
-  Refunds and payments stay imported entries, editable on `/transactions/:id`.
+  Refunds stay imported entries, editable on `/transactions/:id`.
 - **Choosing the card.** For card statements the account picker lists liability
   accounts with the Credit Card detail type first, then any other liability. The
   statement's issuer / last four are matched against card account names to preselect.
   The approve route rejects a non-liability account for a card statement.
-- **Payment lines code to the bank, not the card.** The coding engine's
-  credit-card-payment rule points at the card, which is the statement's own account
-  here. For a card statement's payment lines the suggestion is the client's bank account
-  instead (the only one, or the one whose name the description mentions).
-- **The same payment is never posted twice.** A card payment shows on both statements:
-  the bank's ("CHASE CARD PAYMENT") and the card's ("PAYMENT RECEIVED"). Before posting,
-  each line is checked for a posted entry from another document that already moves the
-  same amount between the same two accounts within 5 days. Matches are marked **Already
-  recorded**, link to that entry, and are unticked by default. This covers transfers
-  between a client's own bank accounts too.
+- **Payments are not posted from the card statement** (changed 2026-10-07, from the
+  2026-10-05 meeting). A card payment shows on both statements: the bank's ("CHASE
+  CARD PAYMENT") and the card's ("PAYMENT RECEIVED"). The bank statement records it
+  (debit the card, credit the bank), and the card statement's charges credit the card,
+  so the card account is complete from those two and the card statement never touches
+  a bank account. On the review screen a payment line shows the card account, cannot
+  be ticked, and reads either **Recorded from the bank statement** with a link to that
+  entry (a posted entry that debits the card for the same amount from an asset account
+  within 5 days), or **Waiting for the bank statement**. `postStatementLines` skips
+  these lines whatever the client sends.
+  - *Open question for the firm:* if that bank statement is never uploaded, the card
+    balance stays too high by the payment, and once the card statement is approved
+    nothing on screen says so. The payment can still be entered by hand.
+- **Transfers are never posted twice.** Before posting, each line coded to another
+  balance-sheet account is checked for a posted entry from another document that
+  already moves the same amount between the same two accounts within 5 days. Matches
+  are marked **Already recorded**, link to that entry, and are unticked by default.
 - **Bank statements: card payments to the right card.** The existing rule now prefers
   the card whose name matches the issuer in the description (Chase, Amex, Capital One…)
   when a client has several cards.

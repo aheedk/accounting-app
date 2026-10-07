@@ -9,10 +9,10 @@ import {
   suggestCodingBatch, rememberCoding, learningDecision, loadCodingContext, type CodingContext,
 } from '../services/ai/autoCodingService.js';
 import {
-  cardPaymentSourceAccount,
   checkNumberOf,
   findAlreadyRecorded,
   guessCardAccount,
+  isCardStatementPayment,
   isInflow,
   postStatementLines,
   statementDateToIso,
@@ -133,22 +133,18 @@ async function attachSuggestions(
 }
 
 /**
- * Card statements: which card they belong to, and where each payment came
- * from. The engine's credit-card-payment rule points a payment at the card,
- * which is this statement's own account, so a card payment is pointed at the
- * bank account it was paid from instead.
+ * Card statements: which card they belong to. A payment toward the card is not
+ * coded at all: it is recorded by the bank statement it was paid from, so it
+ * carries no category here.
  */
 async function attachCardContext(businessId: string, imports: StagedImportRow[]): Promise<void> {
   for (const row of imports) {
     if (row.statement_kind !== 'credit_card') continue;
     row.suggested_statement_account_id = await guessCardAccount(db, businessId, row.account_hint);
     for (const tx of row.extracted_transactions) {
-      if (tx.card_type !== 'payment' || tx.auto_posted) continue;
-      const source = await cardPaymentSourceAccount(db, businessId, tx.description ?? '');
-      if (!source) { delete tx.suggested_account_id; tx.suggestion = null; continue; }
-      tx.suggested_account_id = source.account_id;
-      const confidence = source.confident ? 90 : 72;
-      tx.suggestion = { confidence, band: confidence >= 90 ? 'preselected' : 'suggested', source_layer: 'accounting_rule' };
+      if (tx.card_type !== 'payment') continue;
+      delete tx.suggested_account_id;
+      tx.suggestion = null;
     }
   }
 }
@@ -250,8 +246,9 @@ function parseLines(raw: unknown): StatementLine[] {
  * statement. Runs last: every real suggestion (engine, card, stub) wins.
  */
 async function attachSuspense(serviceCtx: ServiceCtx, businessId: string, imports: StagedImportRow[]): Promise<void> {
-  const uncoded = imports.flatMap(row => row.extracted_transactions)
-    .filter(tx => !tx.auto_posted && !tx.suggested_account_id);
+  // A card statement's payment is not coded here at all, so it is not "unknown".
+  const uncoded = imports.flatMap(row => row.extracted_transactions
+    .filter(tx => !tx.auto_posted && !tx.suggested_account_id && !isCardStatementPayment(row.statement_kind, tx)));
   if (uncoded.length === 0) return;
   const suspense = await db.transaction().execute(trx => getOrCreateSuspenseAccount(trx, serviceCtx, businessId));
   for (const tx of uncoded) {
@@ -279,7 +276,11 @@ router.post(
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
       const transactions = parseLines(staged.extracted_transactions);
-      const included = body.transactions.filter(t => t.include);
+      // A card statement's payment is recorded by the bank statement, never from here.
+      const included = body.transactions.filter(t => {
+        const line = transactions[t.index];
+        return t.include && !(line && isCardStatementPayment(staged.statement_kind, line));
+      });
 
       // Recompute the suggestions server-side rather than trusting what the
       // client says was suggested -- this decides what gets learned.
@@ -373,16 +374,21 @@ router.post(
     try {
       const body = alreadyRecordedSchema.parse(req.body);
       const staged = await db.selectFrom('email_import_staging')
-        .select(['id', 'extracted_transactions'])
+        .select(['id', 'extracted_transactions', 'statement_kind'])
         .where('id', '=', req.params['importId']!)
         .where('business_id', '=', req.tenancy!.business_id)
         .executeTakeFirst();
       if (!staged) { res.status(404).json({ error: 'Import not found' }); return; }
+      const lines = parseLines(staged.extracted_transactions);
+      // A card statement's payments are looked up against whichever bank account paid them.
+      const cardPayments = lines.flatMap((line, index) => (
+        isCardStatementPayment(staged.statement_kind, line) ? [{ index, offset_account_id: null }] : []));
+      const paymentIndexes = new Set(cardPayments.map(p => p.index));
       const matches = await findAlreadyRecorded(db, ctx(req), {
         staging_id: staged.id,
         account_id: body.bank_account_id,
-        lines: parseLines(staged.extracted_transactions),
-        offsets: body.lines,
+        lines,
+        offsets: [...body.lines.filter(l => !paymentIndexes.has(l.index)), ...cardPayments],
       });
       res.json({ matches });
     } catch (e) { next(e); }

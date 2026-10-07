@@ -174,6 +174,11 @@ function isCard(imp: StagedImport): boolean {
   return imp.statement_kind === 'credit_card';
 }
 
+/** A payment toward the card on the card's own statement: recorded by the bank statement, never from here. */
+function isCardPayment(imp: StagedImport, tx: Pick<ExtractedTx, 'card_type'>): boolean {
+  return isCard(imp) && tx.card_type === 'payment';
+}
+
 function deriveBankTitle(imp: StagedImport): string {
   const period = derivePeriodTitle(imp);
   // The account (card name, or "Checking 2553") when the AI could read it.
@@ -392,7 +397,7 @@ export default function EmailImportReviewPage() {
     const initPayees: Record<number, string> = {};
     const initStubs: Record<number, string> = {};
     imp.extracted_transactions.forEach((tx, i) => {
-      initIncluded[i] = true;
+      initIncluded[i] = !isCardPayment(imp, tx);
       if (tx.check_stub) {
         initStubs[i] = tx.check_stub.id;
         if (tx.check_stub.payee_name) initPayees[i] = tx.check_stub.payee_name;
@@ -430,7 +435,8 @@ export default function EmailImportReviewPage() {
     const lines = Object.entries(offsets)
       .filter(([, accountId]) => accountId)
       .map(([index, accountId]) => ({ index: Number(index), offset_account_id: accountId }));
-    if (lines.length === 0) { setRecorded({}); return; }
+    // A card statement is always checked: its payments are looked up on the server.
+    if (lines.length === 0 && !isCard(selectedBank)) { setRecorded({}); return; }
     let cancelled = false;
     const timer = setTimeout(() => {
       api.post<{ matches: AlreadyRecorded[] }>(
@@ -839,8 +845,8 @@ export default function EmailImportReviewPage() {
 
               {isCard(selectedBank) && (
                 <p className="text-xs text-muted-foreground">
-                  Charges post as credit card expenses against this card; payments and refunds reduce what is owed.
-                  A payment already recorded from the bank statement is marked and left out.
+                  Charges post as credit card expenses against this card; refunds reduce what is owed.
+                  Payments are not posted from here: the bank statement they were paid from records them.
                 </p>
               )}
 
@@ -851,8 +857,12 @@ export default function EmailImportReviewPage() {
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="px-3 py-2 text-left w-8">
-                        <input type="checkbox" checked={Object.values(included).every(Boolean)}
-                          onChange={e => { const v = e.target.checked; setIncluded(prev => Object.fromEntries(Object.keys(prev).map(k => [k, v]))); }} />
+                        <input type="checkbox"
+                          checked={selectedBank.extracted_transactions.every((tx, i) => isCardPayment(selectedBank, tx) || included[i])}
+                          onChange={e => {
+                            const v = e.target.checked;
+                            setIncluded(Object.fromEntries(selectedBank.extracted_transactions.map((tx, i) => [i, v && !isCardPayment(selectedBank, tx)])));
+                          }} />
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Date</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Description</th>
@@ -864,10 +874,10 @@ export default function EmailImportReviewPage() {
                   </thead>
                   <tbody>
                     {selectedBank.extracted_transactions.map((tx, i) => (
-                      <tr key={i} className={`border-b ${!included[i] ? 'opacity-40' : ''}`}>
+                      <tr key={i} className={`border-b ${!included[i] && !isCardPayment(selectedBank, tx) ? 'opacity-40' : ''}`}>
                         <td className="px-3 py-2">
                           <input type="checkbox" checked={included[i] ?? true}
-                            disabled={tx.auto_posted}
+                            disabled={tx.auto_posted || isCardPayment(selectedBank, tx)}
                             onChange={e => setIncluded(prev => ({ ...prev, [i]: e.target.checked }))} />
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{tx.date}</td>
@@ -957,6 +967,24 @@ export default function EmailImportReviewPage() {
                           )}
                         </td>
                         <td className="px-3 py-2">
+                          {isCardPayment(selectedBank, tx) ? (
+                            // Not coded here: the bank statement it was paid from records it.
+                            <div className="space-y-1 text-xs">
+                              <div className="font-medium">
+                                {accounts.find(a => a.id === bankAccountId)?.name ?? 'This card'}
+                              </div>
+                              {recorded[i] ? (
+                                <div className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-1 text-[10px] leading-tight text-emerald-950">
+                                  Recorded from the bank statement: {recorded[i]!.label} on {fmtStatementDate(recorded[i]!.entry_date)}.{' '}
+                                  <Link to={recorded[i]!.path} className="font-medium underline">Open</Link>
+                                </div>
+                              ) : (
+                                <div className="rounded border border-amber-300 bg-amber-50 px-1.5 py-1 text-[10px] leading-tight text-amber-950">
+                                  Waiting for the bank statement. This payment is recorded when the bank statement it was paid from is posted.
+                                </div>
+                              )}
+                            </div>
+                          ) : (<>
                           <AppSelect disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
                             onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
                             onAddNew={() => addAccount.open({ onPick: id => setOffsets(prev => ({ ...prev, [i]: id })) })} addNewLabel="Add new account"
@@ -1012,6 +1040,7 @@ export default function EmailImportReviewPage() {
                               </label>
                             )}
                           </div>
+                          </>)}
                         </td>
                       </tr>
                     ))}

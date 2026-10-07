@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
 import { makeAccount, makeBankAccount, makeBusiness, makeFirm, makeUser, seedYearPeriods } from '../helpers/factories.js';
 import {
-  cardPaymentSourceAccount,
   checkNumberOf,
   findAlreadyRecorded,
   guessCardAccount,
@@ -80,7 +79,7 @@ describe('statement import', () => {
     expect(splitByAccount([{ description: 'A' }], undefined)).toEqual([{ account_hint: null, lines: [{ description: 'A' }] }]);
   });
 
-  it('posts a card statement against the card: charge, refund and payment', async () => {
+  it('posts a card statement against the card: charge and refund, but never the payment', async () => {
     const data = await setup(t);
     const ids = await t.db.transaction().execute(trx => postStatementLines(trx, data.ctx, {
       staging_id: randomUUID(),
@@ -93,24 +92,28 @@ describe('statement import', () => {
         { index: 2, offset_account_id: data.checking.id },
       ],
     }));
-    const [charge, refund, payment] = ids as string[];
+    const [charge, refund, payment] = ids;
 
     expect(await entryLines(t, charge!)).toEqual([[data.card.id, '0.0000', '89.9900'], [data.supplies.id, '89.9900', '0.0000']]);
     expect(await entryLines(t, refund!)).toEqual([[data.card.id, '20.0000', '0.0000'], [data.supplies.id, '0.0000', '20.0000']]);
-    expect(await entryLines(t, payment!)).toEqual([[data.card.id, '500.0000', '0.0000'], [data.checking.id, '0.0000', '500.0000']]);
+    // 2026-10-05 meeting: the payment is recorded by the bank statement, so the
+    // card statement posts nothing for it and never touches the bank account.
+    expect(payment).toBeNull();
+    const touchingBank = await t.db.selectFrom('journal_entry_lines').select('id')
+      .where('account_id', '=', data.checking.id).execute();
+    expect(touchingBank).toEqual([]);
 
-    // The charge became an Expense paid by credit card; refund and payment stay imported entries.
+    // The charge became an Expense paid by credit card; the refund stays an imported entry.
     const expense = await t.db.selectFrom('expense_transactions').selectAll()
       .where('journal_entry_id', '=', charge!).executeTakeFirstOrThrow();
     expect(expense).toMatchObject({ payment_method: 'credit_card', payment_account_id: data.card.id });
 
     const entries = await t.db.selectFrom('journal_entries')
       .select(['id', 'source_type', 'source_id', 'transaction_type', 'payee_name', 'reference', 'journal_number'])
-      .where('id', 'in', ids as string[]).execute();
+      .where('id', 'in', [charge!, refund!]).execute();
     const labels = await describeTransactions(t.db, entries.map(e => ({ ...e, transaction_type: e.transaction_type ?? null, payee_name: e.payee_name ?? null })));
-    expect([charge, refund, payment].map(id => labels.get(id!)?.label))
-      .toEqual(['Credit Card Expense', 'Credit Card Credit', 'Credit Card Payment']);
-    expect(labels.get(payment!)?.path).toBe(`/transactions/${payment}`);
+    expect([charge, refund].map(id => labels.get(id!)?.label)).toEqual(['Credit Card Expense', 'Credit Card Credit']);
+    expect(labels.get(refund!)?.path).toBe(`/transactions/${refund}`);
   });
 
   it('refuses a card statement on a bank account, and a line coded to the statement account', async () => {
@@ -121,7 +124,7 @@ describe('statement import', () => {
     }))).rejects.toThrow(/credit card \(liability\) account/);
     await expect(t.db.transaction().execute(trx => postStatementLines(trx, data.ctx, {
       staging_id: randomUUID(), statement_kind: 'credit_card', lines: cardStatement,
-      account_id: data.card.id, items: [{ index: 2, offset_account_id: data.card.id }],
+      account_id: data.card.id, items: [{ index: 0, offset_account_id: data.card.id }],
     }))).rejects.toThrow(/own account/);
   });
 
@@ -142,7 +145,7 @@ describe('statement import', () => {
       lines: cardStatement,
       offsets: [
         { index: 0, offset_account_id: data.supplies.id },   // a category line: never checked
-        { index: 2, offset_account_id: data.checking.id },
+        { index: 2, offset_account_id: null },               // the payment: from whichever bank account paid it
       ],
     });
     expect(matches).toHaveLength(1);
@@ -152,16 +155,13 @@ describe('statement import', () => {
     const otherAmount = await findAlreadyRecorded(t.db, data.ctx, {
       staging_id: cardStagingId, account_id: data.card.id,
       lines: [{ ...cardStatement[2]!, amount: '499.00' }],
-      offsets: [{ index: 0, offset_account_id: data.checking.id }],
+      offsets: [{ index: 0, offset_account_id: null }],
     });
     expect(otherAmount).toEqual([]);
   });
 
-  it('suggests where a card payment came from, which card a statement is, and which card a bank payment paid', async () => {
+  it('suggests which card a statement is, and which card a bank payment paid', async () => {
     const data = await setup(t);
-    expect(await cardPaymentSourceAccount(t.db, data.business.id, 'PAYMENT RECEIVED'))
-      .toEqual({ account_id: data.checking.id, confident: true });
-
     const amex = await makeAccount(t.db, data.business.id, { code: '2110', name: 'Amex Business Gold', account_type: 'liability', detail_type: 'Credit Card' });
     expect(await guessCardAccount(t.db, data.business.id, 'Chase Ink Business Cash 4421')).toBe(data.card.id);
     expect(await guessCardAccount(t.db, data.business.id, 'American Express Gold 9001')).toBe(amex.id);

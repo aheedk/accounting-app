@@ -99,6 +99,11 @@ function entryTransactionType(kind: StatementKind, line: StatementLine): string 
   return line.type === 'check' ? 'check' : 'expense';
 }
 
+/** A payment toward the card, as it shows on the card's own statement. */
+export function isCardStatementPayment(kind: StatementKind, line: Pick<StatementLine, 'card_type'>): boolean {
+  return kind === 'credit_card' && line.card_type === 'payment';
+}
+
 export type PostStatementItem = {
   index: number;
   offset_account_id: string;
@@ -137,8 +142,12 @@ async function assertStatementAccount(
  * bank become Expenses, bank deposits become Bank Deposits. Card payments and
  * refunds stay imported entries (edited on /transactions/:id).
  *
+ * A payment on a card statement is never posted from here: the bank statement
+ * it was paid from records it (debit the card, credit the bank), and posting it
+ * from both would count it twice.
+ *
  * Returns the created entry ids in the same order as `items`; a line that was
- * already auto-posted gets null.
+ * already auto-posted, or is a card statement's payment, gets null.
  */
 export async function postStatementLines(
   trx: Transaction<DB>,
@@ -154,17 +163,17 @@ export async function postStatementLines(
   const businessId = ctx.business_id;
   if (!businessId) throw new BusinessRuleError(ERR.NOT_FOUND, 'No business selected');
   await assertStatementAccount(trx, businessId, input.statement_kind, input.account_id);
-  if (input.items.some(item => item.offset_account_id === input.account_id)) {
+
+  const postable = input.items.flatMap(item => {
+    const line = input.lines[item.index];
+    return line && !line.auto_posted && !isCardStatementPayment(input.statement_kind, line) ? [{ item, line }] : [];
+  });
+  if (postable.some(({ item }) => item.offset_account_id === input.account_id)) {
     throw new BusinessRuleError(
       ERR.VALIDATION_FAILED,
       'A line cannot be coded to the statement’s own account.',
     );
   }
-
-  const postable = input.items.flatMap(item => {
-    const line = input.lines[item.index];
-    return line && !line.auto_posted ? [{ item, line }] : [];
-  });
 
   const entries: PostJournalEntryInput[] = postable.map(({ item, line }) => {
     const amount = Number(line.amount).toFixed(2);
@@ -245,6 +254,9 @@ const MATCH_WINDOW_DAYS = 5;
  * transfer that shows on both bank statements. Only lines coded to another
  * balance-sheet account can be double-counted this way; category lines (an
  * expense, an income account) are never checked.
+ *
+ * An offset of null asks "from any bank or other asset account": a card
+ * statement's payment line, which does not say which account paid it.
  */
 export async function findAlreadyRecorded(
   db: Kysely<DB>,
@@ -253,14 +265,14 @@ export async function findAlreadyRecorded(
     staging_id: string;
     account_id: string;
     lines: StatementLine[];
-    offsets: Array<{ index: number; offset_account_id: string }>;
+    offsets: Array<{ index: number; offset_account_id: string | null }>;
   },
 ): Promise<AlreadyRecorded[]> {
   const businessId = ctx.business_id;
   if (!businessId || input.offsets.length === 0) return [];
 
-  const offsetIds = [...new Set(input.offsets.map(o => o.offset_account_id))];
-  const balanceSheet = new Set((await db.selectFrom('chart_of_accounts').select('id')
+  const offsetIds = [...new Set(input.offsets.flatMap(o => (o.offset_account_id ? [o.offset_account_id] : [])))];
+  const balanceSheet = new Set(offsetIds.length === 0 ? [] : (await db.selectFrom('chart_of_accounts').select('id')
     .where('business_id', '=', businessId)
     .where('id', 'in', offsetIds)
     .where('account_type', 'in', ['asset', 'liability'])
@@ -270,7 +282,7 @@ export async function findAlreadyRecorded(
   const found: Array<Omit<AlreadyRecorded, 'label' | 'path'>> = [];
   for (const { index, offset_account_id } of input.offsets) {
     const line = input.lines[index];
-    if (!line || line.auto_posted || !balanceSheet.has(offset_account_id)) continue;
+    if (!line || line.auto_posted || (offset_account_id !== null && !balanceSheet.has(offset_account_id))) continue;
     const amount = Number(line.amount).toFixed(4);
     const inflow = isInflow(line);
     const date = statementDateToIso(line.date);
@@ -286,7 +298,11 @@ export async function findAlreadyRecorded(
       .where(eb => eb.not(eb.and([eb('je.source_type', '=', 'bank_import'), eb('je.source_id', '=', input.staging_id)])))
       .where('own.account_id', '=', input.account_id)
       .where(inflow ? 'own.debit' : 'own.credit', '=', amount)
-      .where('other.account_id', '=', offset_account_id)
+      .where(eb => (offset_account_id !== null
+        ? eb('other.account_id', '=', offset_account_id)
+        : eb.exists(eb.selectFrom('chart_of_accounts as paid_from').select('paid_from.id')
+          .whereRef('paid_from.id', '=', 'other.account_id')
+          .where('paid_from.account_type', '=', 'asset'))))
       .where(inflow ? 'other.credit' : 'other.debit', '=', amount)
       .orderBy(sql`abs(je.entry_date - ${date}::date)`)
       .execute();
@@ -312,48 +328,6 @@ export async function findAlreadyRecorded(
       path: described?.path ?? `/journal/${f.journal_entry_id}`,
     };
   });
-}
-
-/**
- * The bank account a card payment most likely came from: the only bank account,
- * or the one the description names. Null when the client has none.
- */
-export async function cardPaymentSourceAccount(
-  db: Kysely<DB>, businessId: string, description: string,
-): Promise<{ account_id: string; confident: boolean } | null> {
-  const banks = await db.selectFrom('bank_accounts as b')
-    .innerJoin('chart_of_accounts as a', 'a.id', 'b.cash_account_id')
-    .select(['a.id', 'a.name', 'b.name as bank_name', 'b.institution', 'b.account_last_four'])
-    .where('b.business_id', '=', businessId)
-    .where('b.is_active', '=', true)
-    .where('b.deleted_at', 'is', null)
-    .where('a.account_type', '=', 'asset')
-    .where('a.is_active', '=', true)
-    .orderBy('a.code')
-    .execute();
-  const pool = banks.length > 0
-    ? banks
-    : (await db.selectFrom('chart_of_accounts').select(['id', 'name'])
-      .where('business_id', '=', businessId)
-      .where('account_type', '=', 'asset')
-      .where('is_active', '=', true)
-      .where(eb => eb.or([
-        eb('detail_type', 'in', ['Checking', 'Savings', 'Money Market', 'Cash on hand']),
-        eb('name', '~*', '(checking|operating|bank)'),
-      ]))
-      .orderBy('code')
-      .execute()).map(row => ({ ...row, bank_name: null, institution: null, account_last_four: null }));
-  if (pool.length === 0) return null;
-  if (pool.length === 1) return { account_id: pool[0]!.id, confident: true };
-
-  const text = description.toLowerCase();
-  const named = pool.filter(bank => [bank.name, bank.bank_name, bank.institution, bank.account_last_four]
-    .some(part => {
-      const word = (part ?? '').toLowerCase().trim();
-      return word.length >= 3 && text.includes(word);
-    }));
-  if (named.length === 1) return { account_id: named[0]!.id, confident: true };
-  return { account_id: pool[0]!.id, confident: false };
 }
 
 /**
