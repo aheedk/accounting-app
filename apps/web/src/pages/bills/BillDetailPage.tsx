@@ -10,6 +10,7 @@ import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { PostErrorNotice } from '@/components/SaveAndPost';
+import { fmtQty } from '@/lib/labels';
 
 type Bill = {
   id: string;
@@ -146,7 +147,7 @@ export default function BillDetailPage() {
                 {
                   label: 'Journal entry',
                   value: bill.posted_journal_entry_id
-                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${bill.posted_journal_entry_id}`}>JE {bill.posted_journal_entry_id.slice(0, 8)}</Link>
+                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${bill.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
               ]}
@@ -173,7 +174,7 @@ export default function BillDetailPage() {
                 <tr key={l.id} className="border-b last:border-b-0">
                   <td className="p-3">{l.line_number}</td>
                   <td className="p-3">{l.description}</td>
-                  <td className="p-3 text-right">{l.quantity}</td>
+                  <td className="p-3 text-right">{fmtQty(l.quantity)}</td>
                   <td className="p-3 text-right">{fmtMoney(l.unit_price)}</td>
                   <td className="p-3 text-right font-mono">{fmtMoney(l.line_subtotal)}</td>
                 </tr>

@@ -13,6 +13,7 @@ import { useAddParty } from '@/components/addNew/useAddParty';
 import { useAddVendorQuick } from '@/components/addNew/useAddVendorQuick';
 import { pickErr } from '@/lib/apiErrors';
 import CheckStubsPanel from './CheckStubsPanel';
+import { fmtQty } from '@/lib/labels';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -1363,7 +1364,7 @@ export default function EmailImportReviewPage() {
                             onChange={e => setLineIncluded(prev => ({ ...prev, [i]: e.target.checked }))} />
                         </td>
                         <td className="px-3 py-2 max-w-[220px] truncate">{li.description}</td>
-                        <td className="px-3 py-2 text-right font-mono text-xs">{li.quantity}</td>
+                        <td className="px-3 py-2 text-right font-mono text-xs">{fmtQty(li.quantity)}</td>
                         <td className="px-3 py-2 text-right font-mono text-xs">{fmtMoney(li.unit_price)}</td>
                         <td className="px-3 py-2 text-right font-mono font-medium">{fmtMoney(li.amount)}</td>
                         {hasTaxCol && (

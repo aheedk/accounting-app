@@ -12,6 +12,7 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { PostErrorNotice } from '@/components/SaveAndPost';
+import { humanizeCode } from '@/lib/labels';
 
 type Payment = {
   id: string;
@@ -143,7 +144,7 @@ export default function PaymentDetailPage() {
       <div className="grid gap-3 md:grid-cols-3">
         <DetailMetric label="Applied" value={fmtMoney(applied)} hint={`${data.applications.length} invoice application${data.applications.length === 1 ? '' : 's'}`} />
         <DetailMetric label="Unapplied" value={fmtMoney(p.unapplied_amount)} hint="Available to apply" />
-        <DetailMetric label="Payment date" value={fmtLongDate(p.payment_date)} hint={p.payment_method.replace(/_/g, ' ')} />
+        <DetailMetric label="Payment date" value={fmtLongDate(p.payment_date)} hint={humanizeCode(p.payment_method)} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -152,7 +153,7 @@ export default function PaymentDetailPage() {
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <DetailField label="Customer" value={customer ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : p.customer_id} />
             <DetailField label="Customer email" value={customer?.email} />
-            <DetailField label="Method" value={p.payment_method.replace(/_/g, ' ')} />
+            <DetailField label="Method" value={humanizeCode(p.payment_method)} />
             <DetailField label="Deposit account" value={accountMap.get(p.cash_account_id) ?? p.cash_account_id} />
             <DetailField label="Reference" value={p.reference} />
             <DetailField label="Memo" value={p.memo} />
@@ -171,7 +172,7 @@ export default function PaymentDetailPage() {
                 {
                   label: 'Journal entry',
                   value: p.posted_journal_entry_id
-                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${p.posted_journal_entry_id}`}>JE {p.posted_journal_entry_id.slice(0, 8)}</Link>
+                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${p.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
               ]}

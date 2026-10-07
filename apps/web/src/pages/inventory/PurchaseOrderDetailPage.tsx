@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { fmtQty } from '@/lib/labels';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -174,7 +175,7 @@ export default function PurchaseOrderDetailPage() {
                     <td className="p-3">{l.line_number}</td>
                     <td className="p-3">{it ? `${it.sku} — ${it.name}` : '—'}</td>
                     <td className="p-3">{l.description ?? '—'}</td>
-                    <td className="p-3 text-right">{l.quantity}</td>
+                    <td className="p-3 text-right">{fmtQty(l.quantity)}</td>
                     <td className="p-3 text-right">{fmtMoney(l.unit_cost)}</td>
                     <td className="p-3 text-right">{fmtMoney(lineTotal(l.quantity, l.unit_cost))}</td>
                   </tr>

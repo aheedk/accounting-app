@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
+import { humanizeCode } from '@/lib/labels';
 
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
@@ -33,7 +34,7 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           <span className="font-medium text-foreground">{user?.full_name ?? ''}</span>
           {user?.role && (
             <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-              {user.role}
+              {humanizeCode(user.role)}
             </span>
           )}
         </div>

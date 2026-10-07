@@ -130,7 +130,7 @@ export default function CodingRulesPage() {
             <tbody>
               {visible.map(rule => (
                 <tr key={rule.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{rule.normalized_vendor}</td>
+                  <td className="px-3 py-2 font-medium capitalize">{rule.normalized_vendor}</td>
                   <td className="px-3 py-2 capitalize text-muted-foreground">{rule.direction}</td>
                   <td className="px-3 py-2">
                     {rule.lines.map((line, index) => (

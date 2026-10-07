@@ -6,6 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { fmtQty } from '@/lib/labels';
 
 type LineItem = {
   description: string;
@@ -298,7 +299,7 @@ export default function InvoiceImportReviewPage() {
                         onChange={e => setLineIncluded(prev => ({ ...prev, [i]: e.target.checked }))} />
                     </td>
                     <td className="px-3 py-2 max-w-[220px] truncate">{li.description}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">{li.quantity}</td>
+                    <td className="px-3 py-2 text-right font-mono text-xs">{fmtQty(li.quantity)}</td>
                     <td className="px-3 py-2 text-right font-mono text-xs">{fmtMoney(li.unit_price)}</td>
                     <td className="px-3 py-2 text-right font-mono font-medium">{fmtMoney(li.amount)}</td>
                     <td className="px-3 py-2">

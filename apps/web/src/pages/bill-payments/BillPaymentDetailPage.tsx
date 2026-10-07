@@ -8,6 +8,7 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { PostErrorNotice } from '@/components/SaveAndPost';
+import { humanizeCode } from '@/lib/labels';
 
 type BillPayment = {
   id: string;
@@ -108,7 +109,7 @@ export default function BillPaymentDetailPage() {
       </div>
       <Card><CardHeader><CardTitle>Details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>Status: {p.status}</div><div>Method: {p.payment_method}</div>
+          <div>Status: {humanizeCode(p.status)}</div><div>Method: {humanizeCode(p.payment_method)}</div>
           <div>Amount: {fmtMoney(p.amount)}</div><div>Unapplied: {fmtMoney(p.unapplied_amount)}</div>
           <div>Reference: {p.reference ?? '—'}</div><div>Memo: {p.memo ?? '—'}</div>
         </CardContent>

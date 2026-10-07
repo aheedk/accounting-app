@@ -500,7 +500,7 @@ export default function IntegrationInboxPage() {
                         <div className="flex items-center gap-2">
                           {t.matched_journal_entry_id && (
                             <Link to={`/journal/${t.matched_journal_entry_id}`} className="text-primary underline font-mono text-xs">
-                              JE {t.matched_journal_entry_id.slice(0, 8)}
+                              Journal entry
                             </Link>
                           )}
                           {t.status === 'excluded' && t.excluded_reason && (

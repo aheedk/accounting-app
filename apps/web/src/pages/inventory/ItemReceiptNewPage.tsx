@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { fmtQty } from '@/lib/labels';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -210,7 +211,7 @@ export default function ItemReceiptNewPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{it?.sku ?? '—'}</td>
                     <td className="px-4 py-3 text-right font-mono">{fmtMoney(l.unit_cost)}</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">{l.quantity}</td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold">{fmtQty(l.quantity)}</td>
                   </tr>
                 );
               })}

@@ -55,7 +55,7 @@ export default function DashboardPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
           {activeBusiness
-            ? <>Working in <span className="font-medium text-foreground">{activeBusiness.name}</span>. Pick a quick action below to jump in.</>
+            ? <>Working in <span className="font-medium text-foreground">{activeBusiness.name}</span>{activeBusiness.name.endsWith('.') ? '' : '.'} Pick a quick action below to jump in.</>
             : 'Select a business from the top bar to get started.'}
         </p>
       </section>

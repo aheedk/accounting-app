@@ -14,6 +14,7 @@ import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { humanizeCode } from '@/lib/labels';
 
 type CashFlowLine = {
   entry_date: string;
@@ -222,7 +223,7 @@ export default function CashFlowPage() {
                     <tr key={l.journal_entry_id} className="border-b hover:bg-muted/30">
                       <td className="p-3 whitespace-nowrap">{l.entry_date}</td>
                       <td className="p-3">
-                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize">{l.source_type}</span>
+                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">{humanizeCode(l.source_type)}</span>
                         {l.status === 'voided' && <span className="ml-2 text-xs uppercase text-muted-foreground">Voided</span>}
                       </td>
                       <td className="p-3">{l.memo ?? ''}</td>

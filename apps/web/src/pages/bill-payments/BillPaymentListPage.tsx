@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { humanizeCode } from '@/lib/labels';
 
 type BillPaymentSummary = {
   id: string;
@@ -95,7 +96,7 @@ export default function BillPaymentListPage() {
 
   const columns: Column<Row>[] = [
     { key: 'payment_date', header: 'Date', sortable: true, sortValue: r => r.payment_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.payment_date)}</span> },
-    { key: 'payment_method', header: 'Method', sortable: true, sortValue: r => r.payment_method, render: r => <span className="capitalize">{r.payment_method}</span> },
+    { key: 'payment_method', header: 'Method', sortable: true, sortValue: r => r.payment_method, render: r => humanizeCode(r.payment_method) },
     { key: 'reference', header: 'No.', sortable: true, sortValue: r => r.reference ?? '', render: r => r.reference ? <span className="font-mono">{r.reference}</span> : <span className="text-muted-foreground">—</span> },
     { key: 'vendor', header: 'Vendor', sortable: true, sortValue: r => r.vendor_name, render: r => r.vendor_name || <span className="text-muted-foreground">—</span> },
     { key: 'memo', header: 'Memo', sortable: false, render: r => r.memo ? <span className="block max-w-[16rem] truncate">{r.memo}</span> : <span className="text-muted-foreground">—</span> },

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { humanizeCode } from '@/lib/labels';
 
 type FixedAssetStatus = 'active' | 'disposed';
 
@@ -119,7 +120,7 @@ export default function FixedAssetDetailPage() {
           <div>Status: {data.status}</div>
           <div>Purchase date: {data.purchase_date}</div>
           <div>Useful life: {data.useful_life_years} yr(s)</div>
-          <div>Method: {data.depreciation_method}</div>
+          <div>Method: {humanizeCode(data.depreciation_method)}</div>
           <div>Memo: {data.memo ?? '—'}</div>
           <div>Cost: {fmtMoney(data.cost)}</div>
           <div>Salvage value: {fmtMoney(data.salvage_value)}</div>

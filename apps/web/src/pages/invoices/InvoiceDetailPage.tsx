@@ -10,6 +10,7 @@ import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { PostErrorNotice } from '@/components/SaveAndPost';
+import { fmtQty } from '@/lib/labels';
 
 type Invoice = {
   id: string;
@@ -147,7 +148,7 @@ export default function InvoiceDetailPage() {
                 {
                   label: 'Journal entry',
                   value: inv.posted_journal_entry_id
-                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${inv.posted_journal_entry_id}`}>JE {inv.posted_journal_entry_id.slice(0, 8)}</Link>
+                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${inv.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
               ]}
@@ -176,7 +177,7 @@ export default function InvoiceDetailPage() {
                 <tr key={l.id} className="border-b last:border-b-0">
                   <td className="p-3">{l.line_number}</td>
                   <td className="p-3">{l.description}</td>
-                  <td className="p-3 text-right">{l.quantity}</td>
+                  <td className="p-3 text-right">{fmtQty(l.quantity)}</td>
                   <td className="p-3 text-right">{fmtMoney(l.unit_price)}</td>
                   <td className="p-3 text-right">{fmtMoney(l.line_subtotal)}</td>
                   <td className="p-3 text-right">{fmtMoney(l.tax_amount)}</td>

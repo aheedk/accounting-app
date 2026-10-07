@@ -4,6 +4,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { fmtMoney } from '@/lib/money';
+import { fmtQty } from '@/lib/labels';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -234,7 +235,7 @@ export default function SalesOrderDetailPage() {
                 <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{l.line_number}</td>
                 <td className="px-4 py-3">{itemLabel(l.inventory_item_id)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{l.description ?? '—'}</td>
-                <td className="px-4 py-3 text-right font-mono">{l.quantity}</td>
+                <td className="px-4 py-3 text-right font-mono">{fmtQty(l.quantity)}</td>
                 <td className="px-4 py-3 text-right font-mono">{fmtMoney(l.unit_price)}</td>
                 <td className="px-4 py-3 text-right font-mono">{fmtMoney(lineAmount(l).toFixed(2))}</td>
               </tr>

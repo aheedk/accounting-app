@@ -100,6 +100,9 @@ function highlight(text: string, query: string): React.ReactNode {
   );
 }
 
+// The key the browser actually listens for: Cmd on a Mac, Ctrl everywhere else.
+const SHORTCUT_LABEL = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -202,7 +205,7 @@ export function GlobalSearch() {
           className="h-9 w-full rounded-md border bg-muted/40 pl-9 pr-16 text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring"
         />
         <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden items-center gap-0.5 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:flex">
-          ⌘K
+          {SHORTCUT_LABEL}
         </kbd>
       </div>
 

@@ -16,6 +16,7 @@ import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { previewDepositSummary, previewDepositSlipAndSummary, previewDepositAlignmentTest, type DepositDocInput } from '@/lib/download';
+import { humanizeCode } from '@/lib/labels';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -800,7 +801,7 @@ export default function BankDepositPage() {
                             <td className="px-2 py-2 capitalize text-muted-foreground">Payment</td>
                             <td className="px-2 py-2 font-medium">{p.customer_name}</td>
                             <td className="px-2 py-2 text-muted-foreground">{p.cash_account_code} {p.cash_account_name}</td>
-                            <td className="px-2 py-2 capitalize">{p.payment_method.replace('_', ' ')}</td>
+                            <td className="px-2 py-2">{humanizeCode(p.payment_method)}</td>
                             <td className="px-2 py-2">{p.reference ?? '—'}</td>
                             <td className="px-2 py-2 text-right font-mono">{fmtMoney(p.amount)}</td>
                           </tr>
