@@ -43,6 +43,7 @@ import TenNinetyNineReportPage from '@/pages/reports/TenNinetyNineReportPage';
 import ProfitLossPage from '@/pages/reports/ProfitLossPage';
 import BalanceSheetPage from '@/pages/reports/BalanceSheetPage';
 import CashFlowPage from '@/pages/reports/CashFlowPage';
+import StatementOfCashFlowsPage from '@/pages/reports/StatementOfCashFlowsPage';
 import CustomReportsPage from '@/pages/reports/CustomReportsPage';
 import ManagementReportsPage from '@/pages/reports/ManagementReportsPage';
 import PerformanceCenterPage from '@/pages/reports/PerformanceCenterPage';
@@ -140,6 +141,7 @@ export default function App() {
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
+            <Route path="/reports/statement-of-cash-flows" element={<StatementOfCashFlowsPage />} />
             <Route path="/reports/custom" element={<CustomReportsPage />} />
             <Route path="/reports/management" element={<ManagementReportsPage />} />
             <Route path="/reports/performance" element={<PerformanceCenterPage />} />

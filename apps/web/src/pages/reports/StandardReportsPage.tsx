@@ -11,7 +11,7 @@ const groups: ReportGroup[] = [
     reports: [
       { to: '/reports/pnl', name: 'Profit and Loss', description: 'Revenue and expenses for a period, with gross profit and net income.' },
       { to: '/reports/balance-sheet', name: 'Balance Sheet', description: 'Assets, liabilities, and equity as of a point in time.' },
-      { to: '/reports/cash-flow', name: 'Statement of Cash Flows', description: 'Cash account activity over a period with beginning and ending balances.' },
+      { to: '/reports/statement-of-cash-flows', name: 'Statement of Cash Flows', description: 'The change in cash for a period, explained as operating, investing and financing activities.' },
     ],
   },
   {
@@ -19,6 +19,7 @@ const groups: ReportGroup[] = [
     reports: [
       { to: '/reports/general-ledger', name: 'General Ledger', description: 'Detailed transactions, opening balances, and running balances grouped by account.' },
       { to: '/reports/trial-balance', name: 'Trial Balance', description: 'Debit and credit balances for every account as of a chosen date.' },
+      { to: '/reports/cash-flow', name: 'Cash Activity by Account', description: 'Every movement in one bank account over a period, with a running balance.' },
     ],
   },
   {

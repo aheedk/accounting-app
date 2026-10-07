@@ -111,7 +111,7 @@ export default function CashFlowPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Cash Flow Statement</h1>
+        <h1 className="text-2xl font-semibold">Cash Activity</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">Period start</div>
@@ -139,13 +139,13 @@ export default function CashFlowPage() {
           <Button variant="outline" onClick={() => load()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
           <div className="flex items-center gap-2">
             <div className="relative group">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { if (!report) return; setExcelBusy(true); try { downloadAsExcel(['Date', 'Source', 'Memo', 'Debit', 'Credit', 'Net', 'Running Balance'], report.lines.map(l => [l.entry_date, l.source_type, l.memo ?? '', l.debit, l.credit, l.net_amount, l.running_balance]), `cash-flow-${periodStart}-${periodEnd}`, { title: 'Cash Flow Statement', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}` }); } finally { setExcelBusy(false); } }} disabled={excelBusy || !report} aria-label="Export to Excel">
+              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { if (!report) return; setExcelBusy(true); try { downloadAsExcel(['Date', 'Source', 'Memo', 'Debit', 'Credit', 'Net', 'Running Balance'], report.lines.map(l => [l.entry_date, l.source_type, l.memo ?? '', l.debit, l.credit, l.net_amount, l.running_balance]), `cash-flow-${periodStart}-${periodEnd}`, { title: 'Cash Activity', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}` }); } finally { setExcelBusy(false); } }} disabled={excelBusy || !report} aria-label="Export to Excel">
                 <FileDown className="h-4 w-4" />
               </button>
               <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
             </div>
             <div className="relative group">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { if (!report) return; printReport({ title: 'Cash Flow Statement', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}`, headers: ['Date', 'Source', 'Memo', 'Debit', 'Credit', 'Net', 'Running Balance'], rows: report.lines.map(l => [l.entry_date, l.source_type, l.memo ?? '', l.debit, l.credit, l.net_amount, l.running_balance]) }); }} disabled={!report} aria-label="Print">
+              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { if (!report) return; printReport({ title: 'Cash Activity', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}`, headers: ['Date', 'Source', 'Memo', 'Debit', 'Credit', 'Net', 'Running Balance'], rows: report.lines.map(l => [l.entry_date, l.source_type, l.memo ?? '', l.debit, l.credit, l.net_amount, l.running_balance]) }); }} disabled={!report} aria-label="Print">
                 <Printer className="h-4 w-4" />
               </button>
               <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
@@ -198,7 +198,7 @@ export default function CashFlowPage() {
 
           <ReportCard
             companyName={bizName}
-            title={`Statement of Cash Flows — ${report.cash_account_code} ${report.cash_account_name}`}
+            title={`Cash Activity — ${report.cash_account_code} ${report.cash_account_name}`}
             subtitle={`${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`}
           >
             {report.lines.length === 0 ? (

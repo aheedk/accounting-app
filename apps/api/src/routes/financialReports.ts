@@ -7,6 +7,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import * as pnl from '../services/reports/profitLossService.js';
 import * as bs from '../services/reports/balanceSheetService.js';
 import * as cf from '../services/reports/cashFlowService.js';
+import * as scf from '../services/reports/statementOfCashFlowsService.js';
 import * as gl from '../services/reports/generalLedgerService.js';
 
 const router = Router({ mergeParams: true });
@@ -37,6 +38,20 @@ router.get('/businesses/:businessId/reports/balance-sheet', async (req: Request,
       as_of: q.as_of,
     });
     res.json(report);
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/reports/statement-of-cash-flows', async (req: Request, res, next) => {
+  try {
+    const q = schemas.pnlQuerySchema.parse({
+      period_start: req.query['period_start'],
+      period_end: req.query['period_end'],
+    });
+    res.json(await scf.statementOfCashFlows(db, {
+      business_id: req.tenancy!.business_id,
+      period_start: q.period_start,
+      period_end: q.period_end,
+    }));
   } catch (e) { next(e); }
 });
 
