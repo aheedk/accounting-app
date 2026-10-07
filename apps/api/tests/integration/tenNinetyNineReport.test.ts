@@ -3,6 +3,7 @@ import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/te
 import { makeFirm, makeBusiness, makeUser, makeVendor, seedYearPeriods, seedCoa } from '../helpers/factories.js';
 import * as billSvc from '../../src/services/ap/billService.js';
 import * as payment from '../../src/services/ap/billPaymentService.js';
+import * as expenseSvc from '../../src/services/ap/expenseTransactionService.js';
 import * as rpt from '../../src/services/ap/reports/tenNinetyNineReportService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -54,5 +55,21 @@ describe('1099 report', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.vendor_name).toBe('Contractor Co');
     expect(rows[0]!.total_paid).toBe('800.0000');
+
+    // 2026-09-28 audit: money paid straight to a contractor counts too, by cash or
+    // check, but not by card (the card processor reports that on a 1099-K).
+    const direct = (method: 'check' | 'credit_card', amount: string, vendor_id: string) =>
+      t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+        transaction_date: '2026-07-01', vendor_id, payment_account_id: cash.id, payment_method: method,
+        lines: [{ category_account_id: expense.id, amount }],
+      }));
+    await direct('check', '317.00', v1099.id);
+    await direct('credit_card', '999.00', v1099.id);
+    await direct('check', '50.00', vNot.id);
+
+    const withDirect = await rpt.tenNinetyNine(t.db, { business_id: biz.id, year: 2026 });
+    expect(withDirect).toHaveLength(1);
+    expect(withDirect[0]!.total_paid).toBe('1117.0000');
+    expect(await rpt.tenNinetyNine(t.db, { business_id: biz.id, year: 2025 })).toEqual([]);
   });
 });
