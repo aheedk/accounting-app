@@ -44,4 +44,19 @@ router.post('/businesses/:businessId/tax-codes', requireMinRole('firm_admin'), a
   } catch (e) { next(e); }
 });
 
+router.patch('/businesses/:businessId/tax-codes/:id', requireMinRole('firm_admin'), async (req, res, next) => {
+  try {
+    const body = schemas.taxCodeUpdateSchema.parse(req.body);
+    const patch: Parameters<typeof tax.updateTaxCode>[2]['patch'] = {};
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.tax_payable_account_id !== undefined) patch.tax_payable_account_id = body.tax_payable_account_id;
+    if (body.is_active !== undefined) patch.is_active = body.is_active;
+    if (body.new_rate !== undefined) patch.new_rate = body.new_rate;
+    const updated = await db.transaction().execute(trx =>
+      tax.updateTaxCode(trx, ctxFromReq(req), { business_id: req.tenancy!.business_id, tax_code_id: req.params['id']!, patch }),
+    );
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
 export default router;

@@ -17,7 +17,7 @@ import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPos
 
 type Line = { description: string; inventory_item_id: string; amount: string };
 type Customer = { id: string; name: string; default_terms_days?: number };
-type TaxCode = { id: string; code: string; name: string; current_rate: string | null };
+type TaxCode = { id: string; code: string; name: string; current_rate: string | null; is_active: boolean };
 const blank = (): Line => ({ description: '', inventory_item_id: '', amount: '' });
 
 const TERMS_OPTIONS: { label: string; days: number }[] = [
@@ -71,7 +71,8 @@ function InvoiceNewPage() {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/customers`).then(r => setCustomers(r.data.customers));
     refetchItems();
-    api.get(`/businesses/${bizId}/tax-codes`).then(r => setTaxCodes(r.data.tax_codes ?? []));
+    // A tax code switched off on Setup → Tax Codes is not offered on new invoices.
+    api.get<{ tax_codes?: TaxCode[] }>(`/businesses/${bizId}/tax-codes`).then(r => setTaxCodes((r.data.tax_codes ?? []).filter(tc => tc.is_active)));
     api.get(`/businesses/${bizId}/invoices/next-number`).then(r => {
       setHdr(h => h.invoice_number ? h : { ...h, invoice_number: r.data.next_number });
     });

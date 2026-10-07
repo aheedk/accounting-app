@@ -1,7 +1,7 @@
 import { Kysely, type Transaction } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
-import { BusinessRuleError } from '../../lib/errors.js';
+import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
@@ -42,6 +42,65 @@ export async function createTaxCode(trx: Transaction<DB>, ctx: ServiceCtx, input
     before: null, after: tc,
   });
   return tc;
+}
+
+export type UpdateTaxCodeInput = {
+  business_id: string;
+  tax_code_id: string;
+  patch: {
+    name?: string;
+    tax_payable_account_id?: string;
+    is_active?: boolean;
+    /** A rate that takes over from a date. Earlier dates keep the rate they had. */
+    new_rate?: { rate: number; effective_from: string };
+  };
+};
+
+function dayBefore(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! - 1)).toISOString().slice(0, 10);
+}
+
+export async function updateTaxCode(trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateTaxCodeInput) {
+  const before = await trx.selectFrom('tax_codes').selectAll()
+    .where('id', '=', input.tax_code_id).where('business_id', '=', input.business_id).executeTakeFirst();
+  if (!before) throw new NotFoundError('tax_code', input.tax_code_id);
+
+  const patch: { name?: string; tax_payable_account_id?: string; is_active?: boolean } = {};
+  if (input.patch.name !== undefined) patch.name = input.patch.name;
+  if (input.patch.is_active !== undefined) patch.is_active = input.patch.is_active;
+  if (input.patch.tax_payable_account_id !== undefined) {
+    const acct = await trx.selectFrom('chart_of_accounts').selectAll()
+      .where('id', '=', input.patch.tax_payable_account_id).executeTakeFirst();
+    if (!acct || acct.business_id !== input.business_id || acct.account_type !== 'liability') {
+      throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'tax_payable_account must be a liability account in this business');
+    }
+    patch.tax_payable_account_id = input.patch.tax_payable_account_id;
+  }
+  const after = Object.keys(patch).length > 0
+    ? await trx.updateTable('tax_codes').set(patch).where('id', '=', before.id).returningAll().executeTakeFirstOrThrow()
+    : before;
+
+  const newRate = input.patch.new_rate;
+  if (newRate) {
+    // The new rate replaces anything dated from that day on, and the rate in
+    // force until then ends the day before.
+    await trx.deleteFrom('tax_rates')
+      .where('tax_code_id', '=', before.id).where('effective_from', '>=', newRate.effective_from).execute();
+    await trx.updateTable('tax_rates').set({ effective_to: dayBefore(newRate.effective_from) })
+      .where('tax_code_id', '=', before.id)
+      .where(eb => eb.or([eb('effective_to', 'is', null), eb('effective_to', '>=', newRate.effective_from)]))
+      .execute();
+    await trx.insertInto('tax_rates').values({
+      tax_code_id: before.id, rate: String(newRate.rate), effective_from: newRate.effective_from, effective_to: null,
+    }).execute();
+  }
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.TAX_CODE_UPDATE, entity_type: 'tax_code', entity_id: before.id,
+    before, after: newRate ? { ...after, new_rate: newRate } : after,
+  });
+  return after;
 }
 
 export async function getEffectiveRate(db: Kysely<DB>, tax_code_id: string, as_of: string): Promise<string> {

@@ -19,3 +19,13 @@ export const taxRateAddSchema = z.object({
   effective_from: dateString,
   effective_to: dateString.nullable().optional(),
 });
+
+// The code itself is fixed once created. A rate is never rewritten: a new one
+// takes over from a date, and earlier dates keep the rate they had.
+export const taxCodeUpdateSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  tax_payable_account_id: z.string().uuid().optional(),
+  is_active: z.boolean().optional(),
+  new_rate: z.object({ rate: z.number().min(0).max(1), effective_from: dateString }).optional(),
+});
+export type TaxCodeUpdate = z.infer<typeof taxCodeUpdateSchema>;
