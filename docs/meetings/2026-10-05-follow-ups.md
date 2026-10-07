@@ -11,10 +11,6 @@ over from the previous meeting.
 
 | # | What | Owner |
 |---|---|---|
-| 5 | Statement review: the bank account picker lists only bank accounts, not every asset | Aheed |
-| 6 | Card statement: the payment line must not post to the bank account (see note below) | Aheed |
-| 7 | Checks on a bank statement take their category from the stub's memo ("food") instead of going to Suspense | Aheed |
-| 8 | New account panel: close the gap at the top of the window | Aheed |
 | 17 | Fix the QA audit bugs (`docs/qa/2026-09-28-app-audit.md`). 8 are serious: invoice due dates, the 1099 report, Profit & Loss **(10-01)** | Aheed |
 | 18 | Put every report up and review them together, after 17 | Aheed |
 | 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
@@ -26,15 +22,14 @@ over from the previous meeting.
 | 33 | Vendor menu: Email and "Ask vendor for info" still say "coming soon" | Riham |
 | 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Faizan sends files, Aheed tests |
 | 15 | Suspense: reclassify some real lines **(10-01)** | Faizan |
-| 16 | Test a real credit card statement, after 6 **(10-01)** | Faizan |
+| 16 | Test a real credit card statement **(10-01)** | Faizan |
 
-**Item 6, the card payment.** Today the payment line on a card statement posts
-debit card, credit bank. The firm wants it to show the card account instead,
-because the bank statement already records the payment. Build it so the payment
-line on a card statement does not post at all and links to the bank statement's
-entry. To confirm with the firm: if that bank statement is never uploaded, the
-card balance stays too high, so show those payments as "waiting for the bank
-statement".
+**To confirm with the firm (item 6).** A payment on a card statement is no
+longer posted from the card statement; the bank statement records it, and the
+line shows "Recorded from the bank statement" or "Waiting for the bank
+statement". If that bank statement is never uploaded, the card balance stays too
+high by the payment. Is that acceptable, or should there be a way to post it
+from the card statement anyway?
 
 ## Later (January or after)
 
@@ -69,6 +64,10 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 2 | Typing 9 becomes 9.00, on every amount box in the app | Aheed, `896e7bb` |
 | 3 | Delete is under More on Journal Entry, Bank Deposit, Expense and Check | Riham, `7dd3df1` |
 | 4 | Attachments work on bank deposits | Aheed, `9c6edcb` |
+| 5 | Statement review: the bank account picker lists only bank accounts | Aheed, `85b13bf` |
+| 6 | Card statement: the payment line is not posted and never touches the bank account | Aheed, `a267697` |
+| 7 | A check takes its category from the stub's payee and memo ("food") | Aheed, `b3cf55f` |
+| 8 | New account and Edit account panels reach the top of the window | Aheed, `4370f0b` |
 | 9 | Vendor dropdown in the AI inbox, with the AI matching renamed payees **(10-01)** | Riham, `40d1214` |
 | 19 | General Ledger fiscal-year presets use the client's fiscal year **(10-01)** | Riham, `e9acc5a` |
 
