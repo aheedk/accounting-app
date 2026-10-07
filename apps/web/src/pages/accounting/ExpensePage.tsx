@@ -9,6 +9,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
@@ -728,7 +729,7 @@ export default function ExpensePage() {
                       <Input value={line.description} onChange={e => updateLine(idx, 'description', e.target.value)} disabled={!canEdit} className="w-full" />
                     </td>
                     <td className="px-2 py-1.5">
-                      <Input
+                      <MoneyInput
                         value={line.amount}
                         onChange={e => updateLine(idx, 'amount', e.target.value)}
                         disabled={!canEdit}

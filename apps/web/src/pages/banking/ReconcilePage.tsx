@@ -7,6 +7,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
@@ -271,10 +272,8 @@ export default function ReconcilePage() {
             </div>
             <div>
               <Label>Statement ending balance</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.statement_ending_balance}
+              <MoneyInput
+                allowNegative value={form.statement_ending_balance}
                 onChange={e => setForm(f => ({ ...f, statement_ending_balance: e.target.value }))}
                 placeholder="0.00"
                 required

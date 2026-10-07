@@ -6,6 +6,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -371,8 +372,7 @@ export default function ImportedTransactionPage() {
                 />
               </td>
               <td className="p-3">
-                <Input
-                  type="number" step="0.01" inputMode="decimal"
+                <MoneyInput
                   value={form.amount}
                   onChange={e => set({ amount: e.target.value })}
                   placeholder="0.00" required

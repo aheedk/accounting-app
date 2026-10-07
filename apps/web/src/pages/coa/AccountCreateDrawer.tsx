@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ChevronDown, Info, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/apiClient';
@@ -284,7 +285,7 @@ export default function AccountCreateDrawer({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="new-account-opening-balance" className="inline-flex items-center gap-1">Opening balance <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden /></Label>
-                  <Input id="new-account-opening-balance" className="mt-1" inputMode="decimal" placeholder="0.00" value={form.opening_balance} onChange={event => setForm(current => ({ ...current, opening_balance: event.target.value }))} />
+                  <MoneyInput id="new-account-opening-balance" className="mt-1" placeholder="0.00" allowNegative value={form.opening_balance} onChange={event => setForm(current => ({ ...current, opening_balance: event.target.value }))} />
                 </div>
                 <div>
                   <Label htmlFor="new-account-opening-date">As of</Label>

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
@@ -103,7 +103,7 @@ export default function VendorCreditDetailPage() {
                   <option value="">Select…</option>{openBills.map(b => <option key={b.id} value={b.id}>{b.bill_number} — {fmtMoney(b.total)}</option>)}
                 </AppSelect>
               </div>
-              <div className="col-span-3"><label className="text-sm">Apply amount</label><Input type="number" step="0.01" value={applyForm.applied_amount} onChange={e => setApplyForm(f => ({ ...f, applied_amount: e.target.value }))} /></div>
+              <div className="col-span-3"><label className="text-sm">Apply amount</label><MoneyInput value={applyForm.applied_amount} onChange={e => setApplyForm(f => ({ ...f, applied_amount: e.target.value }))} /></div>
               <div className="col-span-2"><Button type="submit" disabled={busy}>Apply</Button></div>
             </form>
           </CardContent>

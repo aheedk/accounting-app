@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
@@ -161,11 +162,7 @@ export default function FixedAssetNewPage() {
           </div>
           <div>
             <Label>Cost</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              inputMode="decimal"
+            <MoneyInput
               value={form.cost}
               onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))}
               placeholder="0.00"
@@ -175,11 +172,7 @@ export default function FixedAssetNewPage() {
           </div>
           <div>
             <Label>Salvage value</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              inputMode="decimal"
+            <MoneyInput
               value={form.salvage_value}
               onChange={(e) => setForm((f) => ({ ...f, salvage_value: e.target.value }))}
               placeholder="0.00"

@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
@@ -185,9 +186,7 @@ export default function PurchaseOrderNewPage() {
               </div>
               <div className="col-span-2">
                 <Label className="sr-only">Unit cost</Label>
-                <Input
-                  type="number"
-                  step="0.01"
+                <MoneyInput
                   value={l.unit_cost}
                   onChange={(e) => update(i, { unit_cost: e.target.value })}
                   required

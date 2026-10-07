@@ -229,7 +229,7 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     const event = await pressTab(search);
 
     expect(event.defaultPrevented).toBe(true);
-    const debits = row.querySelectorAll<HTMLInputElement>('input[type="number"]')[0]!;
+    const debits = row.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]')[0]!;
     expect(document.activeElement).toBe(debits);
   });
 
@@ -501,7 +501,7 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     await renderEditor(readOnlyEntry);
 
     const row = dataRows()[0]!;
-    expect(row.querySelectorAll('input[type="number"]')).toHaveLength(0);
+    expect(row.querySelectorAll('input[inputmode="decimal"]')).toHaveLength(0);
     expect(row.textContent).toContain('10.00');
     expect(row.textContent).not.toContain('10.0000');
   });

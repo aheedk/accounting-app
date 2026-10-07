@@ -6,6 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney } from '@/lib/money';
@@ -525,10 +526,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     {readOnly ? (
                       <div className="w-full px-3 py-2 text-right font-mono">{line.debit ? fmtMoney(line.debit) : ''}</div>
                     ) : (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                      <MoneyInput
                         value={line.debit}
                         onChange={event => updateLine(index, { debit: event.target.value, credit: '' })}
                         placeholder="0.00"
@@ -540,10 +538,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     {readOnly ? (
                       <div className="w-full px-3 py-2 text-right font-mono">{line.credit ? fmtMoney(line.credit) : ''}</div>
                     ) : (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                      <MoneyInput
                         value={line.credit}
                         onChange={event => updateLine(index, { credit: event.target.value, debit: '' })}
                         placeholder="0.00"

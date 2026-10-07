@@ -4,6 +4,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
@@ -484,11 +485,11 @@ export default function RecurringTransactionsPage() {
                     </div>
                     <div className="col-span-2">
                       <Label className="sr-only">Debit</Label>
-                      <Input type="number" step="0.0001" min="0" value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: '0.00' })} />
+                      <MoneyInput value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: '0.00' })} />
                     </div>
                     <div className="col-span-2">
                       <Label className="sr-only">Credit</Label>
-                      <Input type="number" step="0.0001" min="0" value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: '0.00' })} />
+                      <MoneyInput value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: '0.00' })} />
                     </div>
                     <div className="col-span-3">
                       <Label className="sr-only">Memo</Label>

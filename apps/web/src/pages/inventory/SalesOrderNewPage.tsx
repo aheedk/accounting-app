@@ -6,6 +6,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
@@ -374,10 +375,7 @@ export default function SalesOrderNewPage() {
                     )}
                     {showRate && (
                       <td className="px-3 py-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <MoneyInput
                           value={l.unit_price}
                           onChange={(e) => updateLine(i, { unit_price: e.target.value })}
                           className="h-9 text-right font-mono"
@@ -442,10 +440,7 @@ export default function SalesOrderNewPage() {
               {showShippingFee && (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">Shipping fee</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <MoneyInput
                     value={shippingFeeAmt}
                     onChange={(e) => setShippingFeeAmt(e.target.value)}
                     className="h-7 w-24 text-right text-xs font-mono"

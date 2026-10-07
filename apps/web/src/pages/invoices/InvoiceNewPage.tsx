@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/ProductServiceSelect';
@@ -176,7 +177,7 @@ function InvoiceNewPage() {
               </div>
               <div className="col-span-2 flex items-center gap-1">
                 <Label htmlFor={`line-${i}-amount`} className="sr-only">Amount</Label>
-                <Input id={`line-${i}-amount`} type="number" step="0.01" inputMode="decimal" value={l.amount} onChange={e => update(i, { amount: e.target.value })} placeholder="0.00" className="text-right font-mono" />
+                <MoneyInput id={`line-${i}-amount`} value={l.amount} onChange={e => update(i, { amount: e.target.value })} placeholder="0.00" className="text-right font-mono" />
                 <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100" onClick={() => setLines(ls => ls.filter((_, idx) => idx !== i))} disabled={lines.length <= 1} aria-label="Remove line">×</Button>
               </div>
             </div>

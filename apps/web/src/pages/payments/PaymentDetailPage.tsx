@@ -5,7 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { fmtDateTime, fmtLongDate } from '@/lib/dates';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
@@ -223,7 +223,7 @@ export default function PaymentDetailPage() {
               </div>
               <div className="md:col-span-3">
                 <label className="text-sm font-medium">Apply amount</label>
-                <Input type="number" step="0.01" value={applyForm.applied_amount} onChange={e => setApplyForm(f => ({ ...f, applied_amount: e.target.value }))} />
+                <MoneyInput value={applyForm.applied_amount} onChange={e => setApplyForm(f => ({ ...f, applied_amount: e.target.value }))} />
               </div>
               <div className="md:col-span-2">
                 <Button type="submit" disabled={busy}>Apply</Button>

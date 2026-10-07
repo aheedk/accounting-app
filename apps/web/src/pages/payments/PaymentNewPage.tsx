@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelect } from '@/components/ui/AccountSelect';
@@ -185,8 +186,7 @@ function PaymentNewPage() {
         <Card><CardHeader><CardTitle className="text-base">Amount</CardTitle></CardHeader>
           <CardContent>
             <Label className="text-xs text-muted-foreground">Amount received</Label>
-            <Input
-              type="number" step="0.01" inputMode="decimal"
+            <MoneyInput
               value={form.amount}
               onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
               placeholder={String(appliedTotal.toFixed(2))}
@@ -222,8 +222,7 @@ function PaymentNewPage() {
                     <td className="p-3 text-right font-mono">{fmtMoney(r.original_amount)}</td>
                     <td className="p-3 text-right font-mono">{fmtMoney(r.open_balance)}</td>
                     <td className="p-3 text-right">
-                      <Input
-                        type="number" step="0.01" inputMode="decimal"
+                      <MoneyInput
                         className="ml-auto w-32 text-right font-mono"
                         value={payments[r.invoice_id] ?? ''}
                         onChange={e => setPayments(p => ({ ...p, [r.invoice_id]: e.target.value }))}

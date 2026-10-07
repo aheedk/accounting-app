@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -211,7 +212,7 @@ export default function CustomerNewPage() {
             <SelectInput value={form.invoice_language} onChange={v => setForm(f => ({ ...f, invoice_language: v }))} options={LANGUAGES} />
           </Field>
           <Field label="Credit Limit">
-            <Input type="number" step="0.01" min="0" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: e.target.value }))} />
+            <MoneyInput value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: e.target.value }))} />
           </Field>
         </div>
       </Section>
@@ -230,7 +231,7 @@ export default function CustomerNewPage() {
           <div className="text-sm font-medium pb-2">Opening balance</div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Opening balance">
-              <Input type="number" step="0.01" value={form.opening_balance} onChange={e => setForm(f => ({ ...f, opening_balance: e.target.value }))} />
+              <MoneyInput allowNegative value={form.opening_balance} onChange={e => setForm(f => ({ ...f, opening_balance: e.target.value }))} />
             </Field>
             <Field label="As of">
               <DateInput value={form.opening_balance_as_of} onChange={e => setForm(f => ({ ...f, opening_balance_as_of: e.target.value }))} />
