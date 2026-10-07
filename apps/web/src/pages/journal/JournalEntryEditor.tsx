@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
+import { ComboInput } from '@/components/ui/ComboInput';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
@@ -65,6 +66,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const [businessId] = useActiveBusinessId();
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<JournalAccount[]>([]);
+  // The client's cost centers (Setup > Cost Centers), offered in the Class column.
+  const [costCenters, setCostCenters] = useState<string[]>([]);
+  useEffect(() => {
+    if (!businessId) return;
+    api.get<{ cost_centers: Array<{ name: string; is_active: boolean }> }>(`/businesses/${businessId}/cost-centers`)
+      .then(r => setCostCenters(r.data.cost_centers.filter(c => c.is_active).map(c => c.name)))
+      .catch(() => setCostCenters([]));
+  }, [businessId]);
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
   const [periodsLoaded, setPeriodsLoaded] = useState(false);
   const [periodBusy, setPeriodBusy] = useState(false);
@@ -566,13 +575,25 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <Input
-                      value={line.class_name}
-                      onChange={event => updateLine(index, { class_name: event.target.value })}
-                      onKeyDown={event => handleLastLineTab(event, index)}
-                      disabled={readOnly}
-                      className="w-full"
-                    />
+                    {costCenters.length > 0 && !readOnly ? (
+                      // A client with cost centers picks one; typing something else is still allowed.
+                      <div onKeyDown={event => handleLastLineTab(event as unknown as React.KeyboardEvent<HTMLInputElement>, index)}>
+                        <ComboInput
+                          value={line.class_name}
+                          onChange={value => updateLine(index, { class_name: value })}
+                          options={costCenters}
+                          className="w-full"
+                        />
+                      </div>
+                    ) : (
+                      <Input
+                        value={line.class_name}
+                        onChange={event => updateLine(index, { class_name: event.target.value })}
+                        onKeyDown={event => handleLastLineTab(event, index)}
+                        disabled={readOnly}
+                        className="w-full"
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-1.5">
                     {!readOnly && (

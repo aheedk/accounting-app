@@ -154,8 +154,8 @@ export default function CostCentersPage() {
         <div>
           <h1 className="text-2xl font-semibold">Cost centers</h1>
           <p className="text-sm text-muted-foreground">
-            Departments, classes, and locations. Ledger tagging arrives later —
-            for now this is master data only.
+            Departments, classes, and locations. On a journal entry, pick one in the Class
+            column to tag a line; the General Ledger shows it in its Class column.
           </p>
         </div>
         <div className="flex items-center gap-2">
