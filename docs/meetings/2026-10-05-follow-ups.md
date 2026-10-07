@@ -11,8 +11,8 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 
 | # | What | Owner |
 |---|---|---|
-| 17 | QA audit bugs (`docs/qa/2026-09-28-app-audit.md`). 7 of the 8 serious ones are fixed. Left: inventory never reaches the ledger (a larger job), then the less serious lists **(10-01)** | Aheed |
-| 18 | Put every report up and review them together. The 1099, Management and Profit & Loss numbers are fixed, so this can go ahead | Aheed |
+| 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): every bug and wrong number is fixed. What is left is listed under "Audit: what is left" below, and all of it needs a decision before it is built **(10-01)** | Aheed, firm |
+| 18 | Review the reports with the firm. They are all up and agree with each other; see "Reports" below | Aheed, firm |
 | 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
 | 12 | "+ New" menu: match QuickBooks exactly | Riham |
@@ -23,6 +23,39 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 | 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Faizan sends files, Aheed tests |
 | 15 | Suspense: reclassify some real lines **(10-01)** | Faizan |
 | 16 | Test a real credit card statement **(10-01)** | Faizan |
+
+**Reports (item 18)**
+
+In the app now: Profit & Loss, Balance Sheet, Statement of Cash Flows (new), Cash
+Activity, General Ledger, Trial Balance, A/R Aging, A/P Aging (new), 1099, Management,
+Performance, Custom.
+
+`npm -w @accounting/api run report:tie-out` checks them against each other, and on
+both local companies everything agrees: the trial balance and balance sheet balance,
+net income is the same on the P&L, balance sheet and cash flow statement, and both
+aging reports equal their control accounts. Running it found two real bugs, now fixed:
+
+- The P&L and three other reports dropped month-end reversing entries (off by 7,500
+  on Blue Widget).
+- Every balance sheet would have gone out of balance on January 1, because nothing
+  carried the old year's profit into Retained Earnings.
+
+For the firm to pick from, not built: comparative columns, P&L by month, aging detail
+by invoice, customer and vendor balance summaries, sales by customer, expenses by
+vendor.
+
+**Audit: what is left (item 17)**
+
+- **Inventory never reaches the ledger.** The last serious one. It needs three
+  answers first (how receipts post, average cost or first-in-first-out, what to do
+  with stock already entered): `docs/specs/2026-10-07-inventory-ledger-design.md`.
+- **Features, each a job of its own:** run payroll from the app, AI suggestions on
+  Bank Transactions, editing posted invoices, emailing an invoice or saving it as a
+  PDF, cost centers, Transfer and Estimate, searching customers and invoices, paying
+  several vendors' bills at once.
+- **Look and naming:** unstyled Fixed Asset, Purchase Order and Employee pages, a
+  fuller dashboard, mixed table header capitals, the two Contractors pages, the two
+  rule systems, and the name "Spreadsheet Sync".
 
 **Questions for the firm**
 
@@ -35,6 +68,8 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
   is how the firm files.
 - **Pay stubs (22) and payroll.** Are pay stubs still wanted, and does Payroll
   stay in the sidebar?
+- **Inventory.** The three answers in the inventory proposal, if inventory is to be
+  used for clients at all this year.
 
 ## Later (January or after)
 
@@ -86,6 +121,18 @@ Audit bugs fixed (part of item 17), all Aheed:
 | Management Reports shows revenue by month (every month read 0.00) | `8d33f9a` |
 | Net Operating Income on the Profit & Loss takes operating expenses off | `95b12eb` |
 | Bank Transactions → Categorize starts with no account chosen | `614d5d4` |
+| A/P Aging report; both aging reports split 61–90 / 91+ and equal the ledger | `5099ac8` |
+| Statement of Cash Flows (operating, investing, financing) | `8ab2737` |
+| P&L and three other reports count reversing entries | `bd80fcb` |
+| Balance sheet still balances after year end; year to date follows the fiscal year | `f6101a7` |
+| Client Overview and A/P Overview agree with the ledger | `556aeaa` |
+| Payments, Credit Memos, Bill Payments and Vendor Credits open on This year | `7ed7be7` |
+| Vendor page counts, Books Review month, recurring template amounts | `26e921a` |
+| Fixed Assets says when the register and the ledger differ | `70a62f8` |
+| Contractors → Create bill keeps the contractor; Copy link confirms; journal entry links to its source | `528485e` |
+| Codes read as words, quantities lose their padding, Ctrl K on Windows | `c91f78a` |
+| The auto-post switch saves (it never had); capitalization threshold has a setting | `34eee11` |
+| Bank Accounts shows book balances; pages print without the sidebar and top bar | `c1f13f0` |
 
 Also added by Riham since the meeting: Write Check (Accounts Payable → Checks),
 the Transactions page, the table-settings gear on list pages, vendor batch
@@ -177,3 +224,29 @@ click. Item 3 and the other Riham items are hers to show.
   account box is empty and Submit stays off until one is chosen.
 - **AI inbox guesses.** Nothing to click: a line the engine is not sure of no
   longer arrives with an account filled in from a loose name match.
+
+### Reports (item 18)
+
+- **A/P Aging.** Accounts Payable → Aging. The total is 10,790.00, the same as
+  Accounts Payable on the Balance Sheet; the unused vendor credit shows as a negative.
+- **A/R Aging.** Accounts Receivable → Aging. The total is 32,376.16, the same as
+  Accounts Receivable (it was 34,416.16 before, with money on account left out).
+  Point out the separate 61 - 90 and 91 and over columns.
+- **Statement of Cash Flows.** Reports → Cash Flows. Operating, investing and
+  financing add up to the net change, and Cash at end matches the bank accounts on
+  the Balance Sheet. Click any amount to see its entries.
+- **Balance Sheet after year end.** Reports → Balance Sheet, set the date to
+  1/31/2027: it still says "In balance", with this year's profit inside Retained
+  Earnings.
+- **The check itself.** In a terminal: `npm -w @accounting/api run report:tie-out`.
+  Every line reads OK.
+
+### Other fixes worth a minute
+
+- **Auto-post switch.** AI → Coding Rules. Tick "Auto-post high-confidence
+  transactions", reload the page: it stays ticked. (It never saved before.) The
+  capitalization threshold is on the same card.
+- **Bank balances.** Accounting → Bank Accounts has a Book balance column.
+- **Printing.** Open any invoice → ⋯ → Print: the preview has no sidebar or top bar.
+- **Fixed Assets.** Accounting → Fixed Assets shows an amber note that the register
+  (43,000.00) and the ledger differ, with the amounts.

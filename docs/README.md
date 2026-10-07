@@ -25,3 +25,4 @@ to run the app.
 | [Card statements and check stubs](./specs/2026-10-04-card-statements-and-check-stubs-design.md) | Credit card statements in the AI inbox, card payments on bank statements, check stubs, long multi-account PDFs. |
 | [Suspense](./specs/2026-10-04-suspense-account-design.md) | Where the AI parks what it cannot categorize, and clearing it. |
 | [Report set](./specs/2026-10-07-report-set-design.md) | A/R and A/P aging that tie to the ledger, and the Statement of Cash Flows. |
+| [Inventory in the ledger](./specs/2026-10-07-inventory-ledger-design.md) | **Proposal, not built.** What the firm has to decide before inventory can post to the books. |
