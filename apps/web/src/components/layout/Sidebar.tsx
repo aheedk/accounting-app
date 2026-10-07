@@ -69,6 +69,7 @@ const groups: NavGroup[] = [
       { to: '/ap/bill-payments', label: 'Bill Payments' },
       { to: '/ap/vendor-credits', label: 'Vendor Credits' },
       { to: '/ap/contractors', label: 'Contractors' },
+      { to: '/reports/ap-aging', label: 'Aging' },
       { to: '/reports/1099', label: '1099s' },
     ],
   },

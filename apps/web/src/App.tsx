@@ -136,6 +136,7 @@ export default function App() {
             <Route path="/reports/trial-balance" element={<TrialBalancePage />} />
             <Route path="/reports/general-ledger" element={<GeneralLedgerPage />} />
             <Route path="/reports/aging" element={<AgingReportPage />} />
+            <Route path="/reports/ap-aging" element={<AgingReportPage kind="ap" />} />
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />

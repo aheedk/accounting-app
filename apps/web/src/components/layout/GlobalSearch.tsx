@@ -22,6 +22,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Bill Payments', group: 'Accounts Payable', to: '/ap/bill-payments' },
   { label: 'Vendor Credits', group: 'Accounts Payable', to: '/ap/vendor-credits' },
   { label: 'Contractors', group: 'Accounts Payable', to: '/ap/contractors' },
+  { label: 'AP Aging', group: 'Accounts Payable', to: '/reports/ap-aging' },
   { label: '1099s', group: 'Accounts Payable', to: '/reports/1099' },
   // AI
   { label: 'Document Inbox', group: 'AI', to: '/ai/inbox' },

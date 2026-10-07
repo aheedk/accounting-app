@@ -10,44 +10,53 @@ import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
 import { printReport } from '@/lib/reportExport';
 
-type Row = { customer_id: string; customer_name: string; current: string; over_30: string; over_60: string; over_90: string; total: string };
+type Row = {
+  id: string; name: string;
+  current: string; days_1_30: string; days_31_60: string; days_61_90: string; days_over_90: string; total: string;
+};
+const BUCKETS = ['current', 'days_1_30', 'days_31_60', 'days_61_90', 'days_over_90'] as const;
+const BUCKET_LABELS = ['Current', '1 - 30', '31 - 60', '61 - 90', '91 and over'];
+
+// One page for both sides: who owes the client (A/R) and who the client owes (A/P).
+const KINDS = {
+  ar: { endpoint: 'aging', heading: 'AR Aging', title: 'A/R Aging Summary', party: 'Customer', file: 'ar-aging' },
+  ap: { endpoint: 'ap-aging', heading: 'AP Aging', title: 'A/P Aging Summary', party: 'Vendor', file: 'ap-aging' },
+} as const;
 
 // QBO leaves zero cells blank in aging reports.
 function cell(v: string) {
   return Number(v) === 0 ? '' : fmtMoney(v);
 }
 
-export default function AgingReportPage() {
+export default function AgingReportPage({ kind = 'ar' }: { kind?: keyof typeof KINDS }) {
+  const report = KINDS[kind];
   const [bizId] = useActiveBusinessId();
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const [asOf, setAsOf] = useState(todayLocal());
   const [rows, setRows] = useState<Row[]>([]);
-  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/reports/aging`, { params: { as_of: asOf } }).then(r => setRows(r.data.rows)); }, [bizId, asOf]);
+  useEffect(() => {
+    if (bizId) api.get(`/businesses/${bizId}/reports/${report.endpoint}`, { params: { as_of: asOf } }).then(r => setRows(r.data.rows));
+  }, [bizId, asOf, report.endpoint]);
   const [excelBusy, setExcelBusy] = useState(false);
   if (!bizId) return <div>Pick a business.</div>;
-  const totals = rows.reduce((acc, r) => ({
-    current: acc.current + parseFloat(r.current),
-    over_30: acc.over_30 + parseFloat(r.over_30),
-    over_60: acc.over_60 + parseFloat(r.over_60),
-    over_90: acc.over_90 + parseFloat(r.over_90),
-    total: acc.total + parseFloat(r.total),
-  }), { current: 0, over_30: 0, over_60: 0, over_90: 0, total: 0 });
-  const dlHeaders = ['Customer', 'Current', '1-30', '31-60', '61 and over', 'Total'];
-  const dlRows = () => rows.map(r => [r.customer_name, r.current, r.over_30, r.over_60, r.over_90, r.total]);
+  const bucketTotals = BUCKETS.map(bucket => rows.reduce((sum, r) => sum + parseFloat(r[bucket]), 0));
+  const grandTotal = rows.reduce((sum, r) => sum + parseFloat(r.total), 0);
+  const dlHeaders = [report.party, ...BUCKET_LABELS.map(label => label.replace(/ - /, '-')), 'Total'];
+  const dlRows = () => rows.map(r => [r.name, ...BUCKETS.map(bucket => r[bucket]), r.total]);
   function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'ar-aging', { title: 'A/R Aging Summary', subtitle: `As of ${fmtLongDate(asOf)}` }); } finally { setExcelBusy(false); }
+    try { downloadAsExcel(dlHeaders, dlRows(), report.file, { title: report.title, subtitle: `As of ${fmtLongDate(asOf)}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
-    printReport({ title: 'A/R Aging Summary', subtitle: `As of ${fmtLongDate(asOf)}`, headers: dlHeaders, rows: dlRows() });
+    printReport({ title: report.title, subtitle: `As of ${fmtLongDate(asOf)}`, headers: dlHeaders, rows: dlRows() });
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">AR Aging</h1>
+        <h1 className="text-2xl font-semibold">{report.heading}</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">as of</div>
@@ -70,40 +79,31 @@ export default function AgingReportPage() {
         </div>
       </div>
 
-      <ReportCard companyName={bizName} title="A/R Aging Summary Report" subtitle={`As of ${fmtLongDate(asOf)}`}>
+      <ReportCard companyName={bizName} title={`${report.title} Report`} subtitle={`As of ${fmtLongDate(asOf)}`}>
         <div className="w-full overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm sm:min-w-0">
+        <table className="w-full min-w-[720px] text-sm sm:min-w-0">
           <thead className="border-b">
             <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="p-3 text-left"></th>
-              <th className="p-3 text-right">Current</th>
-              <th className="p-3 text-right">1 - 30</th>
-              <th className="p-3 text-right">31 - 60</th>
-              <th className="p-3 text-right">61 and over</th>
+              {BUCKET_LABELS.map(label => <th key={label} className="p-3 text-right">{label}</th>)}
               <th className="p-3 text-right">Total</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.customer_id} className="border-b hover:bg-muted/30">
-                <td className="p-3">{r.customer_name}</td>
-                <td className="p-3 text-right font-mono">{cell(r.current)}</td>
-                <td className="p-3 text-right font-mono">{cell(r.over_30)}</td>
-                <td className="p-3 text-right font-mono">{cell(r.over_60)}</td>
-                <td className="p-3 text-right font-mono">{cell(r.over_90)}</td>
+              <tr key={r.id} className="border-b hover:bg-muted/30">
+                <td className="p-3">{r.name}</td>
+                {BUCKETS.map(bucket => <td key={bucket} className="p-3 text-right font-mono">{cell(r[bucket])}</td>)}
                 <td className="p-3 text-right font-mono">{fmtMoney(r.total)}</td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No open balances as of this date.</td></tr>
+              <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No open balances as of this date.</td></tr>
             )}
             <tr className="font-semibold">
               <td className="p-3">TOTAL</td>
-              <td className="p-3 text-right font-mono">{fmtMoney(totals.current)}</td>
-              <td className="p-3 text-right font-mono">{fmtMoney(totals.over_30)}</td>
-              <td className="p-3 text-right font-mono">{fmtMoney(totals.over_60)}</td>
-              <td className="p-3 text-right font-mono">{fmtMoney(totals.over_90)}</td>
-              <td className="p-3 text-right font-mono">{fmtMoney(totals.total)}</td>
+              {bucketTotals.map((total, i) => <td key={BUCKETS[i]} className="p-3 text-right font-mono">{fmtMoney(total)}</td>)}
+              <td className="p-3 text-right font-mono">{fmtMoney(grandTotal)}</td>
             </tr>
           </tbody>
         </table>

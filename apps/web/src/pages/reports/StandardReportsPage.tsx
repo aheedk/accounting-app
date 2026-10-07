@@ -24,7 +24,13 @@ const groups: ReportGroup[] = [
   {
     heading: 'Who owes you',
     reports: [
-      { to: '/reports/aging', name: 'Accounts Receivable Aging Summary', description: 'Outstanding customer invoices bucketed by days past due.' },
+      { to: '/reports/aging', name: 'Accounts Receivable Aging Summary', description: 'Outstanding customer invoices bucketed by days past due, less unapplied payments and credits.' },
+    ],
+  },
+  {
+    heading: 'What you owe',
+    reports: [
+      { to: '/reports/ap-aging', name: 'Accounts Payable Aging Summary', description: 'Unpaid vendor bills bucketed by days past due, less unused vendor credits.' },
     ],
   },
   {
