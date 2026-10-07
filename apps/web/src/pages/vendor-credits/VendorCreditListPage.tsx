@@ -30,6 +30,8 @@ const STATUSES = ['draft', 'posted', 'applied', 'voided'];
 const DATE_RANGES = [
   { value: '30d', label: 'Last 30 days', days: 30 },
   { value: '3m', label: 'Last 3 months', days: 92 },
+  // days -1: from January 1, to match the 'this year' figures in the bar above the table.
+  { value: 'ytd', label: 'This year', days: -1 },
   { value: '12m', label: 'Last 12 months', days: 365 },
   { value: 'all', label: 'All dates', days: 0 },
 ] as const;
@@ -45,7 +47,7 @@ export default function VendorCreditListPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState<string>('3m');
+  const [dateFilter, setDateFilter] = useState<string>('ytd');
   const [vendorQuery, setVendorQuery] = useState('');
 
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/vendor-credits`).then(r => setItems(r.data.vendor_credits)); }, [bizId]);
@@ -61,7 +63,7 @@ export default function VendorCreditListPage() {
 
   const rows = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = range && range.days > 0 ? daysAgoLocal(range.days) : '';
+    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : `${currentYearLocal()}-01-01`;
     const q = vendorQuery.trim().toLowerCase();
     return allRows.filter(r =>
       (!statusFilter || r.status === statusFilter) &&
