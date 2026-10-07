@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CreditCard, FileText, Trash2 } from 'lucide-react';
+import { CreditCard, FileDown, FileText, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { PostErrorNotice } from '@/components/SaveAndPost';
 import { fmtQty } from '@/lib/labels';
+import { cachedGet } from '@/lib/referenceDataCache';
+import { downloadInvoicePdf } from '@/lib/invoicePdf';
 
 type Invoice = {
   id: string;
@@ -89,6 +91,38 @@ export default function InvoiceDetailPage() {
     finally { setBusy(false); }
   }
 
+  // The invoice as a document to send: company, customer, lines and balance due.
+  async function savePdf() {
+    if (!data || !bizId) return;
+    setErr(null);
+    try {
+      const company = await cachedGet<{
+        name: string;
+        address: { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string } | null;
+      }>(`/businesses/${bizId}`);
+      const a = company.address;
+      const cityLine = [[a?.city, a?.state].filter(Boolean).join(', '), a?.postal_code].filter(Boolean).join(' ');
+      const invoice = data.invoice;
+      downloadInvoicePdf({
+        companyName: company.name,
+        companyAddressLines: [a?.line1, a?.line2, cityLine || null, a?.country].filter((l): l is string => !!l),
+        customerName: customer?.name ?? '',
+        invoiceNumber: invoice.invoice_number,
+        issueDate: fmtLongDate(invoice.issue_date),
+        dueDate: fmtLongDate(invoice.due_date),
+        terms: invoice.terms,
+        status: invoice.status,
+        lines: data.lines.map(l => ({ description: l.description, quantity: l.quantity, unitPrice: l.unit_price, amount: l.line_subtotal })),
+        subtotal: invoice.subtotal,
+        taxTotal: invoice.tax_total,
+        total: invoice.total,
+        paid: String(Number(invoice.total) - Number(data.amount_due)),
+        balanceDue: data.amount_due,
+        memo: invoice.memo,
+      });
+    } catch (e: unknown) { setErr(pickErr(e)); }
+  }
+
   if (!data) return <div>Loading...</div>;
   const inv = data.invoice;
   const paid = Number(inv.total) - Number(data.amount_due);
@@ -111,6 +145,7 @@ export default function InvoiceDetailPage() {
         ]}
         menuActions={[
           ...baseDetailMenuActions(),
+          { label: 'Save as PDF', icon: <FileDown className="h-4 w-4" />, onSelect: savePdf },
           ...(canVoid ? [{ label: 'Void invoice', icon: <Trash2 className="h-4 w-4" />, onSelect: voidIt, destructive: true, disabled: busy }] : []),
         ]}
       />
