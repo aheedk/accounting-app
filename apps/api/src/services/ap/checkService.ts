@@ -122,11 +122,25 @@ async function isReconciled(db: Kysely<DB>, journal_entry_id: string | null): Pr
 export async function nextCheckNumber(
   db: Kysely<DB>, business_id: string, bank_account_id: string,
 ): Promise<string> {
+  // Also considers checks written the old way, as an Expense with payment
+  // method Check (expense_transactions.reference) against this same bank
+  // account's cash account -- otherwise a new check would restart at 1 and
+  // collide with a business's real check-number history pre-dating this
+  // feature.
   const row = await sql<{ next: string }>`
-    SELECT COALESCE(MAX(CAST(check_number AS INTEGER)), 0) + 1 AS next
-    FROM checks
-    WHERE business_id = ${business_id} AND bank_account_id = ${bank_account_id}
-    AND check_number ~ '^[0-9]+$'
+    SELECT COALESCE(MAX(num), 0) + 1 AS next
+    FROM (
+      SELECT CAST(check_number AS INTEGER) AS num
+      FROM checks
+      WHERE business_id = ${business_id} AND bank_account_id = ${bank_account_id}
+      AND check_number ~ '^[0-9]+$'
+      UNION ALL
+      SELECT CAST(e.reference AS INTEGER) AS num
+      FROM expense_transactions e
+      JOIN bank_accounts ba ON ba.cash_account_id = e.payment_account_id
+      WHERE e.business_id = ${business_id} AND ba.id = ${bank_account_id}
+      AND e.payment_method = 'check' AND e.reference ~ '^[0-9]+$'
+    ) sub
   `.execute(db);
   return String(row.rows[0]?.next ?? 1);
 }
@@ -431,17 +445,42 @@ export async function getCheck(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
 }
 
 export async function listChecks(db: Kysely<DB>, ctx: ServiceCtx) {
-  const rows = await db.selectFrom('checks as c')
-    .leftJoin('vendors as v', 'v.id', 'c.payee_id')
-    .leftJoin('customers as cu', 'cu.id', 'c.payee_id')
-    .innerJoin('bank_accounts as ba', 'ba.id', 'c.bank_account_id')
-    .select([
-      'c.id', 'c.check_number', 'c.payment_date', 'c.payee_text', 'c.memo',
-      'c.total_amount', 'c.bank_account_id', 'c.status', 'c.journal_entry_id', 'c.updated_at',
-      'v.name as vendor_name', 'cu.name as customer_name', 'ba.name as bank_account_name',
-    ])
-    .where('c.business_id', '=', ctx.business_id!)
-    .orderBy('c.payment_date', 'desc')
-    .execute();
-  return rows.map(row => ({ ...row, payee_name: payeeName(row) }));
+  const bizId = ctx.business_id!;
+  const [checks, legacyChecks] = await Promise.all([
+    db.selectFrom('checks as c')
+      .leftJoin('vendors as v', 'v.id', 'c.payee_id')
+      .leftJoin('customers as cu', 'cu.id', 'c.payee_id')
+      .innerJoin('bank_accounts as ba', 'ba.id', 'c.bank_account_id')
+      .select([
+        'c.id', 'c.check_number', 'c.payment_date', 'c.payee_text', 'c.memo',
+        'c.total_amount', 'c.status', 'c.journal_entry_id', 'c.updated_at',
+        'c.bank_account_id', 'v.name as vendor_name', 'cu.name as customer_name', 'ba.name as bank_account_name',
+      ])
+      .where('c.business_id', '=', bizId)
+      .execute(),
+    // Checks written the old way, as an Expense with payment method Check —
+    // this feature's own `checks` table has no record of them, so without
+    // this they're invisible here even though the General Ledger (which
+    // reads every source_type) already shows them.
+    db.selectFrom('expense_transactions as e')
+      .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
+      .leftJoin('customers as cu', 'cu.id', 'e.customer_id')
+      .innerJoin('chart_of_accounts as coa', 'coa.id', 'e.payment_account_id')
+      .leftJoin('bank_accounts as ba', 'ba.cash_account_id', 'e.payment_account_id')
+      .select([
+        'e.id', 'e.reference as check_number', 'e.transaction_date as payment_date', 'e.payee_text', 'e.memo',
+        'e.total_amount', 'e.status', 'e.journal_entry_id', 'e.updated_at', 'ba.id as bank_account_id',
+        'v.name as vendor_name', 'cu.name as customer_name',
+        sql<string>`coalesce(ba.name, coa.name)`.as('bank_account_name'),
+      ])
+      .where('e.business_id', '=', bizId)
+      .where('e.payment_method', '=', 'check')
+      .execute(),
+  ]);
+
+  const merged = [
+    ...checks.map(row => ({ ...row, payee_name: payeeName(row), legacy: false, path: `/accounting/checks/${row.id}` })),
+    ...legacyChecks.map(row => ({ ...row, check_number: row.check_number ?? '', payee_name: payeeName(row), legacy: true, path: `/accounting/expenses/${row.id}` })),
+  ];
+  return merged.sort((a, b) => (a.payment_date < b.payment_date ? 1 : a.payment_date > b.payment_date ? -1 : 0));
 }

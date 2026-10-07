@@ -91,6 +91,30 @@ describe('checkService', () => {
     expect(await checkSvc.nextCheckNumber(t.db, biz.id, otherBankAccount.id)).toBe('1');
   });
 
+  it('nextCheckNumber also counts checks written the old way, as an Expense with payment method Check', async () => {
+    const { biz, ctx, cash, bankAccount } = await bootstrap();
+    const misc = await makeAccount(t.db, biz.id, { code: '6500', name: 'Misc', account_type: 'expense' });
+    await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+      transaction_date: '2026-03-01', payee_text: 'Old Vendor', reference: '2399',
+      payment_account_id: cash.id, payment_method: 'check',
+      lines: [{ category_account_id: misc.id, amount: '50.00' }],
+    }));
+
+    // cash is this bank account's own cash account, so the legacy expense counts.
+    expect(await checkSvc.nextCheckNumber(t.db, biz.id, bankAccount.id)).toBe('2400');
+
+    // A legacy expense on an unrelated account (no matching bank_accounts row)
+    // never joins to this bank account, so it can't skew its sequence.
+    const otherCash = await makeAccount(t.db, biz.id, { code: '1170', name: 'Unlinked Cash', account_type: 'asset' });
+    const misc2 = await makeAccount(t.db, biz.id, { code: '6510', name: 'Misc 2', account_type: 'expense' });
+    await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+      transaction_date: '2026-03-02', payee_text: 'Unrelated', reference: '999999',
+      payment_account_id: otherCash.id, payment_method: 'check',
+      lines: [{ category_account_id: misc2.id, amount: '20.00' }],
+    }));
+    expect(await checkSvc.nextCheckNumber(t.db, biz.id, bankAccount.id)).toBe('2400');
+  });
+
   it('vendorDefaultCategory learns from the vendor\'s most recent check or expense', async () => {
     const { biz, ctx, repairs, supplies, cash, bankAccount } = await bootstrap();
     const vendor = await makeVendor(t.db, biz.id, { name: 'Action Lawn Maintenance' });
@@ -194,5 +218,31 @@ describe('checkService', () => {
     expect(list).toHaveLength(1);
     expect(list[0]?.payee_name).toBe('Action Lawn Maintenance');
     expect(list[0]?.bank_account_name).toBe('Operating Checking');
+    expect(list[0]?.legacy).toBe(false);
+    expect(list[0]?.path).toBe(`/accounting/checks/${check.id}`);
+  });
+
+  it('listChecks also surfaces checks written the old way, as an Expense with payment method Check', async () => {
+    const { ctx, repairs, cash, bankAccount } = await bootstrap();
+    const legacy = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+      transaction_date: '2026-03-01', payee_text: 'Old Vendor', reference: '2399',
+      payment_account_id: cash.id, payment_method: 'check',
+      lines: [{ category_account_id: repairs.id, amount: '50.00' }],
+    }));
+    const real = await t.db.transaction().execute(trx => checkSvc.createCheck(trx, ctx, {
+      payment_date: '2026-04-15', payee_text: 'New Vendor', bank_account_id: bankAccount.id,
+      lines: [{ account_id: repairs.id, amount: '150.00' }],
+    }));
+
+    const list = await checkSvc.listChecks(t.db, ctx);
+    expect(list).toHaveLength(2);
+    // Most recent first.
+    expect(list[0]?.id).toBe(real.id);
+    expect(list[0]?.legacy).toBe(false);
+    expect(list[1]?.id).toBe(legacy.id);
+    expect(list[1]?.legacy).toBe(true);
+    expect(list[1]?.check_number).toBe('2399');
+    expect(list[1]?.path).toBe(`/accounting/expenses/${legacy.id}`);
+    expect(list[1]?.bank_account_name).toBe('Operating Checking');
   });
 });

@@ -20,12 +20,16 @@ type Check = {
   payment_date: string;
   memo: string | null;
   total_amount: string;
-  bank_account_id: string;
+  bank_account_id: string | null;
   bank_account_name: string;
   payee_name: string | null;
   status: 'draft' | 'posted' | 'void';
   journal_entry_id: string | null;
   updated_at: string;
+  /** Written the old way, as an Expense with payment method Check — opens on
+   * the Expense page (its own record), not this feature's Check page. */
+  legacy: boolean;
+  path: string;
 };
 
 const DATE_RANGES = [
@@ -75,7 +79,7 @@ export default function CheckListPage() {
 
   const bankAccounts = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const c of items) seen.set(c.bank_account_id, c.bank_account_name);
+    for (const c of items) if (c.bank_account_id) seen.set(c.bank_account_id, c.bank_account_name);
     return [...seen.entries()];
   }, [items]);
 
@@ -93,7 +97,14 @@ export default function CheckListPage() {
 
   const columns: Column<Check>[] = [
     { key: 'payment_date', header: 'Date', sortable: true, sortValue: r => r.payment_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.payment_date)}</span> },
-    { key: 'type', header: 'Type', sortable: false, render: () => 'Check' },
+    {
+      key: 'type',
+      header: 'Type',
+      sortable: false,
+      render: r => r.legacy
+        ? <span title="Written as an Expense with payment method Check, before this page existed">Check <span className="text-muted-foreground">(Expense)</span></span>
+        : 'Check',
+    },
     { key: 'check_number', header: 'Check No.', sortable: true, sortValue: r => r.check_number, render: r => <span className="font-mono">{r.check_number}</span> },
     { key: 'payee_name', header: 'Payee', sortable: true, sortValue: r => r.payee_name ?? '', render: r => r.payee_name ?? DASH },
     { key: 'bank_account_name', header: 'Bank Account', sortable: true, sortValue: r => r.bank_account_name, render: r => r.bank_account_name },
@@ -194,7 +205,7 @@ export default function CheckListPage() {
           defaultSortDir="desc"
           pagination={{ pageSize: 25 }}
           selectable={false}
-          onRowClick={r => nav(`/accounting/checks/${r.id}`)}
+          onRowClick={r => nav(r.path)}
           emptyMessage={<EmptyState title="No checks found" hint="Adjust the filters above, or write a check." actionLabel="Write check" actionTo="/accounting/checks/new" />}
         />
       </CardContent></Card>
