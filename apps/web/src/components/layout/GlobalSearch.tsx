@@ -59,6 +59,8 @@ const ALL_PAGES: Page[] = [
   { label: 'Trial Balance', group: 'Reports', to: '/reports/trial-balance' },
   // Payroll
   { label: 'Payroll Overview', group: 'Payroll', to: '/payroll/overview' },
+  { label: 'Pay Runs', group: 'Payroll', to: '/payroll/pay-runs' },
+  { label: 'Run Payroll', group: 'Payroll', to: '/payroll/pay-runs/new' },
   { label: 'Employees', group: 'Payroll', to: '/payroll/employees' },
   { label: 'Payroll Contractors', group: 'Payroll', to: '/payroll/contractors' },
   { label: 'Payroll Taxes', group: 'Payroll', to: '/payroll/taxes' },

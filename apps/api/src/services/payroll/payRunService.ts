@@ -263,9 +263,19 @@ export async function listPayRuns(
   business_id: string,
   opts: { status?: PayRunStatus } = {},
 ) {
-  let q = db.selectFrom('pay_runs').selectAll().where('business_id', '=', business_id);
+  // With what each run paid, so a list can show it without loading every line.
+  const lineTotal = (column: 'gross' | 'net') => sql<string>`(
+    SELECT COALESCE(SUM(prl.${sql.ref(column)}), 0)::text FROM pay_run_lines prl WHERE prl.pay_run_id = pay_runs.id
+  )`;
+  let q = db.selectFrom('pay_runs').selectAll()
+    .select([
+      lineTotal('gross').as('gross_total'),
+      lineTotal('net').as('net_total'),
+      sql<number>`(SELECT COUNT(*)::int FROM pay_run_lines prl WHERE prl.pay_run_id = pay_runs.id)`.as('employee_count'),
+    ])
+    .where('business_id', '=', business_id);
   if (opts.status) q = q.where('status', '=', opts.status);
-  return q.orderBy('pay_date', 'desc').execute();
+  return q.orderBy('pay_date', 'desc').orderBy('created_at', 'desc').execute();
 }
 
 export async function getPayRunWithLines(db: Kysely<DB>, business_id: string, id: string) {

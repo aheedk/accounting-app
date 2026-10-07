@@ -128,6 +128,7 @@ const groups: NavGroup[] = [
     icon: Briefcase,
     children: [
       { to: '/payroll/overview', label: 'Overview' },
+      { to: '/payroll/pay-runs', label: 'Pay Runs' },
       { to: '/payroll/employees', label: 'Employees' },
       { to: '/payroll/contractors', label: 'Contractors' },
       { to: '/payroll/taxes', label: 'Payroll Taxes' },

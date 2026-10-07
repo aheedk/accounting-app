@@ -31,6 +31,7 @@ const CATEGORIES: CreateCategory[] = [
   {
     heading: 'Team',
     items: [
+      { label: 'Run payroll', to: '/payroll/pay-runs/new' },
       { label: 'Add employee', to: '/payroll/employees/new' },
       { label: 'Add contractor', to: '/ap/contractors' },
     ],

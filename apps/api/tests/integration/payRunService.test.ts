@@ -56,6 +56,13 @@ describe('payRunService', () => {
     expect(lines).toHaveLength(1);
     // 1000 - 100 - 60 - 15 = 825
     expect(lines[0]?.net).toBe('825.0000');
+
+    // The list carries what each run paid, for the Pay Runs page.
+    const listed = await pr.listPayRuns(t.db, run.business_id);
+    expect(listed).toHaveLength(1);
+    expect(Number(listed[0]!.gross_total)).toBe(1000);
+    expect(Number(listed[0]!.net_total)).toBe(825);
+    expect(listed[0]!.employee_count).toBe(1);
   });
 
   it('finalize posts a balanced JE and links it', async () => {

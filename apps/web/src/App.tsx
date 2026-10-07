@@ -97,6 +97,8 @@ import RecurringTransactionsPage from '@/pages/accounting/RecurringTransactionsP
 import ReceiptsPage from '@/pages/accounting/ReceiptsPage';
 import IntegrationInboxPage from '@/pages/accounting/IntegrationInboxPage';
 import PayrollOverviewPage from '@/pages/payroll/PayrollOverviewPage';
+import PayRunListPage from '@/pages/payroll/PayRunListPage';
+import PayRunNewPage from '@/pages/payroll/PayRunNewPage';
 import EmployeeListPage from '@/pages/payroll/EmployeeListPage';
 import EmployeeNewPage from '@/pages/payroll/EmployeeNewPage';
 import EmployeeDetailPage from '@/pages/payroll/EmployeeDetailPage';
@@ -218,6 +220,8 @@ export default function App() {
 
             {/* Payroll (placeholders) */}
             <Route path="/payroll/overview" element={<PayrollOverviewPage />} />
+            <Route path="/payroll/pay-runs" element={<PayRunListPage />} />
+            <Route path="/payroll/pay-runs/new" element={<PayRunNewPage />} />
             <Route path="/payroll/employees" element={<EmployeeListPage />} />
             <Route path="/payroll/employees/new" element={<EmployeeNewPage />} />
             <Route path="/payroll/employees/:id" element={<EmployeeDetailPage />} />
