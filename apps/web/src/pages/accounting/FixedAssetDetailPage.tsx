@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { fmtMoney } from '@/lib/money';
+import { fmtLongDate } from '@/lib/dates';
 import { humanizeCode } from '@/lib/labels';
 
 type FixedAssetStatus = 'active' | 'disposed';
@@ -56,6 +58,15 @@ export default function FixedAssetDetailPage() {
   const [runErr, setRunErr] = useState<string | null>(null);
   const [runMsg, setRunMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Account names, so the page never shows an account's id.
+  const [accountNames, setAccountNames] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!bizId) return;
+    api.get<{ accounts: { id: string; code: string; name: string }[] }>(`/businesses/${bizId}/coa`)
+      .then(r => setAccountNames(new Map(r.data.accounts.map(a => [a.id, `${a.code} ${a.name}`]))))
+      .catch(() => undefined);
+  }, [bizId]);
 
   const reload = useCallback(async () => {
     if (!bizId || !id) return;
@@ -98,43 +109,39 @@ export default function FixedAssetDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{data.name}</h1>
-        <span
-          className={
-            data.status === 'active'
-              ? 'inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800'
-              : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
-          }
-        >
-          {data.status}
-        </span>
+      <DetailPageHeader
+        eyebrow="Fixed asset"
+        title={data.name}
+        subtitle={`Purchased ${fmtLongDate(data.purchase_date)}`}
+        status={data.status}
+        totalLabel="Book value"
+        total={fmtMoney(data.book_value)}
+        menuActions={baseDetailMenuActions()}
+      />
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailMetric label="Cost" value={fmtMoney(data.cost)} hint={`Salvage value ${fmtMoney(data.salvage_value)}`} />
+        <DetailMetric
+          label="Accumulated depreciation"
+          value={fmtMoney(data.accumulated_depreciation)}
+          hint={`${history.length} period${history.length === 1 ? '' : 's'} posted`}
+        />
+        <DetailMetric
+          label="Useful life"
+          value={<span className="font-sans">{data.useful_life_years} year{data.useful_life_years === 1 ? '' : 's'}</span>}
+          hint={humanizeCode(data.depreciation_method)}
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>Name: {data.name}</div>
-          <div>Status: {data.status}</div>
-          <div>Purchase date: {data.purchase_date}</div>
-          <div>Useful life: {data.useful_life_years} yr(s)</div>
-          <div>Method: {humanizeCode(data.depreciation_method)}</div>
-          <div>Memo: {data.memo ?? '—'}</div>
-          <div>Cost: {fmtMoney(data.cost)}</div>
-          <div>Salvage value: {fmtMoney(data.salvage_value)}</div>
-          <div>Accumulated depreciation: {fmtMoney(data.accumulated_depreciation)}</div>
-          <div className="font-semibold">Book value: {fmtMoney(data.book_value)}</div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Asset acct: {data.asset_account_id}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Depreciation expense acct: {data.depreciation_expense_account_id}
-          </div>
-          <div className="col-span-2 font-mono text-xs text-muted-foreground">
-            Accumulated depreciation acct: {data.accumulated_depreciation_account_id}
-          </div>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <DetailField label="Asset account" value={accountNames.get(data.asset_account_id)} />
+          <DetailField label="Depreciation expense account" value={accountNames.get(data.depreciation_expense_account_id)} />
+          <DetailField label="Accumulated depreciation account" value={accountNames.get(data.accumulated_depreciation_account_id)} />
+          <DetailField label="Memo" value={data.memo} />
         </CardContent>
       </Card>
 
@@ -146,7 +153,7 @@ export default function FixedAssetDetailPage() {
           <CardContent className="p-0">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
-                <tr>
+                <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <th className="text-left p-3">Period end</th>
                   <th className="text-right p-3">Amount</th>
                   <th className="text-left p-3">Journal entry</th>
@@ -155,9 +162,9 @@ export default function FixedAssetDetailPage() {
               <tbody>
                 {history.map((h) => (
                   <tr key={h.id} className="border-b last:border-b-0">
-                    <td className="p-3">{h.period_end}</td>
-                    <td className="p-3 text-right">{fmtMoney(h.amount)}</td>
-                    <td className="p-3 font-mono text-xs">{h.journal_entry_id}</td>
+                    <td className="p-3">{fmtLongDate(h.period_end)}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(h.amount)}</td>
+                    <td className="p-3"><Link className="text-primary hover:underline" to={`/journal/${h.journal_entry_id}`}>Open entry</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -190,7 +197,7 @@ export default function FixedAssetDetailPage() {
       </Card>
 
       <Button variant="outline" onClick={() => nav('/accounting/fixed-assets')}>
-        Back to list
+        Back to fixed assets
       </Button>
     </div>
   );

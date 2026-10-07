@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { PackageCheck, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { fmtMoney } from '@/lib/money';
+import { fmtLongDate } from '@/lib/dates';
 import { fmtQty } from '@/lib/labels';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
@@ -32,21 +35,6 @@ type PurchaseOrderDetail = {
 type Vendor = { id: string; name: string };
 type InventoryItem = { id: string; sku: string; name: string };
 type ItemsResponse = { items: InventoryItem[] };
-
-function statusBadgeClass(status: POStatus): string {
-  switch (status) {
-    case 'draft':
-      return 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground';
-    case 'sent':
-      return 'inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800';
-    case 'received':
-      return 'inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800';
-    case 'closed':
-      return 'inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800';
-    case 'void':
-      return 'inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800';
-  }
-}
 
 function lineTotal(qty: string, unit: string): number {
   const q = Number(qty);
@@ -124,41 +112,44 @@ export default function PurchaseOrderDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Purchase Order {data.po_number}</h1>
-        <div className="flex gap-2">
-          {canReceive && (
-            <Button asChild>
-              <Link to={`/inventory/item-receipts/new?po=${data.id}`}>Receive</Link>
-            </Button>
-          )}
-          {canVoid && (
-            <Button variant="destructive" disabled={busy} onClick={voidIt}>
-              {busy ? 'Voiding…' : 'Void'}
-            </Button>
-          )}
-        </div>
+      <DetailPageHeader
+        eyebrow="Purchase order"
+        title={data.po_number}
+        subtitle={vendor ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : 'Vendor'}
+        status={data.status}
+        totalLabel="Order total"
+        total={fmtMoney(total)}
+        actions={canReceive ? [{ label: 'Receive', icon: <PackageCheck className="h-4 w-4" />, to: `/inventory/item-receipts/new?po=${data.id}` }] : []}
+        menuActions={[
+          ...baseDetailMenuActions(),
+          ...(canVoid ? [{ label: busy ? 'Voiding…' : 'Void purchase order', icon: <Trash2 className="h-4 w-4" />, onSelect: voidIt, destructive: true, disabled: busy }] : []),
+        ]}
+      />
+
+      {err && <p className="text-sm text-destructive">{err}</p>}
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailMetric label="Order date" value={<span className="font-sans">{fmtLongDate(data.order_date)}</span>} />
+        <DetailMetric
+          label="Expected delivery"
+          value={<span className="font-sans">{data.expected_delivery_date ? fmtLongDate(data.expected_delivery_date) : 'Not set'}</span>}
+        />
+        <DetailMetric label="Lines" value={data.lines.length} hint="Received through an item receipt, which raises the bill" />
       </div>
+
+      {data.memo && (
+        <Card>
+          <CardHeader><CardTitle>Memo</CardTitle></CardHeader>
+          <CardContent><DetailField label="Note on this order" value={data.memo} /></CardContent>
+        </Card>
+      )}
+
       <Card>
-        <CardHeader>
-          <CardTitle>Header</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            Status: <span className={`${statusBadgeClass(data.status)} capitalize`}>{data.status}</span>
-          </div>
-          <div>Vendor: {vendor?.name ?? '—'}</div>
-          <div>Order date: {data.order_date}</div>
-          <div>Expected: {data.expected_delivery_date ?? '—'}</div>
-          <div className="col-span-2">Memo: {data.memo ?? '—'}</div>
-          <div className="font-semibold">Total: {fmtMoney(total)}</div>
-        </CardContent>
-      </Card>
-      <Card>
+        <CardHeader><CardTitle>Items ordered</CardTitle></CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
-              <tr>
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="text-left p-3">#</th>
                 <th className="text-left p-3">Item</th>
                 <th className="text-left p-3">Description</th>
@@ -175,9 +166,9 @@ export default function PurchaseOrderDetailPage() {
                     <td className="p-3">{l.line_number}</td>
                     <td className="p-3">{it ? `${it.sku} — ${it.name}` : '—'}</td>
                     <td className="p-3">{l.description ?? '—'}</td>
-                    <td className="p-3 text-right">{fmtQty(l.quantity)}</td>
-                    <td className="p-3 text-right">{fmtMoney(l.unit_cost)}</td>
-                    <td className="p-3 text-right">{fmtMoney(lineTotal(l.quantity, l.unit_cost))}</td>
+                    <td className="p-3 text-right font-mono">{fmtQty(l.quantity)}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(l.unit_cost)}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(lineTotal(l.quantity, l.unit_cost))}</td>
                   </tr>
                 );
               })}
@@ -185,9 +176,8 @@ export default function PurchaseOrderDetailPage() {
           </table>
         </CardContent>
       </Card>
-      {err && <p className="text-sm text-destructive">{err}</p>}
       <Button variant="outline" onClick={() => nav('/inventory/purchase-orders')}>
-        Back to list
+        Back to purchase orders
       </Button>
     </div>
   );

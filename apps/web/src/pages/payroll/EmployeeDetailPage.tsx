@@ -3,7 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
+import { Pencil, Trash2 } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
+import { DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -157,28 +159,29 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{data.full_name}</h1>
-          <p className="text-sm text-muted-foreground">Hired {fmtLongDate(data.hire_date)}</p>
-        </div>
-        <span
-          className={
-            data.is_active
-              ? 'inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800'
-              : 'inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
-          }
-        >
-          {data.is_active ? 'Active' : 'Inactive'}
-        </span>
+      <DetailPageHeader
+        eyebrow="Employee"
+        title={data.full_name}
+        subtitle={`Hired ${fmtLongDate(data.hire_date)}`}
+        status={data.is_active ? 'active' : 'inactive'}
+        actions={canEdit && !editing ? [{ label: 'Edit', icon: <Pencil className="h-4 w-4" />, onClick: () => startEdit(data), variant: 'outline' }] : []}
+        menuActions={[
+          ...baseDetailMenuActions(),
+          ...(isFirmAdmin ? [{ label: deleting ? 'Deleting…' : 'Delete employee', icon: <Trash2 className="h-4 w-4" />, onSelect: handleDelete, destructive: true, disabled: deleting }] : []),
+        ]}
+      />
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailMetric label="Pay rate" value={fmtRate(data.default_pay_rate_cents)} hint="An hour" />
+        <DetailMetric label="Pay frequency" value={<span className="font-sans">{humanizeCode(data.default_pay_frequency)}</span>} />
+        <DetailMetric label="W-4 filing status" value={<span className="font-sans">{data.w4_filing_status ? humanizeCode(data.w4_filing_status) : 'Not set'}</span>} />
       </div>
 
       {actionErr && <p className="text-sm text-destructive">{actionErr}</p>}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Details</CardTitle>
-          {canEdit && !editing && <Button size="sm" variant="outline" onClick={() => startEdit(data)}>Edit</Button>}
+        <CardHeader>
+          <CardTitle>{editing ? 'Edit details' : 'Details'}</CardTitle>
         </CardHeader>
         {editing ? (
           <CardContent>
@@ -235,14 +238,11 @@ export default function EmployeeDetailPage() {
             </form>
           </CardContent>
         ) : (
-          <CardContent className="grid grid-cols-2 gap-2 text-sm">
-            <div>Email: {data.email ?? '—'}</div>
-            <div>Phone: {data.phone ?? '—'}</div>
-            <div>Hire date: {fmtLongDate(data.hire_date)}</div>
-            <div>Termination date: {data.termination_date ? fmtLongDate(data.termination_date) : '—'}</div>
-            <div>Pay rate: <span className="font-mono">{fmtRate(data.default_pay_rate_cents)}</span> an hour</div>
-            <div>Pay frequency: {humanizeCode(data.default_pay_frequency)}</div>
-            <div className="col-span-2">W-4 filing status: {data.w4_filing_status ? humanizeCode(data.w4_filing_status) : '—'}</div>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <DetailField label="Email" value={data.email} />
+            <DetailField label="Phone" value={data.phone} />
+            <DetailField label="Hire date" value={fmtLongDate(data.hire_date)} />
+            <DetailField label="Termination date" value={data.termination_date ? fmtLongDate(data.termination_date) : null} />
           </CardContent>
         )}
       </Card>
@@ -279,13 +279,8 @@ export default function EmployeeDetailPage() {
 
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => nav('/payroll/employees')}>
-          Back to list
+          Back to employees
         </Button>
-        {isFirmAdmin && (
-          <Button variant="ghost" onClick={handleDelete} disabled={deleting}>
-            {deleting ? 'Deleting…' : 'Delete employee'}
-          </Button>
-        )}
       </div>
     </div>
   );
