@@ -112,36 +112,49 @@ describe('VendorListPage', () => {
     return click(trigger);
   }
 
-  it('grays out Delete with an explanatory title when the vendor has transactions', async () => {
-    await render();
-    await openRowMenu('Has Transactions Co');
-
-    const deleteButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Delete')!;
-    expect(deleteButton.disabled).toBe(true);
-    expect(deleteButton.title).toMatch(/existing transactions/i);
-  });
-
-  it('deletes a vendor with no transactions after confirming', async () => {
+  it('matches the QuickBooks row menu: no Edit or Delete, just the four secondary actions', async () => {
     await render();
     await openRowMenu('Clean Vendor');
 
-    const deleteButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Delete')!;
-    expect(deleteButton.disabled).toBe(false);
-    await click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('Permanently delete Clean Vendor? This cannot be undone.');
-    expect(apiDelete).toHaveBeenCalledWith('/businesses/44444444-4444-4444-8444-444444444444/vendors/v2');
+    const labels = Array.from(container.querySelectorAll('a, button'))
+      .map(el => el.textContent?.trim())
+      .filter((text): text is string => !!text);
+    expect(labels).toContain('Create Expense');
+    expect(labels).toContain('Write check');
+    expect(labels).toContain('Make inactive');
+    expect(labels).toContain('Ask vendor for info');
+    expect(labels).not.toContain('Edit');
+    expect(labels).not.toContain('Delete');
   });
 
-  it('disables Make inactive and Delete for a role below the required minimum', async () => {
+  it('stubs Write check and Ask vendor for info with a coming-soon alert', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    await render();
+
+    await openRowMenu('Clean Vendor');
+    await click(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Write check')!);
+    expect(alertSpy).toHaveBeenCalledWith('Check writing coming soon.');
+
+    await openRowMenu('Clean Vendor');
+    await click(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Ask vendor for info')!);
+    expect(alertSpy).toHaveBeenCalledWith('Vendor info request coming soon.');
+  });
+
+  it('"Create Expense" links to the expense form with this vendor pre-selected', async () => {
+    await render();
+    await openRowMenu('Clean Vendor');
+
+    const link = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'Create Expense')!;
+    expect(link.getAttribute('href')).toBe('/accounting/expenses/new?vendor_id=v2');
+  });
+
+  it('disables Make inactive for a role below the required minimum', async () => {
     authRole = 'staff';
     await render();
     await openRowMenu('Clean Vendor');
 
     const makeInactive = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Make inactive')!;
-    const deleteButton = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Delete')!;
     expect(makeInactive.disabled).toBe(true);
-    expect(deleteButton.disabled).toBe(true);
   });
 
   it('requests inactive vendors only when "Show inactive vendors" is checked', async () => {

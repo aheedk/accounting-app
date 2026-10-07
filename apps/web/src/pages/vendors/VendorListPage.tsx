@@ -35,7 +35,6 @@ export default function VendorListPage() {
   const { user, businesses } = useAuth();
   const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
   const canMakeInactive = role !== undefined && hasMinRole(role, 'accountant');
-  const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
 
   const [items, setItems] = useState<Vendor[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
@@ -45,7 +44,6 @@ export default function VendorListPage() {
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
   const [openActionRow, setOpenActionRow] = useState<string | null>(null);
-  const [rowBusyId, setRowBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function reload() {
@@ -138,18 +136,6 @@ export default function VendorListPage() {
       await reload();
     } catch (e: unknown) { setErr(pickErr(e)); }
     finally { setBatchBusy(false); }
-  }
-
-  async function deleteVendor(v: Vendor) {
-    if (!bizId) return;
-    if (!window.confirm(`Permanently delete ${v.name}? This cannot be undone.`)) return;
-    setRowBusyId(v.id);
-    setErr(null);
-    try {
-      await api.delete(`/businesses/${bizId}/vendors/${v.id}`);
-      await reload();
-    } catch (e: unknown) { setErr(pickErr(e)); }
-    finally { setRowBusyId(null); }
   }
 
   if (!bizId) return <div>Pick a business.</div>;
@@ -265,7 +251,6 @@ export default function VendorListPage() {
               <button
                 type="button"
                 onClick={() => setOpenActionRow(current => (current === r.id ? null : r.id))}
-                disabled={rowBusyId === r.id}
                 aria-label={`More actions for ${r.name}`}
               >
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -275,26 +260,19 @@ export default function VendorListPage() {
                   <div className="fixed inset-0 z-40" onClick={() => setOpenActionRow(null)} />
                   <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border bg-white text-left shadow-lg dark:bg-zinc-900">
                     <Link
-                      to={`/ap/bills/new?vendor_id=${r.id}`}
-                      onClick={() => setOpenActionRow(null)}
-                      className="block w-full px-3 py-2 text-sm hover:bg-accent"
-                    >
-                      Create bill
-                    </Link>
-                    <Link
                       to={`/accounting/expenses/new?vendor_id=${r.id}`}
                       onClick={() => setOpenActionRow(null)}
                       className="block w-full px-3 py-2 text-sm hover:bg-accent"
                     >
-                      Create expense
+                      Create Expense
                     </Link>
-                    <Link
-                      to={`/ap/vendors/${r.id}`}
-                      onClick={() => setOpenActionRow(null)}
-                      className="block w-full px-3 py-2 text-sm hover:bg-accent"
+                    <button
+                      type="button"
+                      onClick={() => { setOpenActionRow(null); alert('Check writing coming soon.'); }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
                     >
-                      Edit
-                    </Link>
+                      Write check
+                    </button>
                     <button
                       type="button"
                       disabled={!canMakeInactive || !r.is_active}
@@ -306,16 +284,10 @@ export default function VendorListPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={!canDelete || r.has_transactions}
-                      onClick={() => { setOpenActionRow(null); void deleteVendor(r); }}
-                      className="block w-full border-t px-3 py-2 text-left text-sm text-destructive hover:bg-accent disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-60"
-                      title={
-                        r.has_transactions
-                          ? 'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.'
-                          : !canDelete ? 'Firm admin access is required' : undefined
-                      }
+                      onClick={() => { setOpenActionRow(null); alert('Vendor info request coming soon.'); }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
                     >
-                      Delete
+                      Ask vendor for info
                     </button>
                   </div>
                 </>

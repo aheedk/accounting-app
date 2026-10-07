@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
+import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MoneyBar } from '@/components/ui/MoneyBar';
@@ -31,7 +34,9 @@ type Vendor = {
   tax_id_last_four: string | null;
   tax_id_type: 'SSN' | 'EIN' | null;
   is_1099: boolean;
+  is_active: boolean;
   default_terms_days: number;
+  has_transactions: boolean;
 };
 type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string };
 type Account = { id: string; name: string };
@@ -58,11 +63,17 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function VendorDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const nav = useNavigate();
   const [bizId] = useActiveBusinessId();
+  const { user, businesses } = useAuth();
+  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [bills, setBills] = useState<BillSummary[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<string>('transactions');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bizId || !id) return;
@@ -70,6 +81,18 @@ export default function VendorDetailPage() {
     api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: id, limit: 1000 } }).then(r => setBills(r.data.bills));
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts));
   }, [bizId, id]);
+
+  async function deleteVendor() {
+    if (!bizId || !vendor) return;
+    if (!window.confirm(`Permanently delete ${vendor.name}? This cannot be undone.`)) return;
+    setDeleteBusy(true);
+    setDeleteErr(null);
+    try {
+      await api.delete(`/businesses/${bizId}/vendors/${vendor.id}`);
+      nav('/ap/vendors');
+    } catch (e: unknown) { setDeleteErr(pickErr(e)); }
+    finally { setDeleteBusy(false); }
+  }
 
   const today = todayLocal();
   const stats = useMemo(() => {
@@ -94,7 +117,10 @@ export default function VendorDetailPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</div>
-          <h1 className="text-2xl font-semibold">{vendor.name}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            {vendor.name}
+            {!vendor.is_active && <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Inactive</span>}
+          </h1>
           {vendor.company_name && <div className="text-sm text-muted-foreground">{vendor.company_name}</div>}
         </div>
         <div className="flex items-start gap-2">
@@ -104,8 +130,23 @@ export default function VendorDetailPage() {
           </div>
           <Button asChild variant="outline"><Link to={`/ap/bill-payments/new?vendor_id=${vendor.id}`}>Pay bills</Link></Button>
           <Button asChild><Link to={`/ap/bills/new?vendor_id=${vendor.id}`}>Create bill</Link></Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            disabled={!canDelete || vendor.has_transactions || deleteBusy}
+            onClick={() => { void deleteVendor(); }}
+            title={
+              vendor.has_transactions
+                ? 'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.'
+                : !canDelete ? 'Firm admin access is required' : undefined
+            }
+          >
+            {deleteBusy ? 'Deleting…' : 'Delete'}
+          </Button>
         </div>
       </div>
+      {deleteErr && <p className="text-sm text-destructive">{deleteErr}</p>}
 
       <MoneyBar segments={[
         { amount: stats.overdue, caption: `${stats.overdueCount} overdue`, colorClass: 'bg-orange-400' },

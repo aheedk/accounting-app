@@ -44,8 +44,11 @@ router.get('/businesses/:businessId/vendors', async (req, res, next) => {
 });
 
 router.get('/businesses/:businessId/vendors/:id', async (req, res, next) => {
-  try { res.json(await vend.getVendor(db, req.tenancy!.business_id, req.params['id']!)); }
-  catch (e) { next(e); }
+  try {
+    const vendor = await vend.getVendor(db, req.tenancy!.business_id, req.params['id']!);
+    const has_transactions = await vend.vendorHasAnyTransaction(db, vendor.id);
+    res.json({ ...vendor, has_transactions });
+  } catch (e) { next(e); }
 });
 
 router.post('/businesses/:businessId/vendors', requireMinRole('staff'), async (req, res, next) => {

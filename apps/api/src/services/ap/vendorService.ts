@@ -188,7 +188,7 @@ export async function updateVendor(
 // Every table that can point at a vendor. A vendor with any row in any of
 // these is history that must be kept readable, so Delete refuses it outright
 // — Make inactive (is_active) is the reversible option for that vendor.
-async function vendorHasAnyTransaction(db: Kysely<DB> | Transaction<DB>, vendor_id: string): Promise<boolean> {
+export async function vendorHasAnyTransaction(db: Kysely<DB> | Transaction<DB>, vendor_id: string): Promise<boolean> {
   const [expense, po, bill, billPayment, vendorCredit] = await Promise.all([
     db.selectFrom('expense_transactions').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
     db.selectFrom('purchase_orders').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
