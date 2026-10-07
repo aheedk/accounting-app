@@ -18,7 +18,7 @@ import { printReport } from '@/lib/reportExport';
 type Account = { id: string; code: string; name: string; account_type: string };
 
 type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-type TemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense';
+type TemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense' | 'check';
 
 type Template = {
   id: string;
@@ -39,7 +39,8 @@ type RunDueResult = {
   results: Array<{ template_id: string; runs_created: number }>;
 };
 
-type Line = { account_id: string; debit: string; credit: string; memo: string };
+// name and class_name are not edited here; they are carried so saving a template keeps them.
+type Line = { account_id: string; debit: string; credit: string; memo: string; name?: string | null; class_name?: string | null };
 
 /**
  * What one run of a template is for, read from its saved lines: a journal
@@ -67,6 +68,7 @@ const blankForm = () => ({
   end_date: '',
   memo: '',
   reference: '',
+  is_active: true,
 });
 
 function pickErr(e: unknown): string {
@@ -89,6 +91,7 @@ const TXN_TYPE_LABELS: Record<TemplateType, string> = {
   journal_entry: 'Journal Entry',
   deposit: 'Bank Deposit',
   expense: 'Expense',
+  check: 'Check',
 };
 
 const TXN_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; disabled?: boolean; title?: string }> = [
@@ -127,6 +130,11 @@ export default function RecurringTransactionsPage() {
   const [formErr, setFormErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  // The template being changed, or null while a new one is being written.
+  const [editing, setEditing] = useState<Template | null>(null);
+  // Only a journal entry's lines are written on this page. The other kinds are
+  // saved from their own page, so here only their schedule can change.
+  const editsLines = editing === null || editing.template_type === 'journal_entry';
 
   // Filter state
   const [nameFilter, setNameFilter] = useState('');
@@ -176,6 +184,38 @@ export default function RecurringTransactionsPage() {
     setForm(blankForm());
     setLines([blankLine(), blankLine()]);
     setFormErr(null);
+    setEditing(null);
+  }
+
+  function startEdit(t: Template) {
+    const payload = (t.payload ?? {}) as { memo?: string | null; reference?: string | null; lines?: unknown };
+    setEditing(t);
+    setForm({
+      name: t.name,
+      template_type: t.template_type,
+      recurrence: t.recurrence,
+      next_run_date: t.next_run_date.slice(0, 10),
+      end_date: t.end_date ? t.end_date.slice(0, 10) : '',
+      memo: payload.memo ?? '',
+      reference: payload.reference ?? '',
+      is_active: t.is_active,
+    });
+    const saved = t.template_type === 'journal_entry' && Array.isArray(payload.lines) ? payload.lines : [];
+    setLines(saved.length >= 2
+      ? saved.map((raw): Line => {
+        const line = raw as { account_id?: string; debit?: unknown; credit?: unknown; memo?: string | null; name?: string | null; class_name?: string | null };
+        return {
+          account_id: line.account_id ?? '',
+          debit: (Number(line.debit) || 0).toFixed(2),
+          credit: (Number(line.credit) || 0).toFixed(2),
+          memo: line.memo ?? '',
+          ...(line.name != null ? { name: line.name } : {}),
+          ...(line.class_name != null ? { class_name: line.class_name } : {}),
+        };
+      })
+      : [blankLine(), blankLine()]);
+    setFormErr(null);
+    setShowForm(true);
   }
 
   function updateLine(i: number, patch: Partial<Line>) {
@@ -187,7 +227,7 @@ export default function RecurringTransactionsPage() {
     const headers = ['Template Name', 'Type', 'TXN Type', 'Interval', 'Previous Date', 'Next Date', 'Amount'];
     const rows = filteredTemplates.map(t => [
       t.name,
-      'Scheduled',
+      t.is_active ? 'Scheduled' : 'Paused',
       TXN_TYPE_LABELS[t.template_type] ?? t.template_type,
       INTERVAL_LABELS[t.recurrence] ?? t.recurrence,
       fmtShortDate(t.last_run_at),
@@ -281,15 +321,17 @@ export default function RecurringTransactionsPage() {
     if (!bizId) return;
     setFormErr(null);
 
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i]!;
-      const d = parseFloat(l.debit) || 0;
-      const c = parseFloat(l.credit) || 0;
-      if (!l.account_id) { setFormErr(`Line ${i + 1}: select an account.`); return; }
-      if (d > 0 && c > 0) { setFormErr(`Line ${i + 1}: only one of debit or credit may be > 0.`); return; }
-      if (d === 0 && c === 0) { setFormErr(`Line ${i + 1}: enter a debit or credit amount.`); return; }
+    if (editsLines) {
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i]!;
+        const d = parseFloat(l.debit) || 0;
+        const c = parseFloat(l.credit) || 0;
+        if (!l.account_id) { setFormErr(`Line ${i + 1}: select an account.`); return; }
+        if (d > 0 && c > 0) { setFormErr(`Line ${i + 1}: only one of debit or credit may be > 0.`); return; }
+        if (d === 0 && c === 0) { setFormErr(`Line ${i + 1}: enter a debit or credit amount.`); return; }
+      }
+      if (!balanced) { setFormErr('Total debit must equal total credit.'); return; }
     }
-    if (!balanced) { setFormErr('Total debit must equal total credit.'); return; }
 
     setBusy(true);
     try {
@@ -301,16 +343,26 @@ export default function RecurringTransactionsPage() {
           debit: parseMoneyInput(l.debit || '0'),
           credit: parseMoneyInput(l.credit || '0'),
           memo: l.memo || null,
+          ...(l.name != null ? { name: l.name } : {}),
+          ...(l.class_name != null ? { class_name: l.class_name } : {}),
         })),
       };
-      await api.post(`/businesses/${bizId}/recurring-templates`, {
+      const schedule = {
         name: form.name,
-        template_type: form.template_type,
-        payload,
         recurrence: form.recurrence,
         next_run_date: form.next_run_date,
         end_date: form.end_date || null,
-      });
+      };
+      if (editing) {
+        await api.patch(`/businesses/${bizId}/recurring-templates/${editing.id}`, {
+          ...schedule,
+          is_active: form.is_active,
+          // Keep whatever else the template carries (an adjusting-entry flag, say).
+          ...(editsLines ? { payload: { ...(editing.payload as Record<string, unknown>), ...payload } } : {}),
+        });
+      } else {
+        await api.post(`/businesses/${bizId}/recurring-templates`, { ...schedule, template_type: form.template_type, payload });
+      }
       resetForm();
       setShowForm(false);
       reload();
@@ -428,6 +480,16 @@ export default function RecurringTransactionsPage() {
         <CardContent className="space-y-4">
           {showForm && (
             <form className="space-y-4 border rounded-md p-4" onSubmit={submitForm}>
+              {editing && (
+                <p className="text-sm font-medium">
+                  Editing {editing.name}
+                  {!editsLines && (
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      The schedule can be changed here. What it records was saved from the {TXN_TYPE_LABELS[editing.template_type] ?? editing.template_type} page.
+                    </span>
+                  )}
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Name</Label>
@@ -435,6 +497,9 @@ export default function RecurringTransactionsPage() {
                 </div>
                 <div>
                   <Label>Transaction type</Label>
+                  {editing ? (
+                    <Input value={TXN_TYPE_LABELS[editing.template_type] ?? editing.template_type} disabled />
+                  ) : (
                   <AppSelect
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={form.template_type}
@@ -445,6 +510,7 @@ export default function RecurringTransactionsPage() {
                       <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>{o.label}</option>
                     ))}
                   </AppSelect>
+                  )}
                 </div>
                 <div>
                   <Label>Recurrence</Label>
@@ -468,16 +534,27 @@ export default function RecurringTransactionsPage() {
                   <Label>End date (optional)</Label>
                   <DateInput value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))} />
                 </div>
-                <div>
-                  <Label>Reference</Label>
-                  <Input value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} />
-                </div>
-                <div className="col-span-2">
-                  <Label>Memo</Label>
-                  <Input value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} />
-                </div>
+                {editing && (
+                  <label className="flex items-center gap-2 self-end pb-2 text-sm">
+                    <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
+                    Active (a paused template is skipped until it is turned back on)
+                  </label>
+                )}
+                {editsLines && (
+                  <>
+                    <div>
+                      <Label>Reference</Label>
+                      <Input value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>Memo</Label>
+                      <Input value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} />
+                    </div>
+                  </>
+                )}
               </div>
 
+              {editsLines && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Lines</Label>
@@ -522,10 +599,13 @@ export default function RecurringTransactionsPage() {
                   <div className={balanced ? 'text-green-600' : 'text-destructive'}>{balanced ? 'BALANCED' : 'UNBALANCED'}</div>
                 </div>
               </div>
+              )}
 
               {formErr && <p className="text-sm text-destructive">{formErr}</p>}
               <div className="flex gap-2">
-                <Button type="submit" disabled={busy || !balanced}>{busy ? 'Saving…' : 'Create template'}</Button>
+                <Button type="submit" disabled={busy || (editsLines && !balanced)}>
+                  {busy ? 'Saving…' : editing ? 'Save changes' : 'Create template'}
+                </Button>
                 <Button type="button" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
               </div>
             </form>
@@ -556,7 +636,7 @@ export default function RecurringTransactionsPage() {
                 filteredTemplates.map((t) => (
                   <tr key={t.id} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="p-3 font-medium">{t.name}</td>
-                    <td className="p-3 text-muted-foreground">Scheduled</td>
+                    <td className="p-3 text-muted-foreground">{t.is_active ? 'Scheduled' : 'Paused'}</td>
                     <td className="p-3">{TXN_TYPE_LABELS[t.template_type] ?? t.template_type}</td>
                     <td className="p-3">{INTERVAL_LABELS[t.recurrence] ?? t.recurrence}</td>
                     <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(t.last_run_at)}</td>
@@ -572,6 +652,9 @@ export default function RecurringTransactionsPage() {
                         onClick={() => void runNow(t.id)}
                       >
                         {runNowBusyId === t.id ? 'Running…' : 'Run now'}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => startEdit(t)}>
+                        Edit
                       </Button>
                       <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={() => deleteTemplate(t.id)}>
                         Delete
