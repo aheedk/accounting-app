@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, makeCustomer, makeVendor, seedYearPeriods, seedCoa } from '../helpers/factories.js';
+import { makeAccount, makeFirm, makeBusiness, makeUser, makeCustomer, makeVendor, seedYearPeriods, seedCoa } from '../helpers/factories.js';
 import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
 import * as billSvc from '../../src/services/ap/billService.js';
 import * as rpt from '../../src/services/reports/profitLossService.js';
@@ -51,6 +51,41 @@ describe('P&L report', () => {
     expect(r.net_income).toBe('750.0000');
     expect(r.revenue_lines.find(l => l.account_code === '4010')?.amount).toBe('1000.0000');
     expect(r.expense_lines.find(l => l.account_code === '5010')?.amount).toBe('250.0000');
+  });
+
+  // 2026-09-28 audit: Net Operating Income equalled total income, because expenses
+  // were sorted by account number and the client's numbers were not 6xxx.
+  it('takes operating expenses off Net Operating Income whatever the account numbers are', async () => {
+    const { biz, ctx, revenue, customer, vendor } = await setup();
+    const utilities = await makeAccount(t.db, biz.id, { code: '7200', name: 'Utilities', account_type: 'expense', detail_type: 'Utilities' });
+    const materials = await makeAccount(t.db, biz.id, { code: '8100', name: 'Job Materials', account_type: 'expense', detail_type: 'Supplies & Materials - COGS' });
+    const depreciation = await makeAccount(t.db, biz.id, { code: '9100', name: 'Depreciation', account_type: 'expense', detail_type: 'Depreciation' });
+    const inv = await t.db.transaction().execute(trx => invoiceSvc.createDraft(trx, ctx, {
+      business_id: biz.id, customer_id: customer.id, invoice_number: 'INV-NOI',
+      issue_date: '2026-04-10', due_date: '2026-05-10', memo: null, terms: null,
+      lines: [{ description: 'X', quantity: '1', unit_price: '1000.00', revenue_account_id: revenue.id, tax_code_id: null }],
+    }));
+    await t.db.transaction().execute(trx => invoiceSvc.postInvoice(trx, ctx, { invoice_id: inv.invoice.id }));
+    const bill = await t.db.transaction().execute(trx => billSvc.createDraft(trx, ctx, {
+      business_id: biz.id, vendor_id: vendor.id, bill_number: 'B-NOI',
+      bill_date: '2026-04-12', due_date: '2026-05-12', memo: null, terms: null,
+      lines: [
+        { description: 'Power', quantity: '1', unit_price: '100.00', expense_account_id: utilities.id },
+        { description: 'Lumber', quantity: '1', unit_price: '300.00', expense_account_id: materials.id },
+        { description: 'Depreciation', quantity: '1', unit_price: '50.00', expense_account_id: depreciation.id },
+      ],
+    }));
+    await t.db.transaction().execute(trx => billSvc.postBill(trx, ctx, { bill_id: bill.bill.id }));
+
+    const r = await rpt.profitLoss(t.db, { business_id: biz.id, period_start: '2026-04-01', period_end: '2026-04-30' });
+    expect(r.gross_profit).toBe('700.0000');            // 1000 - 300 cost of goods
+    expect(r.operating_expenses_total).toBe('100.0000');
+    expect(r.operating_income).toBe('600.0000');        // 700 - 100 operating
+    expect(r.other_expenses_total).toBe('50.0000');
+    expect(r.net_income).toBe('550.0000');
+
+    expect(rpt.expenseSection({ code: '5010', name: 'Cost of Goods Sold', detail_type: null })).toBe('cogs');
+    expect(rpt.expenseSection({ code: '4444', name: 'Rent', detail_type: null })).toBe('operating');
   });
 
   it('excludes voided JEs and honors the period window', async () => {
