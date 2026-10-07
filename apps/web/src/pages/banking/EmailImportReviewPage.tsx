@@ -6,7 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import DocumentUpload from '@/pages/ai/DocumentUpload';
 import ConfidenceBadge, { type SuggestionMeta } from '@/pages/ai/ConfidenceBadge';
-import { SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
+import { statementBankAccounts } from '@/lib/bankAccountOptions';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
@@ -139,23 +139,8 @@ export function bestVendorMatch(extracted: string, vendors: Vendor[]): string | 
   return best && best.score >= 0.5 ? best.name : null;
 }
 
-// The detail types under the "Bank" account type in the Chart of Accounts.
-const BANK_DETAIL_TYPES = new Set(['Cash on hand', 'Checking', 'Money Market', 'Rents Held in Trust', 'Savings', 'Trust account']);
-
-/** The accounts a bank statement can belong to: accounts of type Bank, plus any
- * account set up under Banking. A chart where nothing is marked as a bank falls
- * back to every asset, so the picker is never empty; the account already chosen
- * always stays listed. */
-export function statementBankAccounts(
-  accounts: CoaAccount[], bankingAccountIds: ReadonlySet<string>, selectedId: string,
-): CoaAccount[] {
-  // Suspense is an asset too, but never the account a statement belongs to.
-  const assets = accounts.filter(a => a.account_type === 'asset' && a.detail_type !== SUSPENSE_DETAIL_TYPE);
-  const banks = assets.filter(a => bankingAccountIds.has(a.id) || BANK_DETAIL_TYPES.has(a.detail_type ?? ''));
-  if (banks.length === 0) return assets;
-  const selected = assets.find(a => a.id === selectedId);
-  return selected && !banks.includes(selected) ? [...banks, selected] : banks;
-}
+// Which accounts a bank statement can belong to lives in lib, shared with Pay Bills.
+export { statementBankAccounts } from '@/lib/bankAccountOptions';
 
 // Mirrors statementImportService.checkNumberOf on the API.
 const CHECK_NUMBER = /\b(?:check|chk|ck)\s*(?:no\.?|number|num|#)?\s*#?\s*(\d{2,10})\b/i;

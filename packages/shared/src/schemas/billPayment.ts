@@ -21,3 +21,13 @@ export const billPaymentApplicationSchema = z.object({
 });
 
 export const billPaymentVoidSchema = z.object({ void_reason: z.string().min(1).max(500) });
+
+// Pay Bills: several vendors' bills in one go, one payment per vendor.
+export const billPaymentBatchSchema = z.object({
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  payment_method: z.enum(['cash','check','ach','wire','card','other']),
+  cash_account_id: z.string().uuid(),
+  reference: z.string().max(200).nullable().optional(),
+  items: z.array(z.object({ bill_id: z.string().uuid(), amount: moneyStr })).min(1).max(500),
+});
+export type BillPaymentBatch = z.infer<typeof billPaymentBatchSchema>;

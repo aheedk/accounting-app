@@ -66,6 +66,7 @@ const groups: NavGroup[] = [
       { to: '/accounting/checks', label: 'Checks' },
       { to: '/ap/vendors', label: 'Vendors' },
       { to: '/ap/bills', label: 'Bills' },
+      { to: '/ap/pay-bills', label: 'Pay Bills' },
       { to: '/ap/bill-payments', label: 'Bill Payments' },
       { to: '/ap/vendor-credits', label: 'Vendor Credits' },
       { to: '/ap/contractors', label: 'Contractors' },

@@ -33,6 +33,27 @@ router.get('/businesses/:businessId/bill-payments', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Pay Bills: every bill with something owed, across vendors.
+router.get('/businesses/:businessId/unpaid-bills', async (req, res, next) => {
+  try { res.json({ bills: await pay.listUnpaidBills(db, req.tenancy!.business_id) }); }
+  catch (e) { next(e); }
+});
+
+// Pay Bills: pays the chosen bills and posts one payment per vendor, all or nothing.
+router.post('/businesses/:businessId/bill-payments/batch', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const body = schemas.billPaymentBatchSchema.parse(req.body);
+    const result = await db.transaction().execute(trx => pay.payBills(trx, ctxFromReq(req), {
+      payment_date: body.payment_date,
+      payment_method: body.payment_method,
+      cash_account_id: body.cash_account_id,
+      reference: body.reference ?? null,
+      items: body.items,
+    }));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+});
+
 router.get('/businesses/:businessId/bill-payments/:id', async (req, res, next) => {
   try { res.json(await pay.getBillPaymentWithApplications(db, req.tenancy!.business_id, req.params['id']!)); }
   catch (e) { next(e); }

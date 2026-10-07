@@ -21,6 +21,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Expense Transactions', group: 'Accounts Payable', to: '/accounting/expense-transactions' },
   { label: 'Vendors', group: 'Accounts Payable', to: '/ap/vendors' },
   { label: 'Bills', group: 'Accounts Payable', to: '/ap/bills' },
+  { label: 'Pay Bills', group: 'Accounts Payable', to: '/ap/pay-bills' },
   { label: 'Bill Payments', group: 'Accounts Payable', to: '/ap/bill-payments' },
   { label: 'Vendor Credits', group: 'Accounts Payable', to: '/ap/vendor-credits' },
   { label: 'Contractors', group: 'Accounts Payable', to: '/ap/contractors' },

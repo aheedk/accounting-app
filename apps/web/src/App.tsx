@@ -35,6 +35,7 @@ import BillNewPage from '@/pages/bills/BillNewPage';
 import BillDetailPage from '@/pages/bills/BillDetailPage';
 import BillPaymentListPage from '@/pages/bill-payments/BillPaymentListPage';
 import BillPaymentNewPage from '@/pages/bill-payments/BillPaymentNewPage';
+import PayBillsPage from '@/pages/bill-payments/PayBillsPage';
 import BillPaymentDetailPage from '@/pages/bill-payments/BillPaymentDetailPage';
 import VendorCreditListPage from '@/pages/vendor-credits/VendorCreditListPage';
 import VendorCreditNewPage from '@/pages/vendor-credits/VendorCreditNewPage';
@@ -166,6 +167,7 @@ export default function App() {
             <Route path="/ap/bills/new" element={<BillNewPage />} />
             <Route path="/ap/bills/:id" element={<BillDetailPage />} />
             <Route path="/ap/bill-payments" element={<BillPaymentListPage />} />
+            <Route path="/ap/pay-bills" element={<PayBillsPage />} />
             <Route path="/ap/bill-payments/new" element={<BillPaymentNewPage />} />
             <Route path="/ap/bill-payments/:id" element={<BillPaymentDetailPage />} />
             <Route path="/ap/vendor-credits" element={<VendorCreditListPage />} />

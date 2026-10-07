@@ -250,3 +250,102 @@ export async function listBillPayments(db: Kysely<DB>, q: { business_id: string;
   if (q.status) qb = qb.where('status', '=', q.status as BillPaymentStatus);
   return qb.orderBy('payment_date', 'desc').execute();
 }
+
+export type UnpaidBill = {
+  bill_id: string;
+  bill_number: string;
+  vendor_id: string;
+  vendor_name: string;
+  bill_date: string;
+  due_date: string;
+  total: string;
+  open_balance: string;
+};
+
+/** Every posted bill with something still owed, across all vendors, oldest due date first. */
+export async function listUnpaidBills(db: Kysely<DB>, business_id: string): Promise<UnpaidBill[]> {
+  const bills = await db.selectFrom('bills as b')
+    .innerJoin('vendors as v', 'v.id', 'b.vendor_id')
+    .select(['b.id', 'b.bill_number', 'b.vendor_id', 'v.name as vendor_name', 'b.bill_date', 'b.due_date', 'b.total'])
+    .where('b.business_id', '=', business_id)
+    .where('b.status', '=', 'posted')
+    .where('b.deleted_at', 'is', null)
+    .orderBy('b.due_date').orderBy('v.name').orderBy('b.bill_number')
+    .execute();
+  if (bills.length === 0) return [];
+  const applied = new Map<string, string>();
+  const apps = await db.selectFrom('bill_payment_applications as bpa')
+    .leftJoin('bill_payments as bp', 'bp.id', 'bpa.bill_payment_id')
+    .leftJoin('vendor_credits as vc', 'vc.id', 'bpa.vendor_credit_id')
+    .select(['bpa.bill_id', 'bpa.applied_amount'])
+    .where('bpa.bill_id', 'in', bills.map(b => b.id))
+    // A draft payment has reserved the amount too, so it is not offered to be paid twice.
+    .where(eb => eb.or([eb('bp.status', 'in', ['draft', 'posted']), eb('vc.status', 'in', ['posted', 'applied'])]))
+    .execute();
+  for (const a of apps) applied.set(a.bill_id, toMoneyString(addMoney(applied.get(a.bill_id) ?? '0', a.applied_amount)));
+  return bills.flatMap(b => {
+    const open = toMoneyString(subMoney(b.total, applied.get(b.id) ?? '0'));
+    return parseFloat(open) > 0 ? [{
+      bill_id: b.id, bill_number: b.bill_number, vendor_id: b.vendor_id, vendor_name: b.vendor_name,
+      bill_date: String(b.bill_date).slice(0, 10), due_date: String(b.due_date).slice(0, 10),
+      total: toMoneyString(addMoney(b.total, '0')), open_balance: open,
+    }] : [];
+  });
+}
+
+export type PayBillsInput = {
+  payment_date: string;
+  payment_method: PaymentMethod;
+  cash_account_id: string;
+  reference?: string | null;
+  items: Array<{ bill_id: string; amount: string }>;
+};
+
+/**
+ * Pay bills of several vendors in one go, as QuickBooks' Pay Bills does: one
+ * posted bill payment per vendor, each applied to that vendor's chosen bills.
+ * All of it happens in the caller's transaction, so either every payment posts
+ * or none does.
+ */
+export async function payBills(trx: Transaction<DB>, ctx: ServiceCtx, input: PayBillsInput) {
+  const business_id = ctx.business_id;
+  if (!business_id) throw new PreconditionError('No business selected');
+  const items = input.items.filter(item => parseFloat(item.amount) > 0);
+  if (items.length === 0) throw new PreconditionError('Choose at least one bill to pay');
+  if (new Set(items.map(item => item.bill_id)).size !== items.length) {
+    throw new PreconditionError('A bill is listed twice');
+  }
+
+  const bills = await trx.selectFrom('bills').select(['id', 'vendor_id'])
+    .where('business_id', '=', business_id)
+    .where('id', 'in', items.map(item => item.bill_id))
+    .execute();
+  const vendorOf = new Map(bills.map(b => [b.id, b.vendor_id]));
+
+  const byVendor = new Map<string, Array<{ bill_id: string; applied_amount: string }>>();
+  for (const item of items) {
+    const vendorId = vendorOf.get(item.bill_id);
+    if (!vendorId) throw new NotFoundError('bill', item.bill_id);
+    const list = byVendor.get(vendorId) ?? [];
+    list.push({ bill_id: item.bill_id, applied_amount: toMoneyString(addMoney(item.amount, '0')) });
+    byVendor.set(vendorId, list);
+  }
+
+  const paid: Array<{ id: string; vendor_id: string; amount: string; bill_count: number }> = [];
+  for (const [vendor_id, applications] of byVendor) {
+    const amount = applications.reduce<string>((sum, a) => toMoneyString(addMoney(sum, a.applied_amount)), '0');
+    const draft = await createDraft(trx, ctx, {
+      business_id, vendor_id,
+      payment_date: input.payment_date,
+      payment_method: input.payment_method,
+      reference: input.reference ?? null,
+      amount,
+      cash_account_id: input.cash_account_id,
+      memo: null,
+      initial_applications: applications,
+    });
+    await postBillPayment(trx, ctx, { bill_payment_id: draft.bill_payment.id });
+    paid.push({ id: draft.bill_payment.id, vendor_id, amount, bill_count: applications.length });
+  }
+  return { bill_payments: paid };
+}
