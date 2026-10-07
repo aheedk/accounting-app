@@ -5,7 +5,9 @@ import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
+import { schemas } from '@accounting/shared';
 import { ingestUploadedPdf } from '../services/ai/documentIngestService.js';
+import { updateLearnedRule } from '../services/ai/autoCodingService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -79,6 +81,21 @@ router.get('/businesses/:businessId/ai/coding-rules', async (req, res, next) => 
     res.json({ rules: rows });
   } catch (e) { next(e); }
 });
+
+/** Change where a learned rule posts. */
+router.patch(
+  '/businesses/:businessId/ai/coding-rules/:ruleId',
+  requireMinRole('accountant'),
+  async (req, res, next) => {
+    try {
+      const body = schemas.codingRuleUpdateSchema.parse(req.body);
+      const updated = await db.transaction().execute(trx =>
+        updateLearnedRule(trx, ctxFromReq(req), { rule_id: req.params['ruleId']!, account_ids: body.account_ids }),
+      );
+      res.json(updated);
+    } catch (e) { next(e); }
+  },
+);
 
 router.delete(
   '/businesses/:businessId/ai/coding-rules/:ruleId',

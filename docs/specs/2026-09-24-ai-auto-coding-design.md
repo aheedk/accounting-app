@@ -124,7 +124,7 @@ Migration `0066_ai_auto_coding.sql`:
 - `POST /businesses/:businessId/ai/documents` - multipart PDF upload, accountant+. Stores the PDF, runs the same classify-and-extract path the Gmail worker uses, returns the staging row.
 - `GET /businesses/:businessId/ai/documents` - review queue, both sources.
 - `POST /businesses/:businessId/ai/documents/:id/approve` / `/reject` - existing behavior, plus memory learning on approve.
-- `GET/PUT/DELETE /businesses/:businessId/ai/coding-rules` - view and manage learned rules.
+- `GET/PATCH/DELETE /businesses/:businessId/ai/coding-rules` - view and manage learned rules. `PATCH` changes the account a rule posts to (one per line); the vendor and direction are fixed, and the account must be one the engine would use (active, not locked, not Suspense).
 
 All state-changing routes require `requireRole('accountant')`.
 

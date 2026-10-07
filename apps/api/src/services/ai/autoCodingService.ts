@@ -7,8 +7,10 @@ import {
   type CodingLayerId,
   type ConfidenceBand,
   ERR,
+  AUDIT,
 } from '@accounting/shared';
-import { BusinessRuleError } from '../../lib/errors.js';
+import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
+import { record as auditRecord } from '../audit/auditService.js';
 import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
@@ -474,4 +476,41 @@ export async function rememberCoding(
         last_applied_at: sql`now()`,
       }))
     .execute();
+}
+
+/**
+ * Points a learned rule at different accounts, one for each of its lines, in
+ * order. The rule keeps its vendor and direction. This is the fix for "it
+ * learned the wrong account" that does not need the rule deleted and taught again.
+ */
+export async function updateLearnedRule(
+  trx: Transaction<DB>,
+  ctx: ServiceCtx,
+  input: { rule_id: string; account_ids: string[] },
+) {
+  const businessId = requireBusiness(ctx);
+  const before = await trx.selectFrom('account_coding_memory').selectAll()
+    .where('id', '=', input.rule_id).where('business_id', '=', businessId).executeTakeFirst();
+  if (!before) throw new NotFoundError('coding_rule', input.rule_id);
+
+  const lines = before.lines as SuggestionLine[];
+  if (lines.length !== input.account_ids.length) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `This rule has ${lines.length} line(s); give one account for each.`);
+  }
+  // Only accounts the engine would post to: an inactive, locked or Suspense
+  // account would leave a rule that is silently never applied.
+  const usable = new Set((await activeAccounts(trx, businessId)).map(account => account.id));
+  if (input.account_ids.some(id => !usable.has(id))) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'A coding rule can only post to an active account of this client.');
+  }
+
+  const next = lines.map((line, index) => ({ ...line, account_id: input.account_ids[index]! }));
+  const after = await trx.updateTable('account_coding_memory')
+    .set({ lines: JSON.stringify(next), times_corrected: sql`times_corrected + 1` })
+    .where('id', '=', before.id)
+    .returningAll().executeTakeFirstOrThrow();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.CODING_RULE_UPDATE, entity_type: 'coding_rule', entity_id: before.id, before, after,
+  });
+  return after;
 }

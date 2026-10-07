@@ -217,6 +217,7 @@ export const AUDIT = {
   CHECK_STUB_MATCH: 'check_stub.match',
   CHECK_STUB_DISMISS: 'check_stub.dismiss',
   SUSPENSE_RECLASSIFY: 'suspense.reclassify',
+  CODING_RULE_UPDATE: 'coding_rule.update',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

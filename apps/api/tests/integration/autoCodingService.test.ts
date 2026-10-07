@@ -485,4 +485,34 @@ describe('autoCodingService.rememberCoding', () => {
     const rows = await t.db.selectFrom('account_coding_memory').selectAll().execute();
     expect(rows).toHaveLength(0);
   });
+
+  // 2026-09-28 audit, P1 item 4: a rule that learned the wrong account could only be deleted.
+  it('points a learned rule at a different account, and only at one the engine would use', async () => {
+    const { firm, ctx, bank, software, utilities } = await setup(t);
+    await t.db.transaction().execute(trx => autoCoding.rememberCoding(trx, ctx, {
+      description: 'MICROSOFT*SUBSCRIPTION 8812',
+      direction: 'debit',
+      bank_account_id: null,
+      lines: [{ account_id: software.id, debit: '100.0000', credit: '0.0000', memo: null }],
+      was_correction: false,
+    }));
+    const rule = await t.db.selectFrom('account_coding_memory').selectAll().executeTakeFirstOrThrow();
+    const change = (account_ids: string[]) => t.db.transaction().execute(trx =>
+      autoCoding.updateLearnedRule(trx, ctx, { rule_id: rule.id, account_ids }));
+
+    const updated = await change([utilities.id]);
+    expect(updated).toMatchObject({ normalized_vendor: 'microsoft', times_corrected: 1 });
+    const result = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'MICROSOFT*SUBSCRIPTION 9903',
+      bank_account_id: bank.id,
+    }));
+    expect(result).toMatchObject({ source_layer: 'learned_rule' });
+    expect(result!.lines[0]!.account_id).toBe(utilities.id);
+
+    // Another client's account, or the wrong number of accounts, is refused.
+    const other = await makeBusiness(t.db, firm.id, 'Other Biz');
+    const foreign = await makeAccount(t.db, other.id, { code: '6200', name: 'Utilities', account_type: 'expense' });
+    await expect(change([foreign.id])).rejects.toThrow(/active account of this client/);
+    await expect(change([utilities.id, software.id])).rejects.toThrow(/one account for each/);
+  });
 });

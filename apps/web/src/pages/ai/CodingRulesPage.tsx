@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Sparkles, Trash2 } from 'lucide-react';
+import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import AiSettingsCard from './AiSettingsCard';
 import { Input } from '@/components/ui/input';
+import { AppSelect } from '../../components/ui/select';
 
 type RuleLine = {
   account_id: string;
@@ -25,7 +26,7 @@ type CodingRule = {
   bank_account_name: string | null;
 };
 
-type Account = { id: string; code: string; name: string };
+type Account = { id: string; code: string; name: string; is_active?: boolean };
 
 export default function CodingRulesPage() {
   const [bizId] = useActiveBusinessId();
@@ -34,6 +35,10 @@ export default function CodingRulesPage() {
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The rule whose accounts are being changed, and the account chosen for each of its lines.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAccounts, setEditAccounts] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!bizId) return;
@@ -64,6 +69,30 @@ export default function CodingRulesPage() {
     } catch {
       setRules(previous);
       setError('Could not delete that rule.');
+    }
+  }
+
+  function startEdit(rule: CodingRule) {
+    setEditingId(rule.id);
+    setEditAccounts(rule.lines.map(line => line.account_id));
+    setError(null);
+  }
+
+  async function saveEdit(rule: CodingRule) {
+    if (!bizId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.patch(`/businesses/${bizId}/ai/coding-rules/${rule.id}`, { account_ids: editAccounts });
+      setRules(current => current.map(item => (item.id === rule.id
+        ? { ...item, lines: item.lines.map((line, index) => ({ ...line, account_id: editAccounts[index] ?? line.account_id })) }
+        : item)));
+      setEditingId(null);
+    } catch (e: unknown) {
+      const message = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
+      setError(message ?? 'Could not change that rule.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -124,7 +153,7 @@ export default function CodingRulesPage() {
                 <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posts to</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bank account</th>
                 <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Applied</th>
-                <th className="w-16 px-3 py-2.5" />
+                <th className="w-24 px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -133,7 +162,27 @@ export default function CodingRulesPage() {
                   <td className="px-3 py-2 font-medium capitalize">{rule.normalized_vendor}</td>
                   <td className="px-3 py-2 capitalize text-muted-foreground">{rule.direction}</td>
                   <td className="px-3 py-2">
-                    {rule.lines.map((line, index) => (
+                    {editingId === rule.id ? (
+                      <div className="space-y-2">
+                        {rule.lines.map((_, index) => (
+                          <AppSelect
+                            key={index}
+                            aria-label={`Account for ${rule.normalized_vendor}`}
+                            className="h-9 w-full min-w-56 rounded-md border bg-background px-3 text-sm"
+                            value={editAccounts[index] ?? ''}
+                            onChange={event => setEditAccounts(current => current.map((id, i) => (i === index ? event.target.value : id)))}
+                          >
+                            {accounts.filter(account => account.is_active !== false || account.id === editAccounts[index]).map(account => (
+                              <option key={account.id} value={account.id}>{account.code} {account.name}</option>
+                            ))}
+                          </AppSelect>
+                        ))}
+                        <div className="flex gap-2">
+                          <Button size="sm" disabled={saving} onClick={() => void saveEdit(rule)}>{saving ? 'Saving…' : 'Save'}</Button>
+                          <Button size="sm" variant="ghost" disabled={saving} onClick={() => setEditingId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : rule.lines.map((line, index) => (
                       <div key={index}>{accountLabel(line)}</div>
                     ))}
                   </td>
@@ -141,7 +190,15 @@ export default function CodingRulesPage() {
                     {rule.bank_account_name ?? 'Any'}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{rule.times_applied}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Change the account for ${rule.normalized_vendor}`}
+                      onClick={() => startEdit(rule)}
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
