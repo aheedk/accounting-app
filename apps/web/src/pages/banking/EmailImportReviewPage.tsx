@@ -409,15 +409,8 @@ export default function EmailImportReviewPage() {
         const matched = bestVendorMatch(initPayees[i]!, vendors);
         if (matched) initPayees[i] = matched;
       }
-      if (tx.suggested_account_id) {
-        initOffsets[i] = tx.suggested_account_id;
-      } else if (tx.suggested_offset) {
-        const hint = tx.suggested_offset.toLowerCase();
-        const match = accounts.find(a =>
-          a.name.toLowerCase().includes(hint) || hint.includes(a.name.toLowerCase()),
-        );
-        if (match) initOffsets[i] = match.id;
-      }
+      // Only what the coding engine accepted is filled in; its absence means not sure.
+      if (tx.suggested_account_id) initOffsets[i] = tx.suggested_account_id;
     });
     setIncluded(initIncluded);
     setOffsets(initOffsets);
@@ -562,15 +555,7 @@ export default function EmailImportReviewPage() {
     const initAccounts: Record<number, string> = {};
     imp.line_items.forEach((li, i) => {
       initIncluded[i] = true;
-      if (li.suggested_account_id) {
-        initAccounts[i] = li.suggested_account_id;
-      } else if (li.suggested_account) {
-        const hint = li.suggested_account.toLowerCase();
-        const match = accounts.find(a =>
-          a.name.toLowerCase().includes(hint) || hint.includes(a.name.toLowerCase()),
-        );
-        if (match) initAccounts[i] = match.id;
-      }
+      if (li.suggested_account_id) initAccounts[i] = li.suggested_account_id;
     });
     setLineIncluded(initIncluded);
     setLineAccountIds(initAccounts);
