@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { hasMinRole } from '@accounting/shared';
-import { BookOpen, ChevronDown, Clock, Copy, History, Paperclip, Trash2, X } from 'lucide-react';
+import { BookOpen, ChevronDown, Clock, Copy, History, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { cachedGet, invalidateReferenceCache } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
 import { AppSelect } from '@/components/ui/select';
+import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { previewDepositSummary, previewDepositSlipAndSummary, previewDepositAlignmentTest, type DepositDocInput } from '@/lib/download';
@@ -347,6 +349,7 @@ export default function BankDepositPage() {
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentDeposits, setRecentDeposits] = useState<RecentDeposit[] | null>(null);
+  const attachments = useAttachments('bank_deposit', isNew ? null : (id ?? null));
 
   const load = useCallback(async () => {
     if (!bizId) return;
@@ -507,6 +510,10 @@ export default function BankDepositPage() {
         };
         const res = await api.post<{ id: string }>(`/businesses/${bizId}/bank-deposits`, body);
         invalidateReferenceCache(`/businesses/${bizId}/bank-accounts/${bankAccountId}`);
+        // Files added before the deposit existed are uploaded now that it has an id.
+        const failedAttach = await attachments.attachTo(res.data.id);
+        attachments.reset();
+        if (failedAttach) setErr(failedAttach);
         nav(`/accounting/bank-deposits/${res.data.id}`);
       } else {
         const body = {
@@ -885,7 +892,7 @@ export default function BankDepositPage() {
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      <Input
+                      <MoneyInput
                         value={line.amount}
                         onChange={e => updateLine(idx, 'amount', e.target.value)}
                         disabled={!canEdit}
@@ -943,12 +950,7 @@ export default function BankDepositPage() {
               rows={4}
               className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <label className="mb-2 mt-4 block text-sm font-medium">Attachments</label>
-            <div className="flex h-[108px] flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed text-sm text-muted-foreground hover:border-primary/40 hover:bg-muted/20">
-              <Paperclip className="h-5 w-5" />
-              <span className="cursor-pointer text-primary hover:underline">Add attachment</span>
-              <span className="text-xs">Max file size: 20 MB</span>
-            </div>
+            <AttachmentsPanel attachments={attachments} className="mt-4" />
           </div>
 
           <div className="flex flex-col gap-4">
@@ -983,7 +985,7 @@ export default function BankDepositPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">Cash back amount</label>
-                <Input
+                <MoneyInput
                   value={cashBackAmount}
                   onChange={e => setCashBackAmount(e.target.value)}
                   disabled={!canEdit}

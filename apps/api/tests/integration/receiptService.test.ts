@@ -60,6 +60,18 @@ describe('receiptService', () => {
     )).rejects.toThrow(/not found/i);
   });
 
+  it('attaches a file to a bank deposit and lists it there', async () => {
+    const { biz, file, ctx } = await bootstrap();
+    const depositId = '00000000-0000-0000-0000-000000000333';
+    const attached = await t.db.transaction().execute(trx => r.createReceipt(trx, ctx, {
+      business_id: biz.id, file_id: file.id, linked_entity_type: 'bank_deposit', linked_entity_id: depositId,
+    }));
+    expect(attached.linked_entity_type).toBe('bank_deposit');
+
+    const list = await r.listReceipts(t.db, biz.id, { entity_type: 'bank_deposit', entity_id: depositId });
+    expect(list.map(row => row.id)).toEqual([attached.id]);
+  });
+
   it('linkReceipt back to unlinked clears the link and audit-logs UNLINK', async () => {
     const { biz, file, ctx } = await bootstrap();
     const created = await t.db.transaction().execute(trx =>

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { sql } from 'kysely';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeBankAccount, makeCustomer, seedCoa, seedYearPeriods } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, grantAccess, makeAccount, makeBankAccount, makeCustomer, makeFile, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
 import * as depositSvc from '../../src/services/banking/bankDepositService.js';
+import * as receiptSvc from '../../src/services/accounting/receiptService.js';
 import * as paymentSvc from '../../src/services/ar/paymentService.js';
 
 let t: TestDb;
@@ -229,6 +230,25 @@ describe('bankDepositService', () => {
     const reversal = await t.db.selectFrom('journal_entries').select('id')
       .where('reversed_entry_id', '=', deposit.journal_entry_id!).executeTakeFirst();
     expect(reversal).toBeUndefined();
+  });
+
+  it('deleteDeposit leaves an attached file behind as an unlinked receipt', async () => {
+    const { biz, user, ctx, bankAccount, income } = await bootstrap();
+    const deposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, ctx, {
+      bank_account_id: bankAccount.id,
+      deposit_date: '2026-03-06',
+      lines: [{ line_type: 'other_funds', account_id: income.id, amount: '500.00' }],
+    }));
+    const file = await makeFile(t.db, biz.id, user.id);
+    const receipt = await t.db.transaction().execute(trx => receiptSvc.createReceipt(trx, ctx, {
+      business_id: biz.id, file_id: file.id, linked_entity_type: 'bank_deposit', linked_entity_id: deposit.id,
+    }));
+
+    await t.db.transaction().execute(trx => depositSvc.deleteDeposit(trx, ctx, deposit.id));
+
+    const after = await t.db.selectFrom('receipts').select(['linked_entity_type', 'linked_entity_id'])
+      .where('id', '=', receipt.id).executeTakeFirstOrThrow();
+    expect(after).toEqual({ linked_entity_type: 'unlinked', linked_entity_id: null });
   });
 
   it('a normally created deposit is editable', async () => {

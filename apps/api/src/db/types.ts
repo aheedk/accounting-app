@@ -485,7 +485,7 @@ export interface FilesTable {
   created_at: Generated<Timestamp>;
 }
 
-export type ReceiptLinkedEntityType = 'bank_transaction' | 'bill' | 'expense_transaction' | 'invoice' | 'journal_entry' | 'check' | 'unlinked';
+export type ReceiptLinkedEntityType = 'bank_transaction' | 'bill' | 'expense_transaction' | 'invoice' | 'journal_entry' | 'check' | 'bank_deposit' | 'unlinked';
 
 export interface ReceiptsTable {
   id: Generated<string>;

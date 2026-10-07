@@ -602,6 +602,14 @@ export async function deleteDeposit(
   const guard = before.journal_entry_id ? await voidGuardFor(trx, before.journal_entry_id) : {};
   await trx.deleteFrom('bank_deposits').where('id', '=', id).execute();
 
+  // Attached files stay on the Receipts page, unlinked, like a deleted journal entry's.
+  await trx.updateTable('receipts')
+    .set({ linked_entity_type: 'unlinked', linked_entity_id: null })
+    .where('business_id', '=', bizId)
+    .where('linked_entity_type', '=', 'bank_deposit')
+    .where('linked_entity_id', '=', id)
+    .execute();
+
   if (before.journal_entry_id) {
     await ledger.deleteJournalEntry(trx, ctx, {
       journal_entry_id: before.journal_entry_id,

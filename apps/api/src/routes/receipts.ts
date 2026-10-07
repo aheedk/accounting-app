@@ -13,7 +13,7 @@ import type { ServiceCtx } from '../lib/ctx.js';
 const router = Router({ mergeParams: true });
 
 const RECEIPT_LINKED_ENTITY_TYPES: readonly ReceiptLinkedEntityType[] = [
-  'bank_transaction', 'bill', 'expense_transaction', 'invoice', 'journal_entry', 'check', 'unlinked',
+  'bank_transaction', 'bill', 'expense_transaction', 'invoice', 'journal_entry', 'check', 'bank_deposit', 'unlinked',
 ];
 
 function ctxFromReq(req: Request): ServiceCtx {
@@ -47,7 +47,7 @@ router.get('/businesses/:businessId/receipts', async (req, res, next) => {
 const receiptCreateSchema = z.object({
   file_id: z.string().uuid(),
   linked_entity_type: z.enum([
-    'bank_transaction', 'bill', 'expense_transaction', 'invoice', 'journal_entry', 'check', 'unlinked',
+    'bank_transaction', 'bill', 'expense_transaction', 'invoice', 'journal_entry', 'check', 'bank_deposit', 'unlinked',
   ]).optional(),
   linked_entity_id: z.string().uuid().nullable().optional(),
 }).refine(

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const receiptLinkSchema = z.object({
   linked_entity_type: z.enum([
-    'bank_transaction', 'bill', 'expense_transaction', 'invoice', 'journal_entry', 'check', 'unlinked',
+    'bank_transaction', 'bill', 'expense_transaction', 'invoice', 'journal_entry', 'check', 'bank_deposit', 'unlinked',
   ]),
   linked_entity_id: z.string().uuid().nullable().optional(),
 }).refine(

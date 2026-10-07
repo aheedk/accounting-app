@@ -20,6 +20,8 @@ type LinkedEntityType =
   | 'expense_transaction'
   | 'invoice'
   | 'journal_entry'
+  | 'check'
+  | 'bank_deposit'
   | 'unlinked';
 
 type Receipt = {
@@ -72,6 +74,10 @@ function entityBadge(type: LinkedEntityType) {
       return <span className={`${base} bg-emerald-100 text-emerald-800`}>invoice</span>;
     case 'journal_entry':
       return <span className={`${base} bg-violet-100 text-violet-800`}>journal</span>;
+    case 'check':
+      return <span className={`${base} bg-orange-100 text-orange-800`}>check</span>;
+    case 'bank_deposit':
+      return <span className={`${base} bg-emerald-100 text-emerald-800`}>deposit</span>;
     default:
       return <span className={base}>{type}</span>;
   }

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 // Must match the upload limit in apps/api/src/routes/files.ts.
 const MAX_BYTES = 10 * 1024 * 1024;
 
-export type AttachmentEntityType = 'expense_transaction' | 'journal_entry' | 'check';
+export type AttachmentEntityType = 'expense_transaction' | 'journal_entry' | 'check' | 'bank_deposit';
 
 type Attachment = {
   key: string;
