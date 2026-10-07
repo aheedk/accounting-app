@@ -36,7 +36,9 @@ export async function getManagementReport(db: Kysely<DB>, ctx: ServiceCtx): Prom
   const revenueRes = await db.executeQuery<MonthAmtRow>(sql<MonthAmtRow>`
     SELECT
       to_char(m.month, 'YYYY-MM') AS month,
-      COALESCE(SUM(jel.credit - jel.debit), 0)::text AS amount
+      -- Only revenue lines: the join below keeps every line of the entry, and a
+      -- balanced entry summed whole is always zero.
+      COALESCE(SUM(jel.credit - jel.debit) FILTER (WHERE coa.id IS NOT NULL), 0)::text AS amount
     FROM generate_series(
       date_trunc('month', now()) - interval '11 months',
       date_trunc('month', now()),

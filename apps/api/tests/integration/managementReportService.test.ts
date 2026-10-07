@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, seedYearPeriods, seedCoa } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, makeCustomer, seedYearPeriods, seedCoa } from '../helpers/factories.js';
+import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 import { getManagementReport } from '../../src/services/reports/managementReportService.js';
 
@@ -32,5 +33,32 @@ describe('managementReportService', () => {
     expect(report.expense_breakdown).toEqual([]);
     expect(Number(report.total_revenue_last_12)).toBe(0);
     expect(Number(report.total_expense_last_12)).toBe(0);
+  });
+
+  // 2026-09-28 audit: every month read $0.00 while the header showed the real total.
+  it('shows this month\'s revenue in the monthly breakdown', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id);
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
+    const now = new Date();
+    await seedYearPeriods(t.db, biz.id, now.getUTCFullYear());
+    await seedCoa(t.db, biz.id);
+    const customer = await makeCustomer(t.db, biz.id);
+    const revenue = await t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('business_id', '=', biz.id).where('code', '=', '4010').executeTakeFirstOrThrow();
+    const today = now.toISOString().slice(0, 10);
+    const inv = await t.db.transaction().execute(trx => invoiceSvc.createDraft(trx, ctx, {
+      business_id: biz.id, customer_id: customer.id, invoice_number: 'INV-MGMT',
+      issue_date: today, due_date: today, memo: null, terms: null,
+      lines: [{ description: 'X', quantity: '1', unit_price: '1000.00', revenue_account_id: revenue.id, tax_code_id: null }],
+    }));
+    await t.db.transaction().execute(trx => invoiceSvc.postInvoice(trx, ctx, { invoice_id: inv.invoice.id }));
+
+    const report = await getManagementReport(t.db, ctx);
+    const thisMonth = report.revenue_by_month.find(r => r.month === today.slice(0, 7));
+    expect(Number(thisMonth?.amount)).toBe(1000);
+    expect(report.revenue_by_month.reduce((sum, r) => sum + Number(r.amount), 0)).toBe(1000);
+    expect(Number(report.total_revenue_last_12)).toBe(1000);
   });
 });
