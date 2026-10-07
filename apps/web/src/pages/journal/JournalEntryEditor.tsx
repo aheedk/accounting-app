@@ -409,6 +409,9 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           {readOnly
             ? existing.correction_block_reason
             : 'Saving updates this entry in place. The change is recorded in the audit history.'}
+          {readOnly && existing.source_path && (
+            <>{' '}<Link className="font-medium text-primary underline" to={existing.source_path}>Open the source transaction</Link></>
+          )}
         </div>
       )}
 

@@ -10,8 +10,8 @@ import { printReport } from '@/lib/reportExport';
 
 // Read-only payroll-side view of 1099 contractors. W-9 management lives on the
 // AP Contractors page; this page focuses on initiating payment via a Bill.
-// Decision: BillNewPage may not yet honor the ?vendor= query param — the link is
-// still wired so the integration lands the moment the prefill support exists.
+// The button opens a new bill with the contractor already chosen; paying it is
+// the usual Pay bills step, so the button says Create bill.
 
 type Contractor = {
   id: string;
@@ -65,7 +65,7 @@ export default function PayrollContractorsPage() {
   }, [bizId]);
 
   function payContractor(c: Contractor) {
-    navigate(`/ap/bills/new?vendor=${c.id}`);
+    navigate(`/ap/bills/new?vendor_id=${c.id}`);
   }
 
   if (!bizId) return <div>Pick a business.</div>;
@@ -175,7 +175,7 @@ export default function PayrollContractorsPage() {
                   </td>
                   <td className="p-3 text-right">
                     <Button size="sm" onClick={() => payContractor(c)}>
-                      Pay contractor
+                      Create bill
                     </Button>
                   </td>
                 </tr>

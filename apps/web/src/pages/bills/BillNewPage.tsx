@@ -71,6 +71,21 @@ function BillNewPage() {
 
   const vendor = useMemo(() => vendors.find(v => v.id === hdr.vendor_id), [vendors, hdr.vendor_id]);
 
+  // A vendor handed in by the link (Contractors, the vendor page) gets its terms
+  // and due date the same way a picked one does, once the vendor list is in.
+  const linkedVendorId = params.get('vendor_id') ?? params.get('vendor') ?? '';
+  const [linkedVendorApplied, setLinkedVendorApplied] = useState(false);
+  useEffect(() => {
+    if (linkedVendorApplied || !linkedVendorId) return;
+    const linked = vendors.find(v => v.id === linkedVendorId);
+    if (!linked) return;
+    setLinkedVendorApplied(true);
+    setHdr(h => ({
+      ...h, vendor_id: linked.id, terms_days: linked.default_terms_days ?? 0,
+      due_date: addDays(h.bill_date, linked.default_terms_days ?? 0),
+    }));
+  }, [vendors, linkedVendorId, linkedVendorApplied]);
+
   // Picking a vendor adopts its default terms; changing terms or bill date recomputes the due date (QBO behavior).
   function pickVendor(vendor_id: string) {
     const v = vendors.find(x => x.id === vendor_id);

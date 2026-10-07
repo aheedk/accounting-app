@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Copy, MoreHorizontal, Printer, Share2 } from 'lucide-react';
+import { flashMessage } from '@/lib/flash';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -148,23 +149,35 @@ export function DetailMoreMenu({ actions }: { actions: DetailMenuAction[] }) {
 
 export function baseDetailMenuActions(copyText?: string): DetailMenuAction[] {
   const shareUrl = copyText ?? window.location.href;
+  // Both actions happen off the page, so each says what it did.
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      flashMessage('Link copied');
+    } catch {
+      flashMessage('Could not copy the link');
+    }
+  }
   const shareAction: DetailMenuAction[] =
     typeof navigator.share === 'function'
       ? [{
         label: 'Share link',
         icon: <Share2 className="h-4 w-4" />,
-        onSelect: () => navigator.share({ title: document.title, url: shareUrl }),
+        onSelect: async () => {
+          try {
+            await navigator.share({ title: document.title, url: shareUrl });
+          } catch (e: unknown) {
+            // Closing the share sheet is not an error; anything else falls back to copying.
+            if (!(e instanceof DOMException && e.name === 'AbortError')) await copyLink();
+          }
+        },
       }]
       : [];
 
   return [
     { label: 'Print', icon: <Printer className="h-4 w-4" />, onSelect: () => window.print() },
     ...shareAction,
-    {
-      label: 'Copy link',
-      icon: <Copy className="h-4 w-4" />,
-      onSelect: () => navigator.clipboard?.writeText(shareUrl),
-    },
+    { label: 'Copy link', icon: <Copy className="h-4 w-4" />, onSelect: copyLink },
   ];
 }
 
