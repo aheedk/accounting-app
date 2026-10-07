@@ -1,4 +1,4 @@
-import { Kysely, sql, type Transaction } from 'kysely';
+import { Kysely, type Transaction } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
@@ -14,6 +14,7 @@ export type CreateVendorInput = {
   billing_address?: unknown;
   default_terms_days?: number;
   is_1099?: boolean;
+  is_active?: boolean;
   tax_id?: string | null;        // plaintext; service encrypts
   tax_id_type?: 'SSN' | 'EIN' | null;
   // QBO-style expanded fields (mirrors customers).
@@ -61,6 +62,7 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
     billing_address: unknown | null;
     default_terms_days?: number;
     is_1099?: boolean;
+    is_active?: boolean;
     tax_id_encrypted: Buffer | null;
     tax_id_last_four: string | null;
     tax_id_type: 'SSN' | 'EIN' | null;
@@ -112,6 +114,7 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
   };
   if (input.default_terms_days !== undefined) values.default_terms_days = input.default_terms_days;
   if (input.is_1099 !== undefined) values.is_1099 = input.is_1099;
+  if (input.is_active !== undefined) values.is_active = input.is_active;
 
   const row = await trx.insertInto('vendors').values(values).returningAll().executeTakeFirstOrThrow();
 
@@ -151,6 +154,7 @@ export async function updateVendor(
     ...(input.patch.billing_address !== undefined ? { billing_address: input.patch.billing_address ?? null } : {}),
     ...(input.patch.default_terms_days !== undefined ? { default_terms_days: input.patch.default_terms_days } : {}),
     ...(input.patch.is_1099 !== undefined ? { is_1099: input.patch.is_1099 } : {}),
+    ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
     ...(input.patch.company_name !== undefined ? { company_name: input.patch.company_name ?? null } : {}),
     ...(input.patch.title !== undefined ? { title: input.patch.title ?? null } : {}),
     ...(input.patch.first_name !== undefined ? { first_name: input.patch.first_name ?? null } : {}),
@@ -172,31 +176,71 @@ export async function updateVendor(
     ...taxIdPatch,
   }).where('id', '=', input.vendor_id).returningAll().executeTakeFirstOrThrow();
 
-  await auditRecord(trx, ctx, { action: AUDIT.VENDOR_UPDATE, entity_type: 'vendor', entity_id: input.vendor_id, before, after: updated });
+  const action = input.patch.is_active === false
+    ? AUDIT.VENDOR_DEACTIVATE
+    : input.patch.is_active === true
+      ? AUDIT.VENDOR_REACTIVATE
+      : AUDIT.VENDOR_UPDATE;
+  await auditRecord(trx, ctx, { action, entity_type: 'vendor', entity_id: input.vendor_id, before, after: updated });
   return updated;
+}
+
+// Every table that can point at a vendor. A vendor with any row in any of
+// these is history that must be kept readable, so Delete refuses it outright
+// — Make inactive (is_active) is the reversible option for that vendor.
+async function vendorHasAnyTransaction(db: Kysely<DB> | Transaction<DB>, vendor_id: string): Promise<boolean> {
+  const [expense, po, bill, billPayment, vendorCredit] = await Promise.all([
+    db.selectFrom('expense_transactions').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+    db.selectFrom('purchase_orders').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+    db.selectFrom('bills').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+    db.selectFrom('bill_payments').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+    db.selectFrom('vendor_credits').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+  ]);
+  return [expense, po, bill, billPayment, vendorCredit].some(row => row !== undefined);
+}
+
+/** Vendor ids (within this business) that have at least one transaction on
+ * file, for graying out Delete in the vendor list without a round trip per row. */
+export async function vendorIdsWithTransactions(db: Kysely<DB>, business_id: string): Promise<Set<string>> {
+  const [expenses, pos, bills, billPayments, vendorCredits] = await Promise.all([
+    db.selectFrom('expense_transactions').select('vendor_id')
+      .where('business_id', '=', business_id).where('vendor_id', 'is not', null).distinct().execute(),
+    db.selectFrom('purchase_orders').select('vendor_id')
+      .where('business_id', '=', business_id).distinct().execute(),
+    db.selectFrom('bills').select('vendor_id')
+      .where('business_id', '=', business_id).distinct().execute(),
+    db.selectFrom('bill_payments').select('vendor_id')
+      .where('business_id', '=', business_id).distinct().execute(),
+    db.selectFrom('vendor_credits').select('vendor_id')
+      .where('business_id', '=', business_id).distinct().execute(),
+  ]);
+  const ids = new Set<string>();
+  for (const rows of [expenses, pos, bills, billPayments, vendorCredits]) {
+    for (const row of rows) if (row.vendor_id) ids.add(row.vendor_id);
+  }
+  return ids;
 }
 
 export async function deleteVendor(trx: Transaction<DB>, ctx: ServiceCtx, input: { vendor_id: string }) {
   const before = await trx.selectFrom('vendors').selectAll().where('id', '=', input.vendor_id).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('vendor', input.vendor_id);
 
-  const liveBills = await trx.selectFrom('bills').select('id')
-    .where('vendor_id', '=', input.vendor_id).where('status', 'in', ['draft', 'posted', 'paid'])
-    .where('deleted_at', 'is', null).execute();
-  if (liveBills.length > 0) {
+  if (await vendorHasAnyTransaction(trx, input.vendor_id)) {
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED,
-      `Vendor has ${liveBills.length} active bill(s); void or delete them first`,
-      { live_bill_ids: liveBills.map(i => i.id) });
+      'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.');
   }
 
-  await trx.updateTable('vendors').set({ deleted_at: sql`now()` }).where('id', '=', input.vendor_id).execute();
+  await trx.deleteFrom('vendors').where('id', '=', input.vendor_id).execute();
   await auditRecord(trx, ctx, { action: AUDIT.VENDOR_DELETE, entity_type: 'vendor', entity_id: input.vendor_id, before, after: null });
 }
 
-export async function listVendors(db: Kysely<DB>, business_id: string) {
-  return db.selectFrom('vendors').selectAll()
-    .where('business_id', '=', business_id).where('deleted_at', 'is', null)
-    .orderBy('name').execute();
+export async function listVendors(
+  db: Kysely<DB>, business_id: string, opts: { includeInactive?: boolean } = {},
+) {
+  let q = db.selectFrom('vendors').selectAll()
+    .where('business_id', '=', business_id).where('deleted_at', 'is', null);
+  if (!opts.includeInactive) q = q.where('is_active', '=', true);
+  return q.orderBy('name').execute();
 }
 
 export async function getVendor(db: Kysely<DB>, business_id: string, vendor_id: string) {

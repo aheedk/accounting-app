@@ -73,6 +73,8 @@ export const AUDIT = {
   // Vendors
   VENDOR_CREATE: 'vendor.create',
   VENDOR_UPDATE: 'vendor.update',
+  VENDOR_DEACTIVATE: 'vendor.deactivate',
+  VENDOR_REACTIVATE: 'vendor.reactivate',
   VENDOR_DELETE: 'vendor.delete',
 
   // Bills

@@ -81,6 +81,19 @@ months.
 
 **Priority:** low.
 
+### Customers: same batch actions / active / delete pattern as Vendors
+Vendors (list page) now has row checkboxes with a batch-actions bar (Email
+stub, Make inactive), a per-row Action dropdown (Create bill, Create expense,
+Edit, Make inactive, Delete), an `is_active` flag defaulting dropdowns app-wide
+to active-only, and a hard Delete that's blocked with a 409 whenever the
+vendor has any transaction on file (`vendorService.ts`: `is_active`,
+`vendorIdsWithTransactions`, rewritten `deleteVendor`). Customers has no
+equivalent yet — same shape of work (`customerService.ts` + `CustomerListPage.tsx`),
+checking `invoices`/`payments`/`credit_memos`/`sales_orders` (whichever
+actually have a `customer_id` FK) instead of the AP tables.
+
+**Priority:** medium — raised alongside the Vendors work, not implemented.
+
 ### Third-party integrations (out of scope until a client needs them)
 - **Payroll tax engine** (Symmetry, ADP API, …) — slice 13 ships manual
   tax-table entry per pay run line; integrate at the point of needing filings.

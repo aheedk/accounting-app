@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { hasMinRole } from '@accounting/shared';
 import { BookOpen, ChevronDown, Clock, Copy, History, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -306,6 +306,7 @@ function AuditHistoryModal({ bizId, expenseId, onClose }: { bizId: string; expen
 export default function ExpensePage() {
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
+  const [searchParams] = useSearchParams();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const { user, businesses } = useAuth();
@@ -379,6 +380,10 @@ export default function ExpensePage() {
       setLines(e.lines.length > 0
         ? e.lines.map(l => ({ id: l.id, category_account_id: l.category_account_id, description: l.description ?? '', amount: l.amount }))
         : [emptyLine(0), emptyLine(1)]);
+    } else {
+      // From a vendor's "Create expense" action: pre-select them as payee.
+      const vendorId = searchParams.get('vendor_id');
+      if (vendorId) { setPayeeId(vendorId); setPayeeType('vendor'); setPayeeText(''); }
     }
   }, [bizId, id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 

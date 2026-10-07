@@ -30,8 +30,17 @@ const EXPANDED_VENDOR_FIELDS = [
 ] as const;
 
 router.get('/businesses/:businessId/vendors', async (req, res, next) => {
-  try { res.json({ vendors: await vend.listVendors(db, req.tenancy!.business_id) }); }
-  catch (e) { next(e); }
+  try {
+    const businessId = req.tenancy!.business_id;
+    const includeInactive = req.query['include_inactive'] === 'true';
+    const [vendors, withTransactions] = await Promise.all([
+      vend.listVendors(db, businessId, { includeInactive }),
+      vend.vendorIdsWithTransactions(db, businessId),
+    ]);
+    res.json({
+      vendors: vendors.map(v => ({ ...v, has_transactions: withTransactions.has(v.id) })),
+    });
+  } catch (e) { next(e); }
 });
 
 router.get('/businesses/:businessId/vendors/:id', async (req, res, next) => {
@@ -49,6 +58,7 @@ router.post('/businesses/:businessId/vendors', requireMinRole('staff'), async (r
     };
     if (body.phone !== undefined) input.phone = body.phone ?? null;
     if (body.is_1099 !== undefined) input.is_1099 = body.is_1099;
+    if (body.is_active !== undefined) input.is_active = body.is_active;
     if (body.tax_id !== undefined) input.tax_id = body.tax_id ?? null;
     if (body.tax_id_type !== undefined) input.tax_id_type = body.tax_id_type ?? null;
     if (body.default_terms_days !== undefined) input.default_terms_days = body.default_terms_days;
@@ -71,6 +81,7 @@ router.patch('/businesses/:businessId/vendors/:id', requireMinRole('accountant')
     if (parsed.email !== undefined) patch.email = parsed.email ?? null;
     if (parsed.phone !== undefined) patch.phone = parsed.phone ?? null;
     if (parsed.is_1099 !== undefined) patch.is_1099 = parsed.is_1099;
+    if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;
     if (parsed.tax_id !== undefined) patch.tax_id = parsed.tax_id ?? null;
     if (parsed.tax_id_type !== undefined) patch.tax_id_type = parsed.tax_id_type ?? null;
     if (parsed.default_terms_days !== undefined) patch.default_terms_days = parsed.default_terms_days;

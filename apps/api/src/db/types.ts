@@ -354,6 +354,7 @@ export interface VendorsTable {
   tax_id_last_four: string | null;
   tax_id_type: 'SSN' | 'EIN' | null;
   is_1099: Generated<boolean>;
+  is_active: Generated<boolean>;
   default_terms_days: Generated<number>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { hasMinRole } from '@accounting/shared';
 import { ChevronDown, FileDown, Printer, Settings } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -13,6 +15,7 @@ import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
 import { daysAgoLocal, todayLocal } from '@/lib/dates';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { printReport } from '@/lib/reportExport';
+import { pickErr } from '@/lib/apiErrors';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -21,21 +24,38 @@ const IMPORT_COLS = [
   { key: 'default_terms_days', header: 'Terms Days' },
 ];
 
-type Vendor = { id: string; name: string; email: string | null; phone: string | null; default_terms_days: number; is_1099: boolean };
+type Vendor = {
+  id: string; name: string; email: string | null; phone: string | null;
+  default_terms_days: number; is_1099: boolean; is_active: boolean; has_transactions: boolean;
+};
 type Bill = { id: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
 
 export default function VendorListPage() {
   const [bizId] = useActiveBusinessId();
+  const { user, businesses } = useAuth();
+  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  const canMakeInactive = role !== undefined && hasMinRole(role, 'accountant');
+  const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
+
   const [items, setItems] = useState<Vendor[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [openActionRow, setOpenActionRow] = useState<string | null>(null);
+  const [rowBusyId, setRowBusyId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   async function reload() {
     if (!bizId) return;
-    const r = await api.get(`/businesses/${bizId}/vendors`);
+    const r = await api.get(`/businesses/${bizId}/vendors`, {
+      params: showInactive ? { include_inactive: 'true' } : {},
+    });
     setItems(r.data.vendors);
   }
-  useEffect(() => { reload(); }, [bizId]);
+  useEffect(() => { reload(); }, [bizId, showInactive]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setBills(r.data.bills)); }, [bizId]);
 
   const today = todayLocal();
@@ -71,7 +91,18 @@ export default function VendorListPage() {
   );
 
   const columns: Column<Row>[] = [
-    { key: 'name', header: 'Vendor', sortable: true, sortValue: r => r.name, render: r => <Link className="font-medium hover:underline" to={`/ap/vendors/${r.id}`}>{r.name}</Link> },
+    {
+      key: 'name',
+      header: 'Vendor',
+      sortable: true,
+      sortValue: r => r.name,
+      render: r => (
+        <span className="inline-flex items-center gap-2">
+          <Link className="font-medium hover:underline" to={`/ap/vendors/${r.id}`}>{r.name}</Link>
+          {!r.is_active && <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Inactive</span>}
+        </span>
+      ),
+    },
     { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</span> },
     { key: 'email', header: 'Email', sortable: true, sortValue: r => r.email ?? '', render: r => r.email || <span className="text-muted-foreground">—</span> },
     {
@@ -93,6 +124,32 @@ export default function VendorListPage() {
       phone: row['phone'] || null,
       default_terms_days: row['default_terms_days'] ? parseInt(row['default_terms_days'], 10) : undefined,
     });
+  }
+
+  async function makeInactive(ids: string[]) {
+    if (!bizId) return;
+    const noun = ids.length === 1 ? 'vendor' : `${ids.length} vendors`;
+    if (!window.confirm(`Make ${noun} inactive? They will be hidden from dropdowns but their transaction history will be preserved.`)) return;
+    setErr(null);
+    setBatchBusy(true);
+    try {
+      await Promise.all(ids.map(id => api.patch(`/businesses/${bizId}/vendors/${id}`, { is_active: false })));
+      setSelectedIds(new Set());
+      await reload();
+    } catch (e: unknown) { setErr(pickErr(e)); }
+    finally { setBatchBusy(false); }
+  }
+
+  async function deleteVendor(v: Vendor) {
+    if (!bizId) return;
+    if (!window.confirm(`Permanently delete ${v.name}? This cannot be undone.`)) return;
+    setRowBusyId(v.id);
+    setErr(null);
+    try {
+      await api.delete(`/businesses/${bizId}/vendors/${v.id}`);
+      await reload();
+    } catch (e: unknown) { setErr(pickErr(e)); }
+    finally { setRowBusyId(null); }
   }
 
   if (!bizId) return <div>Pick a business.</div>;
@@ -141,6 +198,57 @@ export default function VendorListPage() {
         ]} />
       </div>
 
+      {err && <p className="text-sm text-destructive">{err}</p>}
+
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" checked={showInactive} onChange={e => { setShowInactive(e.target.checked); setSelectedIds(new Set()); }} />
+          Show inactive vendors
+        </label>
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-md bg-gray-900 px-4 py-2.5 text-sm text-white">
+          <span className="font-medium">{selectedIds.size} vendor{selectedIds.size === 1 ? '' : 's'} selected</span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setBatchOpen(current => !current)}
+              disabled={batchBusy}
+              className="inline-flex items-center gap-1 rounded-md border border-white/30 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-50"
+            >
+              Batch actions <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {batchOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setBatchOpen(false)} />
+                <div className="absolute top-full left-0 z-50 mt-1 w-48 rounded-md border bg-white text-foreground shadow-lg dark:bg-zinc-900">
+                  <button
+                    type="button"
+                    onClick={() => { setBatchOpen(false); alert('Email — coming soon'); }}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    Email
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canMakeInactive}
+                    onClick={() => { setBatchOpen(false); void makeInactive([...selectedIds]); }}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                    title={canMakeInactive ? undefined : 'Accountant access is required'}
+                  >
+                    Make inactive
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <button type="button" onClick={() => setSelectedIds(new Set())} className="ml-auto text-white/70 hover:text-white" aria-label="Clear selection">
+            ×
+          </button>
+        </div>
+      )}
+
       <Card><CardContent className="p-0">
         <DataTable
           rows={rows}
@@ -148,11 +256,70 @@ export default function VendorListPage() {
           columns={columns}
           defaultSortKey="name"
           defaultSortDir="asc"
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
-            <span className="inline-flex items-center gap-2">
+            <span className="relative inline-flex items-center gap-2">
               <Link className="text-primary hover:underline" to={`/ap/bills/new?vendor_id=${r.id}`}>Create bill</Link>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <button
+                type="button"
+                onClick={() => setOpenActionRow(current => (current === r.id ? null : r.id))}
+                disabled={rowBusyId === r.id}
+                aria-label={`More actions for ${r.name}`}
+              >
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+              {openActionRow === r.id && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setOpenActionRow(null)} />
+                  <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border bg-white text-left shadow-lg dark:bg-zinc-900">
+                    <Link
+                      to={`/ap/bills/new?vendor_id=${r.id}`}
+                      onClick={() => setOpenActionRow(null)}
+                      className="block w-full px-3 py-2 text-sm hover:bg-accent"
+                    >
+                      Create bill
+                    </Link>
+                    <Link
+                      to={`/accounting/expenses/new?vendor_id=${r.id}`}
+                      onClick={() => setOpenActionRow(null)}
+                      className="block w-full px-3 py-2 text-sm hover:bg-accent"
+                    >
+                      Create expense
+                    </Link>
+                    <Link
+                      to={`/ap/vendors/${r.id}`}
+                      onClick={() => setOpenActionRow(null)}
+                      className="block w-full px-3 py-2 text-sm hover:bg-accent"
+                    >
+                      Edit
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={!canMakeInactive || !r.is_active}
+                      onClick={() => { setOpenActionRow(null); void makeInactive([r.id]); }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                      title={!canMakeInactive ? 'Accountant access is required' : !r.is_active ? 'Already inactive' : undefined}
+                    >
+                      Make inactive
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canDelete || r.has_transactions}
+                      onClick={() => { setOpenActionRow(null); void deleteVendor(r); }}
+                      className="block w-full border-t px-3 py-2 text-left text-sm text-destructive hover:bg-accent disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-60"
+                      title={
+                        r.has_transactions
+                          ? 'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.'
+                          : !canDelete ? 'Firm admin access is required' : undefined
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
             </span>
           )}
           emptyMessage={<EmptyState title="No vendors yet" hint="Add a vendor to start tracking bills and expenses." actionLabel="New vendor" actionTo="/ap/vendors/new" />}

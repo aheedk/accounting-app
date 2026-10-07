@@ -32,6 +32,7 @@ export const vendorCreateSchema = z.object({
   tax_id: z.string().min(1).max(50).nullable().optional(),
   tax_id_type: z.enum(['SSN', 'EIN']).nullable().optional(),
   is_1099: z.boolean().optional(),
+  is_active: z.boolean().optional(),
   default_terms_days: z.number().int().min(0).max(365).optional(),
   ...vendorExpandedFields,
 }).refine(
@@ -48,6 +49,7 @@ export const vendorUpdateSchema = z.object({
   tax_id: z.string().min(1).max(50).nullable().optional(),
   tax_id_type: z.enum(['SSN', 'EIN']).nullable().optional(),
   is_1099: z.boolean().optional(),
+  is_active: z.boolean().optional(),
   default_terms_days: z.number().int().min(0).max(365).optional(),
   ...vendorExpandedFields,
 }).refine(
