@@ -84,6 +84,13 @@ export async function listBankAccounts(db: Kysely<DB>, business_id: string) {
         .whereRef('bt.bank_account_id', '=', 'ba.id')
         .where('bt.status', '!=', 'excluded')
         .as('bank_balance'),
+      // Book side: what the ledger holds in the account behind this bank account.
+      eb.selectFrom('journal_entry_lines as jel')
+        .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
+        .select(sql<string>`COALESCE(SUM(jel.debit - jel.credit), 0)::text`.as('v'))
+        .whereRef('jel.account_id', '=', 'ba.cash_account_id')
+        .where('je.status', 'in', ['posted', 'voided'])
+        .as('book_balance'),
     ])
     .where('ba.business_id', '=', business_id)
     .where('ba.deleted_at', 'is', null)

@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
+import { fmtMoney } from '@/lib/money';
 
 function statusBadge(active: boolean) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
@@ -29,6 +30,10 @@ type Account = {
   is_active: boolean;
   cash_account_code: string;
   cash_account_name: string;
+  /** What the ledger holds in the linked account. */
+  book_balance?: string;
+  /** The total of imported bank-feed transactions. */
+  bank_balance?: string;
 };
 
 type CashAccountRow = {
@@ -98,6 +103,7 @@ export default function BankAccountListPage() {
     { key: 'institution', header: 'Institution', sortable: true, sortValue: r => r.institution ?? '', render: r => r.institution || <span className="text-muted-foreground">—</span> },
     { key: 'account_last_four', header: 'Last 4', sortable: true, sortValue: r => r.account_last_four ?? '', render: r => <span className="font-mono">{r.account_last_four || <span className="text-muted-foreground">—</span>}</span> },
     { key: 'cash_account', header: 'Linked CoA', sortable: true, sortValue: r => `${r.cash_account_code} ${r.cash_account_name}`, render: r => <span className="font-mono">{r.cash_account_code} — {r.cash_account_name}</span> },
+    { key: 'book_balance', header: 'Book balance', sortable: true, align: 'right', sortValue: r => Number(r.book_balance ?? 0), render: r => <span className="font-mono">{fmtMoney(r.book_balance ?? '0')}</span> },
     { key: 'status', header: 'Status', sortable: true, sortValue: r => r.is_active ? 'active' : 'inactive', render: r => statusBadge(r.is_active) },
   ];
 

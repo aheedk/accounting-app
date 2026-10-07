@@ -34,12 +34,17 @@ export function AppShell() {
   if (switchedTo) return <CompanySwitchedScreen businessId={switchedTo} />;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar />
-      <MobileNav open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopBar onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+    // print:* — on paper there is no sidebar or top bar, and the page is as tall as its content.
+    <div className="flex h-screen overflow-hidden bg-background text-foreground print:block print:h-auto print:overflow-visible">
+      <div className="contents print:hidden">
+        <Sidebar />
+        <MobileNav open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
+        <div className="contents print:hidden">
+          <TopBar onMenuClick={() => setMobileNavOpen(true)} />
+        </div>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>
