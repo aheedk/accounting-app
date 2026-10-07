@@ -16,6 +16,7 @@ import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
+import { CODING_LAYERS } from '@accounting/shared';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
 type StatusFilter = BankTransactionStatus | 'all';
@@ -51,6 +52,8 @@ type JournalEntry = {
   source_type: string;
   reference: string | null;
 };
+
+type CodingSuggestion = { account_id: string; confidence: number; band: string; source_layer: string };
 
 type Account = {
   id: string;
@@ -264,20 +267,36 @@ export default function BankTransactionsInboxPage() {
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+  // What the auto-coding engine would pick for the transaction being categorized.
+  const [suggestion, setSuggestion] = useState<CodingSuggestion | null>(null);
+
   function openAction(t: BankTransaction, mode: ActionMode) {
     setErr(null);
+    setSuggestion(null);
     setAction({
       txnId: t.id,
       mode,
       journal_entry_id: '',
-      // Blank on purpose: a pre-filled account gets submitted without being read.
+      // Blank unless the engine is confident: a pre-filled account gets submitted without being read.
       offset_account_id: '',
       memo: '',
       excluded_reason: '',
     });
+    if (mode !== 'categorize' || !bizId) return;
+    api.get<{ suggestion: CodingSuggestion | null }>(`/businesses/${bizId}/bank-transactions/${t.id}/suggestion`)
+      .then(r => {
+        const found = r.data.suggestion;
+        if (!found) return;
+        setSuggestion(found);
+        // 90 and up is filled in (a rule the client taught, a vendor default); below that it is only offered.
+        if (found.confidence >= 90) {
+          setAction(a => (a && a.txnId === t.id && a.offset_account_id === '' ? { ...a, offset_account_id: found.account_id } : a));
+        }
+      })
+      .catch(() => { /* a suggestion is a convenience; categorizing works without it */ });
   }
 
-  function closeAction() { setAction(null); setErr(null); }
+  function closeAction() { setAction(null); setErr(null); setSuggestion(null); }
 
   async function submitMatch(e: React.FormEvent) {
     e.preventDefault();
@@ -824,6 +843,22 @@ export default function BankTransactionsInboxPage() {
                                   );
                                 })}
                               </AppSelect>
+                              {suggestion && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {CODING_LAYERS.find(layer => layer.id === suggestion.source_layer)?.label ?? 'Suggested'}:{' '}
+                                  <span className="font-medium text-foreground">
+                                    {accounts.find(a => a.id === suggestion.account_id)?.name ?? 'an account'}
+                                  </span>{' '}
+                                  ({suggestion.confidence}%)
+                                  {action.offset_account_id !== suggestion.account_id && (
+                                    <>{' '}<button
+                                      type="button"
+                                      className="font-medium text-primary underline"
+                                      onClick={() => setAction(a => (a ? { ...a, offset_account_id: suggestion.account_id } : a))}
+                                    >Use</button></>
+                                  )}
+                                </p>
+                              )}
                             </div>
                             <div className="col-span-4">
                               <Label>Memo (optional)</Label>

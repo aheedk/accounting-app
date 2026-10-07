@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as btSvc from '../services/banking/bankTransactionService.js';
+import { suggestCoding } from '../services/ai/autoCodingService.js';
 import type { BankTransactionStatus } from '../db/types.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
@@ -99,6 +100,34 @@ router.post('/businesses/:businessId/bank-transactions/:id/match', requireMinRol
       }),
     );
     res.json(updated);
+  } catch (e) { next(e); }
+});
+
+// What the auto-coding engine would code this transaction to, if it has a view.
+// The same layered engine the AI inbox uses; null when nothing reaches "suggested".
+router.get('/businesses/:businessId/bank-transactions/:id/suggestion', async (req, res, next) => {
+  try {
+    const txn = await db.selectFrom('bank_transactions as bt')
+      .innerJoin('bank_accounts as ba', 'ba.id', 'bt.bank_account_id')
+      .select(['bt.description', 'bt.amount', 'ba.cash_account_id'])
+      .where('bt.id', '=', req.params['id']!)
+      .where('bt.business_id', '=', req.tenancy!.business_id)
+      .executeTakeFirst();
+    if (!txn) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Bank transaction not found' } }); return; }
+    const amount = Number(txn.amount);
+    const suggestion = await suggestCoding(db, ctxFromReq(req), {
+      description: txn.description,
+      amount: `${Math.abs(amount)}`,
+      // Money in is offset by a credit (income); money out by a debit (an expense).
+      direction: amount >= 0 ? 'credit' : 'debit',
+    });
+    const accountId = suggestion?.lines[0]?.account_id;
+    // A suggestion pointing back at the bank's own account says nothing.
+    res.json({
+      suggestion: suggestion && accountId && accountId !== txn.cash_account_id
+        ? { account_id: accountId, confidence: suggestion.confidence, band: suggestion.band, source_layer: suggestion.source_layer }
+        : null,
+    });
   } catch (e) { next(e); }
 });
 
