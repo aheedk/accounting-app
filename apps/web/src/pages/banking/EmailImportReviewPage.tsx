@@ -10,6 +10,7 @@ import { SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { useAddParty } from '@/components/addNew/useAddParty';
+import { useAddVendorQuick } from '@/components/addNew/useAddVendorQuick';
 import { pickErr } from '@/lib/apiErrors';
 import CheckStubsPanel from './CheckStubsPanel';
 
@@ -199,14 +200,7 @@ export default function EmailImportReviewPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
-  // Set synchronously inside onCreated, so the pick() callback below -- called
-  // right after it, in the same synchronous save() -- can read the vendor's
-  // name without waiting on the setVendors state update to land.
-  const lastCreatedVendorRef = useRef<Vendor | null>(null);
-  const addVendor = useAddParty<Vendor>('vendor', vendor => {
-    lastCreatedVendorRef.current = vendor;
-    setVendors(prev => [...prev, vendor]);
-  });
+  const addVendor = useAddVendorQuick(vendor => setVendors(prev => [...prev, vendor]));
   const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
   // Which bank-review row's payee suggestion dropdown is open, if any.
   const [payeeDropdownRow, setPayeeDropdownRow] = useState<number | null>(null);
@@ -901,10 +895,7 @@ export default function EmailImportReviewPage() {
                                         onMouseDown={e => e.preventDefault()}
                                         onClick={() => {
                                           setPayeeDropdownRow(null);
-                                          addVendor.open(() => {
-                                            const created = lastCreatedVendorRef.current;
-                                            if (created) setPayees(prev => ({ ...prev, [i]: created.name }));
-                                          });
+                                          addVendor.open(vendor => setPayees(prev => ({ ...prev, [i]: vendor.name })));
                                         }}
                                         className="w-full rounded-sm px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-accent"
                                       >
@@ -1288,7 +1279,7 @@ export default function EmailImportReviewPage() {
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium whitespace-nowrap w-52">Vendor</label>
                     <AppSelect value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)}
-                      onAddNew={() => addVendor.open(id => setSelectedVendorId(id))} addNewLabel="Add new vendor"
+                      onAddNew={() => addVendor.open(vendor => setSelectedVendorId(vendor.id))} addNewLabel="Add new vendor"
                       className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm">
                       <option value="">— select vendor —</option>
                       {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
