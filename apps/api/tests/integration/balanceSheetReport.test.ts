@@ -93,4 +93,49 @@ describe('Balance Sheet report', () => {
     expect(bs.assets_total).toBe('0.0000');
     expect(bs.net_income_ytd).toBe('0.0000');
   });
+
+  // Found by the report tie-out on 2026-10-07: nothing carried a finished year's
+  // profit into Retained Earnings, so every balance sheet went out of balance on
+  // the first day of the next year.
+  it('carries earlier years into Retained Earnings, so it still balances after year end', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id);
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
+    await seedYearPeriods(t.db, biz.id, 2026);
+    await seedYearPeriods(t.db, biz.id, 2027);
+    await seedCoa(t.db, biz.id);
+    const account = (code: string) => t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('business_id', '=', biz.id).where('code', '=', code).executeTakeFirstOrThrow();
+    const [cash, revenue, retained] = await Promise.all([account('1020'), account('4010'), account('3020')]);
+    const earn = (entry_date: string, amount: string) => t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date, source_type: 'manual', memo: 'Sale',
+      lines: [
+        { account_id: cash.id, debit: amount, credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: amount, memo: null },
+      ],
+    }));
+    await earn('2026-06-15', '1000.0000');
+    await earn('2027-02-10', '300.0000');
+
+    const during = await rpt.balanceSheet(t.db, { business_id: biz.id, as_of: '2026-12-31' });
+    expect(during).toMatchObject({ net_income_ytd: '1000.0000', retained_earnings_prior_years: '0.0000', in_balance: true });
+
+    const after = await rpt.balanceSheet(t.db, { business_id: biz.id, as_of: '2027-03-31' });
+    expect(after).toMatchObject({
+      assets_total: '1300.0000', net_income_ytd: '300.0000', fiscal_year_start: '2027-01-01',
+      retained_earnings_prior_years: '1000.0000', liabilities_equity_total: '1300.0000', in_balance: true,
+    });
+    expect(after.equity_lines.find(line => line.account_id === retained.id)?.amount).toBe('1000.0000');
+
+    // A July fiscal year: June's sale is already a finished year by August.
+    await t.db.updateTable('businesses').set({ fiscal_year_start_month: 7 }).where('id', '=', biz.id).execute();
+    const fiscal = await rpt.balanceSheet(t.db, { business_id: biz.id, as_of: '2026-08-31' });
+    expect(fiscal).toMatchObject({
+      fiscal_year_start: '2026-07-01', net_income_ytd: '0.0000', retained_earnings_prior_years: '1000.0000', in_balance: true,
+    });
+    expect(rpt.fiscalYearStart('2026-03-15', 7)).toBe('2025-07-01');
+    expect(rpt.fiscalYearStart('2026-07-01', 7)).toBe('2026-07-01');
+    expect(rpt.fiscalYearStart('2026-03-15', 1)).toBe('2026-01-01');
+  });
 });

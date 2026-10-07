@@ -207,15 +207,18 @@ export default function BalanceSheetPage() {
               <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Equity</td>
             </tr>
             {report.equity_lines.map(l => (
-              <tr key={l.account_id} className="border-b hover:bg-muted/30">
+              <tr key={l.account_id || l.account_name} className="border-b hover:bg-muted/30">
                 <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
                 <td className="p-3 text-right font-mono">
+                  {/* Earlier years' profit shown with no account behind it has nothing to drill into. */}
+                  {!l.account_id ? fmtMoney(l.amount) : (
                   <ReportAmountLink
                     to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
                     title={`View ${l.account_name} transactions in the General Ledger`}
                   >
                     {fmtMoney(l.amount)}
                   </ReportAmountLink>
+                  )}
                 </td>
               </tr>
             ))}
