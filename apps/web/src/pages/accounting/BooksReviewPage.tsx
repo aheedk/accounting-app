@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { pickErr } from '@/lib/apiErrors';
+import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 
 type Period = {
@@ -70,8 +71,14 @@ export default function BooksReviewPage() {
       .then(r => {
         const sorted = [...r.data.periods].sort((a, b) => b.starts_on.localeCompare(a.starts_on));
         setPeriods(sorted);
-        const firstOpen = sorted.find(p => p.status === 'open') ?? sorted[0];
-        setPeriodId(firstOpen ? firstOpen.id : '');
+        // The month we are in; failing that the latest open one that has started.
+        // (The latest open period of all is usually next December.)
+        const today = todayLocal();
+        const current = sorted.find(p => p.starts_on <= today && p.ends_on >= today)
+          ?? sorted.find(p => p.status === 'open' && p.starts_on <= today)
+          ?? sorted.find(p => p.status === 'open')
+          ?? sorted[0];
+        setPeriodId(current ? current.id : '');
       })
       .catch((e: unknown) => setErr(pickErr(e)));
   }, [bizId]);

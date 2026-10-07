@@ -54,6 +54,8 @@ type Account = { id: string; name: string };
 type VendorTransaction = {
   id: string; type: string; date: string; ref_no: string | null;
   total_amount: string; status: string; updated_at: string; path: string;
+  // Only a bill has one. A posted bill past it reads Overdue, as on the Bills page.
+  due_date?: string | null;
 };
 
 const TX_TYPE_LABELS: Record<string, string> = {
@@ -273,7 +275,7 @@ export default function VendorDetailPage() {
 
       <MoneyBar segments={[
         { amount: stats.overdue, caption: `${stats.overdueCount} overdue`, colorClass: 'bg-orange-400' },
-        { amount: stats.open, caption: `${stats.openCount} open bill${stats.openCount === 1 ? '' : 's'}`, colorClass: 'bg-gray-300' },
+        { amount: stats.open, caption: `${stats.openCount} not due yet`, colorClass: 'bg-gray-300' },
         { amount: stats.paid, caption: `${stats.paidCount} paid`, colorClass: 'bg-green-600' },
       ]} />
 
@@ -318,7 +320,7 @@ export default function VendorDetailPage() {
                     <td className="p-3 whitespace-nowrap">{tx.date}</td>
                     <td className="p-3">{TX_TYPE_LABELS[tx.type] ?? tx.type}</td>
                     <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="p-3 capitalize">{tx.status}</td>
+                    <td className="p-3 capitalize">{tx.type === 'bill' && tx.status === 'posted' ? (tx.due_date && tx.due_date.slice(0, 10) < today ? 'Overdue' : 'Open') : tx.status}</td>
                     <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
                     <td className="p-3 whitespace-nowrap text-muted-foreground">{fmtDateTime(tx.updated_at)}</td>
                     <td className="p-3 text-right">

@@ -41,6 +41,22 @@ type RunDueResult = {
 
 type Line = { account_id: string; debit: string; credit: string; memo: string };
 
+/**
+ * What one run of a template is for, read from its saved lines: a journal
+ * entry's debits, an invoice's or bill's quantity times price, or the amounts
+ * on a deposit, expense or check.
+ */
+export function templateAmount(payload: unknown): number {
+  const lines = (payload as { lines?: unknown } | null)?.lines;
+  if (!Array.isArray(lines)) return 0;
+  return lines.reduce<number>((total, raw) => {
+    const line = raw as { debit?: unknown; amount?: unknown; quantity?: unknown; unit_price?: unknown };
+    if (line.debit !== undefined) return total + (Number(line.debit) || 0);
+    if (line.amount !== undefined) return total + (Number(line.amount) || 0);
+    return total + (Number(line.quantity ?? 1) || 0) * (Number(line.unit_price) || 0);
+  }, 0);
+}
+
 const blankLine = (): Line => ({ account_id: '', debit: '0.00', credit: '0.00', memo: '' });
 
 const blankForm = () => ({
@@ -176,7 +192,7 @@ export default function RecurringTransactionsPage() {
       INTERVAL_LABELS[t.recurrence] ?? t.recurrence,
       fmtShortDate(t.last_run_at),
       fmtShortDate(t.next_run_date),
-      '0.00',
+      templateAmount(t.payload).toFixed(2),
     ]);
     return { headers, rows };
   }
@@ -546,7 +562,7 @@ export default function RecurringTransactionsPage() {
                     <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(t.last_run_at)}</td>
                     <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(t.next_run_date)}</td>
                     <td className="p-3 text-muted-foreground">—</td>
-                    <td className="p-3 text-right font-mono">0.00</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(templateAmount(t.payload))}</td>
                     <td className="p-3 text-right">
                       <Button
                         size="sm"
