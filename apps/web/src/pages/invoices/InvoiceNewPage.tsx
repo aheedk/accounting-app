@@ -10,17 +10,26 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductServiceSelect, type ProductServiceItem } from '@/components/ui/ProductServiceSelect';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { addDaysLocal, todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { useAddParty } from '@/components/addNew/useAddParty';
 import { SaveButtons, resettable, useSaveAndPost } from '@/components/SaveAndPost';
 
 type Line = { description: string; inventory_item_id: string; amount: string };
-type Customer = { id: string; name: string };
+type Customer = { id: string; name: string; default_terms_days?: number };
 type TaxCode = { id: string; code: string; name: string; current_rate: string | null };
 const blank = (): Line => ({ description: '', inventory_item_id: '', amount: '' });
 
-const STANDARD_TERMS = ['Net 30', 'Net 60', 'Net 90', '2/10 Net 30'];
+const TERMS_OPTIONS: { label: string; days: number }[] = [
+  { label: 'Due on receipt', days: 0 },
+  { label: 'Net 15', days: 15 },
+  { label: 'Net 30', days: 30 },
+  { label: 'Net 45', days: 45 },
+  { label: 'Net 60', days: 60 },
+  { label: 'Net 90', days: 90 },
+  { label: '2/10 Net 30', days: 30 },
+];
+const termsDays = (label: string) => TERMS_OPTIONS.find(t => t.label === label)?.days ?? 0;
 
 function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
@@ -31,7 +40,23 @@ function InvoiceNewPage() {
   const [items, setItems] = useState<ProductServiceItem[]>([]);
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const today = todayLocal();
-  const [hdr, setHdr] = useState({ customer_id: '', invoice_number: '', issue_date: today, due_date: today, memo: '', terms: 'Net 30' });
+  const [hdr, setHdr] = useState({ customer_id: '', invoice_number: '', issue_date: today, due_date: addDaysLocal(today, 30), memo: '', terms: 'Net 30' });
+
+  // Picking a customer adopts its default terms; changing terms or the invoice date
+  // recomputes the due date, same as the Bill form. The due date stays editable.
+  function pickCustomer(customer_id: string) {
+    const days = customers.find(c => c.id === customer_id)?.default_terms_days;
+    const terms = days === undefined ? undefined : TERMS_OPTIONS.find(t => t.days === days)?.label;
+    setHdr(h => (terms
+      ? { ...h, customer_id, terms, due_date: addDaysLocal(h.issue_date, termsDays(terms)) }
+      : { ...h, customer_id }));
+  }
+  function pickTerms(terms: string) {
+    setHdr(h => ({ ...h, terms, due_date: addDaysLocal(h.issue_date, termsDays(terms)) }));
+  }
+  function pickIssueDate(issue_date: string) {
+    setHdr(h => ({ ...h, issue_date, due_date: addDaysLocal(issue_date, termsDays(h.terms)) }));
+  }
   const [taxCodeId, setTaxCodeId] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
@@ -130,17 +155,17 @@ function InvoiceNewPage() {
       <Card><CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Customer</Label>
-            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => setHdr(h => ({ ...h, customer_id: e.target.value }))} required onAddNew={() => addCustomer.open(id => setHdr(h => ({ ...h, customer_id: id })))} addNewLabel="Add new customer">
+            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.customer_id} onChange={e => pickCustomer(e.target.value)} required onAddNew={() => addCustomer.open(id => setHdr(h => ({ ...h, customer_id: id })))} addNewLabel="Add new customer">
               <option value="">Select a customer…</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </AppSelect>
           </div>
           <div><Label>Invoice no.</Label><Input value={hdr.invoice_number} onChange={e => setHdr(h => ({ ...h, invoice_number: e.target.value }))} placeholder="e.g. 1042" required /></div>
           <div><Label>Terms</Label>
-            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms} onChange={e => setHdr(h => ({ ...h, terms: e.target.value }))}>
-              {STANDARD_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+            <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={hdr.terms} onChange={e => pickTerms(e.target.value)}>
+              {TERMS_OPTIONS.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
             </AppSelect>
           </div>
-          <div><Label>Invoice date</Label><DateInput value={hdr.issue_date} onChange={e => setHdr(h => ({ ...h, issue_date: e.target.value }))} required /></div>
+          <div><Label>Invoice date</Label><DateInput value={hdr.issue_date} onChange={e => pickIssueDate(e.target.value)} required /></div>
           <div><Label>Due date</Label><DateInput value={hdr.due_date} onChange={e => setHdr(h => ({ ...h, due_date: e.target.value }))} required /></div>
           <div><Label>Note to customer</Label><Input value={hdr.memo} onChange={e => setHdr(h => ({ ...h, memo: e.target.value }))} placeholder="Thank you for your business." /></div>
         </CardContent>
