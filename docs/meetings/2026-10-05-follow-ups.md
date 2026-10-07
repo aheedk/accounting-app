@@ -49,10 +49,10 @@ vendor.
 - **Inventory never reaches the ledger.** The last serious one. It needs three
   answers first (how receipts post, average cost or first-in-first-out, what to do
   with stock already entered): `docs/specs/2026-10-07-inventory-ledger-design.md`.
-- **Features, each a job of its own:** run payroll from the app, AI suggestions on
-  Bank Transactions, editing posted invoices, emailing an invoice or saving it as a
-  PDF, cost centers, Transfer and Estimate, searching customers and invoices, paying
-  several vendors' bills at once.
+- **Features, each a job of its own:** run payroll from the app, editing posted
+  invoices, emailing an invoice or saving it as a PDF, cost centers, Transfer and
+  Estimate, paying several vendors' bills at once, AI suggestions on Integration
+  Transactions.
 - **Look and naming:** unstyled Fixed Asset, Purchase Order and Employee pages, a
   fuller dashboard, mixed table header capitals, the two Contractors pages, the two
   rule systems, and the name "Spreadsheet Sync".
@@ -133,6 +133,8 @@ Audit bugs fixed (part of item 17), all Aheed:
 | Codes read as words, quantities lose their padding, Ctrl K on Windows | `c91f78a` |
 | The auto-post switch saves (it never had); capitalization threshold has a setting | `34eee11` |
 | Bank Accounts shows book balances; pages print without the sidebar and top bar | `c1f13f0` |
+| The search box finds customers, vendors, invoices and bills | `e6e6bb4` |
+| Bank Transactions → Categorize shows the coding engine's suggestion | `7eb3667` |
 
 Also added by Riham since the meeting: Write Check (Accounts Payable → Checks),
 the Transactions page, the table-settings gear on list pages, vendor batch
@@ -248,5 +250,9 @@ click. Item 3 and the other Riham items are hers to show.
   capitalization threshold is on the same card.
 - **Bank balances.** Accounting → Bank Accounts has a Book balance column.
 - **Printing.** Open any invoice → ⋯ → Print: the preview has no sidebar or top bar.
+- **Search.** Type `contoso` or an invoice number in the search box at the top:
+  customers, vendors, invoices and bills appear under the matching pages.
+- **Suggestions on Categorize.** Accounting → Bank Transactions → Categorize: under
+  the account box is the engine's suggestion with its confidence and a Use link.
 - **Fixed Assets.** Accounting → Fixed Assets shows an amber note that the register
   (43,000.00) and the ledger differ, with the amounts.
