@@ -46,8 +46,7 @@ export async function getManagementReport(db: Kysely<DB>, ctx: ServiceCtx): Prom
     ) AS m(month)
     LEFT JOIN journal_entries je
       ON je.business_id = ${business_id}::uuid
-     AND je.status = 'posted'
-     AND je.reversed_entry_id IS NULL
+     AND je.status IN ('posted', 'voided')
      AND date_trunc('month', je.entry_date) = m.month
     LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
     LEFT JOIN chart_of_accounts coa
@@ -66,8 +65,7 @@ export async function getManagementReport(db: Kysely<DB>, ctx: ServiceCtx): Prom
     JOIN journal_entry_lines jel ON jel.account_id = coa.id
     JOIN journal_entries je
       ON je.id = jel.journal_entry_id
-     AND je.status = 'posted'
-     AND je.reversed_entry_id IS NULL
+     AND je.status IN ('posted', 'voided')
      AND je.entry_date >= (date_trunc('month', now()) - interval '11 months')::date
     WHERE coa.business_id = ${business_id}::uuid
       AND coa.account_type = 'expense'
@@ -82,8 +80,7 @@ export async function getManagementReport(db: Kysely<DB>, ctx: ServiceCtx): Prom
     FROM journal_entry_lines jel
     JOIN journal_entries je
       ON je.id = jel.journal_entry_id
-     AND je.status = 'posted'
-     AND je.reversed_entry_id IS NULL
+     AND je.status IN ('posted', 'voided')
      AND je.entry_date >= (date_trunc('month', now()) - interval '11 months')::date
     JOIN chart_of_accounts coa
       ON coa.id = jel.account_id AND coa.account_type = 'revenue'
@@ -95,8 +92,7 @@ export async function getManagementReport(db: Kysely<DB>, ctx: ServiceCtx): Prom
     FROM journal_entry_lines jel
     JOIN journal_entries je
       ON je.id = jel.journal_entry_id
-     AND je.status = 'posted'
-     AND je.reversed_entry_id IS NULL
+     AND je.status IN ('posted', 'voided')
      AND je.entry_date >= (date_trunc('month', now()) - interval '11 months')::date
     JOIN chart_of_accounts coa
       ON coa.id = jel.account_id AND coa.account_type = 'expense'

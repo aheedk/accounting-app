@@ -35,8 +35,7 @@ export async function getPerformanceReport(db: Kysely<DB>, ctx: ServiceCtx): Pro
     ) AS m(month)
     LEFT JOIN journal_entries je
       ON je.business_id = ${business_id}::uuid
-     AND je.status = 'posted'
-     AND je.reversed_entry_id IS NULL
+     AND je.status IN ('posted', 'voided')
      AND date_trunc('month', je.entry_date) = m.month
     LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
     LEFT JOIN chart_of_accounts coa ON coa.id = jel.account_id
@@ -55,8 +54,7 @@ export async function getPerformanceReport(db: Kysely<DB>, ctx: ServiceCtx): Pro
     ) AS m(month)
     LEFT JOIN journal_entries je
       ON je.business_id = ${business_id}::uuid
-     AND je.status = 'posted'
-     AND je.reversed_entry_id IS NULL
+     AND je.status IN ('posted', 'voided')
      AND date_trunc('month', je.entry_date) = m.month
     LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
     LEFT JOIN chart_of_accounts coa ON coa.id = jel.account_id

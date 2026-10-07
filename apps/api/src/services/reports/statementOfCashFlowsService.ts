@@ -91,7 +91,7 @@ export async function statementOfCashFlows(
     .where('deleted_at', 'is', null)
     .execute()).map(row => row.cash_account_id));
 
-  // Same entries the Profit & Loss counts: posted, and neither side of a void.
+  // The ledger's rule: a voided entry and its reversal are both counted and cancel.
   const activity = await db.selectFrom('journal_entry_lines as jel')
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select(({ fn, eb }) => [
@@ -102,8 +102,7 @@ export async function statementOfCashFlows(
       fn.sum<string>(eb.case().when('je.entry_date', '>=', q.period_start).then(eb.ref('jel.credit')).else(0).end()).as('credit_in'),
     ])
     .where('je.business_id', '=', q.business_id)
-    .where('je.status', '=', 'posted')
-    .where('je.reversed_entry_id', 'is', null)
+    .where('je.status', 'in', ['posted', 'voided'])
     .where('je.entry_date', '<=', q.period_end)
     .groupBy('jel.account_id')
     .execute();

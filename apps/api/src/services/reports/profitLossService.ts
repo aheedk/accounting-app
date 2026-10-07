@@ -67,12 +67,12 @@ export async function profitLoss(db: Kysely<DB>, q: { business_id: string; perio
     .where(eb => eb.or([
       eb('je.id', 'is', null),
       eb.and([
-        eb('je.status', '=', 'posted'),
+        // The ledger's rule (trial balance, general ledger, balance sheet): a voided
+        // entry and its reversal are both counted and cancel. Skipping reversals
+        // instead also dropped month-end reversing entries, whose originals stay posted.
+        eb('je.status', 'in', ['posted', 'voided']),
         eb('je.entry_date', '>=', q.period_start),
         eb('je.entry_date', '<=', q.period_end),
-        // Exclude reversal JEs so voided entries net out entirely (reversal itself is skipped;
-        // the voided original is already filtered by the status='posted' guard above).
-        eb('je.reversed_entry_id', 'is', null),
       ]),
     ]))
     .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type', 'a.detail_type'])

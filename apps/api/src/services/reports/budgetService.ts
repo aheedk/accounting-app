@@ -230,8 +230,7 @@ export async function getVarianceReport(
       JOIN journal_entries je ON je.id = jel.journal_entry_id
       JOIN chart_of_accounts coa ON coa.id = jel.account_id
       WHERE je.business_id = ${business_id}::uuid
-        AND je.status = 'posted'
-        AND je.reversed_entry_id IS NULL
+        AND je.status IN ('posted', 'voided')
         AND je.entry_date >= ${yearStart}::date
         AND je.entry_date <= ${yearEnd}::date
       GROUP BY coa.id, coa.code, coa.name, coa.account_type, month_offset

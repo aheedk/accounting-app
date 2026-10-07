@@ -4,6 +4,7 @@ import { makeAccount, makeFirm, makeBusiness, makeUser, makeCustomer, makeVendor
 import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
 import * as billSvc from '../../src/services/ap/billService.js';
 import * as rpt from '../../src/services/reports/profitLossService.js';
+import * as ledger from '../../src/services/core/ledgerService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
 const meta = { request_id: '00000000-0000-0000-0000-000000004001', ip_address: '127.0.0.1', user_agent: 'vitest' };
@@ -86,6 +87,29 @@ describe('P&L report', () => {
 
     expect(rpt.expenseSection({ code: '5010', name: 'Cost of Goods Sold', detail_type: null })).toBe('cogs');
     expect(rpt.expenseSection({ code: '4444', name: 'Rent', detail_type: null })).toBe('operating');
+  });
+
+  // Found by the report tie-out on 2026-10-07: a month-end accrual and its reversing
+  // entry are both posted. The P&L skipped every reversal, so it kept the accrual and
+  // lost the entry that takes it back, and disagreed with the balance sheet.
+  it('counts a reversing entry, so an accrual and its reversal cancel across the two months', async () => {
+    const { biz, ctx, expense } = await setup();
+    const accrued = await makeAccount(t.db, biz.id, { code: '2300', name: 'Accrued Expenses', account_type: 'liability' });
+    const accrual = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-04-30', source_type: 'manual', memo: 'Accrue April rent',
+      lines: [
+        { account_id: expense.id, debit: '2500.0000', credit: '0.0000', memo: null },
+        { account_id: accrued.id, debit: '0.0000', credit: '2500.0000', memo: null },
+      ],
+    }));
+    await t.db.transaction().execute(trx => ledger.reverseJournalEntry(trx, ctx, { journal_entry_id: accrual.id }));
+
+    const april = await rpt.profitLoss(t.db, { business_id: biz.id, period_start: '2026-04-01', period_end: '2026-04-30' });
+    const may = await rpt.profitLoss(t.db, { business_id: biz.id, period_start: '2026-05-01', period_end: '2026-05-31' });
+    const both = await rpt.profitLoss(t.db, { business_id: biz.id, period_start: '2026-04-01', period_end: '2026-05-31' });
+    expect(april.net_income).toBe('-2500.0000');
+    expect(may.net_income).toBe('2500.0000');
+    expect(both.net_income).toBe('0.0000');
   });
 
   it('excludes voided JEs and honors the period window', async () => {
