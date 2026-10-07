@@ -22,10 +22,10 @@ Owner is who was asked or who volunteered; "open" means nobody was named.
 
 | # | What | Where it stands | Owner |
 |---|---|---|---|
-| 1 | **Journal entry amounts with commas and two decimals** (9,000.00), like the rest of the app | Half done. A posted, read-only entry now shows formatted amounts (Riham, `7dd3df1`). While editing, the debit and credit boxes are still plain number inputs (`JournalEntryEditor.tsx:529`, `:544`), so they show `9000`. | Aheed |
-| 2 | **Typing 9 becomes 9.00** when you tab out of an amount box. Asked for on the journal entry; apply to every amount box | Not done. Same inputs as item 1, so do both together. | Aheed |
-| 3 | **Journal entry: put Delete under a "More" button**, as QuickBooks does. The "are you sure" prompt stays | **Done** by Riham after the meeting (`7dd3df1`): the bottom bar has a More menu with Delete in it. Its Audit history entry still says "coming soon". | Riham, done |
-| 4 | **Attachments on bank deposits do not work** (Faizan; they work on checks) | An Attachments area is on the form (`BankDepositPage.tsx:946`), so this is a bug to reproduce, not a missing feature. Not reproduced yet. | Aheed |
+| 1 | **Journal entry amounts with commas and two decimals** (9,000.00), like the rest of the app | **Done** (`896e7bb`). The debit and credit boxes show 9,000.00; a posted, read-only entry already did (Riham, `7dd3df1`). | Aheed, done |
+| 2 | **Typing 9 becomes 9.00** when you tab out of an amount box. Asked for on the journal entry; apply to every amount box | **Done** (`896e7bb`). One shared amount box, used on the journal entry and 25 other forms: expenses, checks, deposits, invoices, bills, payments, credits, reconcile, opening balances, prices. Quantities, percentages and filter boxes are left as they were. | Aheed, done |
+| 3 | **Journal entry: put Delete under a "More" button**, as QuickBooks does. The "are you sure" prompt stays | **Done** by Riham after the meeting (`7dd3df1`): the bottom bar has a More menu with Delete in it. Its Audit history entry still says "coming soon". Checked on 2026-10-07: Bank Deposit, Expense and Check also keep Delete under More; no other transaction form has a Delete. The Vendor page has its own Delete button, which Riham placed there on purpose. | Riham, done |
+| 4 | **Attachments on bank deposits do not work** (Faizan; they work on checks) | **Done** (`9c6edcb`). The box on the deposit form was a placeholder with nothing behind it. It now works like expenses and checks. Needs migration `0088`. | Aheed, done |
 | 5 | **Statement review: the bank account picker should list only bank accounts**, not most of the chart | It lists every asset account except Suspense (`EmailImportReviewPage.tsx:561`). Should be accounts whose type is Bank (Checking, Savings, Money Market, Cash on hand, Trust...). | Aheed |
 | 6 | **Card statement: the payment line should not go to the bank account.** See "The card payment decision" below | Payment lines are coded to the client's bank account (`cardPaymentSourceAccount`), with a check for the same payment already posted from the bank statement. | Aheed |
 | 7 | **Checks on a bank statement should get their category from the stub's description** ("food" on the stub means a food account), not land in Suspense | Partly done. A matched stub fills payee and memo, but the category only fills when the AI's suggested account name matched an account in the chart (`emailImports.ts:171`). Fix: run the stub's payee and memo through the coding engine when there is no direct match. | Aheed |
@@ -77,7 +77,7 @@ None of these exist in the code yet.
 
 ### Suggested split
 
-- **Aheed:** 1–8 (3 is already done), then 17 and 18.
+- **Aheed:** 5–8 (1–4 are done), then 17 and 18.
 - **Riham:** 10–13 (9 and 19 are already done), plus 31–33 from "Since the
   meeting" below.
 - **Faizan:** files for 14, expected behaviour for 11, testing for 15 and 16.
@@ -124,7 +124,7 @@ Written up by Riham in [`../backlog.md`](../backlog.md); numbered on from the to
 | 32 | **Transactions page**: invoices, bill payments and vendor credits are not in it yet; sorting from the gear only sorts the 25 rows on screen; the saved filter order is not used. | Riham |
 | 33 | **Vendor menu stubs**: batch Email and "Ask vendor for info" only show a "coming soon" message. | Riham |
 
-After pulling, the local database needs the four new migrations (`0084`–`0087`):
+After pulling, the local database needs the new migrations (`0084`–`0088`):
 `npm run db:migrate`.
 
 ## The card payment decision (item 6)
