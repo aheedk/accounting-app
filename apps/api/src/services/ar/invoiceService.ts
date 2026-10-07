@@ -194,6 +194,32 @@ export async function voidInvoice(
   return updated;
 }
 
+/**
+ * Corrects a posted invoice. A posted invoice is never rewritten: the original
+ * is voided (its entry reversed on its own date) and the corrected invoice is
+ * posted in its place, in one transaction, so the books never show neither or
+ * both. An invoice with a payment or credit applied is refused by voidInvoice;
+ * take the payment off first. The replacement needs its own number, because the
+ * voided invoice keeps the one it had.
+ */
+export async function reissueInvoice(
+  trx: Transaction<DB>, ctx: ServiceCtx,
+  input: { invoice_id: string; replacement: CreateDraftInput },
+) {
+  const original = await trx.selectFrom('invoices').selectAll()
+    .where('id', '=', input.invoice_id).where('business_id', '=', input.replacement.business_id)
+    .executeTakeFirst();
+  if (!original) throw new NotFoundError('invoice', input.invoice_id);
+
+  await voidInvoice(trx, ctx, {
+    invoice_id: original.id,
+    void_reason: `Replaced by invoice ${input.replacement.invoice_number}`,
+  });
+  const draft = await createDraft(trx, ctx, input.replacement);
+  const posted = await postInvoice(trx, ctx, { invoice_id: draft.invoice.id });
+  return { invoice: posted, lines: draft.lines, replaced_invoice_id: original.id };
+}
+
 export async function getInvoiceWithLines(db: Kysely<DB>, business_id: string, invoice_id: string) {
   const inv = await db.selectFrom('invoices').selectAll()
     .where('id', '=', invoice_id).where('business_id', '=', business_id)

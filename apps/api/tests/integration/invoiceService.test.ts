@@ -164,4 +164,45 @@ describe('invoiceService', () => {
       ),
     ).rejects.toMatchObject({ code: ERR.INVALID_STATE_TRANSITION });
   });
+
+  // 2026-09-28 audit, P1 item 4: a posted invoice could be voided but not corrected.
+  it('reissueInvoice voids a posted invoice and posts the corrected one in its place', async () => {
+    const { biz, ctx, customer, revenue, ar } = await setup(t);
+    const draft = await t.db.transaction().execute(trx =>
+      invoiceSvc.createDraft(trx, ctx, {
+        business_id: biz.id, customer_id: customer.id,
+        invoice_number: 'INV-007', issue_date: '2026-04-15', due_date: '2026-05-15',
+        memo: null, terms: 'Net 30',
+        lines: [{ description: 'Widget', quantity: '1', unit_price: '100', revenue_account_id: revenue.id, tax_code_id: null }],
+      }),
+    );
+    await t.db.transaction().execute(trx => invoiceSvc.postInvoice(trx, ctx, { invoice_id: draft.invoice.id }));
+
+    const replacement = (invoice_number: string) => ({
+      business_id: biz.id, customer_id: customer.id,
+      invoice_number, issue_date: '2026-04-15', due_date: '2026-05-15',
+      memo: null, terms: 'Net 30',
+      lines: [{ description: 'Widget', quantity: '1', unit_price: '120', revenue_account_id: revenue.id, tax_code_id: null }],
+    });
+    const result = await t.db.transaction().execute(trx =>
+      invoiceSvc.reissueInvoice(trx, ctx, { invoice_id: draft.invoice.id, replacement: replacement('INV-007-R1') }));
+    expect(result.invoice).toMatchObject({ invoice_number: 'INV-007-R1', status: 'posted', total: '120.0000' });
+
+    const original = await t.db.selectFrom('invoices').selectAll().where('id', '=', draft.invoice.id).executeTakeFirstOrThrow();
+    expect(original.status).toBe('voided');
+    // Receivables carry the corrected amount only: 100 posted, 100 reversed, 120 posted.
+    const receivable = await t.db.selectFrom('journal_entry_lines as l')
+      .innerJoin('journal_entries as je', 'je.id', 'l.journal_entry_id')
+      .select(({ fn }) => [fn.sum<string>('l.debit').as('debit'), fn.sum<string>('l.credit').as('credit')])
+      .where('l.account_id', '=', ar.id).where('je.status', 'in', ['posted', 'voided'])
+      .executeTakeFirstOrThrow();
+    expect(Number(receivable.debit) - Number(receivable.credit)).toBe(120);
+
+    // If the corrected invoice cannot be posted, the original is not left voided.
+    await expect(t.db.transaction().execute(trx =>
+      invoiceSvc.reissueInvoice(trx, ctx, { invoice_id: result.invoice.id, replacement: replacement('INV-007') }),
+    )).rejects.toThrow();
+    const still = await t.db.selectFrom('invoices').select('status').where('id', '=', result.invoice.id).executeTakeFirstOrThrow();
+    expect(still.status).toBe('posted');
+  });
 });

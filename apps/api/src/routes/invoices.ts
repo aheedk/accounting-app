@@ -85,4 +85,33 @@ router.post('/businesses/:businessId/invoices/:id/void', requireMinRole('account
   } catch (e) { next(e); }
 });
 
+// Correcting a posted invoice: void it and post the corrected one, together.
+router.post('/businesses/:businessId/invoices/:id/reissue', requireMinRole('accountant'), async (req, res, next) => {
+  try {
+    const body = schemas.invoiceDraftCreateSchema.parse(req.body);
+    const result = await db.transaction().execute(trx =>
+      inv.reissueInvoice(trx, ctxFromReq(req), {
+        invoice_id: req.params['id']!,
+        replacement: {
+          business_id: req.tenancy!.business_id,
+          customer_id: body.customer_id,
+          invoice_number: body.invoice_number,
+          issue_date: body.issue_date,
+          due_date: body.due_date,
+          memo: body.memo ?? null,
+          terms: body.terms ?? null,
+          lines: body.lines.map(l => ({
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            revenue_account_id: l.revenue_account_id,
+            tax_code_id: l.tax_code_id ?? null,
+          })),
+        },
+      }),
+    );
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+});
+
 export default router;

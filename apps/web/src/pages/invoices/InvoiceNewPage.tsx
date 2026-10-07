@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -31,9 +31,23 @@ const TERMS_OPTIONS: { label: string; days: number }[] = [
 ];
 const termsDays = (label: string) => TERMS_OPTIONS.find(t => t.label === label)?.days ?? 0;
 
+// The posted invoice being corrected (?replaces=<id>). Saving voids it and posts this one.
+type SourceInvoice = {
+  invoice: { id: string; customer_id: string; invoice_number: string; issue_date: string; due_date: string; memo: string | null; terms: string | null };
+  lines: { description: string; line_subtotal: string; revenue_account_id: string; tax_code_id: string | null }[];
+};
+/** The voided original keeps its number, so INV-1042 is corrected as INV-1042-R1, then -R2. */
+function revisionNumber(number: string): string {
+  const match = /^(.*)-R(\d+)$/.exec(number);
+  return match ? `${match[1]}-R${Number(match[2]) + 1}` : `${number}-R1`;
+}
+
 function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const replacesId = params.get('replaces');
+  const [source, setSource] = useState<SourceInvoice | null>(null);
   const save = useSaveAndPost();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const addCustomer = useAddParty<Customer>('customer', customer => setCustomers(prev => [...prev, customer]));
@@ -71,12 +85,38 @@ function InvoiceNewPage() {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/customers`).then(r => setCustomers(r.data.customers));
     refetchItems();
-    // A tax code switched off on Setup → Tax Codes is not offered on new invoices.
-    api.get<{ tax_codes?: TaxCode[] }>(`/businesses/${bizId}/tax-codes`).then(r => setTaxCodes((r.data.tax_codes ?? []).filter(tc => tc.is_active)));
+    api.get<{ tax_codes?: TaxCode[] }>(`/businesses/${bizId}/tax-codes`).then(r => setTaxCodes(r.data.tax_codes ?? []));
     api.get(`/businesses/${bizId}/invoices/next-number`).then(r => {
       setHdr(h => h.invoice_number ? h : { ...h, invoice_number: r.data.next_number });
     });
   }, [bizId, refetchItems]);
+
+  // Correcting a posted invoice starts from what it said.
+  useEffect(() => {
+    if (!bizId || !replacesId) return;
+    Promise.all([
+      api.get<SourceInvoice>(`/businesses/${bizId}/invoices/${replacesId}`),
+      api.get<{ items: ProductServiceItem[] }>(`/businesses/${bizId}/inventory-items`),
+    ]).then(([invoiceResponse, itemResponse]) => {
+      const { invoice, lines: sourceLines } = invoiceResponse.data;
+      setSource(invoiceResponse.data);
+      setHdr({
+        customer_id: invoice.customer_id,
+        invoice_number: revisionNumber(invoice.invoice_number),
+        issue_date: invoice.issue_date.slice(0, 10),
+        due_date: invoice.due_date.slice(0, 10),
+        memo: invoice.memo ?? '',
+        terms: invoice.terms ?? 'Net 30',
+      });
+      setTaxCodeId(sourceLines.find(l => l.tax_code_id)?.tax_code_id ?? null);
+      // A saved line keeps its income account, not its product, so the product is matched back from that.
+      setLines(sourceLines.map(l => {
+        const candidates = itemResponse.data.items.filter(it => it.income_account_id === l.revenue_account_id);
+        const item = candidates.find(it => it.name === l.description) ?? candidates[0];
+        return { description: l.description, inventory_item_id: item?.id ?? '', amount: Number(l.line_subtotal).toFixed(2) };
+      }));
+    }).catch(() => setErr('Could not load the invoice to correct.'));
+  }, [bizId, replacesId]);
 
   useEffect(() => {
     function onFocus() { refetchItems(); }
@@ -135,6 +175,11 @@ function InvoiceNewPage() {
         issue_date: hdr.issue_date, due_date: hdr.due_date, memo: hdr.memo || null, terms: hdr.terms || null,
         lines: mapped,
       };
+      if (replacesId) {
+        const reissued = await api.post<{ invoice: { id: string } }>(`/businesses/${bizId}/invoices/${replacesId}/reissue`, body);
+        nav(`/invoices/${reissued.data.invoice.id}`);
+        return;
+      }
       const r = await api.post(`/businesses/${bizId}/invoices`, body);
       await save.finish({
         postUrl: `/businesses/${bizId}/invoices/${r.data.invoice.id}/post`,
@@ -152,7 +197,13 @@ function InvoiceNewPage() {
   if (!bizId) return <div>Pick a business.</div>;
   return (
     <form className="space-y-6" onSubmit={submit}>
-      <h1 className="text-2xl font-semibold">New Invoice</h1>
+      <h1 className="text-2xl font-semibold">{source ? `Correct invoice ${source.invoice.invoice_number}` : 'New Invoice'}</h1>
+      {source && (
+        <p className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          A posted invoice is not rewritten. Saving voids {source.invoice.invoice_number} and posts this one in its place, so the
+          ledger shows both. It needs its own number because the voided invoice keeps the one it had.
+        </p>
+      )}
       <Card><CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-3 gap-3">
           <div><Label>Customer</Label>
@@ -218,7 +269,8 @@ function InvoiceNewPage() {
               <div className="flex justify-between items-center gap-2">
                 <span className="text-muted-foreground shrink-0">Sales tax</span>
                 <AppSelect className="h-8 flex-1 rounded-md border bg-background px-2 text-xs" value={taxCodeId ?? ''} onChange={e => setTaxCodeId(e.target.value || null)}>
-                  <option value="">No tax</option>{taxCodes.map(tc => <option key={tc.id} value={tc.id}>{tc.code}{tc.current_rate ? ` (${(Number(tc.current_rate) * 100).toFixed(2)}%)` : ''}</option>)}
+                  {/* A tax code switched off on Setup → Tax Codes is not offered, unless this invoice already carries it. */}
+                  <option value="">No tax</option>{taxCodes.filter(tc => tc.is_active || tc.id === taxCodeId).map(tc => <option key={tc.id} value={tc.id}>{tc.code}{tc.current_rate ? ` (${(Number(tc.current_rate) * 100).toFixed(2)}%)` : ''}</option>)}
                 </AppSelect>
                 <span className="font-mono w-20 text-right">{fmtMoney(totals.tax.toFixed(2))}</span>
               </div>
@@ -228,7 +280,12 @@ function InvoiceNewPage() {
         </CardContent>
       </Card>
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <div className="flex gap-2"><SaveButtons save={save} busy={busy} /><Button type="button" variant="outline" onClick={() => nav('/invoices')}>Cancel</Button></div>
+      <div className="flex gap-2">
+        {replacesId
+          ? <Button type="submit" disabled={busy || !source}>{busy ? 'Saving…' : 'Void the original and post this one'}</Button>
+          : <SaveButtons save={save} busy={busy} />}
+        <Button type="button" variant="outline" onClick={() => nav(replacesId ? `/invoices/${replacesId}` : '/invoices')}>Cancel</Button>
+      </div>
       {addCustomer.dialog}
     </form>
   );

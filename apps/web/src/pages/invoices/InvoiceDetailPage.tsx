@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CreditCard, FileDown, FileText, Trash2 } from 'lucide-react';
+import { CreditCard, FileDown, FileText, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -129,6 +129,8 @@ export default function InvoiceDetailPage() {
   const canPost = inv.status === 'draft';
   const canReceive = (inv.status === 'posted' || inv.status === 'paid') && Number(data.amount_due) > 0;
   const canVoid = inv.status === 'posted' || inv.status === 'paid';
+  // Corrected by voiding and posting a replacement, which a payment or credit on the invoice blocks.
+  const canCorrect = inv.status === 'posted' && paid === 0;
 
   return (
     <div className="space-y-6">
@@ -146,6 +148,7 @@ export default function InvoiceDetailPage() {
         menuActions={[
           ...baseDetailMenuActions(),
           { label: 'Save as PDF', icon: <FileDown className="h-4 w-4" />, onSelect: savePdf },
+          ...(canCorrect ? [{ label: 'Correct invoice', icon: <Pencil className="h-4 w-4" />, onSelect: () => nav(`/invoices/new?replaces=${inv.id}`), disabled: busy }] : []),
           ...(canVoid ? [{ label: 'Void invoice', icon: <Trash2 className="h-4 w-4" />, onSelect: voidIt, destructive: true, disabled: busy }] : []),
         ]}
       />
