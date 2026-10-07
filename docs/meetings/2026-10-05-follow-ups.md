@@ -11,8 +11,8 @@ over from the previous meeting.
 
 | # | What | Owner |
 |---|---|---|
-| 17 | Fix the QA audit bugs (`docs/qa/2026-09-28-app-audit.md`). 8 are serious: invoice due dates, the 1099 report, Profit & Loss **(10-01)** | Aheed |
-| 18 | Put every report up and review them together, after 17 | Aheed |
+| 17 | QA audit bugs (`docs/qa/2026-09-28-app-audit.md`). 7 of the 8 serious ones are fixed. Left: inventory never reaches the ledger (a larger job), then the less serious lists **(10-01)** | Aheed |
+| 18 | Put every report up and review them together. The 1099, Management and Profit & Loss numbers are fixed, so this can go ahead | Aheed |
 | 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
 | 12 | "+ New" menu: match QuickBooks exactly | Riham |
