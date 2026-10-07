@@ -67,6 +67,7 @@ import emailImportsRouter from './routes/emailImports.js';
 import invoiceImportsRouter from './routes/invoiceImports.js';
 import aiRouter from './routes/ai.js';
 import bankDepositsRouter from './routes/bankDeposits.js';
+import searchRouter from './routes/search.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -143,6 +144,7 @@ export function makeApp(): Express {
   app.use(invoiceImportsRouter);
   app.use(aiRouter);
   app.use(bankDepositsRouter);
+app.use(searchRouter);
   app.use(errorHandler);
   return app;
 }

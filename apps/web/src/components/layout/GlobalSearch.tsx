@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/apiClient';
+import { useActiveBusinessId } from '@/lib/business';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type Page = { label: string; group: string; to: string };
@@ -100,6 +102,24 @@ function highlight(text: string, query: string): React.ReactNode {
   );
 }
 
+type RecordResult = { type: 'customer' | 'vendor' | 'invoice' | 'bill'; id: string; label: string; detail: string | null };
+
+const RECORD_KINDS: Record<RecordResult['type'], { group: string; path: (id: string) => string }> = {
+  customer: { group: 'Customers', path: id => `/customers/${id}` },
+  vendor: { group: 'Vendors', path: id => `/ap/vendors/${id}` },
+  invoice: { group: 'Invoices', path: id => `/invoices/${id}` },
+  bill: { group: 'Bills', path: id => `/ap/bills/${id}` },
+};
+
+function recordToPage(result: RecordResult): Page {
+  const kind = RECORD_KINDS[result.type];
+  return {
+    label: result.detail ? `${result.label} · ${result.detail}` : result.label,
+    group: kind.group,
+    to: kind.path(result.id),
+  };
+}
+
 // The key the browser actually listens for: Cmd on a Mac, Ctrl everywhere else.
 const SHORTCUT_LABEL = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
@@ -138,13 +158,30 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  // Records of the open company (customers, vendors, invoices, bills) that match,
+  // fetched a moment after typing stops. Shown under the matching pages.
+  const [bizId] = useActiveBusinessId();
+  const [records, setRecords] = useState<Page[]>([]);
+  useEffect(() => {
+    const text = query.trim();
+    if (!bizId || text.length < 2) { setRecords([]); return; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.get<{ results: RecordResult[] }>(`/businesses/${bizId}/search`, { params: { q: text } })
+        .then(r => { if (!cancelled) setRecords(r.data.results.map(recordToPage)); })
+        .catch(() => { if (!cancelled) setRecords([]); });
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [bizId, query]);
+
   const items = useMemo<Page[]>(() => {
     if (!query.trim()) return QUICK_LINKS;
     const q = query.toLowerCase();
-    return ALL_PAGES.filter(
+    const pages = ALL_PAGES.filter(
       p => p.label.toLowerCase().includes(q) || p.group.toLowerCase().includes(q),
     );
-  }, [query]);
+    return [...pages, ...records];
+  }, [query, records]);
 
   // Grouped with flat index pre-computed for keyboard nav
   const grouped = useMemo(() => {
@@ -197,7 +234,7 @@ export function GlobalSearch() {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Search pages and features…"
+          placeholder="Search pages, customers, vendors, invoices…"
           value={query}
           onFocus={() => setOpen(true)}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
