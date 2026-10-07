@@ -273,7 +273,8 @@ export function DataTable<T>({
                 <button
                   type="button"
                   onClick={() => toggleSort(c.key)}
-                  className={`inline-flex items-center gap-1 ${sortKey === c.key ? 'text-foreground' : ''} hover:text-foreground`}
+                  // A button does not inherit the row's capitals, so sortable headers read "Name" beside "PHONE".
+                  className={`inline-flex items-center gap-1 uppercase ${sortKey === c.key ? 'text-foreground' : ''} hover:text-foreground`}
                 >
                   {c.header}
                   {sortKey === c.key
