@@ -7,6 +7,8 @@ from the 2026-10-01 meeting are in the same list, marked **10-01**. Parts of the
 recording were unclear or not in English; the last section lists what could not
 be made out.
 
+Work finished after the meeting is in "Since the meeting", updated 2026-10-07.
+
 **Dates set in the meeting**
 
 - **November 1, 2026** — Faizan's team starts using the app for actual clients.
@@ -76,13 +78,54 @@ None of these exist in the code yet.
 ### Suggested split
 
 - **Aheed:** 1–8 (3 is already done), then 17 and 18.
-- **Riham:** 10–13 (9 and 19 are already done).
+- **Riham:** 10–13 (9 and 19 are already done), plus 31–33 from "Since the
+  meeting" below.
 - **Faizan:** files for 14, expected behaviour for 11, testing for 15 and 16.
 - **Needs a decision from the firm before work starts:** 22, 24, 25, 26–28, and
   whether payroll stays (see Decided).
 
 For November 1 the list that matters is 1–19. Items 20–30 are January work or
 later.
+
+## Since the meeting (as of 2026-10-07)
+
+Riham's work pulled into `main` after the meeting. All of it is hers.
+
+### To-do items it finished
+
+| Item | What changed | Where |
+|---|---|---|
+| 3 | Journal entry bottom bar matches QuickBooks: Cancel on the left, Reverse · Make recurring · More in the middle, Save on the right. Copy, Delete, Transaction journal and Audit history are under More. Delete now needs a firm admin (it was accountant). | `7dd3df1` |
+| 1 (half) | A posted, read-only journal entry shows formatted amounts instead of four decimals. The boxes you type into are unchanged, so items 1 and 2 stay open. | `7dd3df1` |
+| 9 | AI inbox Name column: a dropdown of the client's vendors that filters as you type, with Add new vendor at the bottom. The AI is now given the client's vendor list when it reads a document, so "Duke Power" comes back as "Duke Energy". Applies to bank and card statements, check stubs and invoices. | `40d1214`, `ddc2b41`, `6ba32c8` |
+| 19 | General Ledger: This / Last Fiscal Year use the client's own fiscal year start month. | `e9acc5a` |
+
+### Other changes (not on the list)
+
+| What | Detail | Where |
+|---|---|---|
+| **Write Check** | Its own form and list (Accounts Payable → Checks), like Bank Deposits and Expenses: payee, bank account with book balance, check number assigned automatically, Print later, category lines, memo, attachments, Make recurring, More (Copy, Void, Delete), and a printable check with the amount in words. Opens from the General Ledger. | `b1f3bd3` |
+| **Older checks show in the Checks list** | Checks entered before as an Expense paid by check appear in the list tagged "(Expense)", and the next check number continues the client's real sequence instead of restarting at 1. | `a74731f` |
+| **Transactions page** | One page (Accounting → Transactions) listing deposits, expenses, checks, journal entries, bills, payments and credit memos, filterable by type, date, reference, contact and amount. "View more" on the deposit, expense and check forms goes here. | `69f680f` |
+| **Table settings** | A gear on Bank Deposits, Expense Transactions, Checks, Vendors and Customers to choose sort, rows per page, columns and filters. Remembered per user in that browser. | `69f680f` |
+| **Vendors list** | Checkboxes with batch Make inactive, a "Show inactive vendors" switch, and a row menu matching QuickBooks (Create expense, Write check, Make inactive). Inactive vendors drop out of every vendor dropdown. Delete moved to the vendor's own page and only works when the vendor has no transactions. | `2f0e4ab`, `99156e8` |
+| **Add vendor from the AI inbox** | A fuller popup: company and display name, contact name, email, phone, address. | `b1f8f4d` |
+| **Journal entry details** | Reversing entries have their own read-only message, reversal links show the journal number, lines can be dragged to reorder, and Reverse dates the reversal on the original entry's date. | `7dd3df1`, `d89c639` |
+| **Voided imported transactions** | Red "Voided" pill, amount struck through, and the recent-items popup. | `18cb523` |
+| **General Ledger print** | Transaction Type header no longer wraps and dates are no longer cut off. | `93f41a0` |
+
+### What that work left open
+
+Written up by Riham in [`../backlog.md`](../backlog.md); numbered on from the to-do list.
+
+| # | What | Owner |
+|---|---|---|
+| 31 | **Customers need the same treatment as Vendors**: batch actions, active / inactive, delete only when there are no transactions. | Riham |
+| 32 | **Transactions page**: invoices, bill payments and vendor credits are not in it yet; sorting from the gear only sorts the 25 rows on screen; the saved filter order is not used. | Riham |
+| 33 | **Vendor menu stubs**: batch Email and "Ask vendor for info" only show a "coming soon" message. | Riham |
+
+After pulling, the local database needs the four new migrations (`0084`–`0087`):
+`npm run db:migrate`.
 
 ## The card payment decision (item 6)
 
