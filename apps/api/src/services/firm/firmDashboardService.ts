@@ -32,8 +32,9 @@ export async function getFirmOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<
     SELECT
       b.id AS business_id,
       b.name AS business_name,
-      COALESCE(ar.balance, 0)::text AS ar_balance,
-      COALESCE(ap.balance, 0)::text AS ap_balance,
+      -- Net of money on account, so each figure equals its control account in the ledger.
+      (COALESCE(ar.balance, 0) - COALESCE(arc.credits, 0))::text AS ar_balance,
+      (COALESCE(ap.balance, 0) - COALESCE(apc.credits, 0))::text AS ap_balance,
       COALESCE(ut.cnt, 0)::int AS unreviewed_bank_txn_count,
       COALESCE(op.cnt, 0)::int AS open_period_count,
       lr.last_period_end::text AS last_reconciliation_date
@@ -58,6 +59,20 @@ export async function getFirmOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<
        WHERE bi.status = 'posted' AND bi.deleted_at IS NULL
        GROUP BY bi.business_id
     ) ap ON ap.business_id = b.id
+    LEFT JOIN (
+      SELECT business_id, SUM(credits) AS credits FROM (
+        SELECT business_id, unapplied_amount AS credits FROM payments WHERE status = 'posted'
+        UNION ALL
+        SELECT business_id, remaining_amount FROM credit_memos WHERE status IN ('posted', 'applied')
+      ) on_account GROUP BY business_id
+    ) arc ON arc.business_id = b.id
+    LEFT JOIN (
+      SELECT business_id, SUM(credits) AS credits FROM (
+        SELECT business_id, unapplied_amount AS credits FROM bill_payments WHERE status = 'posted'
+        UNION ALL
+        SELECT business_id, remaining_amount FROM vendor_credits WHERE status IN ('posted', 'applied')
+      ) with_vendors GROUP BY business_id
+    ) apc ON apc.business_id = b.id
     LEFT JOIN (
       SELECT business_id, COUNT(*) AS cnt
         FROM bank_transactions WHERE status = 'unreviewed' GROUP BY business_id

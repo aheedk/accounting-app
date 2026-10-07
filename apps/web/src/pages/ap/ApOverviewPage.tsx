@@ -12,6 +12,8 @@ type TopVendor = {
 
 type Overview = {
   outstanding_bills_total: string;
+  unused_credits_total: string;
+  net_payable_total: string;
   overdue_bills_count: number;
   upcoming_payments_7d: string;
   upcoming_payments_30d: string;
@@ -46,7 +48,15 @@ export default function ApOverviewPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Outstanding bills</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold font-mono">{fmtMoney(data.outstanding_bills_total)}</div></CardContent>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono">{fmtMoney(data.outstanding_bills_total)}</div>
+            {Number(data.unused_credits_total) !== 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Less unused credits {fmtMoney(data.unused_credits_total)}: net payable{' '}
+                <span className="font-mono font-medium text-foreground">{fmtMoney(data.net_payable_total)}</span>
+              </div>
+            )}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Overdue bills</CardTitle></CardHeader>

@@ -4,6 +4,10 @@ import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type ApOverview = {
   outstanding_bills_total: string;
+  /** Vendor credits not yet used and bill payments not yet applied. */
+  unused_credits_total: string;
+  /** Outstanding bills less unused credits: equals Accounts Payable in the ledger. */
+  net_payable_total: string;
   overdue_bills_count: number;
   upcoming_payments_7d: string;
   upcoming_payments_30d: string;
@@ -17,6 +21,8 @@ export async function getOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<ApOv
   if (!business_id) {
     return {
       outstanding_bills_total: '0',
+      unused_credits_total: '0',
+      net_payable_total: '0',
       overdue_bills_count: 0,
       upcoming_payments_7d: '0',
       upcoming_payments_30d: '0',
@@ -38,6 +44,17 @@ export async function getOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<ApOv
        AND b.status = 'posted'
        AND b.deleted_at IS NULL
   `.compile(db));
+
+  const creditsRow = await db.executeQuery<{ total: string }>(sql<{ total: string }>`
+    SELECT (
+      COALESCE((SELECT SUM(remaining_amount) FROM vendor_credits
+                 WHERE business_id = ${business_id} AND status IN ('posted', 'applied')), 0)
+      + COALESCE((SELECT SUM(unapplied_amount) FROM bill_payments
+                   WHERE business_id = ${business_id} AND status = 'posted'), 0)
+    )::text AS total
+  `.compile(db));
+  const outstanding = outstandingRow.rows[0]?.total ?? '0';
+  const unusedCredits = creditsRow.rows[0]?.total ?? '0';
 
   const overdueRow = await db.executeQuery<{ cnt: number }>(sql<{ cnt: number }>`
     SELECT COUNT(*)::int AS cnt
@@ -93,7 +110,9 @@ export async function getOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<ApOv
   );
 
   return {
-    outstanding_bills_total: outstandingRow.rows[0]?.total ?? '0',
+    outstanding_bills_total: outstanding,
+    unused_credits_total: unusedCredits,
+    net_payable_total: (Number(outstanding) - Number(unusedCredits)).toFixed(4),
     overdue_bills_count: overdueRow.rows[0]?.cnt ?? 0,
     upcoming_payments_7d: upcoming7Row.rows[0]?.total ?? '0',
     upcoming_payments_30d: upcoming30Row.rows[0]?.total ?? '0',
