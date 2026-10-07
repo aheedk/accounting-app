@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { startTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, grantAccess, makeFile } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, grantAccess, makeFile, makeAccount, makeExpenseTransaction } from '../helpers/factories.js';
 import { systemCtx } from '../../src/lib/ctx.js';
 import * as r from '../../src/services/accounting/receiptService.js';
 
@@ -58,6 +58,21 @@ describe('receiptService', () => {
     await expect(t.db.transaction().execute(trx =>
       r.linkReceipt(trx, other.ctx, { receipt_id: attached.id, linked_entity_type: 'unlinked', linked_entity_id: null }),
     )).rejects.toThrow(/not found/i);
+  });
+
+  // The Receipts page shows what a receipt is attached to, not the record's id.
+  it('names the record a receipt is attached to', async () => {
+    const { biz, file, ctx } = await bootstrap();
+    const cash = await makeAccount(t.db, biz.id, { code: '1010', name: 'Checking', account_type: 'asset' });
+    const supplies = await makeAccount(t.db, biz.id, { code: '6100', name: 'Supplies', account_type: 'expense' });
+    const expense = await makeExpenseTransaction(t.db, biz.id, supplies.id, cash.id, { payee_text: 'Staples' });
+    await t.db.transaction().execute(trx => r.createReceipt(trx, ctx, {
+      business_id: biz.id, file_id: file.id, linked_entity_type: 'expense_transaction', linked_entity_id: expense.id,
+    }));
+    await t.db.transaction().execute(trx => r.createReceipt(trx, ctx, { business_id: biz.id, file_id: file.id }));
+
+    const list = await r.listReceipts(t.db, biz.id);
+    expect(list.map(row => row.linked_label).sort()).toEqual(['Staples', null]);
   });
 
   it('attaches a file to a bank deposit and lists it there', async () => {

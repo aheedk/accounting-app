@@ -31,6 +31,10 @@ type Receipt = {
   uploaded_by_user_id: string;
   linked_entity_type: LinkedEntityType;
   linked_entity_id: string | null;
+  // Sent with the list: the file's name and type, and what the receipt is attached to, in words.
+  file_name?: string;
+  file_mime_type?: string;
+  linked_label?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -252,13 +256,13 @@ export default function ReceiptsPage() {
         <h1 className="text-2xl font-semibold">Receipts</h1>
         <div className="flex items-center gap-2">
           <div className="relative group">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['ID', 'Linked To', 'Created At'], receipts.map(r => [r.id, r.linked_entity_type, r.created_at]), 'receipts', { title: 'Receipts' }); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['File', 'Linked To', 'Record', 'Uploaded'], receipts.map(r => [r.file_name ?? 'Receipt', LINK_TYPES.find(t => t.value === r.linked_entity_type)?.label ?? r.linked_entity_type, r.linked_label ?? '', new Date(r.created_at).toLocaleDateString()]), 'receipts', { title: 'Receipts' }); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
               <FileDown className="h-4 w-4" />
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
           </div>
           <div className="relative group">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { printReport({ title: 'Receipts', headers: ['ID', 'Linked To', 'Created At'], rows: receipts.map(r => [r.id, r.linked_entity_type, r.created_at]) }); }} aria-label="Print">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { printReport({ title: 'Receipts', headers: ['File', 'Linked To', 'Record', 'Uploaded'], rows: receipts.map(r => [r.file_name ?? 'Receipt', LINK_TYPES.find(t => t.value === r.linked_entity_type)?.label ?? r.linked_entity_type, r.linked_label ?? '', new Date(r.created_at).toLocaleDateString()]) }); }} aria-label="Print">
               <Printer className="h-4 w-4" />
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
@@ -310,7 +314,7 @@ export default function ReceiptsPage() {
                 <th className="text-left p-3">Type</th>
                 <th className="text-left p-3">File</th>
                 <th className="text-left p-3">Linked to</th>
-                <th className="text-left p-3">Entity ID</th>
+                <th className="text-left p-3">Record</th>
                 <th className="text-right p-3">Action</th>
               </tr>
             </thead>
@@ -320,8 +324,8 @@ export default function ReceiptsPage() {
               )}
               {receipts.map(r => {
                 const f = files[r.file_id];
-                const name = f?.original_name ?? r.file_id.slice(0, 8);
-                const mime = f?.mime_type ?? '';
+                const name = r.file_name ?? f?.original_name ?? 'Receipt';
+                const mime = r.file_mime_type ?? f?.mime_type ?? '';
                 return (
                   <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="p-3 whitespace-nowrap">{new Date(r.created_at).toLocaleDateString()}</td>
@@ -336,7 +340,7 @@ export default function ReceiptsPage() {
                       </button>
                     </td>
                     <td className="p-3">{entityBadge(r.linked_entity_type)}</td>
-                    <td className="p-3 font-mono text-xs">{r.linked_entity_id ?? '—'}</td>
+                    <td className="p-3">{r.linked_label ?? '—'}</td>
                     <td className="p-3 text-right">
                       <Button size="sm" variant="outline" onClick={() => openLink(r)}>Link…</Button>
                     </td>

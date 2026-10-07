@@ -1,4 +1,4 @@
-import { type Transaction, type Kysely } from 'kysely';
+import { sql, type Transaction, type Kysely } from 'kysely';
 import { AUDIT } from '@accounting/shared';
 import type { DB, ReceiptLinkedEntityType } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
@@ -78,6 +78,16 @@ export async function listReceipts(
     .innerJoin('files as f', 'f.id', 'r.file_id')
     .selectAll('r')
     .select(['f.original_name as file_name', 'f.mime_type as file_mime_type', 'f.byte_size as file_byte_size'])
+    // What the receipt is attached to, in words, so the Receipts page shows a record and not an id.
+    .select(sql<string | null>`CASE r.linked_entity_type
+      WHEN 'bill' THEN (SELECT 'Bill ' || b.bill_number FROM bills b WHERE b.id = r.linked_entity_id)
+      WHEN 'invoice' THEN (SELECT 'Invoice ' || i.invoice_number FROM invoices i WHERE i.id = r.linked_entity_id)
+      WHEN 'journal_entry' THEN (SELECT 'Journal entry ' || je.journal_number FROM journal_entries je WHERE je.id = r.linked_entity_id)
+      WHEN 'check' THEN (SELECT 'Check ' || c.check_number FROM checks c WHERE c.id = r.linked_entity_id)
+      WHEN 'bank_deposit' THEN (SELECT 'Deposit ' || d.deposit_number FROM bank_deposits d WHERE d.id = r.linked_entity_id)
+      WHEN 'expense_transaction' THEN (SELECT COALESCE(NULLIF(e.payee_text, ''), 'Expense') FROM expense_transactions e WHERE e.id = r.linked_entity_id)
+      WHEN 'bank_transaction' THEN (SELECT bt.description FROM bank_transactions bt WHERE bt.id = r.linked_entity_id)
+    END`.as('linked_label'))
     .where('r.business_id', '=', business_id);
   if (opts.entity_type) q = q.where('r.linked_entity_type', '=', opts.entity_type);
   if (opts.entity_id) q = q.where('r.linked_entity_id', '=', opts.entity_id);

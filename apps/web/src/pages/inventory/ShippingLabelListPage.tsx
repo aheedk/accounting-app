@@ -15,6 +15,8 @@ type ShippingLabel = {
   id: string;
   invoice_id: string | null;
   sales_order_id: string | null;
+  invoice_number: string | null;
+  so_number: string | null;
   carrier: string;
   tracking_number: string;
   shipped_at: string;
@@ -105,13 +107,13 @@ export default function ShippingLabelListPage() {
     },
     {
       key: 'linked',
-      header: 'Linked Entity',
+      header: 'For',
       render: r => (
-        <span className="font-mono text-xs">
+        <span>
           {r.invoice_id
-            ? <span><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">invoice</span> {r.invoice_id.slice(0, 8)}</span>
+            ? <Link className="text-primary hover:underline" to={`/invoices/${r.invoice_id}`}>Invoice {r.invoice_number ?? ''}</Link>
             : r.sales_order_id
-              ? <span><span className="rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">SO</span> {r.sales_order_id.slice(0, 8)}</span>
+              ? <Link className="text-primary hover:underline" to={`/inventory/sales-orders/${r.sales_order_id}`}>Sales order {r.so_number ?? ''}</Link>
               : <span className="text-muted-foreground">—</span>}
         </span>
       ),

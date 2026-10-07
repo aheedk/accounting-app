@@ -66,8 +66,14 @@ export async function deleteLabel(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function listLabels(db: Kysely<DB>, business_id: string, opts: { invoice_id?: string; sales_order_id?: string } = {}) {
-  let q = db.selectFrom('shipping_labels').selectAll().where('business_id', '=', business_id);
-  if (opts.invoice_id) q = q.where('invoice_id', '=', opts.invoice_id);
-  if (opts.sales_order_id) q = q.where('sales_order_id', '=', opts.sales_order_id);
-  return q.orderBy('shipped_at', 'desc').execute();
+  // The invoice and sales order numbers ride along so the list never shows an id.
+  let q = db.selectFrom('shipping_labels as sl')
+    .leftJoin('invoices as i', 'i.id', 'sl.invoice_id')
+    .leftJoin('sales_orders as so', 'so.id', 'sl.sales_order_id')
+    .selectAll('sl')
+    .select(['i.invoice_number', 'so.so_number'])
+    .where('sl.business_id', '=', business_id);
+  if (opts.invoice_id) q = q.where('sl.invoice_id', '=', opts.invoice_id);
+  if (opts.sales_order_id) q = q.where('sl.sales_order_id', '=', opts.sales_order_id);
+  return q.orderBy('sl.shipped_at', 'desc').execute();
 }
