@@ -8,8 +8,10 @@ import {
   listCheckStubs,
   matchStubsToLines,
   saveCheckStubs,
+  stubCategory,
   toIsoDate,
 } from '../../src/services/ai/checkStubService.js';
+import { loadCodingContext } from '../../src/services/ai/autoCodingService.js';
 import { postStatementLines, type StatementLine } from '../../src/services/ai/statementImportService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -57,6 +59,33 @@ describe('check stubs', () => {
       suggested_account_id: data.utilities.id, status: 'unmatched',
     });
     expect(stubs[1]).toMatchObject({ amount: '2500.00', suggested_account_id: data.rent.id });
+  });
+
+  // 2026-10-05 meeting: a stub that says "food" should categorize the check, not leave it in Suspense.
+  it('finds a stub category from the memo or payee when the AI named no matching account', async () => {
+    const data = await setup(t);
+    const food = await makeAccount(t.db, data.business.id, { code: '5100', name: 'Food Purchases', account_type: 'expense' });
+    const meals = await makeAccount(t.db, data.business.id, { code: '6200', name: 'Meals & Entertainment', account_type: 'expense' });
+    const vendor = await makeVendor(t.db, data.business.id, { name: 'Duke Energy' });
+    await t.db.updateTable('vendors').set({ default_expense_account_id: data.utilities.id }).where('id', '=', vendor.id).execute();
+    const coding = await loadCodingContext(t.db, data.ctx);
+    const stub = { payee_name: null, memo: null, amount: '50.00', suggested_account_name: null, suggested_account_id: null };
+
+    // The memo names an expense account.
+    expect(stubCategory(coding, { ...stub, payee_name: 'Reward Network', memo: 'food' }))
+      .toEqual({ account_id: food.id, confidence: 75 });
+    // The AI's account name is close, but not exactly an account's name.
+    expect(stubCategory(coding, { ...stub, suggested_account_name: 'Meals and Entertainment' })?.account_id).toBe(meals.id);
+    // The payee is a vendor with a default account: that wins over what the AI read.
+    expect(stubCategory(coding, { ...stub, payee_name: 'Duke Energy', suggested_account_id: data.rent.id })?.account_id)
+      .toBe(data.utilities.id);
+    // The AI's matched account is used as before.
+    expect(stubCategory(coding, { ...stub, memo: 'food', suggested_account_id: data.rent.id }))
+      .toEqual({ account_id: data.rent.id, confidence: 88 });
+    // Nothing to go on, or two accounts fit equally: not sure, so no category.
+    expect(stubCategory(coding, { ...stub, payee_name: 'Bob', memo: 'reimbursement' })).toBeNull();
+    await makeAccount(t.db, data.business.id, { code: '5110', name: 'Food Supplies', account_type: 'expense' });
+    expect(stubCategory(await loadCodingContext(t.db, data.ctx), { ...stub, memo: 'food' })).toBeNull();
   });
 
   it('reads stub dates, taking a date with no year as the most recent one', () => {

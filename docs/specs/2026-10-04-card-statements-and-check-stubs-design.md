@@ -72,9 +72,13 @@ Upload those, and fill each check's payee and category automatically.
   within 60 days. Check numbers are read from the line's `check_number` field (now
   extracted for bank statements) or from its description ("CHECK 1042", "CHK #1042").
 - **On the statement review screen** a matched check line shows the stub, and its payee
-  and category are prefilled from it. The category comes from the stub's suggestion,
-  falling back to the vendor's default or the client's coding history. Approving the
-  statement marks the stub matched to the posted entry.
+  and category are prefilled from it. The category comes from, in order: how the client
+  codes that payee (a learned rule or the vendor's default account); the account the AI
+  read off the stub; how the payee was coded before; and last an expense account whose
+  name shares words with the AI's suggestion or the stub's memo ("food" → Food
+  Purchases; two accounts that fit equally well means no pick). With none of these the
+  check goes to Suspense like any other unknown. Approving the statement marks the stub
+  matched to the posted entry.
 - **Checks that were already posted.** The Check stubs tab lists every stub; an
   unmatched stub whose check is already in the books (an imported check with the same
   number and amount) offers **Apply**, which sets that expense's payee, memo and, if

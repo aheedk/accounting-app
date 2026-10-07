@@ -1,11 +1,12 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
-import { AUDIT, ERR } from '@accounting/shared';
+import { AUDIT, ERR, SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { updateExpense } from '../ap/expenseTransactionService.js';
 import { updateImportedTransaction } from '../banking/importedTransactionService.js';
+import { suggestFromContext, type CodingContext } from './autoCodingService.js';
 
 // Check stubs (the client's checkbook stubs, register, or check images) name
 // the payee and purpose of checks that bank statements show only as
@@ -74,6 +75,74 @@ export function toIsoDate(value: string | null | undefined, today: Date = new Da
 
 function normalizeAccountName(name: string): string {
   return name.toLowerCase().replace(/^[\d\s.-]+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// Words that say nothing about what a check paid for.
+const FILLER_WORDS = new Set([
+  'and', 'the', 'for', 'of', 'to', 'expense', 'expenses', 'payment', 'payments', 'cost', 'costs', 'misc', 'inv', 'invoice',
+  'jan', 'january', 'feb', 'february', 'mar', 'march', 'apr', 'april', 'may', 'jun', 'june', 'jul', 'july',
+  'aug', 'august', 'sep', 'sept', 'september', 'oct', 'october', 'nov', 'november', 'dec', 'december',
+]);
+
+function meaningfulWords(text: string): string[] {
+  return text.toLowerCase().replace(/[^a-z]+/g, ' ').split(' ')
+    .filter(word => word.length > 2 && !FILLER_WORDS.has(word))
+    .map(word => (word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word));
+}
+
+/**
+ * The one expense account whose name shares the most words with the text
+ * ("food" -> "Food Purchases", "Meals and Entertainment" -> "Meals & Entertainment").
+ * Two accounts that fit equally well means not sure, so neither is picked.
+ */
+function expenseAccountByWords(accounts: CodingContext['accounts'], text: string): string | null {
+  const wanted = meaningfulWords(text);
+  if (wanted.length === 0) return null;
+  const scored = accounts
+    .filter(account => account.account_type === 'expense' && account.detail_type !== SUSPENSE_DETAIL_TYPE)
+    .map(account => {
+      const name = meaningfulWords(account.name);
+      return { id: account.id, score: wanted.filter(word => name.includes(word)).length, extra: name.length };
+    })
+    .filter(hit => hit.score > 0)
+    .sort((a, b) => b.score - a.score || a.extra - b.extra);
+  const [best, next] = scored;
+  if (!best) return null;
+  if (next && next.score === best.score && next.extra === best.extra) return null;
+  return best.id;
+}
+
+/**
+ * The category a stub points a check to, most trusted source first:
+ *  1. how this client codes the payee (a learned rule, or the vendor's default account);
+ *  2. the account the AI read off the stub;
+ *  3. how the payee was coded before;
+ *  4. an expense account named like the AI's suggestion or the stub's memo.
+ * Null when none of them say, which leaves the check for Suspense.
+ */
+export function stubCategory(
+  context: CodingContext,
+  stub: Pick<CheckStubRow, 'payee_name' | 'memo' | 'amount' | 'suggested_account_name' | 'suggested_account_id'>,
+): { account_id: string; confidence: number } | null {
+  const byPayee = stub.payee_name
+    ? suggestFromContext(context, { description: stub.payee_name, amount: stub.amount, direction: 'debit' })
+    : null;
+  const payeeAccount = byPayee?.lines[0]?.account_id;
+  // The engine's accounting rules read bank wording ("transfer", "loan"), not payee names, so they are not used here.
+  const layer = byPayee?.source_layer;
+  if (byPayee && payeeAccount && (layer === 'learned_rule' || layer === 'vendor_default')) {
+    return { account_id: payeeAccount, confidence: byPayee.confidence };
+  }
+  if (stub.suggested_account_id && context.accountIds.has(stub.suggested_account_id)) {
+    return { account_id: stub.suggested_account_id, confidence: 88 };
+  }
+  if (byPayee && payeeAccount && layer === 'history') return { account_id: payeeAccount, confidence: byPayee.confidence };
+
+  for (const text of [stub.suggested_account_name, stub.memo]) {
+    const account = text ? expenseAccountByWords(context.accounts, text) : null;
+    if (account) return { account_id: account, confidence: 75 };
+  }
+  return null;
 }
 
 /** Save the checks read from one uploaded stub document. */

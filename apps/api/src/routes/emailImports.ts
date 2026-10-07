@@ -4,7 +4,10 @@ import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
-import { suggestCodingBatch, rememberCoding, learningDecision } from '../services/ai/autoCodingService.js';
+import { confidenceBand } from '@accounting/shared';
+import {
+  suggestCodingBatch, rememberCoding, learningDecision, loadCodingContext, type CodingContext,
+} from '../services/ai/autoCodingService.js';
 import {
   cardPaymentSourceAccount,
   checkNumberOf,
@@ -16,7 +19,7 @@ import {
   type StatementKind,
   type StatementLine,
 } from '../services/ai/statementImportService.js';
-import { matchStubsToLines } from '../services/ai/checkStubService.js';
+import { matchStubsToLines, stubCategory } from '../services/ai/checkStubService.js';
 import { findSuspenseAccount, getOrCreateSuspenseAccount } from '../services/core/chartOfAccountsService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
@@ -71,7 +74,7 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
     if (!history) {
       await attachSuggestions(ctx(req), imports);
       await attachCardContext(bizId, imports);
-      await attachCheckStubs(bizId, imports);
+      await attachCheckStubs(ctx(req), bizId, imports);
       await attachSuspense(ctx(req), bizId, imports);
     }
 
@@ -151,7 +154,9 @@ async function attachCardContext(businessId: string, imports: StagedImportRow[])
 }
 
 /** Bank statements: pair check lines with uploaded check stubs, and let a stub's category lead. */
-async function attachCheckStubs(businessId: string, imports: StagedImportRow[]): Promise<void> {
+async function attachCheckStubs(serviceCtx: ServiceCtx, businessId: string, imports: StagedImportRow[]): Promise<void> {
+  // Loaded once, and only if some check has a stub.
+  let coding: CodingContext | null = null;
   for (const row of imports) {
     if (row.statement_kind !== 'bank') continue;
     const matches = await matchStubsToLines(db, businessId, row.extracted_transactions.map((tx, index) => ({
@@ -168,9 +173,11 @@ async function attachCheckStubs(businessId: string, imports: StagedImportRow[]):
         id: stub.id, check_number: stub.check_number, payee_name: stub.payee_name, memo: stub.memo,
         amount: stub.amount, check_date: stub.check_date, suggested_account_id: stub.suggested_account_id,
       };
-      if (stub.suggested_account_id) {
-        tx.suggested_account_id = stub.suggested_account_id;
-        tx.suggestion = { confidence: 88, band: 'suggested', source_layer: 'check_stub' };
+      coding ??= await loadCodingContext(db, serviceCtx);
+      const category = stubCategory(coding, stub);
+      if (category) {
+        tx.suggested_account_id = category.account_id;
+        tx.suggestion = { confidence: category.confidence, band: confidenceBand(category.confidence), source_layer: 'check_stub' };
       }
     }
   }
