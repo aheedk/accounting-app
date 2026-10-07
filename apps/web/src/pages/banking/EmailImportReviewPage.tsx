@@ -138,6 +138,24 @@ export function bestVendorMatch(extracted: string, vendors: Vendor[]): string | 
   return best && best.score >= 0.5 ? best.name : null;
 }
 
+// The detail types under the "Bank" account type in the Chart of Accounts.
+const BANK_DETAIL_TYPES = new Set(['Cash on hand', 'Checking', 'Money Market', 'Rents Held in Trust', 'Savings', 'Trust account']);
+
+/** The accounts a bank statement can belong to: accounts of type Bank, plus any
+ * account set up under Banking. A chart where nothing is marked as a bank falls
+ * back to every asset, so the picker is never empty; the account already chosen
+ * always stays listed. */
+export function statementBankAccounts(
+  accounts: CoaAccount[], bankingAccountIds: ReadonlySet<string>, selectedId: string,
+): CoaAccount[] {
+  // Suspense is an asset too, but never the account a statement belongs to.
+  const assets = accounts.filter(a => a.account_type === 'asset' && a.detail_type !== SUSPENSE_DETAIL_TYPE);
+  const banks = assets.filter(a => bankingAccountIds.has(a.id) || BANK_DETAIL_TYPES.has(a.detail_type ?? ''));
+  if (banks.length === 0) return assets;
+  const selected = assets.find(a => a.id === selectedId);
+  return selected && !banks.includes(selected) ? [...banks, selected] : banks;
+}
+
 // Mirrors statementImportService.checkNumberOf on the API.
 const CHECK_NUMBER = /\b(?:check|chk|ck)\s*(?:no\.?|number|num|#)?\s*#?\s*(\d{2,10})\b/i;
 function checkNumberOf(tx: Pick<ExtractedTx, 'check_number' | 'description'>): string | null {
@@ -197,6 +215,8 @@ export default function EmailImportReviewPage() {
   const nav = useNavigate();
   const [topTab, setTopTab] = useState<TopTab>('bank');
   const [accounts, setAccounts] = useState<CoaAccount[]>([]);
+  // Ledger accounts behind the bank accounts set up under Banking.
+  const [bankingAccountIds, setBankingAccountIds] = useState<ReadonlySet<string>>(new Set());
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
@@ -265,7 +285,11 @@ export default function EmailImportReviewPage() {
       api.get(`/businesses/${bizId}/vendors`),
       api.get(`/businesses/${bizId}/customers`),
       api.get(`/businesses/${bizId}`),
-    ]).then(([bankRes, invRes, coaRes, vendRes, custRes, bizRes]) => {
+      // Only narrows the bank account picker, so the page still loads without it.
+      api.get<{ bank_accounts: Array<{ cash_account_id: string }> }>(`/businesses/${bizId}/bank-accounts`)
+        .then(r => r.data.bank_accounts ?? []).catch(() => []),
+    ]).then(([bankRes, invRes, coaRes, vendRes, custRes, bizRes, bankingAccounts]) => {
+      setBankingAccountIds(new Set(bankingAccounts.map(b => b.cash_account_id)));
       setAutoPostEnabled(bizRes.data?.ai_auto_post_enabled === true);
       setBankImports((bankRes.data.imports as StagedImport[]) ?? []);
       setInvoiceImports((invRes.data.imports as InvoiceImport[]) ?? []);
@@ -608,8 +632,7 @@ export default function EmailImportReviewPage() {
     }
   }
 
-  // Suspense is an asset too, but never the account a statement belongs to.
-  const bankAccounts = accounts.filter(a => a.account_type === 'asset' && a.detail_type !== SUSPENSE_DETAIL_TYPE);
+  const bankAccounts = statementBankAccounts(accounts, bankingAccountIds, bankAccountId);
   // Card statements post against a liability: Credit Card accounts first.
   const cardAccounts = [
     ...accounts.filter(a => a.account_type === 'liability' && a.detail_type === 'Credit Card'),
