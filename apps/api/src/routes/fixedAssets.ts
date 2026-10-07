@@ -25,7 +25,8 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 router.get('/businesses/:businessId/fixed-assets', async (req, res, next) => {
   try {
     const list = await assets.listFixedAssets(db, req.tenancy!.business_id);
-    res.json({ fixed_assets: list });
+    const ledgerCost = await assets.fixedAssetLedgerCost(db, req.tenancy!.business_id);
+    res.json({ fixed_assets: list, ledger_cost_total: ledgerCost });
   } catch (e) { next(e); }
 });
 

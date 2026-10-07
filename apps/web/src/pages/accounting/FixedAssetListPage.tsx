@@ -27,7 +27,7 @@ type FixedAssetRow = {
   book_value: string;
 };
 
-type ListResponse = { fixed_assets: FixedAssetRow[] };
+type ListResponse = { fixed_assets: FixedAssetRow[]; ledger_cost_total?: string };
 
 function fmtShortDate(iso: string) {
   const [y, m, d] = iso.split('-');
@@ -49,6 +49,8 @@ export default function FixedAssetListPage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  // What the ledger holds in the asset accounts; the register is kept separately from it.
+  const [ledgerCost, setLedgerCost] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bizId) return;
@@ -56,7 +58,7 @@ export default function FixedAssetListPage() {
     setErr(null);
     api
       .get<ListResponse>(`/businesses/${bizId}/fixed-assets`)
-      .then((r) => setItems(r.data.fixed_assets))
+      .then((r) => { setItems(r.data.fixed_assets); setLedgerCost(r.data.ledger_cost_total ?? null); })
       .catch((e: unknown) => {
         const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
         setErr(msg ?? 'Failed to load fixed assets');
@@ -65,6 +67,7 @@ export default function FixedAssetListPage() {
   }, [bizId]);
 
   const filtered = statusFilter ? items.filter(a => a.status === statusFilter) : items;
+  const activeCost = items.filter(a => a.status === 'active').reduce((sum, a) => sum + Number(a.cost), 0);
 
   // Totals span all assets, unfiltered (QBO behavior).
   const totals = useMemo(() => items.reduce(
@@ -132,6 +135,15 @@ export default function FixedAssetListPage() {
             { amount: totals.book, caption: 'Net book value', colorClass: 'bg-emerald-500' },
           ]}
         />
+      )}
+
+      {ledgerCost !== null && Math.abs(activeCost - Number(ledgerCost)) >= 0.01 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          The register and the ledger disagree. Active assets here cost <span className="font-mono">{fmtMoney(activeCost)}</span>,
+          but their asset accounts hold <span className="font-mono">{fmtMoney(ledgerCost)}</span> in the ledger, a difference
+          of <span className="font-mono">{fmtMoney(Math.abs(activeCost - Number(ledgerCost)))}</span>. Usually a purchase entry was
+          changed in the journal, or something was bought and not added here.
+        </div>
       )}
 
       <div className="flex flex-wrap items-end gap-4">

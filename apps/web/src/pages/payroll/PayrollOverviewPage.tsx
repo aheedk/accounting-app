@@ -50,7 +50,7 @@ export default function PayrollOverviewPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Total Liabilities Outstanding</CardTitle>
+            <CardTitle title="Payroll taxes accrued on pay runs and not yet paid. The Payroll Liabilities account on the balance sheet also holds anything posted to it directly, so it can be higher.">Payroll Taxes Owed</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold font-mono">
             {fmtMoney(data.total_liabilities_outstanding)}

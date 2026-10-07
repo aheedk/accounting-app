@@ -39,6 +39,28 @@ describe('fixedAssetService', () => {
   afterAll(async () => { await stopTestDb(); });
   beforeEach(async () => { await truncateAll(t.db); });
 
+  // 2026-09-28 audit: the register said 43,000 and the ledger 44,000 with nothing
+  // on screen to show it. The list now carries what the ledger holds.
+  it('fixedAssetLedgerCost reports what the ledger holds in the register\'s asset accounts', async () => {
+    const { biz, ctx, equipment, accumDep, depExpense, cash } = await setup(t);
+    expect(await fixedAssetSvc.fixedAssetLedgerCost(t.db, biz.id)).toBe('0.0000');   // nothing registered
+
+    await t.db.transaction().execute(trx => fixedAssetSvc.createFixedAsset(trx, ctx, {
+      business_id: biz.id, name: 'Office furniture', asset_account_id: equipment.id,
+      depreciation_expense_account_id: depExpense.id, accumulated_depreciation_account_id: accumDep.id,
+      purchase_date: '2026-01-10', cost: '6000.0000', salvage_value: '0.0000', useful_life_years: 5, memo: null,
+    }));
+    // The purchase is its own journal entry, and here it was entered as 7,000.
+    await t.db.transaction().execute(trx => postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-01-10', source_type: 'manual', memo: 'Buy furniture',
+      lines: [
+        { account_id: equipment.id, debit: '7000.0000', credit: '0.0000', memo: null },
+        { account_id: cash.id, debit: '0.0000', credit: '7000.0000', memo: null },
+      ],
+    }));
+    expect(await fixedAssetSvc.fixedAssetLedgerCost(t.db, biz.id)).toBe('7000.0000');
+  });
+
   it('createFixedAsset validates account types and inserts', async () => {
     const { biz, ctx, equipment, accumDep, depExpense, revenue } = await setup(t);
 

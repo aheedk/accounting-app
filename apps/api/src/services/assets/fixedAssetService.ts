@@ -147,6 +147,32 @@ export async function listFixedAssets(
   });
 }
 
+/**
+ * What the ledger holds in the accounts the register's active assets sit in.
+ * The register and the ledger are kept separately (adding an asset posts
+ * nothing), so this is how a difference between them gets noticed.
+ */
+export async function fixedAssetLedgerCost(db: Kysely<DB>, business_id: string): Promise<string> {
+  const accounts = await db.selectFrom('fixed_assets')
+    .select('asset_account_id').distinct()
+    .where('business_id', '=', business_id)
+    .where('deleted_at', 'is', null)
+    .where('status', '=', 'active')
+    .execute();
+  if (accounts.length === 0) return '0.0000';
+  const row = await db.selectFrom('journal_entry_lines as jel')
+    .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
+    .select(({ fn }) => [
+      fn.coalesce(fn.sum<string>('jel.debit'), sql.lit('0')).as('debit'),
+      fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('credit'),
+    ])
+    .where('je.business_id', '=', business_id)
+    .where('je.status', 'in', ['posted', 'voided'])
+    .where('jel.account_id', 'in', accounts.map(a => a.asset_account_id))
+    .executeTakeFirst();
+  return toMoneyString(subMoney(row?.debit ?? '0', row?.credit ?? '0'));
+}
+
 export async function getFixedAsset(
   db: Kysely<DB>, business_id: string, fixed_asset_id: string,
 ): Promise<FixedAssetWithAccumulation> {
