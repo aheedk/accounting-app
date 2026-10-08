@@ -26,7 +26,20 @@ export function makeClient(): AxiosInstance {
   let refreshing: Promise<string | null> | null = null;
 
   client.interceptors.response.use(
-    (r) => r,
+    (r) => {
+      // The approval step: in a company that asks for it, a staff login's entry is
+      // held for an accountant and nothing is recorded. Forms expect the record
+      // back, so this is handed to them as a failure that says what happened, and
+      // every form's own error line shows it without knowing about approvals.
+      if (r.status === 202 && (r.data as { pending_approval?: boolean } | undefined)?.pending_approval) {
+        const message = (r.data as { message?: string }).message ?? 'Sent for approval.';
+        return Promise.reject(Object.assign(new Error(message), {
+          pendingApproval: true,
+          response: { status: 202, data: { error: { code: 'PENDING_APPROVAL', message } } },
+        }));
+      }
+      return r;
+    },
     async (error: AxiosError) => {
       const status = error.response?.status;
       const url = error.config?.url ?? '';

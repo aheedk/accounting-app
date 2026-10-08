@@ -7,6 +7,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import AccountPage from '@/pages/AccountPage';
 import ActivityLogPage from '@/pages/setup/ActivityLogPage';
 import MessagesPage from '@/pages/MessagesPage';
+import ApprovalsPage from '@/pages/accounting/ApprovalsPage';
 import SendDocumentsPage from '@/pages/client/SendDocumentsPage';
 import CoaListPage from '@/pages/coa/CoaListPage';
 import AccountRegisterPage from '@/pages/coa/AccountRegisterPage';
@@ -122,6 +123,7 @@ export default function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/setup/activity" element={<ActivityLogPage />} />
             <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/accounting/approvals" element={<ApprovalsPage />} />
             <Route path="/documents/send" element={<SendDocumentsPage />} />
 
             {/* Accounts Receivable */}
