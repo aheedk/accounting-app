@@ -118,7 +118,7 @@ describe('bankDepositService', () => {
     }))).rejects.toThrow(/greater than zero/);
   });
 
-  it('updateDeposit replaces other-funds lines and reposts the JE, keeping undeposited lines fixed', async () => {
+  it('updateDeposit edits the existing JE in place, keeping undeposited lines fixed', async () => {
     const { biz, ctx, bankAccount, undepositedFunds, income } = await bootstrap();
     const payment = await makePostedPayment(ctx, biz.id, undepositedFunds, '500.00');
 
@@ -132,6 +132,8 @@ describe('bankDepositService', () => {
     }));
     expect(created.total_amount).toBe('550.00');
     const originalJeId = created.journal_entry_id!;
+    const originalJe = await t.db.selectFrom('journal_entries').select(['journal_number'])
+      .where('id', '=', originalJeId).executeTakeFirstOrThrow();
 
     const updated = await t.db.transaction().execute(trx => depositSvc.updateDeposit(trx, ctx, created.id, {
       bank_account_id: bankAccount.id,
@@ -141,16 +143,17 @@ describe('bankDepositService', () => {
     }));
 
     expect(updated.total_amount).toBe('575.00');
-    expect(updated.journal_entry_id).not.toBe(originalJeId);
+    // Same JE row — an edit is not a void/repost.
+    expect(updated.journal_entry_id).toBe(originalJeId);
 
-    const originalJe = await t.db.selectFrom('journal_entries').select('status').where('id', '=', originalJeId).executeTakeFirstOrThrow();
-    expect(originalJe.status).toBe('voided');
+    const je = await t.db.selectFrom('journal_entries').selectAll().where('id', '=', originalJeId).executeTakeFirstOrThrow();
+    expect(je.status).toBe('posted');
+    expect(je.journal_number).toBe(originalJe.journal_number);
+    expect(je.entry_date).toBe('2026-03-05');
 
-    // The reversal of the OLD JE reverses on the OLD date (2026-03-04), not
-    // the new deposit_date (2026-03-05) and not today.
-    const reversal = await t.db.selectFrom('journal_entries').selectAll()
-      .where('reversed_entry_id', '=', originalJeId).executeTakeFirstOrThrow();
-    expect(reversal.entry_date).toBe('2026-03-04');
+    const reversals = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', originalJeId).execute();
+    expect(reversals).toHaveLength(0);
 
     const full = await depositSvc.getDeposit(t.db, ctx, created.id);
     expect(full.lines.filter(l => l.line_type === 'undeposited_funds')).toHaveLength(1);

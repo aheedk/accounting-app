@@ -44,6 +44,18 @@ async function voidGuardFor(trx: Transaction<DB>, journal_entry_id: string) {
   return je?.source_id ? { source_guard: { source_type: je.source_type, source_id: je.source_id } } : {};
 }
 
+/** Same lookup as voidGuardFor, unwrapped — for updateJournalEntry's source_guard,
+ * which also needs the existing JE's own source_type as the replacement's
+ * source_type (ledger identity can't change under an in-place edit; see
+ * db/migrations/0065_journal_entry_in_place_edit.sql). */
+async function existingJeSource(trx: Transaction<DB>, journal_entry_id: string) {
+  const je = await trx.selectFrom('journal_entries')
+    .select(['source_type', 'source_id'])
+    .where('id', '=', journal_entry_id)
+    .executeTakeFirstOrThrow();
+  return je;
+}
+
 async function resolvePaymentAccount(trx: Transaction<DB>, bizId: string, payment_account_id: string) {
   const account = await trx.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', payment_account_id)
@@ -248,17 +260,6 @@ export async function updateExpense(
   const total = input.lines.reduce((sum, l) => sum + parseFloat(l.amount), 0);
   validateExpenseTotal(total);
 
-  if (before.journal_entry_id) {
-    await ledger.voidJournalEntry(trx, ctx, {
-      journal_entry_id: before.journal_entry_id,
-      void_reason: `Expense edited`,
-      // Reverse on the original's own date, not today — see the matching
-      // comment in bankDepositService.ts's updateDeposit for why this matters.
-      reversal_date: before.transaction_date,
-      ...(await voidGuardFor(trx, before.journal_entry_id)),
-    });
-  }
-
   await trx.deleteFrom('expense_transaction_lines').where('expense_transaction_id', '=', id).execute();
   await trx.insertInto('expense_transaction_lines').values(
     input.lines.map((l, i) => ({
@@ -271,17 +272,47 @@ export async function updateExpense(
     })),
   ).execute();
 
-  const je = await ledger.postJournalEntry(trx, ctx, {
-    business_id: bizId,
-    entry_date: input.transaction_date,
-    source_type: 'expense',
-    source_id: id,
-    transaction_type: 'expense',
-    payee_name: await resolvePayeeName(trx, input),
-    memo: input.memo ?? null,
-    reference: input.reference ?? null,
-    lines: buildExpenseJeLines(input.lines, input.payment_account_id, total, input.memo),
-  });
+  // Edit in place (QBO parity): an edit is not a void. Changing the vendor,
+  // memo, date, or line amounts/accounts updates the existing posted JE via
+  // the controlled in-place-edit path (0065_journal_entry_in_place_edit.sql)
+  // instead of voiding it and posting a replacement — same journal number,
+  // same row in the GL, running balance unaffected. Void is reserved for the
+  // explicit Void action.
+  let journalEntryId = before.journal_entry_id;
+  const jeLines = buildExpenseJeLines(input.lines, input.payment_account_id, total, input.memo);
+  const payeeName = await resolvePayeeName(trx, input);
+  if (before.journal_entry_id) {
+    const existingSource = await existingJeSource(trx, before.journal_entry_id);
+    const je = await ledger.updateJournalEntry(trx, ctx, {
+      journal_entry_id: before.journal_entry_id,
+      source_guard: { source_type: existingSource.source_type, source_id: existingSource.source_id! },
+      replacement: {
+        business_id: bizId,
+        entry_date: input.transaction_date,
+        source_type: existingSource.source_type,
+        source_id: id,
+        transaction_type: 'expense',
+        payee_name: payeeName,
+        memo: input.memo ?? null,
+        reference: input.reference ?? null,
+        lines: jeLines,
+      },
+    });
+    journalEntryId = je.entry.id;
+  } else {
+    const je = await ledger.postJournalEntry(trx, ctx, {
+      business_id: bizId,
+      entry_date: input.transaction_date,
+      source_type: 'expense',
+      source_id: id,
+      transaction_type: 'expense',
+      payee_name: payeeName,
+      memo: input.memo ?? null,
+      reference: input.reference ?? null,
+      lines: jeLines,
+    });
+    journalEntryId = je.id;
+  }
 
   const updated = await trx.updateTable('expense_transactions').set({
     transaction_date: input.transaction_date,
@@ -293,7 +324,7 @@ export async function updateExpense(
     reference: input.reference ?? null,
     memo: input.memo ?? null,
     total_amount: total.toFixed(2),
-    journal_entry_id: je.id,
+    journal_entry_id: journalEntryId,
   }).where('id', '=', id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {

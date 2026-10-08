@@ -48,6 +48,16 @@ async function voidGuardFor(trx: Transaction<DB>, journal_entry_id: string) {
   return je?.source_id ? { source_guard: { source_type: je.source_type, source_id: je.source_id } } : {};
 }
 
+/** Same lookup as voidGuardFor, unwrapped — updateJournalEntry's source_guard
+ * also needs the existing JE's own source_type as the replacement's
+ * source_type (ledger identity can't change under an in-place edit). */
+async function existingJeSource(trx: Transaction<DB>, journal_entry_id: string) {
+  return trx.selectFrom('journal_entries')
+    .select(['source_type', 'source_id'])
+    .where('id', '=', journal_entry_id)
+    .executeTakeFirstOrThrow();
+}
+
 async function resolveBankAccount(trx: Transaction<DB>, bizId: string, bank_account_id: string) {
   const bankAccount = await trx.selectFrom('bank_accounts')
     .innerJoin('chart_of_accounts as coa', 'coa.id', 'bank_accounts.cash_account_id')
@@ -262,19 +272,6 @@ export async function updateDeposit(
   const netTotal = linesTotal - cashBack;
   validateDepositTotals(linesTotal, cashBack, netTotal);
 
-  if (before.journal_entry_id) {
-    await ledger.voidJournalEntry(trx, ctx, {
-      journal_entry_id: before.journal_entry_id,
-      void_reason: `Bank deposit ${before.deposit_number} edited`,
-      // Reverse on the original's own date, not today — voidJournalEntry
-      // defaults to today when this is omitted, which strands the reversal
-      // outside any GL view bounded to the original's period and leaves the
-      // voided original's full amount visibly unoffset there.
-      reversal_date: before.deposit_date,
-      ...(await voidGuardFor(trx, before.journal_entry_id)),
-    });
-  }
-
   await trx.deleteFrom('bank_deposit_lines')
     .where('deposit_id', '=', id)
     .where('line_type', '=', 'other_funds')
@@ -301,8 +298,36 @@ export async function updateDeposit(
     allLines, bankAccount, netTotal, cashBack,
     input.cash_back_account_id, input.cash_back_memo, input.memo,
   );
+  // Edit in place (QBO parity) — see the matching comment in
+  // expenseTransactionService.updateExpense for why this replaced void+repost.
+  // The one case that still needs an actual void: the edit trimmed the
+  // deposit down to fewer than 2 lines, so there's nothing left to update the
+  // existing JE into.
   let journalEntryId: string | null = null;
-  if (jeLines.length >= 2) {
+  if (before.journal_entry_id && jeLines.length >= 2) {
+    const existingSource = await existingJeSource(trx, before.journal_entry_id);
+    const je = await ledger.updateJournalEntry(trx, ctx, {
+      journal_entry_id: before.journal_entry_id,
+      source_guard: { source_type: existingSource.source_type, source_id: existingSource.source_id! },
+      replacement: {
+        business_id: bizId,
+        entry_date: input.deposit_date,
+        source_type: existingSource.source_type,
+        source_id: id,
+        transaction_type: 'deposit',
+        memo: input.memo ?? null,
+        lines: jeLines,
+      },
+    });
+    journalEntryId = je.entry.id;
+  } else if (before.journal_entry_id) {
+    await ledger.voidJournalEntry(trx, ctx, {
+      journal_entry_id: before.journal_entry_id,
+      void_reason: `Bank deposit ${before.deposit_number} edited`,
+      reversal_date: before.deposit_date,
+      ...(await voidGuardFor(trx, before.journal_entry_id)),
+    });
+  } else if (jeLines.length >= 2) {
     const je = await ledger.postJournalEntry(trx, ctx, {
       business_id: bizId,
       entry_date: input.deposit_date,

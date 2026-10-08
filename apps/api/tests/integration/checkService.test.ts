@@ -136,28 +136,34 @@ describe('checkService', () => {
     expect(await checkSvc.vendorDefaultCategory(t.db, biz.id, vendor.id)).toBe(supplies.id);
   });
 
-  it('updateCheck voids the old JE on the original date and posts a replacement', async () => {
+  it('updateCheck edits the existing JE in place (same row, same journal number), and preserves the check number', async () => {
     const { ctx, repairs, supplies, cash, bankAccount } = await bootstrap();
     const check = await t.db.transaction().execute(trx => checkSvc.createCheck(trx, ctx, {
       payment_date: '2026-04-15', payee_text: 'Action Lawn Maintenance',
       bank_account_id: bankAccount.id, lines: [{ account_id: repairs.id, amount: '150.00' }],
     }));
     const firstJeId = check.journal_entry_id!;
+    const firstJe = await t.db.selectFrom('journal_entries').select(['journal_number'])
+      .where('id', '=', firstJeId).executeTakeFirstOrThrow();
 
+    // Only the vendor and the line changed — check_number was left as-is,
+    // the way a real vendor-name correction would come from the form.
     const updated = await t.db.transaction().execute(trx => checkSvc.updateCheck(trx, ctx, check.id, {
-      payment_date: '2026-04-15', payee_text: 'Action Lawn Maintenance', check_number: check.check_number,
+      payment_date: '2026-04-15', payee_text: 'Action Lawn Maintenance LLC',
       bank_account_id: bankAccount.id, lines: [{ account_id: supplies.id, amount: '200.00' }],
     }));
 
     expect(updated.total_amount).toBe('200.0000');
-    expect(updated.journal_entry_id).not.toBe(firstJeId);
+    expect(updated.check_number).toBe(check.check_number);
+    // Same JE row — an edit is not a void/repost.
+    expect(updated.journal_entry_id).toBe(firstJeId);
 
-    const oldJe = await t.db.selectFrom('journal_entries').selectAll().where('id', '=', firstJeId).executeTakeFirstOrThrow();
-    expect(oldJe.status).toBe('voided');
-    const reversal = await t.db.selectFrom('journal_entries').selectAll()
-      .where('reversed_entry_id', '=', firstJeId).executeTakeFirstOrThrow();
-    // Reversed on the check's own date, not today.
-    expect(reversal.entry_date).toBe('2026-04-15');
+    const je = await t.db.selectFrom('journal_entries').selectAll().where('id', '=', firstJeId).executeTakeFirstOrThrow();
+    expect(je.status).toBe('posted');
+    expect(je.journal_number).toBe(firstJe.journal_number);
+    const reversals = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', firstJeId).execute();
+    expect(reversals).toHaveLength(0);
 
     const cashBal = await ledger.computeAccountBalance(t.db, { account_id: cash.id, as_of: '2026-12-31' });
     expect(cashBal).toBe('-200.0000');

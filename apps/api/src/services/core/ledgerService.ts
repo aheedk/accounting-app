@@ -433,7 +433,11 @@ export async function reverseJournalEntry(
 export async function updateJournalEntry(
   trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateJournalEntryInput,
 ) {
-  if (!hasMinRole(ctx.effective_role, 'accountant')) {
+  // The accountant+ bar is for editing a journal entry directly (the manual
+  // JE editor). A source service editing its own entry via source_guard is
+  // already gated by that entity's own route role requirement (expenses/
+  // checks/deposits are staff-editable) — don't re-impose a stricter bar here.
+  if (!input.source_guard && !hasMinRole(ctx.effective_role, 'accountant')) {
     throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to edit journal entries');
   }
   if (input.replacement.business_id !== ctx.business_id) {
