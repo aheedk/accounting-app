@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
-import { humanizeCode } from '@/lib/labels';
-import { useEffectiveRole } from '@/lib/roleAccess';
+import { roleLabel, useEffectiveRole } from '@/lib/roleAccess';
 
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
@@ -39,7 +38,7 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           <Link to="/account" title="My account" className="font-medium text-foreground hover:underline">{user?.full_name ?? ''}</Link>
           {role && (
             <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-              {humanizeCode(role)}
+              {roleLabel(role)}
             </span>
           )}
         </div>

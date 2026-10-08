@@ -5,8 +5,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { cachedGet } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
-import { useEffectiveRole } from '@/lib/roleAccess';
-import type { Role } from '@/auth/AuthContext';
+import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/date-input';
@@ -78,19 +77,6 @@ function pickErr(e: unknown): string {
     ?.response?.data?.error?.message ?? 'Failed';
 }
 
-const ROLE_RANK: Record<Role, number> = {
-  client: 0,
-  staff: 1,
-  accountant: 2,
-  firm_admin: 3,
-};
-
-function roleAtLeast(role: Role | undefined, floor: Role): boolean {
-  if (!role) return false;
-  const r = ROLE_RANK[role] ?? -1;
-  const f = ROLE_RANK[floor] ?? Number.POSITIVE_INFINITY;
-  return r >= f;
-}
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'unreviewed', label: 'For review' },
@@ -180,7 +166,7 @@ function getPresetRange(preset: string): { from: string; to: string } | null {
 export default function BankTransactionsInboxPage() {
   const [bizId] = useActiveBusinessId();
   // The role on the open company, which is the one the API checks.
-  const canUnreview = roleAtLeast(useEffectiveRole() ?? undefined, 'accountant');
+  const canUnreview = roleAtLeast(useEffectiveRole(), 'accountant');
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');

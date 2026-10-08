@@ -16,7 +16,7 @@ import { makeApp } from '../../src/app.js';
 import { destroyDbSingleton } from '../../src/db/index.js';
 import { clientMayRequest } from '../../src/lib/clientAccess.js';
 
-const ROLES = ['client', 'staff', 'accountant', 'firm_admin'] as const;
+const ROLES = ['client', 'viewer', 'staff', 'accountant', 'firm_admin'] as const;
 type RoleName = (typeof ROLES)[number];
 type RouteDef = { method: string; path: string };
 type Row = RouteDef & Record<RoleName, number>;
@@ -215,6 +215,16 @@ describe('role matrix', () => {
   it('outside a business, a client sees only its own login', () => {
     const firmLevel = rows.filter(r => !r.path.startsWith(BIZ) && r.client !== 403).map(name);
     expect(firmLevel).toEqual(['GET /me']);
+  });
+
+  it('a view-only login reads what staff read, and changes nothing', () => {
+    expect(rows.filter(r => r.method === 'GET' && r.viewer === 403 && r.staff !== 403).map(name)).toEqual([]);
+    // The only non-GET calls it is let into are lookups and report runs, which save nothing.
+    expect(rows.filter(r => r.method !== 'GET' && r.viewer !== 403).map(name).sort()).toEqual([
+      'POST ~/custom-reports/:id/run',
+      'POST ~/custom-reports/run',
+      'POST ~/email-imports/:importId/already-recorded',
+    ]);
   });
 
   it('staff may change exactly what is listed', () => {

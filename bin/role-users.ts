@@ -5,12 +5,12 @@ import { hashPassword } from '../apps/api/src/services/auth/passwordHasher.js';
 
 // Logins for trying the app as each role: `npm run db:role-users`.
 //
-// Creates (or resets) accountant@, staff@ and client@roletest.local in the first
+// Creates (or resets) accountant@, staff@, viewer@ and client@roletest.local in the first
 // firm, each with access to one client, and prints one freshly made password
 // for the three. Local databases only: these are throwaway logins with a
 // password printed to the terminal, which has no place in a real firm's users.
 
-const ROLES = ['accountant', 'staff', 'client'] as const;
+const ROLES = ['accountant', 'staff', 'viewer', 'client'] as const;
 
 async function main() {
   const url = new URL(process.env.DATABASE_URL ?? '');
@@ -49,7 +49,7 @@ async function main() {
 
   console.log(`Test logins for ${business.name}:`);
   for (const role of ROLES) console.log(`  ${role}@roletest.local`);
-  console.log(`  password (all three): ${password}`);
+  console.log(`  password (all of them): ${password}`);
   console.log('Run this again to change the password.');
   await pool.end();
 }

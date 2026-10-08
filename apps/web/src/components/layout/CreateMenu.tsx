@@ -137,8 +137,8 @@ export function CreateMenu() {
       )
     : null;
 
-  // A client login creates nothing, so it has no + New.
-  if (role === 'client') return null;
+  // A client or view-only login creates nothing, so it has no + New.
+  if (!roleAtLeast(role, 'staff')) return null;
 
   return (
     <div className="px-3 py-2">

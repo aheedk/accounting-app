@@ -2,7 +2,7 @@ import type { ColumnType, Generated } from 'kysely';
 
 type Timestamp = ColumnType<Date, string | Date, string | Date>;
 
-export type UserRole = 'firm_admin' | 'accountant' | 'staff' | 'client';
+export type UserRole = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
 
 export interface FirmsTable {
   id: Generated<string>;

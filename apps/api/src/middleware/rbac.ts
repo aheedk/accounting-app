@@ -6,7 +6,8 @@ import { ERR, hasMinRole, type Role } from '@accounting/shared';
 const WHO_CAN: Record<Role, string> = {
   firm_admin: 'Only a firm admin can do this.',
   accountant: 'This needs an accountant or a firm admin.',
-  staff: 'This needs a staff, accountant or firm admin login.',
+  staff: 'This needs a staff, accountant or firm admin login. A view-only login cannot change anything.',
+  viewer: 'You do not have access to this.',
   client: 'You do not have access to this.',
 };
 

@@ -124,7 +124,7 @@ type LineItem = {
 // Serve the original PDF attachment
 router.get(
   '/businesses/:businessId/invoice-imports/:importId/pdf',
-  requireMinRole('staff'),
+  requireMinRole('viewer'),
   async (req, res, next) => {
     try {
       const bizId = req.tenancy!.business_id;

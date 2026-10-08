@@ -25,13 +25,13 @@ export const loginResponseSchema = z.object({
     id: z.string().uuid(),
     email: z.string().email(),
     full_name: z.string(),
-    role: z.enum(['firm_admin', 'accountant', 'staff', 'client']),
+    role: z.enum(['firm_admin', 'accountant', 'staff', 'viewer', 'client']),
     firm_id: z.string().uuid(),
   }),
   businesses: z.array(z.object({
     id: z.string().uuid(),
     name: z.string(),
-    role_override: z.enum(['firm_admin', 'accountant', 'staff', 'client']).nullable(),
+    role_override: z.enum(['firm_admin', 'accountant', 'staff', 'viewer', 'client']).nullable(),
   })),
 });
 export type LoginResponse = z.infer<typeof loginResponseSchema>;

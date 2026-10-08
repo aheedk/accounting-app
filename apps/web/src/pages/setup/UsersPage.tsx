@@ -9,9 +9,10 @@ import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { ROLE_LABELS } from '@accounting/shared';
 
-type Role = 'firm_admin' | 'accountant' | 'staff' | 'client';
-const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'client'];
+type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
+const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'viewer', 'client'];
 
 type BusinessAccess = {
   business_id: string;
@@ -289,7 +290,7 @@ export default function UsersPage() {
                   value={invite.role}
                   onChange={e => setInvite(i => ({ ...i, role: e.target.value as Role }))}
                 >
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </AppSelect>
               </div>
               {inviteErr && <p className="text-sm text-destructive md:col-span-3">{inviteErr}</p>}
@@ -336,7 +337,7 @@ export default function UsersPage() {
                         disabled={isSelf}
                         onChange={e => changeRole(u.id, e.target.value as Role)}
                       >
-                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                        {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                       </AppSelect>
                       {isSelf && <p className="text-xs text-muted-foreground mt-1">(you)</p>}
                     </td>
@@ -352,7 +353,7 @@ export default function UsersPage() {
                             <span>{a.business_name}</span>
                             {a.role_override && (
                               <span className="text-xs rounded-full border px-2 py-0.5">
-                                as {a.role_override}
+                                as {ROLE_LABELS[a.role_override]}
                               </span>
                             )}
                             <button
@@ -389,7 +390,7 @@ export default function UsersPage() {
                               onChange={e => setGrantForm(g => ({ ...g, role_override: e.target.value as '' | Role }))}
                             >
                               <option value="">(no override)</option>
-                              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                              {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                             </AppSelect>
                           </div>
                           <div className="flex gap-2">

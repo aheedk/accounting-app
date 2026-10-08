@@ -58,7 +58,9 @@ export function AppShell() {
               <p className="mt-2 text-sm text-muted-foreground">
                 {role === 'client'
                   ? 'Your login shows your invoices and financial reports. Ask your accountant if you need something else.'
-                  : 'Only a firm admin can open it.'}
+                  : role === 'viewer'
+                    ? 'A view-only login can look at the books and change nothing.'
+                    : 'It needs a login with more access than yours.'}
               </p>
               <Link className="mt-4 inline-block text-sm font-medium text-primary hover:underline" to="/">Back to the dashboard</Link>
             </div>

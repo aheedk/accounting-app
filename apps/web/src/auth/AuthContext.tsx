@@ -1,7 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, setAccessToken } from '@/lib/apiClient';
 
-export type Role = 'firm_admin' | 'accountant' | 'staff' | 'client';
+export type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
 
 export type AuthUser = {
   id: string;

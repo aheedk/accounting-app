@@ -6,8 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
-import { humanizeCode } from '@/lib/labels';
-import { canOpenPage, roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
+import { canOpenPage, roleAtLeast, roleLabel, useEffectiveRole } from '@/lib/roleAccess';
 import { ArrowRight, FileBarChart, FilePlus2, Receipt, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -189,7 +188,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p><span className="text-muted-foreground">Signed in as</span> <span className="font-medium">{user?.email}</span></p>
-            <p><span className="text-muted-foreground">Role</span> <span className="font-medium">{role ? humanizeCode(role) : ''}</span></p>
+            <p><span className="text-muted-foreground">Role</span> <span className="font-medium">{roleLabel(role)}</span></p>
             <p><span className="text-muted-foreground">Businesses</span> <span className="font-medium">{businesses.length}</span></p>
           </CardContent>
         </Card>

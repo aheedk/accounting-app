@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { pickErr } from '@/lib/apiErrors';
 import { fmtDateTime } from '@/lib/dates';
 import { flashMessage } from '@/lib/flash';
-import { humanizeCode } from '@/lib/labels';
+import { roleLabel } from '@/lib/roleAccess';
 import { describeBrowser } from '@/lib/browserName';
 
 type Session = { id: string; started_at: string; last_active_at: string; user_agent: string | null; ip_address: string | null; current: boolean };
@@ -104,7 +104,7 @@ export default function AccountPage() {
       <div>
         <h1 className="text-2xl font-semibold">My account</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {user?.full_name} · {user?.email}{user?.role ? ` · ${humanizeCode(user.role)}` : ''}
+          {user?.full_name} · {user?.email}{user?.role ? ` · ${roleLabel(user.role)}` : ''}
         </p>
       </div>
       {err && <p className="text-sm text-destructive">{err}</p>}

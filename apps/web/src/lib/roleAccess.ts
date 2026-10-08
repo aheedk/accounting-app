@@ -1,4 +1,4 @@
-import { hasMinRole, type Role } from '@accounting/shared';
+import { hasMinRole, ROLE_LABELS, type Role } from '@accounting/shared';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 
@@ -44,6 +44,8 @@ export function canOpenPage(role: Role | null, pathname: string): boolean {
     if (pathname === '/invoices' || (pathname.startsWith('/invoices/') && pathname !== '/invoices/new')) return true;
     return CLIENT_PAGES.some(page => under(pathname, page));
   }
+  // A view-only login opens every page staff can, except the forms that add something.
+  if (role === 'viewer' && /\/(new|import)(\/|$)/.test(pathname)) return false;
   if (FIRM_ADMIN_PAGES.some(page => under(pathname, page))) return role === 'firm_admin';
   if (ACCOUNTANT_PAGES.some(page => under(pathname, page))) return hasMinRole(role, 'accountant');
   return true;
@@ -52,4 +54,9 @@ export function canOpenPage(role: Role | null, pathname: string): boolean {
 /** True when the role is at least `min`; false while the user is still loading. */
 export function roleAtLeast(role: Role | null, min: Role): boolean {
   return role !== null && hasMinRole(role, min);
+}
+
+/** The role as a person reads it: "View only", not "viewer". */
+export function roleLabel(role: Role | null | undefined): string {
+  return role ? ROLE_LABELS[role] : '';
 }

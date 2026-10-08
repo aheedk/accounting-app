@@ -202,7 +202,7 @@ router.get('/businesses/:businessId/email-imports/pending-count', async (req, re
 // Serve the original PDF attachment
 router.get(
   '/businesses/:businessId/email-imports/:importId/pdf',
-  requireMinRole('staff'),
+  requireMinRole('viewer'),
   async (req, res, next) => {
     try {
       const bizId = req.tenancy!.business_id;
@@ -370,7 +370,8 @@ const alreadyRecordedSchema = z.object({
  */
 router.post(
   '/businesses/:businessId/email-imports/:importId/already-recorded',
-  requireMinRole('staff'),
+  // A lookup, sent as a POST only because it carries a list of lines.
+  requireMinRole('viewer'),
   async (req, res, next) => {
     try {
       const body = alreadyRecordedSchema.parse(req.body);

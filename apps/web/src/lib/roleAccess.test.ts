@@ -36,6 +36,15 @@ describe('canOpenPage', () => {
     }
   });
 
+  it('lets a view-only login open every page but the forms that add something', () => {
+    for (const page of ['/', '/invoices', '/payroll/employees', '/ai/inbox', '/reports/general-ledger', '/journal/3f9a']) {
+      expect(canOpenPage('viewer', page), page).toBe(true);
+    }
+    for (const page of ['/invoices/new', '/journal/new', '/accounting/bank-transactions/import', '/setup/users', '/setup/activity']) {
+      expect(canOpenPage('viewer', page), page).toBe(false);
+    }
+  });
+
   it('opens nothing before the user has loaded', () => {
     expect(canOpenPage(null, '/')).toBe(false);
   });
@@ -45,6 +54,8 @@ describe('roleAtLeast', () => {
   it('compares against the role ladder', () => {
     expect(roleAtLeast('accountant', 'staff')).toBe(true);
     expect(roleAtLeast('staff', 'accountant')).toBe(false);
+    expect(roleAtLeast('viewer', 'staff')).toBe(false);
+    expect(roleAtLeast('viewer', 'client')).toBe(true);
     expect(roleAtLeast(null, 'client')).toBe(false);
   });
 });

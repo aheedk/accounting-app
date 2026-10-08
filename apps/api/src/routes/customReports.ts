@@ -79,7 +79,8 @@ router.post('/businesses/:businessId/custom-reports/:id/run', async (req, res, n
   } catch (e) { next(e); }
 });
 
-router.post('/businesses/:businessId/custom-reports/run', requireMinRole('staff'), async (req, res, next) => {
+// Running a report reads; it saves nothing.
+router.post('/businesses/:businessId/custom-reports/run', requireMinRole('viewer'), async (req, res, next) => {
   try {
     const body = z.object({ definition: schemas.customReportDefinitionSchema }).parse(req.body);
     const rows = await crSvc.runReport(db, req.tenancy!.business_id, body.definition);

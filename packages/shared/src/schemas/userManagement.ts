@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const USER_ROLES = ['firm_admin', 'accountant', 'staff', 'client'] as const;
+export const USER_ROLES = ['firm_admin', 'accountant', 'staff', 'viewer', 'client'] as const;
 export const userRoleSchema = z.enum(USER_ROLES);
 
 export const userCreateSchema = z.object({
