@@ -1,4 +1,5 @@
 import { Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
@@ -34,7 +35,8 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
 
       <div className="flex shrink-0 items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-sm">
-          <span className="font-medium text-foreground">{user?.full_name ?? ''}</span>
+          {/* The name opens the person's own login: password, second step, sessions. */}
+          <Link to="/account" title="My account" className="font-medium text-foreground hover:underline">{user?.full_name ?? ''}</Link>
           {role && (
             <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
               {humanizeCode(role)}

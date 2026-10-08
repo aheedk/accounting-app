@@ -26,6 +26,11 @@ type UserRow = {
   role: Role;
   last_login_at: string | null;
   created_at: string;
+  // A login that is switched off stays listed, so it can be switched back on.
+  deactivated_at: string | null;
+  // Held after too many wrong passwords; a new password lifts it.
+  locked: boolean;
+  two_step_enabled: boolean;
   business_access: BusinessAccess[];
 };
 
@@ -56,6 +61,8 @@ export default function UsersPage() {
   const [inviteErr, setInviteErr] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatedUser | null>(null);
+  // A new password made for an existing login, shown once.
+  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
 
   const [grantFor, setGrantFor] = useState<string | null>(null);
   const [grantForm, setGrantForm] = useState<{ business_id: string; role_override: '' | Role }>({
@@ -101,6 +108,21 @@ export default function UsersPage() {
       setInviteErr(errorMessage(e));
     } finally {
       setInviteBusy(false);
+    }
+  }
+
+  // Switch a login off or on, give it a new password, sign it out, or turn off its second step.
+  async function userAction(u: UserRow, action: 'deactivate' | 'reactivate' | 'reset-password' | 'sign-out' | 'reset-two-step', confirmText?: string) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setErr(null);
+    try {
+      const r = await api.post<{ plaintext_password?: string }>(`/me/firm/users/${u.id}/${action}`);
+      if (action === 'reset-password' && r.data.plaintext_password) {
+        setResetResult({ email: u.email, password: r.data.plaintext_password });
+      }
+      await reload();
+    } catch (e) {
+      setErr(errorMessage(e));
     }
   }
 
@@ -227,6 +249,24 @@ export default function UsersPage() {
         </Card>
       )}
 
+      {resetResult && (
+        <Card className="border-emerald-500/40">
+          <CardHeader>
+            <CardTitle className="text-emerald-700">New password</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p>
+              <strong>{resetResult.email}</strong> has a new password and was signed out everywhere.
+              Pass it on now — it will not be shown again. They can change it under My account.
+            </p>
+            <div className="rounded-md bg-muted p-3 font-mono text-sm break-all">{resetResult.password}</div>
+            <div>
+              <Button variant="outline" size="sm" onClick={() => setResetResult(null)}>Dismiss</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {showInvite && (
         <Card>
           <CardHeader><CardTitle>Invite user</CardTitle></CardHeader>
@@ -281,7 +321,14 @@ export default function UsersPage() {
                 return (
                   <tr key={u.id} className="border-b last:border-b-0 align-top hover:bg-muted/30">
                     <td className="p-3">{u.email}</td>
-                    <td className="p-3">{u.full_name}</td>
+                    <td className="p-3">
+                      {u.full_name}
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {u.deactivated_at && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">Switched off</span>}
+                        {u.locked && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Too many wrong passwords. A new password lifts it.">Held</span>}
+                        {u.two_step_enabled && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Two-step</span>}
+                      </div>
+                    </td>
                     <td className="p-3">
                       <AppSelect
                         className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
@@ -363,6 +410,14 @@ export default function UsersPage() {
                           Grant access
                         </Button>
                       )}
+                      <div className="mt-2 flex flex-col items-end gap-1 text-xs">
+                        <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'reset-password', `Give ${u.email} a new password? They will be signed out everywhere.`)}>Reset password</button>
+                        {!isSelf && <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'sign-out')}>Sign out everywhere</button>}
+                        {u.two_step_enabled && <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'reset-two-step', `Turn off the second step for ${u.email}? Do this when they have lost the phone it is on.`)}>Turn off two-step</button>}
+                        {!isSelf && (u.deactivated_at
+                          ? <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'reactivate')}>Switch back on</button>
+                          : <button type="button" className="text-destructive hover:underline" onClick={() => void userAction(u, 'deactivate', `Switch off ${u.email}? They are signed out now and cannot sign in until it is switched back on.`)}>Switch off</button>)}
+                      </div>
                     </td>
                   </tr>
                 );

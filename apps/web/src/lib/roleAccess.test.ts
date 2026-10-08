@@ -3,7 +3,7 @@ import { canOpenPage, roleAtLeast } from './roleAccess';
 
 describe('canOpenPage', () => {
   it('gives a client the dashboard, its invoices and the financial reports', () => {
-    for (const page of ['/', '/invoices', '/invoices/1f0e', '/reports/pnl', '/reports/balance-sheet', '/reports/ap-aging']) {
+    for (const page of ['/', '/account', '/invoices', '/invoices/1f0e', '/reports/pnl', '/reports/balance-sheet', '/reports/ap-aging']) {
       expect(canOpenPage('client', page), page).toBe(true);
     }
   });

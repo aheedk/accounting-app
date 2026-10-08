@@ -7,12 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/auth/useAuth';
 
+type ApiError = { response?: { data?: { error?: { code?: string; message?: string } } } };
+
 export default function LoginPage() {
   const { login } = useAuth();
   const nav = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // Shown once the password is accepted for a login that has the second step on.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -20,12 +25,17 @@ export default function LoginPage() {
     e.preventDefault();
     setErr(null); setBusy(true);
     try {
-      await login(email, password);
+      await login(email, password, needsCode ? code.trim() : undefined);
       nav('/', { replace: true });
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
-        ?.response?.data?.error?.message;
-      setErr(msg ?? 'Login failed');
+      const error = (e as ApiError | undefined)?.response?.data?.error;
+      if (error?.code === 'TWO_STEP_REQUIRED') {
+        // Not a failure: the password was right, and now the code is asked for.
+        setNeedsCode(true);
+        setCode('');
+      } else {
+        setErr(error?.message ?? 'Login failed');
+      }
     } finally {
       setBusy(false);
     }
@@ -39,12 +49,12 @@ export default function LoginPage() {
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required />
+              <Input id="email" type="email" autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); setNeedsCode(false); }} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" className="pr-10" value={password} onChange={e => setPassword(e.target.value)} required />
+                <Input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" className="pr-10" value={password} onChange={e => { setPassword(e.target.value); setNeedsCode(false); }} required />
                 <button
                   type="button"
                   onClick={() => setShowPassword(s => !s)}
@@ -56,8 +66,19 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+            {needsCode && (
+              <div className="space-y-2">
+                <Label htmlFor="code">Code from your authenticator app</Label>
+                <Input
+                  id="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
+                  className="font-mono tracking-widest" placeholder="6 digits"
+                  value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} required
+                />
+                <p className="text-xs text-muted-foreground">Lost the phone it is on? A firm admin can turn the second step off for you.</p>
+              </div>
+            )}
             {err && <p className="text-sm text-destructive">{err}</p>}
-            <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
+            <Button type="submit" className="w-full" disabled={busy || (needsCode && code.length !== 6)}>{busy ? 'Signing in…' : 'Sign in'}</Button>
           </form>
         </CardContent>
       </Card>

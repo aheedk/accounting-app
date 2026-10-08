@@ -35,7 +35,8 @@ const under = (pathname: string, page: string) => pathname === page || pathname.
 export function canOpenPage(role: Role | null, pathname: string): boolean {
   if (!role) return false;
   if (role === 'client') {
-    if (pathname === '/') return true;
+    // The dashboard, and the person's own login (password, second step, sessions).
+    if (pathname === '/' || pathname === '/account') return true;
     // The list and one invoice, but not the form that writes a new one.
     if (pathname === '/invoices' || (pathname.startsWith('/invoices/') && pathname !== '/invoices/new')) return true;
     return CLIENT_PAGES.some(page => under(pathname, page));

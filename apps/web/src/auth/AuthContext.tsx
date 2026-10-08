@@ -16,7 +16,8 @@ type AuthState = {
   status: 'loading' | 'authenticated' | 'anonymous';
   user: AuthUser | null;
   businesses: AuthBusiness[];
-  login: (email: string, password: string) => Promise<void>;
+  /** `code` is the 6-digit second step, for a login that has it on. */
+  login: (email: string, password: string, code?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -39,8 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const r = await api.post('/auth/login', { email, password });
+  const login = useCallback(async (email: string, password: string, code?: string) => {
+    const r = await api.post('/auth/login', { email, password, ...(code ? { code } : {}) });
     setAccessToken(r.data.access_token);
     setUser(r.data.user);
     setBusinesses(r.data.businesses ?? []);
