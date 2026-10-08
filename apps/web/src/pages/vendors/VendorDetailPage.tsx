@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Menu, Plus, Search } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -8,10 +8,13 @@ import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { fmtDateTime, todayLocal } from '@/lib/dates';
+
+type VendorListItem = { id: string; name: string; is_active: boolean };
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Vendor = {
@@ -75,6 +78,58 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function VendorSidebar({
+  vendors, activeId, collapsed, onToggleCollapsed,
+}: { vendors: VendorListItem[]; activeId: string | undefined; collapsed: boolean; onToggleCollapsed: () => void }) {
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q ? vendors.filter(v => v.name.toLowerCase().includes(q)) : vendors;
+    return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  }, [vendors, query]);
+
+  if (collapsed) {
+    return (
+      <div className="w-12 shrink-0 border-r pt-1">
+        <button type="button" onClick={onToggleCollapsed} aria-label="Show vendor list" className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+          <Menu className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-64 shrink-0 flex-col border-r pr-3">
+      <div className="mb-3 flex items-center justify-between">
+        <button type="button" onClick={onToggleCollapsed} aria-label="Hide vendor list" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+          <Menu className="h-4 w-4" />
+        </button>
+        <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <Link to="/ap/vendors/new" aria-label="New vendor"><Plus className="h-4 w-4" /></Link>
+        </Button>
+      </div>
+      <div className="relative mb-2">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input className="h-9 pl-8 text-sm" placeholder="Filter by name" value={query} onChange={e => setQuery(e.target.value)} />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {filtered.map(v => (
+          <Link
+            key={v.id}
+            to={`/ap/vendors/${v.id}`}
+            className={`block truncate rounded-md px-2 py-2 text-sm ${v.id === activeId ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+          >
+            {v.name}
+            {!v.is_active && <span className="ml-1.5 text-xs text-muted-foreground">(inactive)</span>}
+          </Link>
+        ))}
+        {filtered.length === 0 && <div className="px-2 py-2 text-sm text-muted-foreground">No vendors found</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function VendorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
@@ -89,6 +144,8 @@ export default function VendorDetailPage() {
   const [tab, setTab] = useState<string>('transactions');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const [vendorList, setVendorList] = useState<VendorListItem[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     if (!bizId || !id) return;
@@ -98,6 +155,13 @@ export default function VendorDetailPage() {
     api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
       .then(r => setTransactions(r.data.transactions));
   }, [bizId, id]);
+
+  // Loaded once per business (not per vendor) so switching vendors via the
+  // sidebar doesn't re-fetch the whole list each click.
+  useEffect(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}/vendors`, { params: { include_inactive: 'true' } }).then(r => setVendorList(r.data.vendors));
+  }, [bizId]);
 
   async function deleteVendor() {
     if (!bizId || !vendor) return;
@@ -130,7 +194,14 @@ export default function VendorDetailPage() {
 
   if (!vendor) return <div>Loading…</div>;
   return (
-    <div className="space-y-6">
+    <div className="flex items-start gap-6">
+      <VendorSidebar
+        vendors={vendorList}
+        activeId={vendor.id}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed(c => !c)}
+      />
+      <div className="min-w-0 flex-1 space-y-6">
       <Link to="/ap/vendors" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" /> Back to vendors
       </Link>
@@ -280,6 +351,7 @@ export default function VendorDetailPage() {
           </CardContent></Card>
         </div>
       )}
+      </div>
     </div>
   );
 }

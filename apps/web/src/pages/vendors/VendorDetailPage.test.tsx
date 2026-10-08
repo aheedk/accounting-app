@@ -69,6 +69,7 @@ describe('VendorDetailPage', () => {
   async function render(v = vendor()) {
     apiGet.mockImplementation((url: string) => {
       if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: v });
+      if (url.endsWith('/vendors')) return Promise.resolve({ data: { vendors: [{ id: 'v2', name: v.name, is_active: v.is_active }] } });
       if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
       if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
       if (url.endsWith('/transactions')) return Promise.resolve({ data: { transactions: [], total: 0 } });
@@ -142,6 +143,7 @@ describe('VendorDetailPage', () => {
   it('lists transactions from the unified transactions endpoint (not just bills), linking to each one\'s own page', async () => {
     apiGet.mockImplementation((url: string) => {
       if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: vendor() });
+      if (url.endsWith('/vendors')) return Promise.resolve({ data: { vendors: [] } });
       if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
       if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
       if (url.endsWith('/transactions')) {
@@ -169,5 +171,35 @@ describe('VendorDetailPage', () => {
     expect(container.textContent).toContain('5545');
     const link = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'View/Edit');
     expect(link?.getAttribute('href')).toBe('/accounting/checks/c1');
+  });
+
+  it('shows a vendor sidebar linking to each vendor, and folds/unfolds on toggle', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: vendor() });
+      if (url.endsWith('/vendors')) {
+        return Promise.resolve({
+          data: { vendors: [{ id: 'v2', name: 'Clean Vendor', is_active: true }, { id: 'v3', name: 'Other Vendor', is_active: true }] },
+        });
+      }
+      if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
+      if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
+      if (url.endsWith('/transactions')) return Promise.resolve({ data: { transactions: [], total: 0 } });
+      return Promise.resolve({ data: {} });
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/ap/vendors/v2']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes><Route path="/ap/vendors/:id" element={<VendorDetailPage />} /></Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    const otherLink = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'Other Vendor');
+    expect(otherLink?.getAttribute('href')).toBe('/ap/vendors/v3');
+
+    const toggle = container.querySelector('button[aria-label="Hide vendor list"]') as HTMLButtonElement;
+    await click(toggle);
+    expect(container.querySelector('button[aria-label="Show vendor list"]')).toBeTruthy();
+    expect(Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'Other Vendor')).toBeUndefined();
   });
 });
