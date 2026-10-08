@@ -71,6 +71,7 @@ const ALL_GROUPS: NavGroup[] = [
       { to: '/payments', label: 'Payments' },
       { to: '/credit-memos', label: 'Credit Memos' },
       { to: '/reports/aging', label: 'Aging' },
+      { to: '/reports/customer-statement', label: 'Statements' },
     ],
   },
   {

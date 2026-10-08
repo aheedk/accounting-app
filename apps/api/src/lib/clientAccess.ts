@@ -17,7 +17,7 @@ const ID = '[0-9a-fA-F-]{36}';
 
 const CLIENT_READS: RegExp[] = [
   /^\/$/,                                                                      // the business: name and address
-  /^\/reports\/(pnl|balance-sheet|statement-of-cash-flows|trial-balance|aging|ap-aging)$/,
+  /^\/reports\/(pnl|balance-sheet|statement-of-cash-flows|trial-balance|aging|ap-aging|customer-statement)$/,
   /^\/csv-exports\/trial-balance$/,
   /^\/invoices$/,
   new RegExp(`^/invoices/${ID}$`),

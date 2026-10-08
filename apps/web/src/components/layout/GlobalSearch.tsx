@@ -83,6 +83,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Tax Codes', group: 'Setup', to: '/settings/tax-codes' },
   { label: 'Activity Log', group: 'Setup', to: '/setup/activity' },
   { label: 'Approvals', group: 'Accounting', to: '/accounting/approvals' },
+  { label: 'Customer Statement', group: 'Accounts Receivable', to: '/reports/customer-statement' },
   { label: 'Fiscal Periods', group: 'Setup', to: '/settings/periods' },
 ];
 

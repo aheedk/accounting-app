@@ -210,6 +210,7 @@ describe('role matrix', () => {
       'GET ~/reports/aging',
       'GET ~/reports/ap-aging',
       'GET ~/reports/balance-sheet',
+      'GET ~/reports/customer-statement',
       'GET ~/reports/pnl',
       'GET ~/reports/statement-of-cash-flows',
       'GET ~/reports/trial-balance',

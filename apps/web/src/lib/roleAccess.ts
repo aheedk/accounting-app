@@ -24,6 +24,7 @@ const CLIENT_PAGES = [
   '/reports/trial-balance',
   '/reports/aging',
   '/reports/ap-aging',
+  '/reports/customer-statement',
   '/messages',
   '/documents/send',
 ];

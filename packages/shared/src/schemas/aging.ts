@@ -13,3 +13,10 @@ export const agingRowSchema = z.object({
   over_90: z.string(),
   total: z.string(),
 });
+
+// A customer's statement for a period: billed, paid, credited, and the balance at each step.
+export const customerStatementQuerySchema = z.object({
+  customer_id: z.string().uuid(),
+  period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
