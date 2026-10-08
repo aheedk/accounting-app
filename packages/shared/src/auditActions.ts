@@ -229,6 +229,9 @@ export const AUDIT = {
   USER_PASSWORD_RESET: 'user.password_reset',
   USER_SIGN_OUT: 'user.sign_out',
   USER_TWO_STEP_RESET: 'user.two_step_reset',
+
+  // Messages between a client and the firm
+  MESSAGE_CREATE: 'message.create',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

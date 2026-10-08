@@ -18,3 +18,13 @@ export function requireMinRole(min: Role) {
     next();
   };
 }
+
+/**
+ * For the few things a client may do as well as staff: send a document in,
+ * write a message. Everyone with access to the company except a view-only login.
+ */
+export function refuseViewOnly(req: Request, _res: Response, next: NextFunction) {
+  const actual = req.tenancy?.effective_role ?? req.auth?.role;
+  if (!actual || actual === 'viewer') return next(new AuthError(ERR.FORBIDDEN, 'A view-only login cannot change anything.'));
+  next();
+}

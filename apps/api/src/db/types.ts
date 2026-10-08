@@ -1017,6 +1017,21 @@ export interface NumberingCountersTable {
   last_value: ColumnType<string, string | number | undefined, string | number>;
 }
 
+// The thread between a client and the firm (migration 0094).
+export interface MessagesTable {
+  id: Generated<string>;
+  business_id: string;
+  author_user_id: string;
+  body: string;
+  created_at: Generated<Timestamp>;
+}
+
+export interface MessageReadsTable {
+  user_id: string;
+  business_id: string;
+  last_read_at: Generated<Timestamp>;
+}
+
 export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
@@ -1083,6 +1098,8 @@ export interface DB {
   invoice_import_staging: InvoiceImportStagingTable;
   bank_deposits: BankDepositsTable;
   bank_deposit_lines: BankDepositLinesTable;
+  messages: MessagesTable;
+  message_reads: MessageReadsTable;
 }
 
 export interface InvoiceImportStagingTable {

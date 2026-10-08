@@ -4,7 +4,7 @@ import multer from 'multer';
 import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
-import { requireMinRole } from '../middleware/rbac.js';
+import { refuseViewOnly, requireMinRole } from '../middleware/rbac.js';
 import { schemas } from '@accounting/shared';
 import { ingestUploadedPdf } from '../services/ai/documentIngestService.js';
 import { updateLearnedRule } from '../services/ai/autoCodingService.js';
@@ -36,7 +36,9 @@ const UPLOAD_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'
 
 router.post(
   '/businesses/:businessId/ai/documents',
-  requireMinRole('accountant'),
+  // Anyone but a view-only login, the client included: what is sent in only
+  // waits in the inbox, and reaches the books when an accountant approves it.
+  refuseViewOnly,
   upload.single('file'),
   async (req, res, next) => {
     try {

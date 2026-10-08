@@ -46,3 +46,4 @@ export * from './importedTransaction.js';
 export * from './suspense.js';
 export * from './transfer.js';
 export * from './codingRule.js';
+export * from './message.js';

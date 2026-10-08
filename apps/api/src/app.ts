@@ -72,6 +72,7 @@ import transfersRouter from './routes/transfers.js';
 import { requireAuth } from './middleware/auth.js';
 import { PAYROLL_PATHS, requirePayrollAccess } from './middleware/payrollAccess.js';
 import activityLogRouter from './routes/activityLog.js';
+import messagesRouter from './routes/messages.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -153,6 +154,7 @@ export function makeApp(): Express {
 app.use(searchRouter);
 app.use(transfersRouter);
   app.use(activityLogRouter);
+  app.use(messagesRouter);
   app.use(errorHandler);
   return app;
 }

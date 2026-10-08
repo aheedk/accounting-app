@@ -53,6 +53,9 @@ const name = (r: RouteDef) => `${r.method} ${r.path.replace(BIZ, '~')}`;
 const STAFF_MAY_WRITE = [
   'PATCH ~/bank-deposits/:id',
   'PATCH ~/bank-rules/:id',
+  'POST ~/ai/documents',
+  'POST ~/messages',
+  'POST ~/messages/read',
   'PATCH ~/checks/:id',
   'PATCH ~/custom-reports/:id',
   'PATCH ~/expense-transactions/:id',
@@ -186,31 +189,42 @@ describe('role matrix', () => {
     expect(rows.filter(r => ROLES.some(role => r[role] >= 500)).map(name)).toEqual([]);
   });
 
-  it('a client can read its reports and invoices, and nothing else', () => {
+  it('a client can read its reports, invoices, bills and messages, and nothing else', () => {
     const inBusiness = rows.filter(r => r.path.startsWith(BIZ));
     const allowed = (r: Row) => clientMayRequest(r.method, r.path.slice(BIZ.length).replace(/:[A-Za-z]+/g, ZERO) || '/');
     // Refused everything that is not on the list ...
     expect(inBusiness.filter(r => !allowed(r) && r.client !== 403).map(name)).toEqual([]);
     // ... and let in to exactly what is.
-    const opened = inBusiness.filter(r => r.client !== 403).map(name).sort();
+    const opened = inBusiness.filter(r => r.method === 'GET' && r.client !== 403).map(name).sort();
     expect(opened).toEqual([
       'GET ~',
+      'GET ~/bills',
+      'GET ~/bills/:id',
       'GET ~/csv-exports/trial-balance',
       'GET ~/customers',
       'GET ~/customers/:id',
       'GET ~/invoices',
       'GET ~/invoices/:id',
+      'GET ~/messages',
+      'GET ~/messages/unread-count',
       'GET ~/reports/aging',
       'GET ~/reports/ap-aging',
       'GET ~/reports/balance-sheet',
       'GET ~/reports/pnl',
       'GET ~/reports/statement-of-cash-flows',
       'GET ~/reports/trial-balance',
+      'GET ~/vendors',
+      'GET ~/vendors/:id',
     ]);
   });
 
-  it('a client changes nothing, anywhere', () => {
-    expect(rows.filter(r => r.method !== 'GET' && r.client !== 403).map(name)).toEqual([]);
+  it('a client changes nothing in the books: it can only send a document in and write a message', () => {
+    // A document sent in waits in the inbox until an accountant approves it.
+    expect(rows.filter(r => r.method !== 'GET' && r.client !== 403).map(name).sort()).toEqual([
+      'POST ~/ai/documents',
+      'POST ~/messages',
+      'POST ~/messages/read',
+    ]);
   });
 
   it('outside a business, a client sees only its own login', () => {
@@ -225,6 +239,7 @@ describe('role matrix', () => {
       'POST ~/custom-reports/:id/run',
       'POST ~/custom-reports/run',
       'POST ~/email-imports/:importId/already-recorded',
+      'POST ~/messages/read',
     ]);
   });
 
