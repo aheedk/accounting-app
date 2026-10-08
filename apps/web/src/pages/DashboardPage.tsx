@@ -7,11 +7,13 @@ import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { humanizeCode } from '@/lib/labels';
-import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
+import { canOpenPage, roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { ArrowRight, FileBarChart, FilePlus2, Receipt, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type QuickAction = {
+  // Set when the API takes this from an accountant up, so staff are not sent to a form they cannot save.
+  minRole?: 'accountant';
   to: string;
   label: string;
   description: string;
@@ -33,6 +35,7 @@ const quickActions: QuickAction[] = [
   },
   {
     to: '/credit-memos/new',
+    minRole: 'accountant',
     label: 'New Credit Memo',
     description: 'Issue a credit to offset an invoice.',
     icon: Receipt,
@@ -104,7 +107,7 @@ export default function DashboardPage() {
     ...(summary?.profit ? [{ label: 'Profit this month', value: summary.profit.net, hint: `${fmtMoney(summary.profit.income.toFixed(2))} in, ${fmtMoney(summary.profit.expenses.toFixed(2))} out`, to: '/reports/pnl' }] : []),
   ];
   // Quick actions create things, so a role sees only the ones it can use.
-  const actions = quickActions.filter(action => canOpenPage(role, action.to));
+  const actions = quickActions.filter(action => canOpenPage(role, action.to) && (!action.minRole || roleAtLeast(role, action.minRole)));
   const activeBusiness = businesses.find(b => b.id === activeId) ?? null;
   const firmPrefix = user?.full_name ? user.full_name.split(' ')[0] : null;
 
@@ -186,7 +189,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p><span className="text-muted-foreground">Signed in as</span> <span className="font-medium">{user?.email}</span></p>
-            <p><span className="text-muted-foreground">Role</span> <span className="font-medium">{user?.role ? humanizeCode(user.role) : ''}</span></p>
+            <p><span className="text-muted-foreground">Role</span> <span className="font-medium">{role ? humanizeCode(role) : ''}</span></p>
             <p><span className="text-muted-foreground">Businesses</span> <span className="font-medium">{businesses.length}</span></p>
           </CardContent>
         </Card>

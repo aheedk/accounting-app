@@ -4,9 +4,12 @@ import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { humanizeCode } from '@/lib/labels';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
+  // The role on the company that is open; a role given for one company differs from the firm-wide one.
+  const role = useEffectiveRole();
   return (
     // relative z-30: backdrop-blur creates a stacking context at z-auto, which
     // let positioned page content (toolbars, inputs) paint OVER the header's
@@ -32,9 +35,9 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       <div className="flex shrink-0 items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-sm">
           <span className="font-medium text-foreground">{user?.full_name ?? ''}</span>
-          {user?.role && (
+          {role && (
             <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-              {humanizeCode(user.role)}
+              {humanizeCode(role)}
             </span>
           )}
         </div>

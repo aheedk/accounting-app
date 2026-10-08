@@ -5,7 +5,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { cachedGet } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import type { Role } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -179,8 +179,8 @@ function getPresetRange(preset: string): { from: string; to: string } | null {
 
 export default function BankTransactionsInboxPage() {
   const [bizId] = useActiveBusinessId();
-  const { user } = useAuth();
-  const canUnreview = roleAtLeast(user?.role, 'accountant');
+  // The role on the open company, which is the one the API checks.
+  const canUnreview = roleAtLeast(useEffectiveRole() ?? undefined, 'accountant');
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');

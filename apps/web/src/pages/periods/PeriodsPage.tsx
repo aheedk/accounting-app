@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
@@ -28,7 +28,7 @@ function statusBadge(status: 'open' | 'closed') {
 
 export default function PeriodsPage() {
   const [bizId] = useActiveBusinessId();
-  const { user } = useAuth();
+  const role = useEffectiveRole();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -74,7 +74,8 @@ export default function PeriodsPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
 
-  const canReopen = user?.role === 'firm_admin';
+  // The role on the open company, which is the one the API checks.
+  const canReopen = role === 'firm_admin';
   const dlHeaders = ['Start', 'End', 'Status', 'Closed At'];
   const dlRows = () => periods.map(p => [p.starts_on, p.ends_on, p.status, p.closed_at ?? '—']);
 
@@ -104,7 +105,8 @@ export default function PeriodsPage() {
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
           </div>
-          <Button onClick={seedYear}>Seed a year</Button>
+          {/* Creating a year's periods is for a firm admin, like reopening one. */}
+          {canReopen && <Button onClick={seedYear}>Seed a year</Button>}
         </div>
       </div>
       {err && <p className="text-sm text-destructive">{err}</p>}
@@ -121,7 +123,7 @@ export default function PeriodsPage() {
           </thead>
           <tbody>
             {periods.length === 0 && (
-              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No fiscal periods yet. Use “Seed a year” to create them.</td></tr>
+              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{canReopen ? 'No fiscal periods yet. Use “Seed a year” to create them.' : 'No fiscal periods yet. A firm admin creates them.'}</td></tr>
             )}
             {periods.map(p => (
               <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/30">

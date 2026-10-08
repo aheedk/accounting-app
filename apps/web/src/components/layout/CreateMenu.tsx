@@ -8,6 +8,7 @@ import type { Role } from '@accounting/shared';
 import { canOpenPage, roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 
 // minRole: the lowest role the API lets create this, where it is above staff.
+// Kept in step with tests/integration/roleMatrix.test.ts in the API.
 type CreateItem = { label: string; to: string; minRole?: Role };
 type CreateCategory = { heading: string; items: CreateItem[] };
 
@@ -17,7 +18,7 @@ const CATEGORIES: CreateCategory[] = [
     items: [
       { label: 'Invoice', to: '/invoices/new' },
       { label: 'Receive payment', to: '/payments/new' },
-      { label: 'Credit memo', to: '/credit-memos/new' },
+      { label: 'Credit memo', to: '/credit-memos/new', minRole: 'accountant' },
       { label: 'Add customer', to: '/customers/new' },
     ],
   },
@@ -27,15 +28,15 @@ const CATEGORIES: CreateCategory[] = [
       { label: 'Expense', to: '/accounting/expenses/new' },
       { label: 'Check', to: '/accounting/checks/new' },
       { label: 'Bill', to: '/ap/bills/new' },
-      { label: 'Pay bills', to: '/ap/pay-bills' },
-      { label: 'Vendor credit', to: '/ap/vendor-credits/new' },
+      { label: 'Pay bills', to: '/ap/pay-bills', minRole: 'accountant' },
+      { label: 'Vendor credit', to: '/ap/vendor-credits/new', minRole: 'accountant' },
       { label: 'Add vendor', to: '/ap/vendors/new' },
     ],
   },
   {
     heading: 'Team',
     items: [
-      { label: 'Run payroll', to: '/payroll/pay-runs/new' },
+      { label: 'Run payroll', to: '/payroll/pay-runs/new', minRole: 'accountant' },
       { label: 'Add employee', to: '/payroll/employees/new', minRole: 'firm_admin' },
       { label: 'Add contractor', to: '/ap/contractors' },
     ],
@@ -43,9 +44,9 @@ const CATEGORIES: CreateCategory[] = [
   {
     heading: 'Other',
     items: [
-      { label: 'Journal entry', to: '/journal/new' },
+      { label: 'Journal entry', to: '/journal/new', minRole: 'accountant' },
       { label: 'Bank deposit', to: '/accounting/bank-deposits/new' },
-      { label: 'Transfer', to: '/accounting/transfers/new' },
+      { label: 'Transfer', to: '/accounting/transfers/new', minRole: 'accountant' },
       { label: 'Fixed asset', to: '/accounting/fixed-assets/new' },
       { label: 'Sales order', to: '/inventory/sales-orders/new' },
       { label: 'Purchase order', to: '/inventory/purchase-orders/new' },

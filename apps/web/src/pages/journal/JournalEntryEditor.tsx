@@ -3,7 +3,7 @@ import { BookOpen, ChevronDown, Clock, Copy, GripVertical, RotateCcw, Trash2 } f
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
@@ -65,7 +65,8 @@ function fmtJournalDate(iso: string) {
 
 export default function JournalEntryEditor({ existing, copySource }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
-  const { user } = useAuth();
+  // The role on the open company, which is the one the API checks.
+  const role = useEffectiveRole();
   const [accounts, setAccounts] = useState<JournalAccount[]>([]);
   // The client's cost centers (Setup > Cost Centers), offered in the Class column.
   const [costCenters, setCostCenters] = useState<string[]>([]);
@@ -308,7 +309,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   }
 
   async function createMissingPeriods() {
-    if (!businessId || !missingPeriod || user?.role !== 'firm_admin') return;
+    if (!businessId || !missingPeriod || role !== 'firm_admin') return;
     const year = Number(form.date.slice(0, 4));
     if (!Number.isInteger(year)) return;
     setPeriodBusy(true);
@@ -429,7 +430,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       {missingPeriod && (
         <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <span>No fiscal period covers {fmtJournalDate(form.date)}.</span>
-          {user?.role === 'firm_admin' ? (
+          {role === 'firm_admin' ? (
             <Button type="button" size="sm" variant="outline" disabled={periodBusy} onClick={() => { void createMissingPeriods(); }}>
               {periodBusy ? 'Creating...' : `Create ${form.date.slice(0, 4)} periods`}
             </Button>

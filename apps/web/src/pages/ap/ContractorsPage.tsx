@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,8 +41,8 @@ function maskTaxId(type: 'SSN' | 'EIN' | null, lastFour: string | null): string 
 
 export default function ContractorsPage() {
   const [bizId] = useActiveBusinessId();
-  const { user } = useAuth();
-  const isFirmAdmin = user?.role === 'firm_admin';
+  // The role on the open company, which is the one the API checks.
+  const isFirmAdmin = useEffectiveRole() === 'firm_admin';
   const [items, setItems] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

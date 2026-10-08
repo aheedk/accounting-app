@@ -3,6 +3,7 @@ import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +48,8 @@ type CashAccountRow = {
 
 export default function BankAccountListPage() {
   const [bizId] = useActiveBusinessId();
+  // The API takes these changes from a firm admin only.
+  const isFirmAdmin = useEffectiveRole() === 'firm_admin';
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [cashAccounts, setCashAccounts] = useState<CashAccountRow[]>([]);
@@ -138,7 +141,7 @@ export default function BankAccountListPage() {
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
           </div>
-          <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add bank account'}</Button>
+          {isFirmAdmin && <Button onClick={() => setShowCreate(s => !s)}>{showCreate ? 'Cancel' : 'Add bank account'}</Button>}
         </div>
       </div>
 

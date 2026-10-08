@@ -22,7 +22,7 @@ vi.mock('@/lib/business', () => ({
 }));
 
 vi.mock('@/auth/useAuth', () => ({
-  useAuth: () => ({ user: { role: 'firm_admin' } }),
+  useAuth: () => ({ user: { role: 'firm_admin' }, businesses: [] }),
 }));
 
 vi.mock('@/lib/apiClient', () => ({

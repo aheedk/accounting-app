@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,8 +36,8 @@ function statusBadge(active: boolean) {
 
 export default function CostCentersPage() {
   const [bizId] = useActiveBusinessId();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'firm_admin' || user?.role === 'accountant';
+  // The role on the open company, which is the one the API checks.
+  const canEdit = roleAtLeast(useEffectiveRole(), 'accountant');
 
   const [items, setItems] = useState<CostCenter[]>([]);
   const [includeInactive, setIncludeInactive] = useState(false);

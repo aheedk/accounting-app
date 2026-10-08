@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,8 +67,8 @@ function toFormState(b: Business): FormState {
 
 export default function EntityPage() {
   const [bizId] = useActiveBusinessId();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'firm_admin';
+  // The role on the open company, which is the one the API checks.
+  const canEdit = useEffectiveRole() === 'firm_admin';
 
   const [business, setBusiness] = useState<Business | null>(null);
   const [form, setForm] = useState<FormState | null>(null);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,8 @@ function statusBadge(active: boolean) {
 
 export default function TaxCodesPage() {
   const [bizId] = useActiveBusinessId();
+  // The API takes these changes from a firm admin only.
+  const isFirmAdmin = useEffectiveRole() === 'firm_admin';
   const [items, setItems] = useState<TaxCode[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
@@ -127,7 +130,7 @@ export default function TaxCodesPage() {
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
           </div>
-          <Button onClick={() => { setShow(s => !s); setEditing(null); }}>{show ? 'Cancel' : 'New tax code'}</Button>
+          {isFirmAdmin && <Button onClick={() => { setShow(s => !s); setEditing(null); }}>{show ? 'Cancel' : 'New tax code'}</Button>}
         </div>
       </div>
       {show && (
@@ -183,7 +186,7 @@ export default function TaxCodesPage() {
             <td className="p-3">{c.name}</td>
             <td className="p-3 text-right font-mono">{c.current_rate ? `${ratePercent(c.current_rate)}%` : '—'}</td>
             <td className="p-3">{statusBadge(c.is_active)}</td>
-            <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => startEdit(c)}>Edit</Button></td>
+            <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => startEdit(c)} disabled={!isFirmAdmin} title={isFirmAdmin ? undefined : 'Only a firm admin can change a tax code'}>Edit</Button></td>
           </tr>))}</tbody>
         </table>
       </CardContent></Card>

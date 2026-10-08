@@ -4,7 +4,7 @@ import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -61,8 +61,8 @@ function fmtShortDate(iso: string) {
 
 export default function EmployeeListPage() {
   const [bizId] = useActiveBusinessId();
-  const { user } = useAuth();
-  const isFirmAdmin = user?.role === 'firm_admin';
+  // The role on the open company, which is the one the API checks.
+  const isFirmAdmin = useEffectiveRole() === 'firm_admin';
   const [items, setItems] = useState<Employee[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [loading, setLoading] = useState(true);

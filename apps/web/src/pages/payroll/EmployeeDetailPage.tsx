@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
+import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { Pencil, Trash2 } from 'lucide-react';
-import { hasMinRole } from '@accounting/shared';
 import { DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,14 +48,15 @@ export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const { user } = useAuth();
-  const isFirmAdmin = user?.role === 'firm_admin';
+  // The role on the open company, which is the one the API checks.
+  const role = useEffectiveRole();
+  const isFirmAdmin = role === 'firm_admin';
   const [data, setData] = useState<Employee | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [reveal, setReveal] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const canEdit = user?.role !== undefined && hasMinRole(user.role, 'accountant');
+  const canEdit = roleAtLeast(role, 'accountant');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
