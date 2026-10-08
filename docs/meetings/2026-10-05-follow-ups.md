@@ -13,16 +13,19 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 |---|---|---|
 | 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): done, apart from emailing an invoice, Estimate, and three decisions for the firm; see "Audit: what is left" below **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm. They are all up and agree with each other; see "Reports" below | Aheed, firm |
-| 10 | Bank deposit print: show a preview first, like QuickBooks | Riham |
+| 10 | Bank deposit print: show the preview inside the app, like QuickBooks. Print still opens the PDF in a new browser tab, as it did at the meeting | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
-| 12 | "+ New" menu: match QuickBooks exactly | Riham |
-| 13 | More menu: Copy and Audit history on Bank Deposit, and Audit history on Journal Entry, still say "coming soon" | Riham |
-| 31 | Customers: the same batch actions, inactive switch and delete rule as Vendors | Riham |
-| 32 | Transactions page: add invoices, bill payments and vendor credits; sorting only covers the rows on screen | Riham |
-| 33 | Vendor menu: Email and "Ask vendor for info" still say "coming soon" | Riham |
+| 12 | "+ New" menu: match QuickBooks exactly. Not started. Check is not in the menu, although Write Check is built | Riham |
+| 13 | More menu: Copy and Audit history on Bank Deposit, and Audit history on Journal Entry, still say "coming soon". So does Order checks on Write Check. Check and Expense already have a working audit history to reuse | Riham |
+| 31 | Customers: the same batch actions, inactive switch and delete rule as Vendors. Not started: the list has no tick boxes and a customer cannot be made inactive | Riham |
+| 32 | Transactions page: add invoices, bill payments and vendor credits (it lists deposits, expenses, checks, journal entries, bills, payments and credit memos). Sorting still covers only the 25 rows on screen: since 10-08 the server can sort the whole list, but the page does not ask it to | Riham |
+| 33 | Vendors list: Email (batch menu) and "Ask vendor for info" (row menu) still say "coming soon" | Riham |
 | 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Faizan sends files, Aheed tests |
 | 15 | Suspense: reclassify some real lines **(10-01)** | Faizan |
 | 16 | Test a real credit card statement **(10-01)** | Faizan |
+
+Riham's rows were checked against the code on 2026-10-08, after her last push
+(`06389d5`; her branch and `main` are the same). None of the seven is finished.
 
 **Reports (item 18)**
 
@@ -158,9 +161,11 @@ Features the audit listed as missing (part of item 17), all Aheed:
 Also added by Riham since the meeting: Write Check (Accounts Payable → Checks),
 the Transactions page, the table-settings gear on list pages, vendor batch
 actions with active / inactive, and a fuller add-vendor popup in the AI inbox.
-Pulled 2026-10-08: date-range and amount filters, Due date and Balance columns,
-and print / CSV on the Transactions page; and a vendor's page now lists every
-kind of transaction, with a vendor list down the side that folds away.
+Pulled 2026-10-08, all Riham: on the Transactions page, date-range and amount
+filters, Due date and Balance columns, a settings panel for rows, columns and
+filters, and print / CSV; a vendor's page now lists every kind of transaction, with
+a searchable vendor list down the side that folds away and sorts by open balance;
+and long options in dropdowns are no longer cut off.
 
 After pulling, run `npm run db:migrate` (migrations `0084`–`0090`).
 
