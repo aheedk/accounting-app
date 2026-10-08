@@ -122,6 +122,36 @@ describe('transactionsService.listTransactions', () => {
     expect(rows.filter(r => r.type === 'journal')).toHaveLength(1);
   });
 
+  it('lists invoices, bill payments and vendor credits, with what is still open on each', async () => {
+    const { biz, ap, ar, expenseAcct, bankAccount, vendor, customer } = await bootstrap();
+    const invoice = await t.db.insertInto('invoices').values({
+      business_id: biz.id, customer_id: customer.id, invoice_number: 'INV-2001', issue_date: '2026-04-10', due_date: '2026-05-10',
+      status: 'draft', subtotal: '500.00', total: '500.00', ar_account_id: ar.id,
+    }).returning('id').executeTakeFirstOrThrow();
+    const billPayment = await t.db.insertInto('bill_payments').values({
+      business_id: biz.id, vendor_id: vendor.id, payment_date: '2026-04-11', payment_method: 'check', reference: '7001',
+      amount: '120.00', unapplied_amount: '20.00', cash_account_id: bankAccount.cash_account_id, status: 'draft',
+    }).returning('id').executeTakeFirstOrThrow();
+    const vendorCredit = await t.db.insertInto('vendor_credits').values({
+      business_id: biz.id, vendor_id: vendor.id, vendor_credit_number: 'VC-1', credit_date: '2026-04-12',
+      amount: '75.00', remaining_amount: '75.00', offset_account_id: expenseAcct.id, ap_account_id: ap.id, status: 'draft',
+    }).returning('id').executeTakeFirstOrThrow();
+
+    const { rows, total } = await listTransactions(t.db, { business_id: biz.id, limit: 50, offset: 0 });
+    expect(total).toBe(3);
+    const byId = new Map(rows.map(r => [r.id, r]));
+    expect(byId.get(invoice.id)).toMatchObject({ type: 'invoice', ref_no: 'INV-2001', contact_name: 'Sterling Advisors', path: `/invoices/${invoice.id}`, due_date: '2026-05-10' });
+    // A draft is not owed yet, so nothing is open on it; its amount still shows.
+    expect(Number(byId.get(invoice.id)?.balance)).toBe(0);
+    expect(Number(byId.get(invoice.id)?.total_amount)).toBe(500);
+    expect(byId.get(billPayment.id)).toMatchObject({ type: 'bill_payment', ref_no: '7001', contact_name: 'Acme Supplies', path: `/ap/bill-payments/${billPayment.id}` });
+    expect(Number(byId.get(billPayment.id)?.balance)).toBe(20);
+    expect(byId.get(vendorCredit.id)).toMatchObject({ type: 'vendor_credit', ref_no: 'VC-1', path: `/ap/vendor-credits/${vendorCredit.id}` });
+
+    const onlyInvoices = await listTransactions(t.db, { business_id: biz.id, type: 'invoice', limit: 50, offset: 0 });
+    expect(onlyInvoices.total).toBe(1);
+  });
+
   it('filters by type, date range and amount', async () => {
     const { ctx, biz, expenseAcct, bankAccount, vendor } = await bootstrap();
     await t.db.transaction().execute(trx => checkSvc.createCheck(trx, ctx, {

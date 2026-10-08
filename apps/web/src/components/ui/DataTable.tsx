@@ -22,6 +22,8 @@ export interface DataTableProps<T> {
   columns: Column<T>[];
   defaultSortKey?: string;
   defaultSortDir?: 'asc' | 'desc';
+  /** Told when the sort changes, for a list the server pages and so has to sort. */
+  onSortChange?: (key: string, dir: 'asc' | 'desc') => void;
   selectable?: boolean;
   // Controlled selection (QBO-style batch actions). When omitted, selection is
   // managed internally as before.
@@ -65,6 +67,7 @@ export function DataTable<T>({
   columns,
   defaultSortKey,
   defaultSortDir = 'asc',
+  onSortChange,
   selectable = true,
   selectedIds,
   onSelectedIdsChange,
@@ -117,6 +120,10 @@ export function DataTable<T>({
     if (settingsSort) { setSortKey(settingsSort.columnKey); setSortDir(settingsSort.direction); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsSort?.columnKey, settingsSort?.direction]);
+  useEffect(() => {
+    if (sortKey) onSortChange?.(sortKey, sortDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortKey, sortDir]);
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
   const selected = selectedIds ?? internalSelected;
   const setSelected = onSelectedIdsChange ?? setInternalSelected;

@@ -11,7 +11,7 @@ import type { DB } from '../../db/types.js';
 // and vendor credits aren't included yet; adding one is the same pattern as
 // any branch below (business_id-scoped SELECT with the common columns).
 
-export const TRANSACTION_TYPES = ['deposit', 'expense', 'check', 'journal', 'bill', 'payment', 'credit_memo'] as const;
+export const TRANSACTION_TYPES = ['deposit', 'expense', 'check', 'journal', 'bill', 'payment', 'credit_memo', 'invoice', 'bill_payment', 'vendor_credit'] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
 export type TransactionRow = {
@@ -168,6 +168,42 @@ function unionSql(business_id: string) {
     FROM credit_memos cm
     JOIN customers c3 ON c3.id = cm.customer_id
     WHERE cm.business_id = ${business_id}
+
+    UNION ALL
+
+    -- What is still owed on an invoice: its total less what has been applied to it.
+    SELECT 'invoice', i.id, i.issue_date, i.invoice_number,
+      i.customer_id, c4.name,
+      i.due_date,
+      (CASE WHEN i.status = 'posted' THEN (i.total - COALESCE((SELECT SUM(pa.applied_amount) FROM payment_applications pa WHERE pa.invoice_id = i.id), 0))::text ELSE '0.00' END),
+      NULL::text, i.total::text, i.memo, i.status::text,
+      i.updated_at, ('/invoices/' || i.id)
+    FROM invoices i
+    JOIN customers c4 ON c4.id = i.customer_id
+    WHERE i.business_id = ${business_id} AND i.deleted_at IS NULL
+
+    UNION ALL
+
+    SELECT 'bill_payment', bp.id, bp.payment_date, bp.reference,
+      bp.vendor_id, v5.name,
+      NULL::date, bp.unapplied_amount::text,
+      coa2.name, bp.amount::text, bp.memo, bp.status::text,
+      bp.updated_at, ('/ap/bill-payments/' || bp.id)
+    FROM bill_payments bp
+    JOIN vendors v5 ON v5.id = bp.vendor_id
+    JOIN chart_of_accounts coa2 ON coa2.id = bp.cash_account_id
+    WHERE bp.business_id = ${business_id}
+
+    UNION ALL
+
+    SELECT 'vendor_credit', vc.id, vc.credit_date, vc.vendor_credit_number,
+      vc.vendor_id, v6.name,
+      NULL::date, vc.remaining_amount::text,
+      NULL::text, vc.amount::text, vc.memo, vc.status::text,
+      vc.updated_at, ('/ap/vendor-credits/' || vc.id)
+    FROM vendor_credits vc
+    JOIN vendors v6 ON v6.id = vc.vendor_id
+    WHERE vc.business_id = ${business_id}
   `;
 }
 

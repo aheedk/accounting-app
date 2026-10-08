@@ -61,6 +61,7 @@ type VendorTransaction = {
 const TX_TYPE_LABELS: Record<string, string> = {
   deposit: 'Deposit', expense: 'Expense', check: 'Check', journal: 'Journal Entry',
   bill: 'Bill', payment: 'Payment', credit_memo: 'Credit Memo',
+  invoice: 'Invoice', bill_payment: 'Bill Payment', vendor_credit: 'Vendor Credit',
 };
 
 const TABS = [

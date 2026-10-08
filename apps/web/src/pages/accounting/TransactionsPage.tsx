@@ -17,7 +17,7 @@ import { fmtMoney } from '@/lib/money';
 import { fmtDateTime } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 
-type TransactionType = 'deposit' | 'expense' | 'check' | 'journal' | 'bill' | 'payment' | 'credit_memo';
+type TransactionType = 'deposit' | 'expense' | 'check' | 'journal' | 'bill' | 'payment' | 'credit_memo' | 'invoice' | 'bill_payment' | 'vendor_credit';
 
 type TransactionRow = {
   id: string;
@@ -36,6 +36,9 @@ type TransactionRow = {
   path: string;
 };
 
+// The columns the server can sort the whole list by; the rest sort the page on screen.
+const SERVER_SORT_KEYS = ['date', 'type', 'ref_no', 'due_date', 'balance', 'total_amount', 'updated_at'];
+
 const TYPE_LABELS: Record<TransactionType, string> = {
   deposit: 'Deposit',
   expense: 'Expense',
@@ -44,6 +47,9 @@ const TYPE_LABELS: Record<TransactionType, string> = {
   bill: 'Bill',
   payment: 'Payment',
   credit_memo: 'Credit Memo',
+  invoice: 'Invoice',
+  bill_payment: 'Bill Payment',
+  vendor_credit: 'Vendor Credit',
 };
 
 // QBO's full transaction-type taxonomy, in its own order — shown so the
@@ -53,7 +59,7 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 const QBO_TYPE_TAXONOMY: { label: string; type: TransactionType | null }[] = [
   { label: 'Advance payment', type: null },
   { label: 'Bill', type: 'bill' },
-  { label: 'Bill payment', type: null },
+  { label: 'Bill payment', type: 'bill_payment' },
   { label: 'Bill payment credit card', type: null },
   { label: 'Build assembly', type: null },
   { label: 'Cash expense', type: null },
@@ -71,7 +77,7 @@ const QBO_TYPE_TAXONOMY: { label: string; type: TransactionType | null }[] = [
   { label: 'Estimate', type: null },
   { label: 'Expense', type: 'expense' },
   { label: 'Global tax payment', type: null },
-  { label: 'Invoice', type: null },
+  { label: 'Invoice', type: 'invoice' },
   { label: 'Item receipt', type: null },
   { label: 'Journal', type: 'journal' },
   { label: 'Manufacturing order', type: null },
@@ -82,7 +88,7 @@ const QBO_TYPE_TAXONOMY: { label: string; type: TransactionType | null }[] = [
   { label: 'Sales receipt', type: null },
   { label: 'Tax adjustment', type: null },
   { label: 'Transfer', type: null },
-  { label: 'Vendor credit', type: null },
+  { label: 'Vendor credit', type: 'vendor_credit' },
 ];
 
 // Status spellings are inconsistent across source tables ('void' vs 'voided',
@@ -382,6 +388,8 @@ export default function TransactionsPage() {
   const [rows, setRows] = useState<TransactionRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  // The column the table is sorted by, sent to the server so the whole list is sorted, not one page of it.
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'date', dir: 'desc' });
   const [err, setErr] = useState<string | null>(null);
   const [parties, setParties] = useState<Party[]>([]);
 
@@ -420,6 +428,7 @@ export default function TransactionsPage() {
       page: String(page),
       page_size: String(PAGE_SIZE),
     };
+    if (SERVER_SORT_KEYS.includes(sort.key)) { query['sort_key'] = sort.key; query['sort_dir'] = sort.dir; }
     if (typeFilter) query['type'] = typeFilter;
     if (range.start) query['date_start'] = range.start;
     if (range.end) query['date_end'] = range.end;
@@ -439,7 +448,7 @@ export default function TransactionsPage() {
     } catch (e: unknown) {
       setErr(pickErr(e));
     }
-  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page]);
+  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page, sort.key, sort.dir]);
 
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => { setPage(1); }, [typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter]);
@@ -586,6 +595,7 @@ export default function TransactionsPage() {
           onRowClick={r => nav(r.path)}
           defaultSortKey="date"
           defaultSortDir="desc"
+          onSortChange={(key, dir) => { setSort({ key, dir }); setPage(1); }}
           tableSettingsPageId="transactions"
           externalSettingsOpen={settingsOpen}
           onExternalSettingsOpenChange={setSettingsOpen}
