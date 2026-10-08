@@ -546,9 +546,22 @@ export default function TransactionsPage() {
           columns={columns}
           selectable={false}
           onRowClick={r => nav(r.path)}
+          defaultSortKey="date"
+          defaultSortDir="desc"
           tableSettingsPageId="transactions"
           externalSettingsOpen={settingsOpen}
           onExternalSettingsOpenChange={setSettingsOpen}
+          // QBO's own "Sort by" list (Date/Type/Ref no./Due date/Balance/Total
+          // amount/Last modified date), trimmed to the fields this unified row
+          // actually carries — Due date and Balance aren't tracked across all
+          // 7 source types here, so they're left out rather than faked.
+          sortableFields={[
+            { key: 'date', label: 'Date' },
+            { key: 'type', label: 'Type' },
+            { key: 'ref_no', label: 'Ref no.' },
+            { key: 'total_amount', label: 'Total amount' },
+            { key: 'updated_at', label: 'Last modified date' },
+          ]}
           availableFilters={[
             { key: 'date_range', label: 'Date range' },
             { key: 'transaction_type', label: 'Transaction type' },

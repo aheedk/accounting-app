@@ -44,6 +44,11 @@ export interface DataTableProps<T> {
   // persisted per user per page). Give every list page that shares this
   // component its own stable pageId ("vendors", "checks", ...).
   tableSettingsPageId?: string;
+  // The fields offered in the drawer's Sort section — defaults to `columns`.
+  // Pass this when the sortable fields should read differently than the
+  // visible column list (QBO curates its own "Sort by" set, e.g. it skips
+  // Memo/Status and can include fields that aren't columns at all).
+  sortableFields?: TableColumnDef[];
   availableFilters?: TableColumnDef[];
   // By default DataTable renders its own gear-icon opener in a toolbar row
   // above the table. Pass this pair to have the page render its own opener
@@ -70,6 +75,7 @@ export function DataTable<T>({
   downloadable,
   pagination,
   tableSettingsPageId,
+  sortableFields,
   availableFilters,
   externalSettingsOpen,
   onExternalSettingsOpenChange,
@@ -242,6 +248,8 @@ export function DataTable<T>({
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           columns={columns.map(c => ({ key: c.key, label: c.header }))}
+          {...(sortableFields ? { sortFields: sortableFields } : {})}
+          {...(defaultSortKey ? { defaultSort: { columnKey: defaultSortKey, direction: defaultSortDir } } : {})}
           {...(availableFilters ? { availableFilters } : {})}
           settings={tableSettings}
           onChange={updateTableSettings}
