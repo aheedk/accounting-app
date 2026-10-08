@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireMinRole } from '../middleware/rbac.js';
 import { triggerPoll } from '../jobs/gmailWorker.js';
 
 const router = Router();
@@ -45,7 +46,7 @@ router.get('/auth/gmail/callback', async (req, res, next) => {
 });
 
 // Manually trigger an immediate Gmail poll — returns immediately, runs in background
-router.post('/email-imports/poll', requireAuth, (_req, res) => {
+router.post('/email-imports/poll', requireAuth, requireMinRole('accountant'), (_req, res) => {
   void triggerPoll(db).catch((e: unknown) => {
     console.error('[gmail-worker] manual poll error:', e instanceof Error ? e.message : e);
   });

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.js';
 import { AuthError, NotFoundError } from '../lib/errors.js';
 import { ERR, type Role } from '@accounting/shared';
+import { clientMayRequest } from '../lib/clientAccess.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -41,6 +42,11 @@ export async function resolveBusiness(req: Request, _res: Response, next: NextFu
     if (!uba && req.auth.role !== 'firm_admin') throw new AuthError(ERR.FORBIDDEN, 'No access to this business');
 
     const effective_role = (uba?.role_override ?? req.auth.role) as Role;
+    // Checked here, once, because every business route passes through this
+    // middleware before its own handler. `req.path` is what follows the business id.
+    if (effective_role === 'client' && !clientMayRequest(req.method, req.path)) {
+      throw new AuthError(ERR.FORBIDDEN, 'A client login can view reports and invoices only.');
+    }
     req.tenancy = { business_id, effective_role };
     next();
   } catch (err) { next(err); }

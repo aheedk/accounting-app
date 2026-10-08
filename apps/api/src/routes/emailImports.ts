@@ -370,6 +370,7 @@ const alreadyRecordedSchema = z.object({
  */
 router.post(
   '/businesses/:businessId/email-imports/:importId/already-recorded',
+  requireMinRole('staff'),
   async (req, res, next) => {
     try {
       const body = alreadyRecordedSchema.parse(req.body);
