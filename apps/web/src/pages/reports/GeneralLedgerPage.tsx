@@ -342,11 +342,21 @@ export default function GeneralLedgerPage() {
   const [exporting, setExporting] = useState(false);
   const [customizationOpen, setCustomizationOpen] = useState(false);
   const [preferences, setPreferences] = useState(loadGeneralLedgerPreferences);
-  const [accountTypeFilter, setAccountTypeFilter] = useState<AccountTypeFilter>('all');
-  const [sourceFilter, setSourceFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [adjFilter, setAdjFilter] = useState<AdjFilter>('all');
-  const [searchText, setSearchText] = useState('');
+  // All five of these live in the URL too (like the period above), so
+  // clicking a transaction and coming Back restores them instead of
+  // resetting to "all" — this page remounts fresh on Back, so component
+  // state alone doesn't survive the round trip.
+  const [accountTypeFilter, setAccountTypeFilter] = useState<AccountTypeFilter>(
+    () => (searchParams.get('account_type') as AccountTypeFilter | null) ?? 'all',
+  );
+  const [sourceFilter, setSourceFilter] = useState(() => searchParams.get('type') ?? 'all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    () => (searchParams.get('status') as StatusFilter | null) ?? 'all',
+  );
+  const [adjFilter, setAdjFilter] = useState<AdjFilter>(
+    () => (searchParams.get('adj') as AdjFilter | null) ?? 'all',
+  );
+  const [searchText, setSearchText] = useState(() => searchParams.get('q') ?? '');
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(true);
   const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(() => new Set());
 
@@ -401,16 +411,28 @@ export default function GeneralLedgerPage() {
   const draftRef = useRef({ start: draftStart, end: draftEnd, acctId: draftAccountId, preset: periodPreset });
   draftRef.current = { start: draftStart, end: draftEnd, acctId: draftAccountId, preset: periodPreset };
 
+  // Same idea for the five client-side filters below — rememberPeriod writes
+  // the whole URL each time (setSearchParams replaces, it doesn't merge), so
+  // every write needs their current values even when only the period changed.
+  const filtersRef = useRef({ accountTypeFilter, sourceFilter, statusFilter, adjFilter, searchText });
+  filtersRef.current = { accountTypeFilter, sourceFilter, statusFilter, adjFilter, searchText };
+
   // Kept in a ref: setSearchParams gets a new identity on every URL change,
   // which would otherwise re-run the load effect.
   const setSearchParamsRef = useRef(setSearchParams);
   setSearchParamsRef.current = setSearchParams;
   function rememberPeriod(start: string, end: string, acctId: string, preset: DateRangePreset): void {
+    const f = filtersRef.current;
     setSearchParamsRef.current({
       range: preset,
       period_start: start,
       period_end: end,
       ...(acctId ? { account_id: acctId } : {}),
+      ...(f.accountTypeFilter !== 'all' ? { account_type: f.accountTypeFilter } : {}),
+      ...(f.sourceFilter !== 'all' ? { type: f.sourceFilter } : {}),
+      ...(f.statusFilter !== 'all' ? { status: f.statusFilter } : {}),
+      ...(f.adjFilter !== 'all' ? { adj: f.adjFilter } : {}),
+      ...(f.searchText ? { q: f.searchText } : {}),
     }, { replace: true });
   }
 
@@ -420,6 +442,15 @@ export default function GeneralLedgerPage() {
     rememberPeriod(start, end, acctId, preset);
     void load(start, end, acctId);
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The five filters below don't reload the report (they filter what's
+  // already loaded client-side), so they have no "Run report" moment to hang
+  // a rememberPeriod call off of — sync them to the URL live instead.
+  useEffect(() => {
+    const { start, end, acctId, preset } = draftRef.current;
+    rememberPeriod(start, end, acctId, preset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountTypeFilter, sourceFilter, statusFilter, adjFilter, searchText]);
 
   const sourceTypes = useMemo(() => {
     const values = new Set<string>();
