@@ -6,7 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
-import { canOpenPage, roleAtLeast, roleLabel, useEffectiveRole } from '@/lib/roleAccess';
+import { roleAtLeast, roleLabel, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 import { ArrowRight, FileBarChart, FilePlus2, Receipt, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -106,7 +106,8 @@ export default function DashboardPage() {
     ...(summary?.profit ? [{ label: 'Profit this month', value: summary.profit.net, hint: `${fmtMoney(summary.profit.income.toFixed(2))} in, ${fmtMoney(summary.profit.expenses.toFixed(2))} out`, to: '/reports/pnl' }] : []),
   ];
   // Quick actions create things, so a role sees only the ones it can use.
-  const actions = quickActions.filter(action => canOpenPage(role, action.to) && (!action.minRole || roleAtLeast(role, action.minRole)));
+  const canOpen = useCanOpen();
+  const actions = quickActions.filter(action => canOpen(action.to) && (!action.minRole || roleAtLeast(role, action.minRole)));
   const activeBusiness = businesses.find(b => b.id === activeId) ?? null;
   const firmPrefix = user?.full_name ? user.full_name.split(' ')[0] : null;
 

@@ -21,7 +21,7 @@ import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 import { usePendingImportCount } from '@/lib/usePendingImportCount';
-import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
+import { useCanOpen } from '@/lib/roleAccess';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -173,12 +173,12 @@ function pathMatchesChild(pathname: string, child: NavChild): boolean {
 
 /** The menu for the signed-in role: only pages it can open, and no group left empty. */
 function useNavGroups(): NavGroup[] {
-  const role = useEffectiveRole();
+  const canOpen = useCanOpen();
   return useMemo(() => ALL_GROUPS.flatMap(group => {
-    if (!group.children) return canOpenPage(role, group.to ?? '/') ? [group] : [];
-    const children = group.children.filter(child => canOpenPage(role, child.to));
+    if (!group.children) return canOpen(group.to ?? '/') ? [group] : [];
+    const children = group.children.filter(child => canOpen(child.to));
     return children.length > 0 ? [{ ...group, children }] : [];
-  }), [role]);
+  }), [canOpen]);
 }
 
 // Brand header shared by the desktop sidebar and the mobile drawer.

@@ -9,6 +9,8 @@ export type AuthUser = {
   full_name: string;
   role: Role;
   firm_id: string;
+  /** False when a firm admin has switched payroll off for this login. */
+  payroll_access?: boolean;
 };
 export type AuthBusiness = { id: string; name: string; role_override: Role | null };
 

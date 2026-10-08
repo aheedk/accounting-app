@@ -45,6 +45,14 @@ describe('canOpenPage', () => {
     }
   });
 
+  it('closes payroll to a login it was switched off for, whatever the role', () => {
+    const off = { payroll: false };
+    expect(canOpenPage('accountant', '/payroll/pay-runs', off)).toBe(false);
+    expect(canOpenPage('staff', '/payroll/employees/3f9a', off)).toBe(false);
+    expect(canOpenPage('accountant', '/invoices', off)).toBe(true);
+    expect(canOpenPage('accountant', '/payroll/pay-runs')).toBe(true);
+  });
+
   it('opens nothing before the user has loaded', () => {
     expect(canOpenPage(null, '/')).toBe(false);
   });

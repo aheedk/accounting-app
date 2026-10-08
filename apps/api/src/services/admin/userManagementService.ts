@@ -16,7 +16,7 @@ export type UserBusinessAccess = {
 
 export async function listUsers(db: Kysely<DB>, firm_id: string) {
   const users = await db.selectFrom('users')
-    .select(['id', 'email', 'full_name', 'role', 'last_login_at', 'created_at', 'deactivated_at', 'locked_until', 'totp_enabled_at'])
+    .select(['id', 'email', 'full_name', 'role', 'last_login_at', 'created_at', 'deactivated_at', 'locked_until', 'totp_enabled_at', 'payroll_access'])
     .where('firm_id', '=', firm_id)
     .where('deleted_at', 'is', null)
     .orderBy('created_at', 'asc')
@@ -56,6 +56,8 @@ export async function listUsers(db: Kysely<DB>, firm_id: string) {
     deactivated_at: u.deactivated_at,
     locked: u.locked_until !== null && new Date(u.locked_until).getTime() > Date.now(),
     two_step_enabled: u.totp_enabled_at !== null,
+    // A firm admin always has payroll, whatever the switch says.
+    payroll_access: u.role === 'firm_admin' || u.payroll_access,
     business_access: byUser.get(u.id) ?? [],
   }));
 }
@@ -292,4 +294,19 @@ export async function resetUserTwoStep(trx: Transaction<DB>, ctx: ServiceCtx, in
     action: AUDIT.USER_TWO_STEP_RESET, entity_type: 'user', entity_id: user.id, before: null, after: { email: user.email },
   });
   return { ok: true };
+}
+
+/** Opens or closes payroll for a login. A firm admin always has it, so there is nothing to switch. */
+export async function setPayrollAccess(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string; allowed: boolean }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  if (user.role === 'firm_admin') {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'A firm admin always has payroll.');
+  }
+  const before = await trx.selectFrom('users').select('payroll_access').where('id', '=', user.id).executeTakeFirstOrThrow();
+  await trx.updateTable('users').set({ payroll_access: input.allowed }).where('id', '=', user.id).execute();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_UPDATE, entity_type: 'user', entity_id: user.id,
+    before: { payroll_access: before.payroll_access }, after: { payroll_access: input.allowed },
+  });
+  return { payroll_access: input.allowed };
 }

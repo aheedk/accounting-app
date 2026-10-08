@@ -7,7 +7,7 @@ import { CompanySwitchedScreen } from './CompanySwitchedScreen';
 import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business';
 import { setExportCompany } from '@/lib/reportExport';
 import { useAuth } from '@/auth/useAuth';
-import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
+import { useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -35,7 +35,8 @@ export function AppShell() {
   // address, a bookmark, an old link). The API refuses the data either way.
   const role = useEffectiveRole();
   const { pathname } = useLocation();
-  const allowed = canOpenPage(role, pathname);
+  const canOpen = useCanOpen();
+  const allowed = canOpen(pathname);
 
   const switchedTo = useCompanySwitchedElsewhere();
   if (switchedTo) return <CompanySwitchedScreen businessId={switchedTo} />;
@@ -60,7 +61,9 @@ export function AppShell() {
                   ? 'Your login shows your invoices and financial reports. Ask your accountant if you need something else.'
                   : role === 'viewer'
                     ? 'A view-only login can look at the books and change nothing.'
-                    : 'It needs a login with more access than yours.'}
+                    : pathname.startsWith('/payroll')
+                      ? 'Payroll is not open to your login. A firm admin can turn it on.'
+                      : 'It needs a login with more access than yours.'}
               </p>
               <Link className="mt-4 inline-block text-sm font-medium text-primary hover:underline" to="/">Back to the dashboard</Link>
             </div>

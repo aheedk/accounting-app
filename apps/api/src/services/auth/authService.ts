@@ -23,9 +23,14 @@ export type ReqMeta = { request_id: string; ip_address: string; user_agent: stri
 export type LoginResult = {
   access_token: string;
   refresh_token: string; // raw; API caller is responsible for cookie-setting
-  user: { id: string; email: string; full_name: string; role: UserRole; firm_id: string };
+  user: { id: string; email: string; full_name: string; role: UserRole; firm_id: string; payroll_access: boolean };
   businesses: Array<{ id: string; name: string; role_override: UserRole | null }>;
 };
+
+/** Whether this login may open payroll: a firm admin always, anyone else unless it was switched off. */
+export function mayOpenPayroll(user: { role: UserRole; payroll_access: boolean }): boolean {
+  return user.role === 'firm_admin' || user.payroll_access;
+}
 
 // firm_admins can open any business in the firm (matches resolveBusiness),
 // so list them all; other roles only see explicit grants.
@@ -151,7 +156,7 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
     return {
       access_token: signAccessToken({ user_id: user.id, firm_id: user.firm_id, role: user.role, sid: session.session_id }),
       refresh_token: raw,
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id },
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id, payroll_access: mayOpenPayroll(user) },
       businesses,
     };
   });
@@ -197,7 +202,7 @@ export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: Req
     return {
       access_token: signAccessToken({ user_id: user.id, firm_id: user.firm_id, role: user.role, sid: row.session_id }),
       refresh_token: newRaw,
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id },
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id, payroll_access: mayOpenPayroll(user) },
       businesses,
     };
   });

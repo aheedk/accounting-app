@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
+import { useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type Page = { label: string; group: string; to: string };
@@ -167,6 +167,7 @@ export function GlobalSearch() {
   // fetched a moment after typing stops. Shown under the matching pages.
   const [bizId] = useActiveBusinessId();
   const role = useEffectiveRole();
+  const canOpen = useCanOpen();
   const [records, setRecords] = useState<Page[]>([]);
   useEffect(() => {
     const text = query.trim();
@@ -183,13 +184,13 @@ export function GlobalSearch() {
 
   const items = useMemo<Page[]>(() => {
     // Only pages this role can open are offered.
-    if (!query.trim()) return QUICK_LINKS.filter(p => canOpenPage(role, p.to));
+    if (!query.trim()) return QUICK_LINKS.filter(p => canOpen(p.to));
     const q = query.toLowerCase();
     const pages = ALL_PAGES.filter(
-      p => canOpenPage(role, p.to) && (p.label.toLowerCase().includes(q) || p.group.toLowerCase().includes(q)),
+      p => canOpen(p.to) && (p.label.toLowerCase().includes(q) || p.group.toLowerCase().includes(q)),
     );
     return [...pages, ...records];
-  }, [query, records, role]);
+  }, [query, records, canOpen]);
 
   // Grouped with flat index pre-computed for keyboard nav
   const grouped = useMemo(() => {

@@ -124,6 +124,7 @@ const FIRM_ADMIN_ONLY = [
   'POST /me/firm/users',
   'POST /me/firm/users/:id/business-access',
   'POST /me/firm/users/:id/deactivate',
+  'POST /me/firm/users/:id/payroll-access',
   'POST /me/firm/users/:id/reactivate',
   'POST /me/firm/users/:id/reset-password',
   'POST /me/firm/users/:id/reset-two-step',

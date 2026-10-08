@@ -56,6 +56,8 @@ export interface UsersTable {
   sessions_revoked_at: Timestamp | null;
   totp_secret: Buffer | null;
   totp_enabled_at: Timestamp | null;
+  // Whether this login may open payroll (migration 0093). A firm admin always may.
+  payroll_access: Generated<boolean>;
 }
 
 export interface UserBusinessAccessTable {

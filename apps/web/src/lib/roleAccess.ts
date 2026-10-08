@@ -1,4 +1,5 @@
 import { hasMinRole, ROLE_LABELS, type Role } from '@accounting/shared';
+import { useCallback } from 'react';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 
@@ -34,9 +35,13 @@ const ACCOUNTANT_PAGES = ['/setup/activity'];
 
 const under = (pathname: string, page: string) => pathname === page || pathname.startsWith(`${page}/`);
 
-/** Whether this role has any business on the page at `pathname`. */
-export function canOpenPage(role: Role | null, pathname: string): boolean {
+/**
+ * Whether this role has any business on the page at `pathname`. `access.payroll`
+ * is false for a login a firm admin has switched payroll off for.
+ */
+export function canOpenPage(role: Role | null, pathname: string, access: { payroll: boolean } = { payroll: true }): boolean {
   if (!role) return false;
+  if (!access.payroll && under(pathname, '/payroll')) return false;
   if (role === 'client') {
     // The dashboard, and the person's own login (password, second step, sessions).
     if (pathname === '/' || pathname === '/account') return true;
@@ -59,4 +64,16 @@ export function roleAtLeast(role: Role | null, min: Role): boolean {
 /** The role as a person reads it: "View only", not "viewer". */
 export function roleLabel(role: Role | null | undefined): string {
   return role ? ROLE_LABELS[role] : '';
+}
+
+/**
+ * `canOpenPage` for the signed-in user on the open company, with their payroll
+ * switch. What the sidebar, + New, search and the page shell all ask.
+ */
+export function useCanOpen(): (pathname: string) => boolean {
+  const role = useEffectiveRole();
+  const { user } = useAuth();
+  // Absent on a session from before the switch existed: that login keeps payroll until it next signs in.
+  const payroll = user?.payroll_access !== false;
+  return useCallback((pathname: string) => canOpenPage(role, pathname, { payroll }), [role, payroll]);
 }

@@ -29,3 +29,5 @@ export const activityLogQuerySchema = z.object({
   entity_type: z.string().min(1).max(100).optional(),
 });
 export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;
+
+export const payrollAccessSchema = z.object({ allowed: z.boolean() });

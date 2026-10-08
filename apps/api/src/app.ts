@@ -69,6 +69,8 @@ import aiRouter from './routes/ai.js';
 import bankDepositsRouter from './routes/bankDeposits.js';
 import searchRouter from './routes/search.js';
 import transfersRouter from './routes/transfers.js';
+import { requireAuth } from './middleware/auth.js';
+import { PAYROLL_PATHS, requirePayrollAccess } from './middleware/payrollAccess.js';
 import activityLogRouter from './routes/activityLog.js';
 
 export function makeApp(): Express {
@@ -89,6 +91,8 @@ export function makeApp(): Express {
   app.use(authRoutes);
   app.use(gmailAuthRouter);
   app.use(meRoutes);
+  // In front of every router: payroll is closed to a login it has been switched off for.
+  app.use(PAYROLL_PATHS, requireAuth, requirePayrollAccess);
   app.use(coaRoutes);
   app.use(periodRoutes);
   app.use(journalEntryRoutes);

@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 import type { Role } from '@accounting/shared';
-import { canOpenPage, roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
+import { roleAtLeast, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 
 // minRole: the lowest role the API lets create this, where it is above staff.
 // Kept in step with tests/integration/roleMatrix.test.ts in the API.
@@ -97,8 +97,9 @@ export function CreateMenu() {
 
   // Only what this role can actually create.
   const role = useEffectiveRole();
+  const canOpen = useCanOpen();
   const categories = CATEGORIES
-    .map(cat => ({ ...cat, items: cat.items.filter(item => canOpenPage(role, item.to) && (!item.minRole || roleAtLeast(role, item.minRole))) }))
+    .map(cat => ({ ...cat, items: cat.items.filter(item => canOpen(item.to) && (!item.minRole || roleAtLeast(role, item.minRole))) }))
     .filter(cat => cat.items.length > 0);
 
   const popup = open

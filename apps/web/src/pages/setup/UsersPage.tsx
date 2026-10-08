@@ -32,6 +32,8 @@ type UserRow = {
   // Held after too many wrong passwords; a new password lifts it.
   locked: boolean;
   two_step_enabled: boolean;
+  // Whether this login may open payroll. Always true for a firm admin.
+  payroll_access: boolean;
   business_access: BusinessAccess[];
 };
 
@@ -121,6 +123,16 @@ export default function UsersPage() {
       if (action === 'reset-password' && r.data.plaintext_password) {
         setResetResult({ email: u.email, password: r.data.plaintext_password });
       }
+      await reload();
+    } catch (e) {
+      setErr(errorMessage(e));
+    }
+  }
+
+  async function setPayroll(u: UserRow, allowed: boolean) {
+    setErr(null);
+    try {
+      await api.post(`/me/firm/users/${u.id}/payroll-access`, { allowed });
       await reload();
     } catch (e) {
       setErr(errorMessage(e));
@@ -340,6 +352,11 @@ export default function UsersPage() {
                         {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                       </AppSelect>
                       {isSelf && <p className="text-xs text-muted-foreground mt-1">(you)</p>}
+                      {/* Payroll has pay rates and social security numbers; it can be closed to a login. */}
+                      <label className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" title={u.role === 'firm_admin' ? 'A firm admin always has payroll' : undefined}>
+                        <input type="checkbox" checked={u.payroll_access} disabled={u.role === 'firm_admin' || u.role === 'client'} onChange={e => void setPayroll(u, e.target.checked)} />
+                        Payroll
+                      </label>
                     </td>
                     <td className="p-3">
                       <ul className="space-y-1">

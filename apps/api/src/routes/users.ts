@@ -91,6 +91,15 @@ router.delete('/me/firm/users/:id/business-access/:businessId', async (req, res,
 
 // One action each, all on a login in this firm: switch it off or on, give it a
 // new password, sign it out everywhere, turn off its second step.
+router.post('/me/firm/users/:id/payroll-access', async (req, res, next) => {
+  try {
+    const body = schemas.payrollAccessSchema.parse(req.body);
+    const result = await db.transaction().execute(trx =>
+      userSvc.setPayrollAccess(trx, ctxFromReq(req), { user_id: req.params['id']!, allowed: body.allowed }));
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
 type UserAction = (trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) => Promise<unknown>;
 const USER_ACTIONS: Record<string, UserAction> = {
   deactivate: userSvc.deactivateUser,
