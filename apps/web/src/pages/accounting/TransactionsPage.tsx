@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { Calendar, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { cachedGet } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -41,7 +42,44 @@ const TYPE_LABELS: Record<TransactionType, string> = {
   credit_memo: 'Credit Memo',
 };
 
-const TYPE_OPTIONS = Object.entries(TYPE_LABELS) as [TransactionType, string][];
+// QBO's full transaction-type taxonomy, in its own order — shown so the
+// dropdown reads as complete, but only the types transactionsService.ts
+// actually unions in are selectable; the rest are disabled "(coming soon)"
+// rather than silently returning zero rows if picked.
+const QBO_TYPE_TAXONOMY: { label: string; type: TransactionType | null }[] = [
+  { label: 'Advance payment', type: null },
+  { label: 'Bill', type: 'bill' },
+  { label: 'Bill payment', type: null },
+  { label: 'Bill payment credit card', type: null },
+  { label: 'Build assembly', type: null },
+  { label: 'Cash expense', type: null },
+  { label: 'Change order', type: null },
+  { label: 'Check', type: 'check' },
+  { label: 'Credit card', type: null },
+  { label: 'Credit card credit', type: null },
+  { label: 'Credit card payment', type: null },
+  { label: 'Credit memo', type: 'credit_memo' },
+  { label: 'Credit refund', type: null },
+  { label: 'Deposit', type: 'deposit' },
+  { label: 'Employee non-reimbursable expense', type: null },
+  { label: 'Employee reimbursable expense', type: null },
+  { label: 'Employee reimbursement', type: null },
+  { label: 'Estimate', type: null },
+  { label: 'Expense', type: 'expense' },
+  { label: 'Global tax payment', type: null },
+  { label: 'Invoice', type: null },
+  { label: 'Item receipt', type: null },
+  { label: 'Journal', type: 'journal' },
+  { label: 'Manufacturing order', type: null },
+  { label: 'Paycheck', type: null },
+  { label: 'Payment', type: 'payment' },
+  { label: 'Reverse charge', type: null },
+  { label: 'Sales Order', type: null },
+  { label: 'Sales receipt', type: null },
+  { label: 'Tax adjustment', type: null },
+  { label: 'Transfer', type: null },
+  { label: 'Vendor credit', type: null },
+];
 
 // Status spellings are inconsistent across source tables ('void' vs 'voided',
 // 'applied' is AR-only) — normalize to a small badge-color set by prefix match.
@@ -53,33 +91,152 @@ function statusPillClass(status: string): string {
   return 'bg-muted text-muted-foreground';
 }
 
+// 'unset' is this page's own sentinel for "no date filter yet" (the trigger
+// shows "Select…") — it isn't one of the dropdown's own options.
 const DATE_PRESETS = [
-  { value: 'all', label: 'All dates' },
+  { value: 'custom', label: 'Custom' },
   { value: '7d', label: 'Last 7 days' },
+  { value: '14d', label: 'Last 14 days' },
   { value: '30d', label: 'Last 30 days' },
-  { value: 'this_month', label: 'This month' },
-  { value: 'last_month', label: 'Last month' },
-  { value: 'this_quarter', label: 'This quarter' },
+  { value: '3m', label: 'Last 3 months' },
+  { value: 'previous_week', label: 'Previous week' },
+  { value: 'previous_month', label: 'Previous month' },
+  { value: 'previous_quarter', label: 'Previous quarter' },
+  { value: 'this_week', label: 'This week' },
   { value: 'this_year', label: 'This year' },
-  { value: 'custom', label: 'Custom range' },
+  { value: 'last_year', label: 'Last year' },
+  { value: 'last_7_years', label: 'Last 7 years' },
 ] as const;
-type DatePreset = (typeof DATE_PRESETS)[number]['value'];
+type DatePreset = (typeof DATE_PRESETS)[number]['value'] | 'unset';
+const DATE_PRESET_LABELS: Record<DatePreset, string> = {
+  unset: 'Select…',
+  ...Object.fromEntries(DATE_PRESETS.map(p => [p.value, p.label])),
+} as Record<DatePreset, string>;
 
-function presetRange(preset: DatePreset): { start: string | null; end: string | null } {
+function presetRange(preset: DatePreset, customStart: string, customEnd: string): { start: string | null; end: string | null } {
   const now = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const startOfMonth = (y: number, m: number) => new Date(y, m, 1);
   const endOfMonth = (y: number, m: number) => new Date(y, m + 1, 0);
+  // US convention: week starts Sunday.
+  const startOfWeek = (d: Date) => { const s = new Date(d); s.setDate(s.getDate() - s.getDay()); return s; };
+  const addDays = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const addMonths = (d: Date, n: number) => { const r = new Date(d); r.setMonth(r.getMonth() + n); return r; };
+  const addYears = (d: Date, n: number) => { const r = new Date(d); r.setFullYear(r.getFullYear() + n); return r; };
   switch (preset) {
-    case 'all': return { start: null, end: null };
-    case '7d': { const s = new Date(now); s.setDate(s.getDate() - 7); return { start: iso(s), end: iso(now) }; }
-    case '30d': { const s = new Date(now); s.setDate(s.getDate() - 30); return { start: iso(s), end: iso(now) }; }
-    case 'this_month': return { start: iso(startOfMonth(now.getFullYear(), now.getMonth())), end: iso(endOfMonth(now.getFullYear(), now.getMonth())) };
-    case 'last_month': return { start: iso(startOfMonth(now.getFullYear(), now.getMonth() - 1)), end: iso(endOfMonth(now.getFullYear(), now.getMonth() - 1)) };
-    case 'this_quarter': { const q = Math.floor(now.getMonth() / 3); return { start: iso(startOfMonth(now.getFullYear(), q * 3)), end: iso(endOfMonth(now.getFullYear(), q * 3 + 2)) }; }
+    case 'unset': return { start: null, end: null };
+    case 'custom': return { start: customStart || null, end: customEnd || null };
+    case '7d': return { start: iso(addDays(now, -7)), end: iso(now) };
+    case '14d': return { start: iso(addDays(now, -14)), end: iso(now) };
+    case '30d': return { start: iso(addDays(now, -30)), end: iso(now) };
+    case '3m': return { start: iso(addMonths(now, -3)), end: iso(now) };
+    case 'previous_week': { const s = addDays(startOfWeek(now), -7); return { start: iso(s), end: iso(addDays(s, 6)) }; }
+    case 'previous_month': return { start: iso(startOfMonth(now.getFullYear(), now.getMonth() - 1)), end: iso(endOfMonth(now.getFullYear(), now.getMonth() - 1)) };
+    case 'previous_quarter': { const q = Math.floor(now.getMonth() / 3) - 1; const y = now.getFullYear() + (q < 0 ? -1 : 0); const qq = (q + 4) % 4; return { start: iso(startOfMonth(y, qq * 3)), end: iso(endOfMonth(y, qq * 3 + 2)) }; }
+    case 'this_week': { const s = startOfWeek(now); return { start: iso(s), end: iso(addDays(s, 6)) }; }
     case 'this_year': return { start: iso(new Date(now.getFullYear(), 0, 1)), end: iso(new Date(now.getFullYear(), 11, 31)) };
-    case 'custom': return { start: null, end: null };
+    case 'last_year': return { start: iso(new Date(now.getFullYear() - 1, 0, 1)), end: iso(new Date(now.getFullYear() - 1, 11, 31)) };
+    case 'last_7_years': return { start: iso(addYears(now, -7)), end: iso(now) };
   }
+}
+
+function DateRangeFilter({
+  preset, start, end, onApply,
+}: {
+  preset: DatePreset; start: string; end: string;
+  onApply: (next: { preset: DatePreset; start: string; end: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draftPreset, setDraftPreset] = useState<DatePreset>(preset === 'unset' ? 'custom' : preset);
+  const [draftStart, setDraftStart] = useState(start);
+  const [draftEnd, setDraftEnd] = useState(end);
+
+  function openPopup() {
+    setDraftPreset(preset === 'unset' ? 'custom' : preset);
+    setDraftStart(start);
+    setDraftEnd(end);
+    setOpen(true);
+  }
+
+  function draftRange() {
+    return draftPreset === 'custom' ? { start: draftStart, end: draftEnd } : presetRange(draftPreset, '', '');
+  }
+
+  function handleApply() {
+    const range = draftRange();
+    onApply({ preset: draftPreset, start: range.start ?? '', end: range.end ?? '' });
+    setOpen(false);
+  }
+  function handleClear() {
+    onApply({ preset: 'unset', start: '', end: '' });
+    setOpen(false);
+  }
+
+  const displayRange = draftRange();
+
+  return (
+    <div className="relative">
+      <label className="mb-1 block text-xs text-muted-foreground">Date range</label>
+      <button
+        type="button"
+        onClick={openPopup}
+        className="flex h-9 w-44 items-center justify-between rounded-md border bg-background px-3 text-sm text-left"
+      >
+        <span className={preset === 'unset' ? 'text-muted-foreground' : ''}>{DATE_PRESET_LABELS[preset]}</span>
+        <Calendar className="h-4 w-4 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-50 mt-1 w-[420px] rounded-md border bg-white p-4 shadow-lg dark:bg-zinc-900">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Date range</h3>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close">
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Date</label>
+                <AppSelect
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={draftPreset}
+                  onChange={e => setDraftPreset(e.target.value as DatePreset)}
+                >
+                  {DATE_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </AppSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">From</label>
+                <Input
+                  type="date"
+                  className="h-9 w-full"
+                  value={draftPreset === 'custom' ? draftStart : (displayRange.start ?? '')}
+                  disabled={draftPreset !== 'custom'}
+                  onChange={e => setDraftStart(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">To</label>
+                <Input
+                  type="date"
+                  className="h-9 w-full"
+                  value={draftPreset === 'custom' ? draftEnd : (displayRange.end ?? '')}
+                  disabled={draftPreset !== 'custom'}
+                  onChange={e => setDraftEnd(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Button type="button" variant="outline" size="sm" onClick={handleClear}>Clear</Button>
+              <Button type="button" size="sm" onClick={handleApply}>Apply</Button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 type AmountOp = 'any' | 'eq' | 'gt' | 'lt' | 'between';
@@ -98,7 +255,10 @@ export default function TransactionsPage() {
   const [parties, setParties] = useState<Party[]>([]);
 
   const typeFilter = (params.get('type') as TransactionType | null) ?? null;
-  const [datePreset, setDatePreset] = useState<DatePreset>('30d');
+  // No date filter until the user picks one from the popup (matches the
+  // "Select…" empty state) — unlike the old plain dropdown, which defaulted
+  // to Last 30 days.
+  const [datePreset, setDatePreset] = useState<DatePreset>('unset');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [refNo, setRefNo] = useState('');
@@ -125,7 +285,7 @@ export default function TransactionsPage() {
   const reload = useCallback(async () => {
     if (!bizId) { setRows([]); setTotal(0); return; }
     setErr(null);
-    const range = datePreset === 'custom' ? { start: customStart || null, end: customEnd || null } : presetRange(datePreset);
+    const range = presetRange(datePreset, customStart, customEnd);
     const query: Record<string, string> = {
       page: String(page),
       page_size: String(PAGE_SIZE),
@@ -191,28 +351,16 @@ export default function TransactionsPage() {
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Date range</label>
-          <AppSelect className="h-9 w-40 rounded-md border bg-background px-3 text-sm" value={datePreset} onChange={e => setDatePreset(e.target.value as DatePreset)}>
-            {DATE_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </AppSelect>
-        </div>
-        {datePreset === 'custom' && (
-          <>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">From</label>
-              <Input type="date" className="h-9 w-36" value={customStart} onChange={e => setCustomStart(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">To</label>
-              <Input type="date" className="h-9 w-36" value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
-            </div>
-          </>
-        )}
+        <DateRangeFilter
+          preset={datePreset}
+          start={customStart}
+          end={customEnd}
+          onApply={next => { setDatePreset(next.preset); setCustomStart(next.start); setCustomEnd(next.end); }}
+        />
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Transaction type</label>
           <AppSelect
-            className="h-9 w-40 rounded-md border bg-background px-3 text-sm"
+            className="h-9 w-48 rounded-md border bg-background px-3 text-sm"
             value={typeFilter ?? 'all'}
             onChange={e => {
               const next = new URLSearchParams(params);
@@ -221,7 +369,11 @@ export default function TransactionsPage() {
             }}
           >
             <option value="all">All types</option>
-            {TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {QBO_TYPE_TAXONOMY.map(({ label, type }) => (
+              <option key={label} value={type ?? ''} disabled={!type}>
+                {type ? label : `${label} (coming soon)`}
+              </option>
+            ))}
           </AppSelect>
         </div>
         <div>
