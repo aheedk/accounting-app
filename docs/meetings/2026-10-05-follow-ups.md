@@ -113,7 +113,8 @@ None of these are in the code yet. Most need a decision from the firm first.
 
 - Faizan: keep testing and send findings (video is fine).
 - Sample checks for the "Timeout" client **(10-01)**.
-- Clean the test entries out of the real company **(10-01)**.
+- ~~Clean the test entries out of the real company **(10-01)**.~~ Done by Riham on
+  10-08: the August test activity for TIME OUT is removed.
 - Get the product / company name in writing and check it is available.
 
 ## Done
@@ -133,11 +134,11 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 13 | Audit history on Journal Entry and Bank Deposit, and Copy on Bank Deposit, work | Aheed, `11452ee` |
 | 33 | Vendors list: Email and "Ask vendor for info" start a message in the user's mail program | Aheed, `258cdef` |
 | 12 | Check is in the "+ New" menu (the rest of 12 is open) | Aheed, `8ebcbdb` |
-| — | Role audit: a client login sees only its reports and invoices (it could read almost everything), menus and buttons follow the role, a firm admin keeps every client after a reload | Aheed, `d08f828`, `f894249`, `06ac174`, `88de457`, `bcc694d` |
-| — | Signing in: switch a login off, change or reset a password, a hold after five wrong passwords, two-step sign-in, see and end sessions | Aheed, `800c463`, `63ee0d5` |
-| — | A View only role; payroll can be closed to a login; Activity Log; buttons a role cannot use are off every page | Aheed, `5e9e1f7`, `f083cf8`, `3411d48`, `0c440b4` |
-| — | Approval step: staff entries can wait for an accountant (off until a firm admin turns it on for a company) | Aheed, `f6673bd`, `4ef7dcc` |
-| — | For a client: send documents, see bills, messages with the firm. Customer statements for everyone | Aheed, `9d0af37`, `46c1456`, `58f4fa2` |
+| — | Role audit: a client login sees only its reports and invoices (it could read almost everything), menus and buttons follow the role, a firm admin keeps every client after a reload | Aheed, `5afc8e5`, `1a69563`, `388cf49`, `648c399`, `c79c9eb` |
+| — | Signing in: switch a login off, change or reset a password, a hold after five wrong passwords, two-step sign-in, see and end sessions | Aheed, `e4be47a`, `497fe6d` |
+| — | A View only role; payroll can be closed to a login; Activity Log; buttons a role cannot use are off every page | Aheed, `ca7a526`, `7d7b18c`, `8b9b906`, `7862b1c` |
+| — | Approval step: staff entries can wait for an accountant (off until a firm admin turns it on for a company) | Aheed, `2d47079`, `3e159c8` |
+| — | For a client: send documents, see bills, messages with the firm. Customer statements for everyone | Aheed, `6c49cc2`, `7175ef7`, `007f22c` |
 
 Audit bugs fixed (part of item 17), all Aheed:
 

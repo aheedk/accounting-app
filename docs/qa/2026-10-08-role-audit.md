@@ -34,15 +34,15 @@ and none of the 141 that change something; staff into 44 of the 141; an accounta
 
 | # | What was wrong | Fix |
 |---|---|---|
-| 1 | **A client login could read almost everything**: 107 of the 113 read routes, including payroll, employees, bank lines, the AI inbox and audit history. The design gives a client its reports and invoices only | A client is now refused everything that is not on a short list. A new route is closed to clients until it is added to that list. `d08f828` |
-| 2 | Two routes had no role check at all. Any login, a client included, could trigger a poll of the firm's mailbox | Both guarded. `d08f828` |
-| 3 | **A firm admin lost clients on reloading the page.** Signing in listed every client of the firm; reloading listed only the ones granted by name | Reloading gives the same list as signing in. `f894249` |
-| 4 | Nothing in the menus looked at the role. A client saw the whole sidebar, the + New menu and every search result, and found out page by page that none of it would load | The sidebar, + New and search offer only what the role can open. A page reached another way says it is not part of your access. `06ac174` |
-| 5 | On the pages a client can use, links led to pages it cannot: Receive payment, the customer, the journal entry, and every amount on the four statements | Removed for a client. `88de457` |
-| 6 | **Ten pages ignored a role given for one company.** Setup → Users can make someone an accountant for one client only; those pages, and the badge by the user's name, read the firm-wide role instead | They all use the role on the open company, which is the one the API checks. `bcc694d` |
-| 7 | + New offered staff six forms they cannot save: Credit memo, Pay bills, Vendor credit, Run payroll, Journal entry, Transfer | Left out for staff. `bcc694d` |
-| 8 | Add bank account, New tax code and Seed a year were offered to everyone and refused for all but a firm admin | Shown to a firm admin only. `bcc694d` |
-| 9 | A refusal read "Requires accountant" | It says who can do it: "This needs an accountant or a firm admin." `d08f828` |
+| 1 | **A client login could read almost everything**: 107 of the 113 read routes, including payroll, employees, bank lines, the AI inbox and audit history. The design gives a client its reports and invoices only | A client is now refused everything that is not on a short list. A new route is closed to clients until it is added to that list. `5afc8e5` |
+| 2 | Two routes had no role check at all. Any login, a client included, could trigger a poll of the firm's mailbox | Both guarded. `5afc8e5` |
+| 3 | **A firm admin lost clients on reloading the page.** Signing in listed every client of the firm; reloading listed only the ones granted by name | Reloading gives the same list as signing in. `1a69563` |
+| 4 | Nothing in the menus looked at the role. A client saw the whole sidebar, the + New menu and every search result, and found out page by page that none of it would load | The sidebar, + New and search offer only what the role can open. A page reached another way says it is not part of your access. `388cf49` |
+| 5 | On the pages a client can use, links led to pages it cannot: Receive payment, the customer, the journal entry, and every amount on the four statements | Removed for a client. `648c399` |
+| 6 | **Ten pages ignored a role given for one company.** Setup → Users can make someone an accountant for one client only; those pages, and the badge by the user's name, read the firm-wide role instead | They all use the role on the open company, which is the one the API checks. `c79c9eb` |
+| 7 | + New offered staff six forms they cannot save: Credit memo, Pay bills, Vendor credit, Run payroll, Journal entry, Transfer | Left out for staff. `c79c9eb` |
+| 8 | Add bank account, New tax code and Seed a year were offered to everyone and refused for all but a firm admin | Shown to a firm admin only. `c79c9eb` |
+| 9 | A refusal read "Requires accountant" | It says who can do it: "This needs an accountant or a firm admin." `5afc8e5` |
 
 Nothing returned a server error for any role, before or after.
 
@@ -80,7 +80,7 @@ until someone turns it on.
 
 | What | Now |
 |---|---|
-| Remove or switch off a user | **Built.** Setup → Users → Switch off. It ends the person's sessions at once and can be switched back on. `800c463`, `63ee0d5` |
+| Remove or switch off a user | **Built.** Setup → Users → Switch off. It ends the person's sessions at once and can be switched back on. `e4be47a`, `497fe6d` |
 | Change your own password; reset a forgotten one | **Built.** My account → Password. A firm admin can give a login a new one-time password. An emailed reset link is not built (no mail service) |
 | A limit on wrong passwords | **Built.** Five in a row hold a login for fifteen minutes |
 | Two-step sign-in | **Built.** Each person turns it on under My account, with any authenticator app. Requiring it for a role is not built |
@@ -91,18 +91,18 @@ until someone turns it on.
 
 | What | Now |
 |---|---|
-| Hide what a role cannot use on every page | **Built.** Thirty more pages; forms only an accountant can save are closed to staff. `0c440b4` |
-| A view-only role | **Built.** "View only": reads what staff read, changes nothing. `5e9e1f7` |
-| An approval step | **Built.** A switch per company on Accounting → Approvals. `f6673bd`, `4ef7dcc` |
-| Access by area | **Built for payroll.** Setup → Users, the Payroll tick box. `f083cf8` |
-| A log of who did what | **Built.** Setup → Activity Log, for an accountant and up. `3411d48` |
+| Hide what a role cannot use on every page | **Built.** Thirty more pages; forms only an accountant can save are closed to staff. `7862b1c` |
+| A view-only role | **Built.** "View only": reads what staff read, changes nothing. `ca7a526` |
+| An approval step | **Built.** A switch per company on Accounting → Approvals. `2d47079`, `3e159c8` |
+| Access by area | **Built for payroll.** Setup → Users, the Payroll tick box. `7d7b18c` |
+| A log of who did what | **Built.** Setup → Activity Log, for an accountant and up. `8b9b906` |
 
 **For a client login**
 
 | What | Now |
 |---|---|
-| Upload documents | **Built.** Send documents; they wait in the AI inbox for an accountant. `9d0af37`, `46c1456` |
-| See what they owe in detail | **Built.** Bills, and Accounts Receivable → Statements for their customers. `58f4fa2` |
+| Upload documents | **Built.** Send documents; they wait in the AI inbox for an accountant. `6c49cc2`, `7175ef7` |
+| See what they owe in detail | **Built.** Bills, and Accounts Receivable → Statements for their customers. `007f22c` |
 | Pay and be paid online | **Not built.** Needs a Stripe account |
 | Messages | **Built.** One thread per company, with an unread count |
 
