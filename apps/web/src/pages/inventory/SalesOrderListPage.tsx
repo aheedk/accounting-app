@@ -84,7 +84,7 @@ export default function SalesOrderListPage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get<CustomersResponse>(`/businesses/${bizId}/customers`)
+    api.get<CustomersResponse>(`/businesses/${bizId}/customers?include_inactive=true`)
       .then((r) => setCustomers(r.data.customers))
       .catch(() => setCustomers([]));
   }, [bizId]);

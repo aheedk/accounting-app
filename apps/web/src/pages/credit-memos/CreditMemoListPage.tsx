@@ -51,7 +51,7 @@ export default function CreditMemoListPage() {
   const [customerQuery, setCustomerQuery] = useState('');
 
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/credit-memos`).then(r => setItems(r.data.credit_memos)); }, [bizId]);
-  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/customers`).then(r => setCustomers(r.data.customers)); }, [bizId]);
+  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/customers?include_inactive=true`).then(r => setCustomers(r.data.customers)); }, [bizId]);
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
 

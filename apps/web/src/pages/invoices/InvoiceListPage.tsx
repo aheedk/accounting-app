@@ -44,7 +44,7 @@ export default function InvoiceListPage() {
   }, [bizId, statusFilter]);
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/customers`).then(r => setCustomers(r.data.customers));
+    api.get(`/businesses/${bizId}/customers?include_inactive=true`).then(r => setCustomers(r.data.customers));
   }, [bizId]);
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);

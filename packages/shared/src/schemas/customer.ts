@@ -44,5 +44,6 @@ export const customerCreateSchema = z.object({
 });
 export type CustomerCreate = z.infer<typeof customerCreateSchema>;
 
-export const customerUpdateSchema = customerCreateSchema.partial();
+// is_active is only changed, never set on creation: a new customer is active.
+export const customerUpdateSchema = customerCreateSchema.partial().extend({ is_active: z.boolean().optional() });
 export type CustomerUpdate = z.infer<typeof customerUpdateSchema>;

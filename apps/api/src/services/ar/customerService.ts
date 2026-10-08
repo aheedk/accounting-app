@@ -116,7 +116,7 @@ export async function createCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
 
 export async function updateCustomer(
   trx: Transaction<DB>, ctx: ServiceCtx,
-  input: { customer_id: string; patch: Partial<CreateCustomerInput> },
+  input: { customer_id: string; patch: Partial<CreateCustomerInput> & { is_active?: boolean } },
 ) {
   const before = await trx.selectFrom('customers').selectAll().where('id', '=', input.customer_id).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('customer', input.customer_id);
@@ -151,6 +151,7 @@ export async function updateCustomer(
     ...(input.patch.opening_balance !== undefined ? { opening_balance: input.patch.opening_balance ?? null } : {}),
     ...(input.patch.opening_balance_as_of !== undefined ? { opening_balance_as_of: input.patch.opening_balance_as_of ?? null } : {}),
     ...(input.patch.default_terms_days !== undefined ? { default_terms_days: input.patch.default_terms_days } : {}),
+    ...(input.patch.is_active !== undefined ? { is_active: input.patch.is_active } : {}),
   }).where('id', '=', input.customer_id).returningAll().executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, { action: AUDIT.CUSTOMER_UPDATE, entity_type: 'customer', entity_id: input.customer_id, before, after: updated });
@@ -161,20 +162,40 @@ export async function deleteCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   const before = await trx.selectFrom('customers').selectAll().where('id', '=', input.customer_id).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('customer', input.customer_id);
 
-  const liveInvoices = await trx.selectFrom('invoices').select('id')
-    .where('customer_id', '=', input.customer_id).where('status', 'in', ['draft', 'posted', 'paid'])
-    .where('deleted_at', 'is', null).execute();
-  if (liveInvoices.length > 0) {
+  // The same rule as vendors: a customer with any history is made inactive, not deleted.
+  if (await customerHasAnyTransaction(trx, input.customer_id)) {
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED,
-      `Customer has ${liveInvoices.length} active invoice(s); void or delete them first`,
-      { live_invoice_ids: liveInvoices.map(i => i.id) });
+      'Cannot delete — customer has existing transactions. Use "Make inactive" instead.');
   }
 
   await trx.updateTable('customers').set({ deleted_at: sql`now()` }).where('id', '=', input.customer_id).execute();
   await auditRecord(trx, ctx, { action: AUDIT.CUSTOMER_DELETE, entity_type: 'customer', entity_id: input.customer_id, before, after: null });
 }
 
-export async function listCustomers(db: Kysely<DB>, business_id: string) {
+/** Whether anything was ever recorded for this customer: an invoice, a payment, a credit memo or a sales order. */
+export async function customerHasAnyTransaction(db: Kysely<DB> | Transaction<DB>, customer_id: string): Promise<boolean> {
+  const [invoice, payment, creditMemo, salesOrder] = await Promise.all([
+    db.selectFrom('invoices').select('id').where('customer_id', '=', customer_id).where('deleted_at', 'is', null).executeTakeFirst(),
+    db.selectFrom('payments').select('id').where('customer_id', '=', customer_id).executeTakeFirst(),
+    db.selectFrom('credit_memos').select('id').where('customer_id', '=', customer_id).executeTakeFirst(),
+    db.selectFrom('sales_orders').select('id').where('customer_id', '=', customer_id).executeTakeFirst(),
+  ]);
+  return [invoice, payment, creditMemo, salesOrder].some(row => row !== undefined);
+}
+
+/** Customer ids in this business with at least one transaction, for graying out Delete in the list. */
+export async function customerIdsWithTransactions(db: Kysely<DB>, business_id: string): Promise<Set<string>> {
+  const lists = await Promise.all([
+    db.selectFrom('invoices').select('customer_id').where('business_id', '=', business_id).where('deleted_at', 'is', null).distinct().execute(),
+    db.selectFrom('payments').select('customer_id').where('business_id', '=', business_id).distinct().execute(),
+    db.selectFrom('credit_memos').select('customer_id').where('business_id', '=', business_id).distinct().execute(),
+    db.selectFrom('sales_orders').select('customer_id').where('business_id', '=', business_id).distinct().execute(),
+  ]);
+  return new Set(lists.flat().map(row => row.customer_id));
+}
+
+/** Active customers, for dropdowns; `includeInactive` for lists that show history. */
+export async function listCustomers(db: Kysely<DB>, business_id: string, opts: { includeInactive?: boolean } = {}) {
   return db.selectFrom('customers as c')
     .selectAll('c')
     .select(eb => eb
@@ -197,6 +218,7 @@ export async function listCustomers(db: Kysely<DB>, business_id: string) {
     )
     .where('c.business_id', '=', business_id)
     .where('c.deleted_at', 'is', null)
+    .$if(!opts.includeInactive, qb => qb.where('c.is_active', '=', true))
     .orderBy('c.name')
     .execute();
 }

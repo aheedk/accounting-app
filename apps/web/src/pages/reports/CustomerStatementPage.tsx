@@ -40,7 +40,7 @@ export default function CustomerStatementPage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get<{ customers: Customer[] }>(`/businesses/${bizId}/customers`)
+    api.get<{ customers: Customer[] }>(`/businesses/${bizId}/customers?include_inactive=true`)
       .then(r => setCustomers(r.data.customers))
       .catch((e: unknown) => setErr(pickErr(e)));
   }, [bizId]);

@@ -22,8 +22,14 @@ function ctxFromReq(req: Request): ServiceCtx {
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/customers', async (req, res, next) => {
-  try { res.json({ customers: await cust.listCustomers(db, req.tenancy!.business_id) }); }
-  catch (e) { next(e); }
+  try {
+    const businessId = req.tenancy!.business_id;
+    const [customers, withTransactions] = await Promise.all([
+      cust.listCustomers(db, businessId, { includeInactive: req.query['include_inactive'] === 'true' }),
+      cust.customerIdsWithTransactions(db, businessId),
+    ]);
+    res.json({ customers: customers.map(c => ({ ...c, has_transactions: withTransactions.has(c.id) })) });
+  } catch (e) { next(e); }
 });
 
 router.get('/businesses/:businessId/customers/:id', async (req, res, next) => {
@@ -71,7 +77,8 @@ router.post('/businesses/:businessId/customers', requireMinRole('staff'), async 
 router.patch('/businesses/:businessId/customers/:id', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const parsed = schemas.customerUpdateSchema.parse(req.body);
-    const patch = buildPatch(parsed as unknown as Record<string, unknown>);
+    const patch: Parameters<typeof cust.updateCustomer>[2]['patch'] = buildPatch(parsed as unknown as Record<string, unknown>);
+    if (parsed.is_active !== undefined) patch.is_active = parsed.is_active;
     const updated = await db.transaction().execute(trx =>
       cust.updateCustomer(trx, ctxFromReq(req), { customer_id: req.params['id']!, patch }),
     );

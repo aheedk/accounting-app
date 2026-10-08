@@ -218,6 +218,8 @@ export interface CustomersTable {
   opening_balance: ColumnType<string, string | number | null | undefined, string | number | null> | null;
   opening_balance_as_of: ColumnType<string, string | null | undefined, string | null> | null;
   default_terms_days: Generated<number>;
+  /** False hides the customer from dropdowns and keeps their history (migration 0096). */
+  is_active: Generated<boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;

@@ -55,7 +55,7 @@ export default function PaymentListPage() {
   const [customerQuery, setCustomerQuery] = useState('');
 
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/payments`).then(r => setItems(r.data.payments)); }, [bizId]);
-  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/customers`).then(r => setCustomers(r.data.customers)); }, [bizId]);
+  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/customers?include_inactive=true`).then(r => setCustomers(r.data.customers)); }, [bizId]);
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
 
