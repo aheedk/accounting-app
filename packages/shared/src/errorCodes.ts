@@ -7,6 +7,10 @@ export const ERR = {
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   FORBIDDEN: 'FORBIDDEN',
+  // Too many wrong passwords; the login is held for a while.
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
+  // The password was right and the login asks for a code from an authenticator app.
+  TWO_STEP_REQUIRED: 'TWO_STEP_REQUIRED',
 
   // Resource
   NOT_FOUND: 'NOT_FOUND',

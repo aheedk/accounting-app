@@ -97,9 +97,10 @@ const STAFF_MAY_WRITE = [
   'POST ~/vendors',
 ];
 
-// What only a firm admin may do: the firm's users and clients, a client's
-// settings, bank accounts, tax codes and employees, deleting records, reopening
-// a period, and revealing a tax id or social security number.
+// What only a firm admin may do: the firm's users and clients (adding one,
+// switching a login off, resetting its password or second step, signing it
+// out), a client's settings, bank accounts, tax codes and employees, deleting
+// records, reopening a period, and revealing a tax id or social security number.
 const FIRM_ADMIN_ONLY = [
   'DELETE /me/firm/users/:id/business-access/:businessId',
   'DELETE ~/bank-deposits/:id',
@@ -121,6 +122,11 @@ const FIRM_ADMIN_ONLY = [
   'POST /firm/businesses',
   'POST /me/firm/users',
   'POST /me/firm/users/:id/business-access',
+  'POST /me/firm/users/:id/deactivate',
+  'POST /me/firm/users/:id/reactivate',
+  'POST /me/firm/users/:id/reset-password',
+  'POST /me/firm/users/:id/reset-two-step',
+  'POST /me/firm/users/:id/sign-out',
   'POST ~/bank-accounts',
   'POST ~/employees',
   'POST ~/periods/:id/reopen',

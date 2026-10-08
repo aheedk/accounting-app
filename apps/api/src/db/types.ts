@@ -49,6 +49,13 @@ export interface UsersTable {
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   deleted_at: Timestamp | null;
+  // Accounts and signing in (migration 0091)
+  deactivated_at: Timestamp | null;
+  failed_login_count: Generated<number>;
+  locked_until: Timestamp | null;
+  sessions_revoked_at: Timestamp | null;
+  totp_secret: Buffer | null;
+  totp_enabled_at: Timestamp | null;
 }
 
 export interface UserBusinessAccessTable {
@@ -67,6 +74,12 @@ export interface RefreshTokensTable {
   revoked_at: Timestamp | null;
   last_used_at: Timestamp | null;
   created_at: Generated<Timestamp>;
+  // Which sign-in this token belongs to, and when it happened; both carried from
+  // one token to the next (migration 0091).
+  session_id: Generated<string>;
+  session_started_at: ColumnType<Date, string | Date | undefined, string | Date>;
+  user_agent: string | null;
+  ip_address: string | null;
 }
 
 export interface AuditLogsTable {

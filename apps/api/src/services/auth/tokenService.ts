@@ -7,6 +7,8 @@ type AccessClaims = {
   user_id: string;
   firm_id: string;
   role: UserRole;
+  /** The session (sign-in) this token belongs to, so one session can be ended without the others. */
+  sid?: string;
 };
 
 export function signAccessToken(claims: AccessClaims): string {

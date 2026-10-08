@@ -12,7 +12,7 @@ export class BusinessRuleError extends Error {
 }
 
 export class AuthError extends BusinessRuleError {
-  constructor(code: typeof ERR.UNAUTHORIZED | typeof ERR.INVALID_CREDENTIALS | typeof ERR.TOKEN_EXPIRED | typeof ERR.FORBIDDEN, message: string, details?: Record<string, unknown>) {
+  constructor(code: typeof ERR.UNAUTHORIZED | typeof ERR.INVALID_CREDENTIALS | typeof ERR.TOKEN_EXPIRED | typeof ERR.FORBIDDEN | typeof ERR.ACCOUNT_LOCKED | typeof ERR.TWO_STEP_REQUIRED, message: string, details?: Record<string, unknown>) {
     super(code, message, details);
     this.name = 'AuthError';
   }
@@ -30,7 +30,9 @@ export function codeToHttpStatus(code: ErrorCode): number {
     case ERR.VALIDATION_FAILED: return 400;
     case ERR.UNAUTHORIZED:
     case ERR.TOKEN_EXPIRED:
+    case ERR.TWO_STEP_REQUIRED:
     case ERR.INVALID_CREDENTIALS: return 401;
+    case ERR.ACCOUNT_LOCKED: return 429;
     case ERR.FORBIDDEN: return 403;
     case ERR.NOT_FOUND: return 404;
     case ERR.CLOSED_PERIOD:

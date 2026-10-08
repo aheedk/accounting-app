@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import type { Kysely, Transaction } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB, UserRole } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { hashPassword } from '../auth/passwordHasher.js';
+import { endSessions } from '../auth/accountService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
@@ -15,7 +16,7 @@ export type UserBusinessAccess = {
 
 export async function listUsers(db: Kysely<DB>, firm_id: string) {
   const users = await db.selectFrom('users')
-    .select(['id', 'email', 'full_name', 'role', 'last_login_at', 'created_at'])
+    .select(['id', 'email', 'full_name', 'role', 'last_login_at', 'created_at', 'deactivated_at', 'locked_until', 'totp_enabled_at'])
     .where('firm_id', '=', firm_id)
     .where('deleted_at', 'is', null)
     .orderBy('created_at', 'asc')
@@ -51,6 +52,10 @@ export async function listUsers(db: Kysely<DB>, firm_id: string) {
     role: u.role,
     last_login_at: u.last_login_at,
     created_at: u.created_at,
+    // A login that is switched off stays in the list, so it can be switched back on.
+    deactivated_at: u.deactivated_at,
+    locked: u.locked_until !== null && new Date(u.locked_until).getTime() > Date.now(),
+    two_step_enabled: u.totp_enabled_at !== null,
     business_access: byUser.get(u.id) ?? [],
   }));
 }
@@ -202,4 +207,89 @@ export async function revokeBusinessAccess(
     before,
     after: null,
   });
+}
+
+// ── Switching a login off, and the things a firm admin does when someone is
+// locked out. Spec: docs/specs/2026-10-08-accounts-and-roles-design.md
+
+async function userInFirm(trx: Transaction<DB>, ctx: ServiceCtx, user_id: string) {
+  const user = await trx.selectFrom('users')
+    .select(['id', 'email', 'full_name', 'role', 'firm_id', 'deactivated_at'])
+    .where('id', '=', user_id).where('firm_id', '=', ctx.firm_id).where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  if (!user) throw new NotFoundError('user', user_id);
+  return user;
+}
+
+/**
+ * Switches a login off: the person cannot sign in and every session they have
+ * ends now. Their name stays on everything they did. Not yourself, and not the
+ * last firm admin, so a firm can never be left with nobody able to manage it.
+ */
+export async function deactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  if (user.id === ctx.user_id) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'You cannot switch off your own login.');
+  if (user.deactivated_at) return user;
+  if (user.role === 'firm_admin') {
+    const others = await trx.selectFrom('users').select('id')
+      .where('firm_id', '=', ctx.firm_id).where('role', '=', 'firm_admin')
+      .where('deleted_at', 'is', null).where('deactivated_at', 'is', null).where('id', '<>', user.id)
+      .execute();
+    if (others.length === 0) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'This is the only firm admin. Make someone else a firm admin first.');
+  }
+  await trx.updateTable('users').set({ deactivated_at: sql`now()` }).where('id', '=', user.id).execute();
+  await endSessions(trx, { user_id: user.id });
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_DEACTIVATE, entity_type: 'user', entity_id: user.id, before: { active: true }, after: { active: false },
+  });
+  return { ...user, deactivated_at: new Date() };
+}
+
+export async function reactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  if (!user.deactivated_at) return user;
+  await trx.updateTable('users').set({ deactivated_at: null, failed_login_count: 0, locked_until: null })
+    .where('id', '=', user.id).execute();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_REACTIVATE, entity_type: 'user', entity_id: user.id, before: { active: false }, after: { active: true },
+  });
+  return { ...user, deactivated_at: null };
+}
+
+/**
+ * Gives a login a new one-time password, shown once to the firm admin to pass
+ * on. Lifts a hold from wrong tries and ends the person's sessions. There is no
+ * emailed reset link because the app has no mail service.
+ */
+export async function resetUserPassword(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  const plaintext = generateTempPassword();
+  await trx.updateTable('users')
+    .set({ password_hash: await hashPassword(plaintext), failed_login_count: 0, locked_until: null })
+    .where('id', '=', user.id).execute();
+  await endSessions(trx, { user_id: user.id });
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_PASSWORD_RESET, entity_type: 'user', entity_id: user.id, before: null, after: { email: user.email },
+  });
+  return { user, plaintext_password: plaintext };
+}
+
+/** Signs a user out of every browser. */
+export async function signOutUser(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  const ended = await endSessions(trx, { user_id: user.id });
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_SIGN_OUT, entity_type: 'user', entity_id: user.id, before: null, after: { ended },
+  });
+  return { ended };
+}
+
+/** Turns the second step off for someone who has lost the phone it was on. */
+export async function resetUserTwoStep(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  await trx.updateTable('users').set({ totp_secret: null, totp_enabled_at: null }).where('id', '=', user.id).execute();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_TWO_STEP_RESET, entity_type: 'user', entity_id: user.id, before: null, after: { email: user.email },
+  });
+  return { ok: true };
 }

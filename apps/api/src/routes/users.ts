@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import type { Request } from 'express';
+import type { Transaction } from 'kysely';
 import { schemas, ERR } from '@accounting/shared';
 import { db } from '../db/index.js';
+import type { DB } from '../db/types.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { AuthError } from '../lib/errors.js';
@@ -86,5 +88,25 @@ router.delete('/me/firm/users/:id/business-access/:businessId', async (req, res,
     res.status(204).end();
   } catch (e) { next(e); }
 });
+
+// One action each, all on a login in this firm: switch it off or on, give it a
+// new password, sign it out everywhere, turn off its second step.
+type UserAction = (trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) => Promise<unknown>;
+const USER_ACTIONS: Record<string, UserAction> = {
+  deactivate: userSvc.deactivateUser,
+  reactivate: userSvc.reactivateUser,
+  'reset-password': userSvc.resetUserPassword,
+  'sign-out': userSvc.signOutUser,
+  'reset-two-step': userSvc.resetUserTwoStep,
+};
+
+for (const [action, run] of Object.entries(USER_ACTIONS)) {
+  router.post(`/me/firm/users/:id/${action}`, async (req, res, next) => {
+    try {
+      const result = await db.transaction().execute(trx => run(trx, ctxFromReq(req), { user_id: req.params['id']! }));
+      res.json(result);
+    } catch (e) { next(e); }
+  });
+}
 
 export default router;

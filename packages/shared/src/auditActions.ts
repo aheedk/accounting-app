@@ -218,6 +218,17 @@ export const AUDIT = {
   CHECK_STUB_DISMISS: 'check_stub.dismiss',
   SUSPENSE_RECLASSIFY: 'suspense.reclassify',
   CODING_RULE_UPDATE: 'coding_rule.update',
+
+  // Accounts and signing in
+  AUTH_PASSWORD_CHANGE: 'auth.password_change',
+  AUTH_SESSIONS_REVOKE: 'auth.sessions_revoke',
+  AUTH_TWO_STEP_ENABLE: 'auth.two_step_enable',
+  AUTH_TWO_STEP_DISABLE: 'auth.two_step_disable',
+  USER_DEACTIVATE: 'user.deactivate',
+  USER_REACTIVATE: 'user.reactivate',
+  USER_PASSWORD_RESET: 'user.password_reset',
+  USER_SIGN_OUT: 'user.sign_out',
+  USER_TWO_STEP_RESET: 'user.two_step_reset',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
