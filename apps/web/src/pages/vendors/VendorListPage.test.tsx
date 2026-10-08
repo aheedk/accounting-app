@@ -127,13 +127,14 @@ describe('VendorListPage', () => {
     expect(labels).not.toContain('Delete');
   });
 
-  it('stubs Ask vendor for info with a coming-soon alert', async () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  // The request opens in the user's mail program (lib/mailto.test.ts covers the
+  // message); with no address on file there is nothing to open, so it says so.
+  it('Ask vendor for info asks for an email address when the vendor has none', async () => {
     await render();
 
     await openRowMenu('Clean Vendor');
     await click(Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Ask vendor for info')!);
-    expect(alertSpy).toHaveBeenCalledWith('Vendor info request coming soon.');
+    expect(document.getElementById('flash-message')?.textContent).toBe('Add an email address for Clean Vendor first.');
   });
 
   it('"Write check" links to the check form with this vendor pre-selected', async () => {

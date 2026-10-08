@@ -16,6 +16,8 @@ import { daysAgoLocal, todayLocal } from '@/lib/dates';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { printReport } from '@/lib/reportExport';
 import { pickErr } from '@/lib/apiErrors';
+import { flashMessage } from '@/lib/flash';
+import { mailtoLink, vendorInfoRequest } from '@/lib/mailto';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -124,6 +126,22 @@ export default function VendorListPage() {
     });
   }
 
+  // There is no mail service yet, so both of these start a message in the
+  // user's own mail program instead of sending one from the app.
+  function emailSelected() {
+    const addresses = items.filter(v => selectedIds.has(v.id) && v.email).map(v => v.email!);
+    if (addresses.length === 0) { flashMessage('None of the selected vendors has an email address.'); return; }
+    const skipped = selectedIds.size - addresses.length;
+    if (skipped > 0) flashMessage(`${skipped} selected vendor${skipped === 1 ? ' has' : 's have'} no email address and ${skipped === 1 ? 'was' : 'were'} left out.`, 4000);
+    window.location.href = mailtoLink({ bcc: addresses });
+  }
+
+  function askVendorForInfo(vendor: Vendor) {
+    if (!vendor.email) { flashMessage(`Add an email address for ${vendor.name} first.`); return; }
+    const company = businesses.find(b => b.id === bizId)?.name ?? null;
+    window.location.href = mailtoLink({ to: [vendor.email], ...vendorInfoRequest(vendor.name, company) });
+  }
+
   async function makeInactive(ids: string[]) {
     if (!bizId) return;
     const noun = ids.length === 1 ? 'vendor' : `${ids.length} vendors`;
@@ -211,7 +229,7 @@ export default function VendorListPage() {
                 <div className="absolute top-full left-0 z-50 mt-1 w-48 rounded-md border bg-white text-foreground shadow-lg dark:bg-zinc-900">
                   <button
                     type="button"
-                    onClick={() => { setBatchOpen(false); alert('Email — coming soon'); }}
+                    onClick={() => { setBatchOpen(false); emailSelected(); }}
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
                   >
                     Email
@@ -285,7 +303,7 @@ export default function VendorListPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setOpenActionRow(null); alert('Vendor info request coming soon.'); }}
+                      onClick={() => { setOpenActionRow(null); askVendorForInfo(r); }}
                       className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
                     >
                       Ask vendor for info
