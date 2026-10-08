@@ -84,8 +84,14 @@ marked **10-01**.
   The report is `docs/qa/2026-09-28-app-audit.md`; its fixes are still deferred.
 - **Sample checks for the "Timeout" client**, from the months that already have
   bank statements, for testing.
-- **Clean up test entries** added to a real company by mistake. The journal
-  entry Delete button makes this possible.
+- ~~**Clean up test entries** added to a real company by mistake. The journal
+  entry Delete button makes this possible.~~ Done, 2026-10-08: all August 2026
+  seed/test activity for TIME OUT removed (3 bank deposits, 7 expenses, and
+  the journal entries and void/reversal pairs they'd posted), via the real
+  delete services so FK order and the reversal-pair rule were respected, not
+  a raw SQL delete. One entry was deliberately left alone — a reversal of a
+  real "wrong period" correction dated outside August — since deleting it
+  would have undone that correction rather than just removed clutter.
 - **Faizan will record a video** of further changes and send it.
 - **Match the "+ New" menu to QuickBooks.** Mostly done in Riham's `d418377`.
 
