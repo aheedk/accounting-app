@@ -514,7 +514,7 @@ export default function TransactionsPage() {
             onPick={p => { setContactId(p.id); setContactText(p.name); }}
             onTextChange={t => { setContactText(t); if (!t) setContactId(''); }}
             placeholder="Any contact"
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="w-full"
           />
         </div>
         <AmountFilter value={amountFilter} onApply={setAmountFilter} />
