@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 const POLL_MS = 60_000; // refresh every minute
 
 export function usePendingImportCount(): number {
   const [bizId] = useActiveBusinessId();
+  // A client login has no AI inbox, so there is nothing to count or to ask for.
+  const role = useEffectiveRole();
   const [count, setCount] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
-    if (!bizId) { setCount(0); return; }
+    if (!bizId || role === null || role === 'client') { setCount(0); return; }
 
     let cancelled = false;
     async function fetch() {
@@ -28,7 +31,7 @@ export function usePendingImportCount(): number {
       cancelled = true;
       clearInterval(timer.current);
     };
-  }, [bizId]);
+  }, [bizId, role]);
 
   return count;
 }

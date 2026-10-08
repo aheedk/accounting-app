@@ -4,6 +4,7 @@ import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 
 type Page = { label: string; group: string; to: string };
@@ -164,10 +165,12 @@ export function GlobalSearch() {
   // Records of the open company (customers, vendors, invoices, bills) that match,
   // fetched a moment after typing stops. Shown under the matching pages.
   const [bizId] = useActiveBusinessId();
+  const role = useEffectiveRole();
   const [records, setRecords] = useState<Page[]>([]);
   useEffect(() => {
     const text = query.trim();
-    if (!bizId || text.length < 2) { setRecords([]); return; }
+    // A client login searches pages only; record search is not open to it.
+    if (!bizId || text.length < 2 || role === 'client') { setRecords([]); return; }
     let cancelled = false;
     const timer = setTimeout(() => {
       api.get<{ results: RecordResult[] }>(`/businesses/${bizId}/search`, { params: { q: text } })
@@ -175,16 +178,17 @@ export function GlobalSearch() {
         .catch(() => { if (!cancelled) setRecords([]); });
     }, 200);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [bizId, query]);
+  }, [bizId, query, role]);
 
   const items = useMemo<Page[]>(() => {
-    if (!query.trim()) return QUICK_LINKS;
+    // Only pages this role can open are offered.
+    if (!query.trim()) return QUICK_LINKS.filter(p => canOpenPage(role, p.to));
     const q = query.toLowerCase();
     const pages = ALL_PAGES.filter(
-      p => p.label.toLowerCase().includes(q) || p.group.toLowerCase().includes(q),
+      p => canOpenPage(role, p.to) && (p.label.toLowerCase().includes(q) || p.group.toLowerCase().includes(q)),
     );
     return [...pages, ...records];
-  }, [query, records]);
+  }, [query, records, role]);
 
   // Grouped with flat index pre-computed for keyboard nav
   const grouped = useMemo(() => {

@@ -4,6 +4,7 @@ import { AlertCircle, ChevronDown, FileDown, Printer, Settings } from 'lucide-re
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -30,6 +31,8 @@ function daysBetween(fromIso: string, toIso: string) {
 
 export default function InvoiceListPage() {
   const [bizId] = useActiveBusinessId();
+  // A client login reads invoices; it does not write them.
+  const canCreate = roleAtLeast(useEffectiveRole(), 'staff');
   const [items, setItems] = useState<InvoiceSummary[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
@@ -103,7 +106,7 @@ export default function InvoiceListPage() {
               <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
             </div>
           </div>
-          <Button asChild><Link to="/invoices/new">New invoice</Link></Button>
+          {canCreate && <Button asChild><Link to="/invoices/new">New invoice</Link></Button>}
         </div>
       </div>
       <Card><CardContent className="p-0">
@@ -126,7 +129,7 @@ export default function InvoiceListPage() {
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}
-          emptyMessage={<EmptyState title="No invoices found" hint="Bill a customer for goods or services." actionLabel="New invoice" actionTo="/invoices/new" />}
+          emptyMessage={<EmptyState title="No invoices found" hint="Bill a customer for goods or services." {...(canCreate ? { actionLabel: 'New invoice', actionTo: '/invoices/new' } : {})} />}
         />
       </CardContent></Card>
     </div>

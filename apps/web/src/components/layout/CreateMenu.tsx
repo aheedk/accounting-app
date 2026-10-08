@@ -4,8 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
+import type { Role } from '@accounting/shared';
+import { canOpenPage, roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 
-type CreateItem = { label: string; to: string };
+// minRole: the lowest role the API lets create this, where it is above staff.
+type CreateItem = { label: string; to: string; minRole?: Role };
 type CreateCategory = { heading: string; items: CreateItem[] };
 
 const CATEGORIES: CreateCategory[] = [
@@ -33,7 +36,7 @@ const CATEGORIES: CreateCategory[] = [
     heading: 'Team',
     items: [
       { label: 'Run payroll', to: '/payroll/pay-runs/new' },
-      { label: 'Add employee', to: '/payroll/employees/new' },
+      { label: 'Add employee', to: '/payroll/employees/new', minRole: 'firm_admin' },
       { label: 'Add contractor', to: '/ap/contractors' },
     ],
   },
@@ -91,6 +94,12 @@ export function CreateMenu() {
     navigate(to);
   }
 
+  // Only what this role can actually create.
+  const role = useEffectiveRole();
+  const categories = CATEGORIES
+    .map(cat => ({ ...cat, items: cat.items.filter(item => canOpenPage(role, item.to) && (!item.minRole || roleAtLeast(role, item.minRole))) }))
+    .filter(cat => cat.items.length > 0);
+
   const popup = open
     ? createPortal(
         <div
@@ -101,7 +110,7 @@ export function CreateMenu() {
           className="w-max rounded-lg border bg-card p-5 shadow-card"
         >
           <div className="grid grid-cols-4 gap-8">
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <div key={cat.heading} className="min-w-[8rem]">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-foreground">
                   {cat.heading}
@@ -126,6 +135,9 @@ export function CreateMenu() {
         document.body,
       )
     : null;
+
+  // A client login creates nothing, so it has no + New.
+  if (role === 'client') return null;
 
   return (
     <div className="px-3 py-2">

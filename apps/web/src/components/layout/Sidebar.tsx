@@ -21,6 +21,7 @@ import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 import { usePendingImportCount } from '@/lib/usePendingImportCount';
+import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -31,7 +32,7 @@ type NavGroup = {
   children?: NavChild[];
 };
 
-const groups: NavGroup[] = [
+const ALL_GROUPS: NavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -169,6 +170,16 @@ function pathMatchesChild(pathname: string, child: NavChild): boolean {
   return pathname.startsWith(child.to + '/');
 }
 
+/** The menu for the signed-in role: only pages it can open, and no group left empty. */
+function useNavGroups(): NavGroup[] {
+  const role = useEffectiveRole();
+  return useMemo(() => ALL_GROUPS.flatMap(group => {
+    if (!group.children) return canOpenPage(role, group.to ?? '/') ? [group] : [];
+    const children = group.children.filter(child => canOpenPage(role, child.to));
+    return children.length > 0 ? [{ ...group, children }] : [];
+  }), [role]);
+}
+
 // Brand header shared by the desktop sidebar and the mobile drawer.
 export function SidebarBrand() {
   return (
@@ -193,6 +204,7 @@ const AI_INBOX_PATH = '/ai/inbox';
 // Portal keeps flyouts outside the sidebar's scroll clipping without moving its rows.
 function DesktopSidebarNav() {
   const { pathname } = useLocation();
+  const groups = useNavGroups();
   const [openId, setOpenId] = useState<string | null>(null);
   const pendingImports = usePendingImportCount();
   const [position, setPosition] = useState({ left: 256, top: 8 });
@@ -296,6 +308,7 @@ function DesktopSidebarNav() {
 export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps) {
   const location = useLocation();
   const pathname = location.pathname;
+  const groups = useNavGroups();
   const pendingImports = usePendingImportCount();
 
   const activeGroupId = useMemo(() => {
@@ -304,7 +317,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
       if (g.children.some(c => pathMatchesChild(pathname, c))) return g.id;
     }
     return null;
-  }, [pathname]);
+  }, [pathname, groups]);
 
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
   // Tap-to-expand accordion state for touch/drawer mode; defaults to the active group.

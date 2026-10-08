@@ -13,6 +13,7 @@ import { PostErrorNotice } from '@/components/SaveAndPost';
 import { fmtQty } from '@/lib/labels';
 import { cachedGet } from '@/lib/referenceDataCache';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
+import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 
 type Invoice = {
   id: string;
@@ -61,6 +62,10 @@ export default function InvoiceDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const nav = useNavigate();
+  // What the API allows: staff can take a payment, an accountant posts, voids and corrects, a client only reads.
+  const role = useEffectiveRole();
+  const isAccountant = roleAtLeast(role, 'accountant');
+  const isStaff = roleAtLeast(role, 'staff');
 
   async function reload() {
     if (!bizId || !id) return;
@@ -126,18 +131,18 @@ export default function InvoiceDetailPage() {
   if (!data) return <div>Loading...</div>;
   const inv = data.invoice;
   const paid = Number(inv.total) - Number(data.amount_due);
-  const canPost = inv.status === 'draft';
-  const canReceive = (inv.status === 'posted' || inv.status === 'paid') && Number(data.amount_due) > 0;
-  const canVoid = inv.status === 'posted' || inv.status === 'paid';
+  const canPost = isAccountant && inv.status === 'draft';
+  const canReceive = isStaff && (inv.status === 'posted' || inv.status === 'paid') && Number(data.amount_due) > 0;
+  const canVoid = isAccountant && (inv.status === 'posted' || inv.status === 'paid');
   // Corrected by voiding and posting a replacement, which a payment or credit on the invoice blocks.
-  const canCorrect = inv.status === 'posted' && paid === 0;
+  const canCorrect = isAccountant && inv.status === 'posted' && paid === 0;
 
   return (
     <div className="space-y-6">
       <DetailPageHeader
         eyebrow="Invoice"
         title={inv.invoice_number}
-        subtitle={customer ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : 'Customer'}
+        subtitle={!customer ? 'Customer' : isStaff ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : customer.name}
         status={inv.status}
         totalLabel="Balance due"
         total={fmtMoney(data.amount_due)}

@@ -7,6 +7,7 @@ import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { humanizeCode } from '@/lib/labels';
+import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
 import { ArrowRight, FileBarChart, FilePlus2, Receipt, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -45,11 +46,13 @@ const quickActions: QuickAction[] = [
 ];
 
 type AgingRow = { total: string; current: string };
+// Each part is there only if its request came back, so one that is refused or
+// fails leaves out its own card and not the whole row.
 type Summary = {
-  cash: number; bankAccounts: number;
-  receivable: number; receivableOverdue: number;
-  payable: number; payableOverdue: number;
-  income: number; expenses: number; profit: number;
+  cash?: { total: number; accounts: number };
+  receivable?: { total: number; overdue: number };
+  payable?: { total: number; overdue: number };
+  profit?: { income: number; expenses: number; net: number };
 };
 
 const sum = (values: Array<string | number | undefined>) => values.reduce<number>((total, value) => total + (Number(value) || 0), 0);
@@ -59,35 +62,32 @@ const sum = (values: Array<string | number | undefined>) => values.reduce<number
  * accounts at their book balance, the two aging reports, and this month's
  * profit and loss. Null until loaded; a failed request leaves the cards out.
  */
-function useSummary(bizId: string | null): Summary | null {
+function useSummary(bizId: string | null, withCash: boolean): Summary | null {
   const [state, setState] = useState<{ bizId: string; summary: Summary } | null>(null);
   useEffect(() => {
     if (!bizId) return;
     let live = true;
     const today = todayLocal();
+    const orNull = <T,>(request: Promise<{ data: T }>) => request.then(r => r.data).catch(() => null);
     Promise.all([
-      api.get<{ bank_accounts: { book_balance?: string }[] }>(`/businesses/${bizId}/bank-accounts`),
-      api.get<{ rows: AgingRow[] }>(`/businesses/${bizId}/reports/aging`, { params: { as_of: today } }),
-      api.get<{ rows: AgingRow[] }>(`/businesses/${bizId}/reports/ap-aging`, { params: { as_of: today } }),
-      api.get<{ revenue_total: string; expense_total: string; net_income: string }>(
-        `/businesses/${bizId}/reports/pnl`, { params: { period_start: `${today.slice(0, 8)}01`, period_end: today } }),
+      // Bank accounts are not open to a client login, so it is not asked for them.
+      withCash ? orNull(api.get<{ bank_accounts: { book_balance?: string }[] }>(`/businesses/${bizId}/bank-accounts`)) : null,
+      orNull(api.get<{ rows: AgingRow[] }>(`/businesses/${bizId}/reports/aging`, { params: { as_of: today } })),
+      orNull(api.get<{ rows: AgingRow[] }>(`/businesses/${bizId}/reports/ap-aging`, { params: { as_of: today } })),
+      orNull(api.get<{ revenue_total: string; expense_total: string; net_income: string }>(
+        `/businesses/${bizId}/reports/pnl`, { params: { period_start: `${today.slice(0, 8)}01`, period_end: today } })),
     ]).then(([bank, ar, ap, pnl]) => {
       if (!live) return;
       const owed = (rows: AgingRow[]) => ({ total: sum(rows.map(r => r.total)), overdue: sum(rows.map(r => Number(r.total) - Number(r.current))) });
-      const receivable = owed(ar.data.rows);
-      const payable = owed(ap.data.rows);
-      setState({
-        bizId,
-        summary: {
-          cash: sum(bank.data.bank_accounts.map(a => a.book_balance)), bankAccounts: bank.data.bank_accounts.length,
-          receivable: receivable.total, receivableOverdue: receivable.overdue,
-          payable: payable.total, payableOverdue: payable.overdue,
-          income: Number(pnl.data.revenue_total) || 0, expenses: Number(pnl.data.expense_total) || 0, profit: Number(pnl.data.net_income) || 0,
-        },
-      });
-    }).catch(() => undefined);
+      const summary: Summary = {};
+      if (bank) summary.cash = { total: sum(bank.bank_accounts.map(a => a.book_balance)), accounts: bank.bank_accounts.length };
+      if (ar) summary.receivable = owed(ar.rows);
+      if (ap) summary.payable = owed(ap.rows);
+      if (pnl) summary.profit = { income: Number(pnl.revenue_total) || 0, expenses: Number(pnl.expense_total) || 0, net: Number(pnl.net_income) || 0 };
+      setState({ bizId, summary });
+    });
     return () => { live = false; };
-  }, [bizId]);
+  }, [bizId, withCash]);
   // Another client's numbers are never shown while the new ones load.
   return state && state.bizId === bizId ? state.summary : null;
 }
@@ -95,13 +95,16 @@ function useSummary(bizId: string | null): Summary | null {
 export default function DashboardPage() {
   const { user, businesses } = useAuth();
   const [activeId] = useActiveBusinessId();
-  const summary = useSummary(activeId ?? null);
-  const summaryCards = summary ? [
-    { label: 'Cash in the bank', value: summary.cash, hint: `${summary.bankAccounts} bank account${summary.bankAccounts === 1 ? '' : 's'}, book balance`, to: '/accounting/bank-accounts' },
-    { label: 'Owed to you', value: summary.receivable, hint: `${fmtMoney(summary.receivableOverdue.toFixed(2))} past due`, to: '/reports/aging' },
-    { label: 'You owe', value: summary.payable, hint: `${fmtMoney(summary.payableOverdue.toFixed(2))} past due`, to: '/reports/ap-aging' },
-    { label: 'Profit this month', value: summary.profit, hint: `${fmtMoney(summary.income.toFixed(2))} in, ${fmtMoney(summary.expenses.toFixed(2))} out`, to: '/reports/pnl' },
-  ] : [];
+  const role = useEffectiveRole();
+  const summary = useSummary(activeId ?? null, role !== null && role !== 'client');
+  const summaryCards = [
+    ...(summary?.cash ? [{ label: 'Cash in the bank', value: summary.cash.total, hint: `${summary.cash.accounts} bank account${summary.cash.accounts === 1 ? '' : 's'}, book balance`, to: '/accounting/bank-accounts' }] : []),
+    ...(summary?.receivable ? [{ label: 'Owed to you', value: summary.receivable.total, hint: `${fmtMoney(summary.receivable.overdue.toFixed(2))} past due`, to: '/reports/aging' }] : []),
+    ...(summary?.payable ? [{ label: 'You owe', value: summary.payable.total, hint: `${fmtMoney(summary.payable.overdue.toFixed(2))} past due`, to: '/reports/ap-aging' }] : []),
+    ...(summary?.profit ? [{ label: 'Profit this month', value: summary.profit.net, hint: `${fmtMoney(summary.profit.income.toFixed(2))} in, ${fmtMoney(summary.profit.expenses.toFixed(2))} out`, to: '/reports/pnl' }] : []),
+  ];
+  // Quick actions create things, so a role sees only the ones it can use.
+  const actions = quickActions.filter(action => canOpenPage(role, action.to));
   const activeBusiness = businesses.find(b => b.id === activeId) ?? null;
   const firmPrefix = user?.full_name ? user.full_name.split(' ')[0] : null;
 
@@ -115,7 +118,7 @@ export default function DashboardPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
           {activeBusiness
-            ? <>Working in <span className="font-medium text-foreground">{activeBusiness.name}</span>{activeBusiness.name.endsWith('.') ? '' : '.'} Pick a quick action below to jump in.</>
+            ? <>Working in <span className="font-medium text-foreground">{activeBusiness.name}</span>{activeBusiness.name.endsWith('.') ? '' : '.'}{actions.length > 0 ? ' Pick a quick action below to jump in.' : ''}</>
             : 'Select a business from the top bar to get started.'}
         </p>
       </section>
@@ -141,10 +144,11 @@ export default function DashboardPage() {
       )}
 
       {/* Quick actions */}
+      {actions.length > 0 && (
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {quickActions.map(action => {
+          {actions.map(action => {
             const Icon = action.icon;
             return (
               <Link
@@ -172,6 +176,7 @@ export default function DashboardPage() {
           })}
         </div>
       </section>
+      )}
 
       {/* Account */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -190,10 +195,12 @@ export default function DashboardPage() {
             <CardTitle className="text-lg">What you can do</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Full books in one place: AR (customers, invoices, payments, credits),
-            AP (vendors, bills, expenses), banking and reconciliation, journal
-            entries, payroll, inventory, and financial reports — all scoped to the
-            business selected above.
+            {role === 'client'
+              ? 'See your invoices and your financial reports: Profit & Loss, Balance Sheet, Cash Flows, and what is owed to you and by you. Your accountant keeps the books.'
+              : <>Full books in one place: AR (customers, invoices, payments, credits),
+                AP (vendors, bills, expenses), banking and reconciliation, journal
+                entries, payroll, inventory, and financial reports — all scoped to the
+                business selected above.</>}
           </CardContent>
         </Card>
       </section>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { TopBar } from './TopBar';
@@ -7,6 +7,7 @@ import { CompanySwitchedScreen } from './CompanySwitchedScreen';
 import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business';
 import { setExportCompany } from '@/lib/reportExport';
 import { useAuth } from '@/auth/useAuth';
+import { canOpenPage, useEffectiveRole } from '@/lib/roleAccess';
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -30,6 +31,12 @@ export function AppShell() {
 
   // Another tab switched company: replace the page outright, so nothing from
   // the old company stays on screen or stays clickable.
+  // A page the role cannot use is not opened, however it was reached (a typed
+  // address, a bookmark, an old link). The API refuses the data either way.
+  const role = useEffectiveRole();
+  const { pathname } = useLocation();
+  const allowed = canOpenPage(role, pathname);
+
   const switchedTo = useCompanySwitchedElsewhere();
   if (switchedTo) return <CompanySwitchedScreen businessId={switchedTo} />;
 
@@ -45,7 +52,17 @@ export function AppShell() {
           <TopBar onMenuClick={() => setMobileNavOpen(true)} />
         </div>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">
-          <Outlet />
+          {allowed ? <Outlet /> : (
+            <div className="mx-auto mt-16 max-w-md rounded-lg border bg-card p-8 text-center">
+              <h1 className="text-lg font-semibold">This page is not part of your access</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {role === 'client'
+                  ? 'Your login shows your invoices and financial reports. Ask your accountant if you need something else.'
+                  : 'Only a firm admin can open it.'}
+              </p>
+              <Link className="mt-4 inline-block text-sm font-medium text-primary hover:underline" to="/">Back to the dashboard</Link>
+            </div>
+          )}
         </main>
       </div>
     </div>
