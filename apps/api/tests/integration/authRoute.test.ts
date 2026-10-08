@@ -47,4 +47,26 @@ describe('auth routes', () => {
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
   });
+
+  // Role audit 2026-10-08: /me built its own list from explicit grants only, so a
+  // firm admin kept every client on sign-in and lost the ungranted ones on reload.
+  it('GET /me lists the same businesses as signing in: all of the firm for a firm admin, granted ones for others', async () => {
+    const firm = await makeFirm(t.db);
+    const granted = await makeBusiness(t.db, firm.id, 'Granted Co');
+    await makeBusiness(t.db, firm.id, 'Other Co');
+    await makeUser(t.db, firm.id, { email: 'admin@x.com', password: 'pw12345678', role: 'firm_admin' });
+    const accountant = await makeUser(t.db, firm.id, { email: 'acct@x.com', password: 'pw12345678', role: 'accountant' });
+    await grantAccess(t.db, accountant.id, granted.id);
+
+    const app = makeApp();
+    const names = async (email: string) => {
+      const login = await request(app).post('/auth/login').send({ email, password: 'pw12345678' });
+      const me = await request(app).get('/me').set('Authorization', `Bearer ${login.body.access_token as string}`);
+      const list = (body: { businesses: { name: string }[] }) => body.businesses.map(b => b.name).sort();
+      expect(list(me.body)).toEqual(list(login.body));
+      return list(me.body);
+    };
+    expect(await names('admin@x.com')).toEqual(['Granted Co', 'Other Co']);
+    expect(await names('acct@x.com')).toEqual(['Granted Co']);
+  });
 });

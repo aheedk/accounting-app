@@ -21,7 +21,7 @@ export type LoginResult = {
 
 // firm_admins can open any business in the firm (matches resolveBusiness),
 // so list them all; other roles only see explicit grants.
-async function businessesForUser(
+export async function businessesForUser(
   trx: Kysely<DB>,
   user: { id: string; firm_id: string; role: UserRole },
 ): Promise<LoginResult['businesses']> {
