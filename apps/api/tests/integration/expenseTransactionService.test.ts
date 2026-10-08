@@ -117,7 +117,7 @@ describe('expenseTransactionService', () => {
     }))).rejects.toThrow(/greater than zero/);
   });
 
-  it('updateExpense voids the old JE and posts a replacement with the new lines', async () => {
+  it('updateExpense edits the existing JE in place (same row, same journal number — no void/repost)', async () => {
     const { supplies, rent, cash, ctx } = await bootstrap();
     const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
       transaction_date: '2026-04-15', payee_text: 'Staples',
@@ -125,6 +125,8 @@ describe('expenseTransactionService', () => {
       lines: [{ category_account_id: supplies.id, amount: '30.00' }],
     }));
     const originalJeId = expense.journal_entry_id!;
+    const originalJe = await t.db.selectFrom('journal_entries').select(['journal_number'])
+      .where('id', '=', originalJeId).executeTakeFirstOrThrow();
 
     const updated = await t.db.transaction().execute(trx => et.updateExpense(trx, ctx, expense.id, {
       transaction_date: '2026-04-16', payee_text: 'Staples',
@@ -134,21 +136,24 @@ describe('expenseTransactionService', () => {
 
     expect(updated.total_amount).toBe('55.0000');
     expect(updated.reference).toBe('2001');
-    expect(updated.journal_entry_id).not.toBe(originalJeId);
+    // Same JE row — an edit is not a void/repost.
+    expect(updated.journal_entry_id).toBe(originalJeId);
 
-    const originalJe = await t.db.selectFrom('journal_entries').select('status')
+    const je = await t.db.selectFrom('journal_entries').selectAll()
       .where('id', '=', originalJeId).executeTakeFirstOrThrow();
-    expect(originalJe.status).toBe('voided');
+    expect(je.status).toBe('posted');
+    expect(je.journal_number).toBe(originalJe.journal_number);
+    expect(je.entry_date).toBe('2026-04-16');
 
-    // The reversal of the OLD JE reverses on the OLD transaction date
-    // (2026-04-15), not the new one (2026-04-16) and not today.
-    const reversal = await t.db.selectFrom('journal_entries').selectAll()
-      .where('reversed_entry_id', '=', originalJeId).executeTakeFirstOrThrow();
-    expect(reversal.entry_date).toBe('2026-04-15');
+    // No reversal pair was created.
+    const reversals = await t.db.selectFrom('journal_entries').selectAll()
+      .where('reversed_entry_id', '=', originalJeId).execute();
+    expect(reversals).toHaveLength(0);
 
     const newLines = await t.db.selectFrom('journal_entry_lines').selectAll()
-      .where('journal_entry_id', '=', updated.journal_entry_id!).execute();
+      .where('journal_entry_id', '=', originalJeId).execute();
     expect(newLines.find(l => l.account_id === rent.id)?.debit).toBe('55.0000');
+    expect(newLines.find(l => l.account_id === supplies.id)).toBeUndefined();
 
     const linesOnFile = await t.db.selectFrom('expense_transaction_lines').selectAll()
       .where('expense_transaction_id', '=', expense.id).execute();
@@ -308,11 +313,12 @@ describe('expenseTransactionService', () => {
     }))).rejects.toThrow(/source transaction/);
   });
 
-  it('voids, edits, and deletes a legacy expense whose JE still carries source_type=adjustment', async () => {
+  it('edits, voids, and deletes a legacy expense whose JE still carries source_type=adjustment', async () => {
     // je_protect_posted_row() treats source_type as permanent identity on a
     // posted JE, so rows created before the dedicated 'expense' type existed
-    // can never be migrated to it — they stay 'adjustment' forever. voidGuardFor
-    // must echo that back, not assume every expense JE says 'expense'.
+    // can never be migrated to it — they stay 'adjustment' forever. Both the
+    // in-place edit's source_guard and voidGuardFor must echo that back, not
+    // assume every expense JE says 'expense'.
     const { biz, supplies, rent, cash, ctx } = await bootstrap();
     const legacy = await t.db.transaction().execute(async trx => {
       const row = await trx.insertInto('expense_transactions').values({
@@ -341,9 +347,12 @@ describe('expenseTransactionService', () => {
       lines: [{ category_account_id: rent.id, amount: '20.00' }],
     }));
     expect(updated.total_amount).toBe('20.0000');
-    const oldJe = await t.db.selectFrom('journal_entries').select('status')
+    // Edited in place: same JE row, still 'adjustment', still posted.
+    expect(updated.journal_entry_id).toBe(legacy.journal_entry_id);
+    const editedJe = await t.db.selectFrom('journal_entries').select(['status', 'source_type'])
       .where('id', '=', legacy.journal_entry_id!).executeTakeFirstOrThrow();
-    expect(oldJe.status).toBe('voided');
+    expect(editedJe.status).toBe('posted');
+    expect(editedJe.source_type).toBe('adjustment');
 
     const voided = await t.db.transaction().execute(trx =>
       et.voidExpense(trx, ctx, { expense_transaction_id: legacy.id }));
