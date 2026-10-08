@@ -169,7 +169,7 @@ If this is a BANK STATEMENT return:
   "transactions": [
     {
       "date": "MM/DD/YYYY",
-      "payee_name": "vendor or payee name only (e.g. IRS, Duke Energy, Action Lawn Maintenance) — use the matching name from KNOWN VENDORS below when there is one; omit for deposits with no clear payee",
+      "payee_name": "vendor or payee name only (e.g. IRS, Duke Energy, Action Lawn Maintenance) — use the matching name from KNOWN VENDORS below when there is one; omit for deposits with no clear payee. For a check (type: check), a bank statement never prints who the check was written to — only its number. Omit payee_name for every check line so it is flagged for manual review; never put the check number, 'CHECK', or the raw statement description in payee_name.",
       "description": "full transaction description from the statement",
       "amount": "positive number e.g. 1250.00",
       "type": "deposit (money received/inflow), check (outflow paid by physical check), or expense (outflow via card/ACH/wire/cash/EFT)",

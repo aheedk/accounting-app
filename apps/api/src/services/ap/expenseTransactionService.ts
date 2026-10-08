@@ -519,7 +519,15 @@ export async function wrapImportedExpenseJournalEntry(
   const expense = await trx.insertInto('expense_transactions').values({
     business_id: bizId,
     transaction_date: input.entry_date,
-    payee_text: input.payee_name ?? input.description,
+    // A bank statement's description for a check line is usually just the
+    // check number itself (e.g. "CHECK 5517") — falling back to it when
+    // there's no real payee just relabels the check number as the payee.
+    // expense_transactions requires a non-null payee_text or a vendor_id
+    // (et_payee), so a true blank isn't possible; use an unmistakable
+    // placeholder instead so it reads as "needs review", not a real vendor
+    // name. Other payment methods' own descriptions (ACH/wire/card) are
+    // actually informative, so keep the fallback there.
+    payee_text: input.payee_name ?? (input.payment_method === 'check' ? 'Needs review — payee not on statement' : input.description),
     payment_account_id: input.payment_account_id,
     payment_method: input.payment_method,
     memo: input.description,
