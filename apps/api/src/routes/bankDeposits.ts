@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as depositSvc from '../services/banking/bankDepositService.js';
+import * as auditService from '../services/audit/auditService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -39,6 +40,15 @@ router.get('/businesses/:businessId/bank-deposits/:id', async (req, res, next) =
   try {
     const deposit = await depositSvc.getDeposit(db, ctxFromReq(req), req.params['id']!);
     res.json(deposit);
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/bank-deposits/:id/audit-history', async (req, res, next) => {
+  try {
+    const history = await auditService.listByEntity(
+      db, req.tenancy!.business_id, 'bank_deposit', req.params['id']!,
+    );
+    res.json({ history });
   } catch (e) { next(e); }
 });
 

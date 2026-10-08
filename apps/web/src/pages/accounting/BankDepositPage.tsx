@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { hasMinRole } from '@accounting/shared';
 import { BookOpen, ChevronDown, Clock, Copy, History, Trash2, X } from 'lucide-react';
@@ -13,6 +13,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
 import { AppSelect } from '@/components/ui/select';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
+import { AuditHistoryModal } from '@/components/AuditHistoryModal';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { previewDepositSummary, previewDepositSlipAndSummary, previewDepositAlignmentTest, type DepositDocInput } from '@/lib/download';
@@ -348,6 +349,9 @@ export default function BankDepositPage() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  // Set when this form was filled from More → Copy, so loading does not put the first bank account back.
+  const copiedFrom = useRef(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentDeposits, setRecentDeposits] = useState<RecentDeposit[] | null>(null);
   const attachments = useAttachments('bank_deposit', isNew ? null : (id ?? null));
@@ -374,7 +378,7 @@ export default function BankDepositPage() {
       ...(custData?.customers ?? []).map(c => c.name),
       ...(vendData?.vendors ?? []).map(v => v.name),
     ]);
-    if (bas.length > 0 && !bankAccountId) setBankAccountId(bas[0]!.id);
+    if (bas.length > 0 && !bankAccountId && !copiedFrom.current) setBankAccountId(bas[0]!.id);
 
     if (!isNew && id) {
       const res = await api.get<DepositDetail>(`/businesses/${bizId}/bank-deposits/${id}`);
@@ -392,6 +396,43 @@ export default function BankDepositPage() {
   }, [bizId, id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { void load(); }, [load]);
+
+  // More → Copy: a new deposit with the same bank account, memo, cash back and
+  // typed lines, dated today. Payments taken from Undeposited Funds are not
+  // copied; they were deposited once. Same hand-off as Check and Expense.
+  function handleCopy() {
+    const draft = {
+      bankAccountId, memo, cashBackAccountId, cashBackMemo, cashBackAmount,
+      lines: otherLines.filter(l => l.account_id || l.amount).map((l, i) => ({ ...l, id: `new-${i}` })),
+    };
+    sessionStorage.setItem('bank-deposit-copy-draft', JSON.stringify(draft));
+    nav('/accounting/bank-deposits/new?copy=1');
+  }
+
+  // Pick up a copied draft dropped by handleCopy, once, on a fresh "new" form.
+  useEffect(() => {
+    if (!isNew) return;
+    const raw = sessionStorage.getItem('bank-deposit-copy-draft');
+    if (!raw) return;
+    sessionStorage.removeItem('bank-deposit-copy-draft');
+    try {
+      const draft = JSON.parse(raw) as {
+        bankAccountId: string; memo: string; cashBackAccountId: string; cashBackMemo: string; cashBackAmount: string;
+        lines: OtherFundsLine[];
+      };
+      copiedFrom.current = true;
+      setDeposit(null);
+      setSelectedPaymentIds(new Set());
+      setBankAccountId(draft.bankAccountId);
+      setMemo(draft.memo);
+      setCashBackAccountId(draft.cashBackAccountId);
+      setCashBackMemo(draft.cashBackMemo);
+      setCashBackAmount(draft.cashBackAmount);
+      setOtherLines(draft.lines.length > 0 ? draft.lines : [emptyLine(0), emptyLine(1)]);
+      setDepositDate(todayLocal());
+      setErr(null);
+    } catch { /* ignore a malformed draft */ }
+  }, [isNew]);
 
   // Book balance (posted JE debits minus credits on the account's GL cash
   // account) — distinct from the bank-feed balance, which reads $0.00 for any
@@ -1072,7 +1113,7 @@ export default function BankDepositPage() {
                     <div className="absolute bottom-8 left-0 z-50 w-52 rounded-lg border bg-card shadow-xl">
                       <button
                         type="button"
-                        onClick={() => { setMoreOpen(false); alert('Copy — coming soon'); }}
+                        onClick={() => { setMoreOpen(false); handleCopy(); }}
                         className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
                       >
                         <Copy className="h-4 w-4" /> Copy
@@ -1105,7 +1146,7 @@ export default function BankDepositPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setMoreOpen(false); alert('Audit history — coming soon'); }}
+                        onClick={() => { setMoreOpen(false); setAuditOpen(true); }}
                         className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
                       >
                         <Clock className="h-4 w-4" /> Audit history
@@ -1150,6 +1191,10 @@ export default function BankDepositPage() {
           </Button>
         )}
       </div>
+
+      {auditOpen && bizId && id && !isNew && (
+        <AuditHistoryModal url={`/businesses/${bizId}/bank-deposits/${id}/audit-history`} onClose={() => setAuditOpen(false)} />
+      )}
 
       {/* ── Make Recurring Dialog ── */}
       {recurringOpen && bizId && (

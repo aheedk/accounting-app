@@ -10,6 +10,7 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { ComboInput } from '@/components/ui/ComboInput';
 import { AccountSelect } from '@/components/ui/AccountSelect';
+import { AuditHistoryModal } from '@/components/AuditHistoryModal';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
@@ -98,6 +99,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   );
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const saveMenuRef = useRef<HTMLDivElement>(null);
@@ -743,7 +745,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
                     )}
                     <button
                       type="button"
-                      onClick={() => { setMoreOpen(false); alert('Audit history — coming soon'); }}
+                      onClick={() => { setMoreOpen(false); setAuditOpen(true); }}
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
                     >
                       <Clock className="h-4 w-4" /> Audit history
@@ -803,6 +805,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         onOpenChange={setRecurringOpen}
         onCreated={() => setNotice('Recurring journal template created.')}
       />
+      {auditOpen && existing && businessId && (
+        <AuditHistoryModal
+          url={`/businesses/${businessId}/journal-entries/${existing.entry.id}/audit-history`}
+          onClose={() => setAuditOpen(false)}
+        />
+      )}
       {newAccountLineIndex !== null && (
         <AccountCreateDrawer
           businessId={businessId}

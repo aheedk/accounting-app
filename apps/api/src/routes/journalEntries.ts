@@ -9,6 +9,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as ledger from '../services/core/ledgerService.js';
 import * as journalQueries from '../services/core/journalEntryQueryService.js';
+import * as auditService from '../services/audit/auditService.js';
 import { peekNextCounter } from '../services/core/numberingService.js';
 import { runWithClosedPeriodOverride } from '../services/admin/adminOverrideService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
@@ -57,6 +58,15 @@ router.get('/businesses/:businessId/journal-entries/:id', async (req, res, next)
   try {
     const result = await journalQueries.getJournalEntryDetail(db, ctxFromReq(req), req.params['id']!);
     res.json(result);
+  } catch (e) { next(e); }
+});
+
+router.get('/businesses/:businessId/journal-entries/:id/audit-history', async (req, res, next) => {
+  try {
+    const history = await auditService.listByEntity(
+      db, req.tenancy!.business_id, 'journal_entry', req.params['id']!,
+    );
+    res.json({ history });
   } catch (e) { next(e); }
 });
 
