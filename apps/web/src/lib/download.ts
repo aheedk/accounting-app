@@ -10,6 +10,29 @@ function filledRows(rows: string[][]): string[][] {
   return rows.filter(row => row.some(cell => cell.trim() !== ''));
 }
 
+function csvCell(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * Plain CSV download — no dialog, no title/company header rows (unlike
+ * downloadAsExcel): the user clicks the icon and the file lands immediately,
+ * matching QBO's "Export to CSV" on a transactions list.
+ */
+export function downloadAsCsv(headers: string[], rows: string[][], filename: string): void {
+  const body = filledRows(rows);
+  const csv = [headers, ...body].map(row => row.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * Excel export. The sheet opens with the company, report name and period,
  * then the table, then a "Generated ..." line. Amount columns are written as
