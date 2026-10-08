@@ -110,9 +110,17 @@ adding one is the same UNION ALL branch pattern as any existing type in
   server page (25 rows), not the full filtered result set — true server-side
   sorting would mean threading a `sort_key`/`sort_dir` pair from the drawer
   into the `/transactions` query params, which isn't wired up yet.
+- The Amount filter's "Amount type" dropdown (Line or total / Total / Line,
+  matching QBO) always filters `total_amount` — the unified row from
+  `transactionsService.ts` only carries each transaction's total, not its
+  individual lines, so "Line" and "Line or total" behave identically to
+  "Total" today. Adding real line-amount filtering means collecting line
+  amounts per type in the UNION (each type's own lines table) and matching
+  against `ANY(lines)` instead of the total.
 
-**Priority:** low — both are visible-but-inert in the UI rather than broken;
-flagged here rather than fixed without being asked, per scope discipline.
+**Priority:** low — all three are visible-but-inert/approximated rather than
+broken; flagged here rather than fixed without being asked, per scope
+discipline.
 
 ### Third-party integrations (out of scope until a client needs them)
 - **Payroll tax engine** (Symmetry, ADP API, …) — slice 13 ships manual

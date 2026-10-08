@@ -38,7 +38,7 @@ export type ListTransactionsQuery = {
   date_end?: string | null;
   ref_no?: string | null;
   contact_id?: string | null;
-  amount_op?: 'eq' | 'gt' | 'lt' | 'between' | null;
+  amount_op?: 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | null;
   amount_value?: string | null;
   amount_value2?: string | null;
   sort_key?: TransactionSortKey;
@@ -164,7 +164,9 @@ function filteredSql(q: ListTransactionsQuery) {
       AND (${q.contact_id ?? null}::uuid IS NULL OR contact_id = ${q.contact_id ?? null}::uuid)
       AND (${q.amount_op === 'eq' ? amountValue : null}::numeric IS NULL OR total_amount::numeric = ${q.amount_op === 'eq' ? amountValue : null}::numeric)
       AND (${q.amount_op === 'gt' ? amountValue : null}::numeric IS NULL OR total_amount::numeric > ${q.amount_op === 'gt' ? amountValue : null}::numeric)
+      AND (${q.amount_op === 'gte' ? amountValue : null}::numeric IS NULL OR total_amount::numeric >= ${q.amount_op === 'gte' ? amountValue : null}::numeric)
       AND (${q.amount_op === 'lt' ? amountValue : null}::numeric IS NULL OR total_amount::numeric < ${q.amount_op === 'lt' ? amountValue : null}::numeric)
+      AND (${q.amount_op === 'lte' ? amountValue : null}::numeric IS NULL OR total_amount::numeric <= ${q.amount_op === 'lte' ? amountValue : null}::numeric)
       AND (${amountLow}::numeric IS NULL OR total_amount::numeric >= ${amountLow}::numeric)
       AND (${amountHigh}::numeric IS NULL OR total_amount::numeric <= ${amountHigh}::numeric)
   `;

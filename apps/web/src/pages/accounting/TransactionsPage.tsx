@@ -239,7 +239,134 @@ function DateRangeFilter({
   );
 }
 
-type AmountOp = 'any' | 'eq' | 'gt' | 'lt' | 'between';
+type AmountOp = 'eq' | 'between' | 'lt' | 'lte' | 'gt' | 'gte';
+const AMOUNT_OPS: { value: AmountOp; label: string }[] = [
+  { value: 'eq', label: 'Equals' },
+  { value: 'between', label: 'Between' },
+  { value: 'lt', label: 'Less than' },
+  { value: 'lte', label: 'Less than or equal' },
+  { value: 'gt', label: 'Greater than' },
+  { value: 'gte', label: 'Greater than or equal' },
+];
+
+// "Amount type" matches QBO's own options so the UI reads as complete, but
+// line-level amounts aren't in transactionsService.ts's unified row (it only
+// carries each transaction's total) — all three options filter total_amount
+// today. Scoped decision; flagged in docs/backlog.md.
+type AmountType = 'line_or_total' | 'total' | 'line';
+const AMOUNT_TYPES: { value: AmountType; label: string }[] = [
+  { value: 'line_or_total', label: 'Line or total' },
+  { value: 'total', label: 'Total' },
+  { value: 'line', label: 'Line' },
+];
+
+type AmountFilterState = { op: AmountOp; type: AmountType; value: string; value2: string } | null;
+
+function fmtAmountDisplay(n: AmountFilterState): string {
+  if (!n) return 'Select…';
+  const v = (s: string) => `$${s || '0.00'}`;
+  if (n.op === 'between') return `Between ${v(n.value)} - ${v(n.value2)}`;
+  const opLabel = AMOUNT_OPS.find(o => o.value === n.op)?.label ?? '';
+  return `${opLabel} ${v(n.value)}`;
+}
+
+function AmountFilter({ value, onApply }: { value: AmountFilterState; onApply: (next: AmountFilterState) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draftType, setDraftType] = useState<AmountType>(value?.type ?? 'line_or_total');
+  const [draftOp, setDraftOp] = useState<AmountOp>(value?.op ?? 'eq');
+  const [draftValue, setDraftValue] = useState(value?.value ?? '');
+  const [draftValue2, setDraftValue2] = useState(value?.value2 ?? '');
+
+  function openPopup() {
+    setDraftType(value?.type ?? 'line_or_total');
+    setDraftOp(value?.op ?? 'eq');
+    setDraftValue(value?.value ?? '');
+    setDraftValue2(value?.value2 ?? '');
+    setOpen(true);
+  }
+  function handleApply() {
+    onApply({ op: draftOp, type: draftType, value: draftValue || '0.00', value2: draftValue2 || '0.00' });
+    setOpen(false);
+  }
+  function handleClear() {
+    onApply(null);
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <label className="mb-1 block text-xs text-muted-foreground">Amount</label>
+      <button
+        type="button"
+        onClick={openPopup}
+        className="flex h-9 w-32 items-center justify-between rounded-md border bg-background px-3 text-sm text-left"
+      >
+        <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>{fmtAmountDisplay(value)}</span>
+        <svg className="h-3 w-3 shrink-0 text-muted-foreground" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-50 mt-1 w-[300px] rounded-md border bg-white p-4 shadow-lg dark:bg-zinc-900">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Amount</h3>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close">
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs text-muted-foreground">Amount type</label>
+              <AppSelect
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                value={draftType}
+                onChange={e => setDraftType(e.target.value as AmountType)}
+              >
+                {AMOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </AppSelect>
+            </div>
+            <div className="mb-4 flex gap-3">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs text-muted-foreground">Amount</label>
+                <AppSelect
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={draftOp}
+                  onChange={e => setDraftOp(e.target.value as AmountOp)}
+                >
+                  {AMOUNT_OPS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </AppSelect>
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-xs text-muted-foreground">Amount</label>
+                <Input
+                  className="h-9 w-full font-mono"
+                  placeholder="$0.00"
+                  value={draftValue}
+                  onChange={e => setDraftValue(e.target.value)}
+                />
+              </div>
+            </div>
+            {draftOp === 'between' && (
+              <div className="-mt-2 mb-4">
+                <label className="mb-1 block text-xs text-muted-foreground">And</label>
+                <Input
+                  className="h-9 w-full font-mono"
+                  placeholder="$0.00"
+                  value={draftValue2}
+                  onChange={e => setDraftValue2(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <Button type="button" variant="outline" size="sm" onClick={handleClear}>Clear</Button>
+              <Button type="button" size="sm" onClick={handleApply}>Apply</Button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const PAGE_SIZE = 25;
 
@@ -264,9 +391,7 @@ export default function TransactionsPage() {
   const [refNo, setRefNo] = useState('');
   const [contactId, setContactId] = useState('');
   const [contactText, setContactText] = useState('');
-  const [amountOp, setAmountOp] = useState<AmountOp>('any');
-  const [amountValue, setAmountValue] = useState('');
-  const [amountValue2, setAmountValue2] = useState('');
+  const [amountFilter, setAmountFilter] = useState<AmountFilterState>(null);
 
   useEffect(() => {
     if (!bizId) return;
@@ -295,10 +420,10 @@ export default function TransactionsPage() {
     if (range.end) query['date_end'] = range.end;
     if (refNo.trim()) query['ref_no'] = refNo.trim();
     if (contactId) query['contact_id'] = contactId;
-    if (amountOp !== 'any' && amountValue) {
-      query['amount_op'] = amountOp;
-      query['amount_value'] = amountValue;
-      if (amountOp === 'between' && amountValue2) query['amount_value2'] = amountValue2;
+    if (amountFilter) {
+      query['amount_op'] = amountFilter.op;
+      query['amount_value'] = amountFilter.value;
+      if (amountFilter.op === 'between') query['amount_value2'] = amountFilter.value2;
     }
     try {
       const r = await api.get<{ transactions: TransactionRow[]; total: number }>(
@@ -309,10 +434,10 @@ export default function TransactionsPage() {
     } catch (e: unknown) {
       setErr(pickErr(e));
     }
-  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountOp, amountValue, amountValue2, page]);
+  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page]);
 
   useEffect(() => { void reload(); }, [reload]);
-  useEffect(() => { setPage(1); }, [typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountOp, amountValue, amountValue2]);
+  useEffect(() => { setPage(1); }, [typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter]);
 
   function clearTypeFilter() {
     const next = new URLSearchParams(params);
@@ -392,24 +517,7 @@ export default function TransactionsPage() {
             className="h-9 rounded-md border bg-background px-3 text-sm"
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Amount</label>
-          <div className="flex gap-1.5">
-            <AppSelect className="h-9 w-32 rounded-md border bg-background px-2 text-sm" value={amountOp} onChange={e => setAmountOp(e.target.value as AmountOp)}>
-              <option value="any">Any</option>
-              <option value="eq">Equal to</option>
-              <option value="gt">Greater than</option>
-              <option value="lt">Less than</option>
-              <option value="between">Between</option>
-            </AppSelect>
-            {amountOp !== 'any' && (
-              <Input className="h-9 w-24 font-mono" placeholder="0.00" value={amountValue} onChange={e => setAmountValue(e.target.value)} />
-            )}
-            {amountOp === 'between' && (
-              <Input className="h-9 w-24 font-mono" placeholder="0.00" value={amountValue2} onChange={e => setAmountValue2(e.target.value)} />
-            )}
-          </div>
-        </div>
+        <AmountFilter value={amountFilter} onApply={setAmountFilter} />
       </div>
 
       {typeFilter && (

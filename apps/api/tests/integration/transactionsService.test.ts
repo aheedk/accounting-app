@@ -148,5 +148,12 @@ describe('transactionsService.listTransactions', () => {
     const byAmount = await listTransactions(t.db, { business_id: biz.id, amount_op: 'gt', amount_value: '70', limit: 50, offset: 0 });
     expect(byAmount.total).toBe(1);
     expect(byAmount.rows[0]?.total_amount).toBe('80.0000');
+
+    const byAmountGte = await listTransactions(t.db, { business_id: biz.id, amount_op: 'gte', amount_value: '80', limit: 50, offset: 0 });
+    expect(byAmountGte.total).toBe(1);
+
+    const byAmountLte = await listTransactions(t.db, { business_id: biz.id, amount_op: 'lte', amount_value: '60', limit: 50, offset: 0 });
+    expect(byAmountLte.total).toBe(1);
+    expect(byAmountLte.rows[0]?.total_amount).toBe('60.0000');
   });
 });
