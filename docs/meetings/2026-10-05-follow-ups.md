@@ -182,7 +182,9 @@ After pulling, run `npm run db:migrate` (migrations `0084`–`0090`).
 ## Demo for the next meeting (Aheed)
 
 Aheed's finished items, in the same numbering, with where each lives and what to
-click. Item 3 and the other Riham items are hers to show.
+click. Item 3 and the other Riham items are hers to show. Every change of Aheed's
+since the meeting is in this section: the first four parts are for the meeting, and
+"Smaller fixes to check yourself" at the end covers the rest.
 
 **Before the meeting**
 
@@ -283,9 +285,14 @@ click. Item 3 and the other Riham items are hers to show.
   new one is posted with -R1 on its number. Ask the invoice question here.
 - **Cost centers.** + New → Journal entry: the Class column lists the cost centers
   from Setup → Cost Centers.
-- **Editing.** Payroll → Employees → open one → Edit. Accounting → Recurring
-  Transactions → Edit on a row. Setup → Tax Codes → Edit (a new rate starts on a
-  date and leaves earlier invoices alone). AI → Coding Rules → the pencil on a rule.
+- **Editing.** Four things that could only be created or deleted before:
+  - Payroll → Employees → open one → Edit.
+  - Accounting → Recurring Transactions → Edit on a row. Untick Active and save:
+    the row reads Paused.
+  - Setup → Tax Codes → Edit. The rate is typed as a percent (8.75). A changed
+    rate starts on the date given and leaves earlier invoices alone. A code that
+    is switched off is no longer offered on a new invoice.
+  - AI → Coding Rules → the pencil on a rule changes the account it posts to.
 - **Integration Transactions.** Accounting → Integration Transactions → Categorize
   shows the same suggestion as Bank Transactions.
 
@@ -302,3 +309,44 @@ click. Item 3 and the other Riham items are hers to show.
   the account box is the engine's suggestion with its confidence and a Use link.
 - **Fixed Assets.** Accounting → Fixed Assets shows an amber note that the register
   (43,000.00) and the ledger differ, with the amounts.
+
+### Smaller fixes to check yourself
+
+Not worth meeting time, but each one is a change you can see.
+
+- **Payable and receivable figures.** Accounts Payable → Overview: under
+  Outstanding bills it now shows the unused vendor credit and a net payable of
+  10,790.00, the same as A/P Aging. Accounting → Client Overview: receivable and
+  payable equal the Balance Sheet (they left out money on account).
+- **Lists open on This year.** Accounts Receivable → Payments and Credit Memos,
+  Accounts Payable → Bill Payments and Vendor Credits. The date filter starts on
+  This year, so the rows match the totals above them. It was the last 3 months,
+  which could show an empty table under a total.
+- **Vendor page.** Accounts Payable → Vendors → open a vendor with a past-due
+  bill. The bill reads Overdue in the list (it said Open), and the bar no longer
+  says "0 open bills" beside "1 overdue".
+- **Books Review.** Accounting → Books Review opens on this month. It opened on
+  next December.
+- **Recurring amounts.** Accounting → Recurring Transactions: Monthly Office Rent
+  and Quarterly Insurance show their amounts. Every row read 0.00.
+- **Contractors.** Payroll → Contractors → Create bill on a row: the bill form
+  opens with that contractor, their terms and the due date filled in.
+- **Copy link.** Any invoice → ⋯ → Copy link: "Link copied" appears.
+- **Journal entry to its source.** Reports → General Ledger → click a row that
+  came from an invoice or a bill. The read-only entry has an "Open the source
+  transaction" link.
+- **Words instead of codes.** A fixed asset says Straight line, a bill payment
+  says ACH, Setup → Users says Firm admin. Quantities read 1, not 1.0000.
+  AI → Coding Rules shows vendor names with capitals. The search box says Ctrl K.
+- **No ids on screen.** Inventory → Shipping Labels: the For column reads
+  "Invoice INV-..." or "Sales order SO-..." and opens it. Accounting → Receipts:
+  real file names and a Record column in words. A fixed asset's page shows account
+  names, and its depreciation history has an Open entry link.
+- **Table headers.** Open Customers or Vendors: every column header is in
+  capitals. The sortable ones were not.
+- **Three pages restyled.** Open an employee, a fixed asset and a purchase order.
+  Each has the same header, tiles and ⋯ menu as an invoice; Delete and Void are
+  under ⋯.
+- **Reversing entries on the P&L.** Switch to Blue Widget Co. Net income on
+  Reports → Profit & Loss equals the Balance Sheet's. It was off by 7,500.00,
+  because a month-end accrual counted and the entry reversing it did not.
