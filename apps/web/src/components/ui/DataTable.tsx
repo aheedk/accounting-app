@@ -40,11 +40,18 @@ export interface DataTableProps<T> {
   // QBO-style pager ("‹ Previous 1-75 Next ›"). Slices AFTER sorting so
   // column sorts operate on the full data set.
   pagination?: { pageSize: number };
-  // Opts this table into the gear-icon "Table settings" drawer (sort/rows/
-  // columns, persisted per user per page). Give every list page that shares
-  // this component its own stable pageId ("vendors", "checks", ...).
+  // Opts this table into the "Table settings" drawer (sort/rows/columns,
+  // persisted per user per page). Give every list page that shares this
+  // component its own stable pageId ("vendors", "checks", ...).
   tableSettingsPageId?: string;
   availableFilters?: TableColumnDef[];
+  // By default DataTable renders its own gear-icon opener in a toolbar row
+  // above the table. Pass this pair to have the page render its own opener
+  // instead (e.g. a "Customize" button inline with a filter bar) — DataTable
+  // still owns the drawer and the settings themselves, just controlled via
+  // this open state rather than its own internal one.
+  externalSettingsOpen?: boolean;
+  onExternalSettingsOpenChange?: (open: boolean) => void;
 }
 
 export function DataTable<T>({
@@ -64,10 +71,14 @@ export function DataTable<T>({
   pagination,
   tableSettingsPageId,
   availableFilters,
+  externalSettingsOpen,
+  onExternalSettingsOpenChange,
 }: DataTableProps<T>) {
   const { user } = useAuth();
   const allColumnKeys = useMemo(() => columns.map(c => c.key), [columns]);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [internalSettingsOpen, setInternalSettingsOpen] = useState(false);
+  const settingsOpen = onExternalSettingsOpenChange ? (externalSettingsOpen ?? false) : internalSettingsOpen;
+  const setSettingsOpen = onExternalSettingsOpenChange ?? setInternalSettingsOpen;
   const [tableSettings, setTableSettings] = useState(() => (
     tableSettingsPageId && user ? loadTableSettings(user.id, tableSettingsPageId, allColumnKeys) : null
   ));
@@ -209,7 +220,7 @@ export function DataTable<T>({
 
   return (
     <>
-      {(downloadable || tableSettingsPageId) && (
+      {(downloadable || (tableSettingsPageId && !onExternalSettingsOpenChange)) && (
         <div className="flex justify-end gap-2 border-b px-3 py-2">
           {downloadable && (
             <>
@@ -221,7 +232,7 @@ export function DataTable<T>({
               </Button>
             </>
           )}
-          {tableSettingsPageId && tableSettings && (
+          {tableSettingsPageId && tableSettings && !onExternalSettingsOpenChange && (
             <TableSettingsGearButton onClick={() => setSettingsOpen(true)} />
           )}
         </div>

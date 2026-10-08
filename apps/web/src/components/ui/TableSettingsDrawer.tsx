@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, X, GripVertical, Trash2, Plus } from 'lucide-react';
+import { Settings, SlidersHorizontal, X, GripVertical, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppSelect } from '@/components/ui/select';
 import type { TableSettings, TableSortRule, TableRowHeight } from '@/lib/tableSettings';
@@ -207,5 +207,21 @@ export function TableSettingsGearButton({ onClick }: { onClick: () => void }) {
       </button>
       <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Table settings</div>
     </div>
+  );
+}
+
+// QBO-style labeled trigger ("⚙ Customize") for placing the Table Settings
+// drawer's opener inline with a filter bar, instead of DataTable's own
+// above-the-table toolbar row — see TransactionsPage for the pattern.
+export function TableSettingsCustomizeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+    >
+      <SlidersHorizontal className="h-4 w-4" />
+      Customize
+    </button>
   );
 }

@@ -7,6 +7,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { TableSettingsCustomizeButton } from '@/components/ui/TableSettingsDrawer';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/input';
 import { AppSelect } from '@/components/ui/select';
@@ -392,6 +393,7 @@ export default function TransactionsPage() {
   const [contactId, setContactId] = useState('');
   const [contactText, setContactText] = useState('');
   const [amountFilter, setAmountFilter] = useState<AmountFilterState>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!bizId) return;
@@ -475,49 +477,52 @@ export default function TransactionsPage() {
         <h1 className="text-2xl font-semibold">Transactions</h1>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <DateRangeFilter
-          preset={datePreset}
-          start={customStart}
-          end={customEnd}
-          onApply={next => { setDatePreset(next.preset); setCustomStart(next.start); setCustomEnd(next.end); }}
-        />
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Transaction type</label>
-          <AppSelect
-            className="h-9 w-48 rounded-md border bg-background px-3 text-sm"
-            value={typeFilter ?? 'all'}
-            onChange={e => {
-              const next = new URLSearchParams(params);
-              if (e.target.value === 'all') next.delete('type'); else next.set('type', e.target.value);
-              setParams(next);
-            }}
-          >
-            <option value="all">All types</option>
-            {QBO_TYPE_TAXONOMY.map(({ label, type }) => (
-              <option key={label} value={type ?? ''} disabled={!type}>
-                {type ? label : `${label} (coming soon)`}
-              </option>
-            ))}
-          </AppSelect>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Reference number</label>
-          <Input className="h-9 w-36" placeholder="Search…" value={refNo} onChange={e => setRefNo(e.target.value)} />
-        </div>
-        <div className="w-56">
-          <label className="mb-1 block text-xs text-muted-foreground">Contact</label>
-          <PartySelect
-            parties={parties}
-            value={contactId}
-            text={contactText}
-            onPick={p => { setContactId(p.id); setContactText(p.name); }}
-            onTextChange={t => { setContactText(t); if (!t) setContactId(''); }}
-            placeholder="Any contact"
-            className="w-full"
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <DateRangeFilter
+            preset={datePreset}
+            start={customStart}
+            end={customEnd}
+            onApply={next => { setDatePreset(next.preset); setCustomStart(next.start); setCustomEnd(next.end); }}
           />
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Transaction type</label>
+            <AppSelect
+              className="h-9 w-48 rounded-md border bg-background px-3 text-sm"
+              value={typeFilter ?? 'all'}
+              onChange={e => {
+                const next = new URLSearchParams(params);
+                if (e.target.value === 'all') next.delete('type'); else next.set('type', e.target.value);
+                setParams(next);
+              }}
+            >
+              <option value="all">All types</option>
+              {QBO_TYPE_TAXONOMY.map(({ label, type }) => (
+                <option key={label} value={type ?? ''} disabled={!type}>
+                  {type ? label : `${label} (coming soon)`}
+                </option>
+              ))}
+            </AppSelect>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Reference number</label>
+            <Input className="h-9 w-36" placeholder="Search…" value={refNo} onChange={e => setRefNo(e.target.value)} />
+          </div>
+          <div className="w-56">
+            <label className="mb-1 block text-xs text-muted-foreground">Contact</label>
+            <PartySelect
+              parties={parties}
+              value={contactId}
+              text={contactText}
+              onPick={p => { setContactId(p.id); setContactText(p.name); }}
+              onTextChange={t => { setContactText(t); if (!t) setContactId(''); }}
+              placeholder="Any contact"
+              className="w-full"
+            />
+          </div>
+          <AmountFilter value={amountFilter} onApply={setAmountFilter} />
         </div>
-        <AmountFilter value={amountFilter} onApply={setAmountFilter} />
+        <TableSettingsCustomizeButton onClick={() => setSettingsOpen(true)} />
       </div>
 
       {typeFilter && (
@@ -542,6 +547,8 @@ export default function TransactionsPage() {
           selectable={false}
           onRowClick={r => nav(r.path)}
           tableSettingsPageId="transactions"
+          externalSettingsOpen={settingsOpen}
+          onExternalSettingsOpenChange={setSettingsOpen}
           availableFilters={[
             { key: 'date_range', label: 'Date range' },
             { key: 'transaction_type', label: 'Transaction type' },
