@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { TopBar } from './TopBar';
 import { CompanySwitchedScreen } from './CompanySwitchedScreen';
+import { PdfPreviewHost } from '@/components/PdfPreviewHost';
 import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business';
 import { setExportCompany } from '@/lib/reportExport';
 import { useAuth } from '@/auth/useAuth';
@@ -52,6 +53,7 @@ export function AppShell() {
         <div className="contents print:hidden">
           <TopBar onMenuClick={() => setMobileNavOpen(true)} />
         </div>
+        <PdfPreviewHost />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">
           {allowed ? <Outlet /> : (
             <div className="mx-auto mt-16 max-w-md rounded-lg border bg-card p-8 text-center">

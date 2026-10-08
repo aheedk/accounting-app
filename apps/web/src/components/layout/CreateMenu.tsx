@@ -18,6 +18,8 @@ const CATEGORIES: CreateCategory[] = [
     items: [
       { label: 'Invoice', to: '/invoices/new' },
       { label: 'Receive payment', to: '/payments/new' },
+      { label: 'Statement', to: '/reports/customer-statement' },
+      { label: 'Sales order', to: '/inventory/sales-orders/new' },
       { label: 'Credit memo', to: '/credit-memos/new', minRole: 'accountant' },
       { label: 'Add customer', to: '/customers/new' },
     ],
@@ -29,6 +31,7 @@ const CATEGORIES: CreateCategory[] = [
       { label: 'Check', to: '/accounting/checks/new' },
       { label: 'Bill', to: '/ap/bills/new' },
       { label: 'Pay bills', to: '/ap/pay-bills', minRole: 'accountant' },
+      { label: 'Purchase order', to: '/inventory/purchase-orders/new' },
       { label: 'Vendor credit', to: '/ap/vendor-credits/new', minRole: 'accountant' },
       { label: 'Add vendor', to: '/ap/vendors/new' },
     ],
@@ -44,12 +47,12 @@ const CATEGORIES: CreateCategory[] = [
   {
     heading: 'Other',
     items: [
-      { label: 'Journal entry', to: '/journal/new', minRole: 'accountant' },
+      // QuickBooks order: deposit, transfer, journal entry, then product or service.
       { label: 'Bank deposit', to: '/accounting/bank-deposits/new' },
       { label: 'Transfer', to: '/accounting/transfers/new', minRole: 'accountant' },
+      { label: 'Journal entry', to: '/journal/new', minRole: 'accountant' },
+      { label: 'Add product/service', to: '/inventory/items/new' },
       { label: 'Fixed asset', to: '/accounting/fixed-assets/new' },
-      { label: 'Sales order', to: '/inventory/sales-orders/new' },
-      { label: 'Purchase order', to: '/inventory/purchase-orders/new' },
       { label: 'Add client', to: '/clients/new' },
     ],
   },

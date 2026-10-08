@@ -81,35 +81,18 @@ months.
 
 **Priority:** low.
 
-### Customers: same batch actions / active / delete pattern as Vendors
-Vendors (list page) now has row checkboxes with a batch-actions bar (Email
-stub, Make inactive), a per-row Action dropdown (Create bill, Create expense,
-Edit, Make inactive, Delete), an `is_active` flag defaulting dropdowns app-wide
-to active-only, and a hard Delete that's blocked with a 409 whenever the
-vendor has any transaction on file (`vendorService.ts`: `is_active`,
-`vendorIdsWithTransactions`, rewritten `deleteVendor`). Customers has no
-equivalent yet — same shape of work (`customerService.ts` + `CustomerListPage.tsx`),
-checking `invoices`/`payments`/`credit_memos`/`sales_orders` (whichever
-actually have a `customer_id` FK) instead of the AP tables.
-
-**Priority:** medium — raised alongside the Vendors work, not implemented.
-
 ### Unified Transactions page: follow-up scope
 `/accounting/transactions` (`transactionsService.ts` on the API, `TransactionsPage.tsx`
-+ `TableSettingsDrawer.tsx`/`tableSettings.ts` on the web) covers 7 types —
++ `TableSettingsDrawer.tsx`/`tableSettings.ts` on the web) covers 10 types —
 deposit, expense, check (merging the real `checks` table with legacy
 expense-paid-by-check rows), standalone journal entry, bill, payment,
-credit memo. Invoices, bill payments, and vendor credits aren't included yet;
-adding one is the same UNION ALL branch pattern as any existing type in
-`transactionsService.ts`. Two pieces of the spec are intentionally partial:
+credit memo, invoice, bill payment and vendor credit. Adding one is the same
+UNION ALL branch pattern as any existing type in `transactionsService.ts`.
+Sorting a column asks the server, so it covers the whole list. Two pieces of
+the spec are intentionally partial:
 - The Table Settings drawer's Filters section is drag-reorderable and
   persists an order, but the Transactions page's actual filter bar doesn't
   read that order yet — it's always rendered in a fixed sequence.
-- Table Settings' Sort section drives the DataTable's client-side sort, but
-  on the Transactions page specifically that only re-sorts the current
-  server page (25 rows), not the full filtered result set — true server-side
-  sorting would mean threading a `sort_key`/`sort_dir` pair from the drawer
-  into the `/transactions` query params, which isn't wired up yet.
 - The Amount filter's "Amount type" dropdown (Line or total / Total / Line,
   matching QBO) always filters `total_amount` — the unified row from
   `transactionsService.ts` only carries each transaction's total, not its

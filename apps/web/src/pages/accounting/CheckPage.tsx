@@ -944,10 +944,6 @@ export default function CheckPage() {
           <button type="button" className="inline-flex items-center gap-1.5 text-primary hover:underline" onClick={handlePrintCheck}>
             <Printer className="h-3.5 w-3.5" /> Print check
           </button>
-          <span className="text-muted-foreground">·</span>
-          <button type="button" className="text-primary hover:underline" onClick={() => alert('Check ordering coming soon.')}>
-            Order checks
-          </button>
           {canEdit && (
             <>
               <span className="text-muted-foreground">·</span>

@@ -641,25 +641,19 @@ export default function BankDepositPage() {
     };
   }
 
-  // Opening the window synchronously here (before the `await` below) is what
-  // keeps this a user-initiated popup instead of one Safari silently blocks —
-  // open first, navigate it once the PDF is actually ready.
+  // The preview opens inside the app (PdfPreviewHost), not in a new tab.
   async function handlePrintSlipAndSummary() {
-    const win = window.open('', '_blank');
     try {
-      previewDepositSlipAndSummary(await buildDepositDocInput(), win);
+      previewDepositSlipAndSummary(await buildDepositDocInput());
     } catch (e: unknown) {
-      win?.close();
       setErr(e instanceof Error ? e.message : 'Failed to generate deposit slip.');
     }
   }
 
   async function handlePrintSummaryOnly() {
-    const win = window.open('', '_blank');
     try {
-      previewDepositSummary(await buildDepositDocInput(), win);
+      previewDepositSummary(await buildDepositDocInput());
     } catch (e: unknown) {
-      win?.close();
       setErr(e instanceof Error ? e.message : 'Failed to generate deposit slip.');
     }
   }

@@ -13,12 +13,7 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 |---|---|---|
 | 17 | QA audit (`docs/qa/2026-09-28-app-audit.md`): done, apart from emailing an invoice, Estimate, and three decisions for the firm; see "Audit: what is left" below **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm. They are all up and agree with each other; see "Reports" below | Aheed, firm |
-| 10 | Bank deposit print: show the preview inside the app, like QuickBooks. Print still opens the PDF in a new browser tab, as it did at the meeting | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
-| 12 | "+ New" menu: match QuickBooks exactly. Check is now in it (Aheed); the rest of the match is not started | Riham |
-| 13 | Write Check: the Order checks link still says "coming soon". Take it out, or say where it should go | Riham |
-| 31 | Customers: the same batch actions, inactive switch and delete rule as Vendors. Not started: the list has no tick boxes and a customer cannot be made inactive | Riham |
-| 32 | Transactions page: add invoices, bill payments and vendor credits (it lists deposits, expenses, checks, journal entries, bills, payments and credit memos). Sorting still covers only the 25 rows on screen: since 10-08 the server can sort the whole list, but the page does not ask it to | Riham |
 | 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Faizan sends files, Aheed tests |
 | 15 | Suspense: reclassify some real lines **(10-01)** | Faizan |
 | 16 | Test a real credit card statement **(10-01)** | Faizan |
@@ -133,7 +128,11 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 19 | General Ledger fiscal-year presets use the client's fiscal year **(10-01)** | Riham, `e9acc5a` |
 | 13 | Audit history on Journal Entry and Bank Deposit, and Copy on Bank Deposit, work | Aheed, `11452ee` |
 | 33 | Vendors list: Email and "Ask vendor for info" start a message in the user's mail program | Aheed, `258cdef` |
-| 12 | Check is in the "+ New" menu (the rest of 12 is open) | Aheed, `8ebcbdb` |
+| 12 | "+ New" menu follows QuickBooks: Check, Statement and Sales order under Customers, Purchase order under Vendors, and Other runs deposit, transfer, journal entry, product or service | Aheed, `8ebcbdb` and 10-08 |
+| 10 | Bank deposit print: the preview opens inside the app, with the print and download buttons in it. Write Check prints the same way | Aheed, 10-08 |
+| 13 | Write Check: the Order checks link is taken out (there is nowhere to order checks from) | Aheed, 10-08 |
+| 31 | Customers: tick boxes with batch Email and Make inactive, a "Show inactive customers" switch, and Delete only for a customer with no transactions. Same rules as Vendors | Aheed, 10-08 |
+| 32 | Transactions page lists invoices, bill payments and vendor credits, and sorting a column sorts the whole list, not the 25 rows on screen | Aheed, 10-08 |
 | — | Role audit: a client login sees only its reports and invoices (it could read almost everything), menus and buttons follow the role, a firm admin keeps every client after a reload | Aheed, `5afc8e5`, `1a69563`, `388cf49`, `648c399`, `c79c9eb` |
 | — | Signing in: switch a login off, change or reset a password, a hold after five wrong passwords, two-step sign-in, see and end sessions | Aheed, `e4be47a`, `497fe6d` |
 | — | A View only role; payroll can be closed to a login; Activity Log; buttons a role cannot use are off every page | Aheed, `ca7a526`, `7d7b18c`, `8b9b906`, `7862b1c` |
@@ -191,7 +190,7 @@ filters, and print / CSV; a vendor's page now lists every kind of transaction, w
 a searchable vendor list down the side that folds away and sorts by open balance;
 and long options in dropdowns are no longer cut off.
 
-After pulling, run `npm run db:migrate` (migrations `0084`–`0095`).
+After pulling, run `npm run db:migrate` (migrations `0084`–`0096`).
 
 ## Decided — no work
 
@@ -410,6 +409,21 @@ until someone turns it on.
 ### Smaller fixes to check yourself
 
 Not worth meeting time, but each one is a change you can see.
+
+- **Customers list.** Accounts Receivable → Customers. Tick two customers: a
+  dark bar offers Batch actions → Email and Make inactive. The arrow at the
+  end of a row has Create statement, Make inactive and Delete; Delete is gray
+  for a customer with any transaction. Tick "Show inactive customers" to see
+  them again and make one active. An inactive customer leaves the dropdowns
+  but old invoices still show the name.
+- **Transactions page.** Accounting → Transactions. Invoices, bill payments
+  and vendor credits are in the list and in the Type filter. Click the Date
+  or Amount heading: the whole list is sorted, so page 1 starts with the
+  largest or oldest of everything.
+- **Deposit print preview.** Open a bank deposit → Print → Print deposit
+  summary only. The preview opens in a window inside the app, not a new tab.
+- **"+ New" menu.** Statement and Sales order sit under Customers, Purchase
+  order under Vendors. Write Check no longer has an Order checks link.
 
 - **Payable and receivable figures.** Accounts Payable → Overview: under
   Outstanding bills it now shows the unused vendor credit and a net payable of

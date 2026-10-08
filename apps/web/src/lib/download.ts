@@ -393,10 +393,21 @@ function drawBankSlipPage(doc: jsPDF, input: DepositDocInput): void {
 // `window.open('', '_blank')` called before any `await`): opening a window
 // only after an async PDF-build step runs is what popup blockers — Safari's
 // especially — treat as not user-initiated and silently kill.
+//
+// With no `target`, the preview opens inside the app (PdfPreviewHost in the
+// app shell), and only falls back to a new tab where no host is mounted.
 function openPdfPreview(doc: jsPDF, target?: Window | null): void {
   const url = doc.output('bloburl').toString();
   if (target) target.location.href = url;
+  else if (pdfPreviewListener) pdfPreviewListener(url);
   else window.open(url, '_blank');
+}
+
+let pdfPreviewListener: ((url: string) => void) | null = null;
+
+/** Registers the in-app preview window. Called by PdfPreviewHost only. */
+export function setPdfPreviewListener(listener: ((url: string) => void) | null): void {
+  pdfPreviewListener = listener;
 }
 
 /** "Print deposit summary only" — page 2 content as a standalone single-page PDF, opened for preview. */
