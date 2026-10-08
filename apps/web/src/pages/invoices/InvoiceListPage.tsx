@@ -119,14 +119,14 @@ export default function InvoiceListPage() {
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="inline-flex items-center gap-2">
-              <Link className="text-primary hover:underline" to={`/invoices/${r.id}`}>View/Edit</Link>
-              {r.status === 'posted' && (
+              <Link className="text-primary hover:underline" to={`/invoices/${r.id}`}>{canCreate ? 'View/Edit' : 'View'}</Link>
+              {canCreate && r.status === 'posted' && (
                 <>
                   <span className="text-muted-foreground/50">|</span>
                   <Link className="text-primary hover:underline" to={`/payments/new?customer_id=${r.customer_id}&invoice_id=${r.id}`}>Receive payment</Link>
                 </>
               )}
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              {canCreate && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
             </span>
           )}
           emptyMessage={<EmptyState title="No invoices found" hint="Bill a customer for goods or services." {...(canCreate ? { actionLabel: 'New invoice', actionTo: '/invoices/new' } : {})} />}

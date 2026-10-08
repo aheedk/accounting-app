@@ -168,7 +168,7 @@ export default function InvoiceDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <DetailField label="Customer" value={customer ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : inv.customer_id} />
+            <DetailField label="Customer" value={!customer ? null : isStaff ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : customer.name} />
             <DetailField label="Customer email" value={customer?.email} />
             <DetailField label="Invoice date" value={fmtLongDate(inv.issue_date)} />
             <DetailField label="Due date" value={fmtLongDate(inv.due_date)} />
@@ -190,7 +190,8 @@ export default function InvoiceDetailPage() {
                 { label: 'Voided', value: inv.voided_at ? fmtDateTime(inv.voided_at) : null },
                 {
                   label: 'Journal entry',
-                  value: inv.posted_journal_entry_id
+                  // The journal is not part of a client login.
+                  value: inv.posted_journal_entry_id && isStaff
                     ? <Link className="font-mono text-primary hover:underline" to={`/journal/${inv.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
