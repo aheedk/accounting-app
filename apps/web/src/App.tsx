@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import AccountPage from '@/pages/AccountPage';
+import ActivityLogPage from '@/pages/setup/ActivityLogPage';
 import CoaListPage from '@/pages/coa/CoaListPage';
 import AccountRegisterPage from '@/pages/coa/AccountRegisterPage';
 import PeriodsPage from '@/pages/periods/PeriodsPage';
@@ -117,6 +118,7 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/setup/activity" element={<ActivityLogPage />} />
 
             {/* Accounts Receivable */}
             <Route path="/customers" element={<CustomerListPage />} />

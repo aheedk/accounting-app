@@ -112,6 +112,7 @@ const FIRM_ADMIN_ONLY = [
   'DELETE ~/journal-entries/:id',
   'DELETE ~/vendors/:id',
   'GET /firm-overview',
+  'GET /me/firm/activity-log',
   'GET /me/firm/users',
   'GET ~/employees/:id/ssn-reveal',
   'GET ~/vendors/:id/tax-id-reveal',
@@ -221,8 +222,9 @@ describe('role matrix', () => {
     expect(staffWrites).toEqual([...STAFF_MAY_WRITE].sort());
   });
 
-  it('staff can read everything an accountant can', () => {
-    expect(rows.filter(r => r.method === 'GET' && r.staff === 403 && r.accountant !== 403).map(name)).toEqual([]);
+  it('staff can read everything an accountant can, except the activity log', () => {
+    // The log shows what everyone did, with each record before and after.
+    expect(rows.filter(r => r.method === 'GET' && r.staff === 403 && r.accountant !== 403).map(name)).toEqual(['GET ~/activity-log']);
   });
 
   it('only a firm admin may do exactly what is listed', () => {

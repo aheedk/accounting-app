@@ -158,6 +158,7 @@ const ALL_GROUPS: NavGroup[] = [
       { to: '/setup/coa', label: 'Chart of Accounts' },
       { to: '/setup/cost-centers', label: 'Cost Centers' },
       { to: '/setup/users', label: 'Users' },
+      { to: '/setup/activity', label: 'Activity Log' },
       { to: '/settings/tax-codes', label: 'Tax Codes' },
       { to: '/settings/periods', label: 'Fiscal Periods' },
     ],

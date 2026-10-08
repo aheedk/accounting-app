@@ -23,6 +23,12 @@ describe('canOpenPage', () => {
     }
   });
 
+  it('keeps the activity log for an accountant and up', () => {
+    expect(canOpenPage('staff', '/setup/activity')).toBe(false);
+    expect(canOpenPage('accountant', '/setup/activity')).toBe(true);
+    expect(canOpenPage('firm_admin', '/setup/activity')).toBe(true);
+  });
+
   it('opens the rest of the app to staff and accountants', () => {
     for (const page of ['/', '/invoices/new', '/payroll/pay-runs', '/ai/inbox', '/settings/tax-codes']) {
       expect(canOpenPage('staff', page), page).toBe(true);

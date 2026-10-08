@@ -79,6 +79,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Cost Centers', group: 'Setup', to: '/setup/cost-centers' },
   { label: 'Users', group: 'Setup', to: '/setup/users' },
   { label: 'Tax Codes', group: 'Setup', to: '/settings/tax-codes' },
+  { label: 'Activity Log', group: 'Setup', to: '/setup/activity' },
   { label: 'Fiscal Periods', group: 'Setup', to: '/settings/periods' },
 ];
 

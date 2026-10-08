@@ -29,6 +29,9 @@ const CLIENT_PAGES = [
 // rather than opened and left to fail.
 const FIRM_ADMIN_PAGES = ['/setup/users', '/clients/new', '/accounting/client-overview'];
 
+// Pages for an accountant and up. The activity log shows every record before and after each change.
+const ACCOUNTANT_PAGES = ['/setup/activity'];
+
 const under = (pathname: string, page: string) => pathname === page || pathname.startsWith(`${page}/`);
 
 /** Whether this role has any business on the page at `pathname`. */
@@ -42,6 +45,7 @@ export function canOpenPage(role: Role | null, pathname: string): boolean {
     return CLIENT_PAGES.some(page => under(pathname, page));
   }
   if (FIRM_ADMIN_PAGES.some(page => under(pathname, page))) return role === 'firm_admin';
+  if (ACCOUNTANT_PAGES.some(page => under(pathname, page))) return hasMinRole(role, 'accountant');
   return true;
 }
 

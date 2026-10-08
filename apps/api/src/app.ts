@@ -69,6 +69,7 @@ import aiRouter from './routes/ai.js';
 import bankDepositsRouter from './routes/bankDeposits.js';
 import searchRouter from './routes/search.js';
 import transfersRouter from './routes/transfers.js';
+import activityLogRouter from './routes/activityLog.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -147,6 +148,7 @@ export function makeApp(): Express {
   app.use(bankDepositsRouter);
 app.use(searchRouter);
 app.use(transfersRouter);
+  app.use(activityLogRouter);
   app.use(errorHandler);
   return app;
 }

@@ -20,3 +20,12 @@ export const businessAccessGrantSchema = z.object({
   role_override: userRoleSchema.nullable().optional(),
 });
 export type BusinessAccessGrant = z.infer<typeof businessAccessGrantSchema>;
+
+// The activity log: a page of who did what, optionally narrowed to one person or one kind of record.
+export const activityLogQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  before: z.string().datetime().optional(),
+  user_id: z.string().uuid().optional(),
+  entity_type: z.string().min(1).max(100).optional(),
+});
+export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;
