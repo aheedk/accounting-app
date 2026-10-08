@@ -15,17 +15,19 @@ over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 | 18 | Review the reports with the firm. They are all up and agree with each other; see "Reports" below | Aheed, firm |
 | 10 | Bank deposit print: show the preview inside the app, like QuickBooks. Print still opens the PDF in a new browser tab, as it did at the meeting | Riham |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it | Riham, Faizan |
-| 12 | "+ New" menu: match QuickBooks exactly. Not started. Check is not in the menu, although Write Check is built | Riham |
-| 13 | More menu: Copy and Audit history on Bank Deposit, and Audit history on Journal Entry, still say "coming soon". So does Order checks on Write Check. Check and Expense already have a working audit history to reuse | Riham |
+| 12 | "+ New" menu: match QuickBooks exactly. Check is now in it (Aheed); the rest of the match is not started | Riham |
+| 13 | Write Check: the Order checks link still says "coming soon". Take it out, or say where it should go | Riham |
 | 31 | Customers: the same batch actions, inactive switch and delete rule as Vendors. Not started: the list has no tick boxes and a customer cannot be made inactive | Riham |
 | 32 | Transactions page: add invoices, bill payments and vendor credits (it lists deposits, expenses, checks, journal entries, bills, payments and credit memos). Sorting still covers only the 25 rows on screen: since 10-08 the server can sort the whole list, but the page does not ask it to | Riham |
-| 33 | Vendors list: Email (batch menu) and "Ask vendor for info" (row menu) still say "coming soon" | Riham |
 | 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Faizan sends files, Aheed tests |
 | 15 | Suspense: reclassify some real lines **(10-01)** | Faizan |
 | 16 | Test a real credit card statement **(10-01)** | Faizan |
 
 Riham's rows were checked against the code on 2026-10-08, after her last push
-(`06389d5`; her branch and `main` are the same). None of the seven is finished.
+(`06389d5`; her branch and `main` are the same). None of the seven was finished.
+Aheed then did most of 13, all of 33, and the Check entry of 12 (see Done). They
+are in her pages (Bank Deposit, Journal Entry, Vendors list, the + New menu), so
+she should pull before working on them.
 
 **Reports (item 18)**
 
@@ -66,6 +68,9 @@ Every bug, wrong number and missing feature in the audit is done, except:
 - **1099 and card payments.** Payments made to a contractor by card are now left
   off the 1099, because the card processor reports them on a 1099-K. Confirm that
   is how the firm files.
+- **Email from the app.** Emailing vendors now opens the user's own mail program
+  with the message started. Is that enough, or should the app send the email
+  itself? That needs a mail service, and so does emailing an invoice.
 - **Pay stubs (22) and payroll.** Payroll can now be run from the app. Are pay
   stubs still wanted, and does Payroll stay in the sidebar?
 - **Inventory.** It now posts to the ledger. Three choices were made without the
@@ -115,6 +120,9 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 8 | New account and Edit account panels reach the top of the window | Aheed, `4370f0b` |
 | 9 | Vendor dropdown in the AI inbox, with the AI matching renamed payees **(10-01)** | Riham, `40d1214` |
 | 19 | General Ledger fiscal-year presets use the client's fiscal year **(10-01)** | Riham, `e9acc5a` |
+| 13 | Audit history on Journal Entry and Bank Deposit, and Copy on Bank Deposit, work | Aheed, `11452ee` |
+| 33 | Vendors list: Email and "Ask vendor for info" start a message in the user's mail program | Aheed, `258cdef` |
+| 12 | Check is in the "+ New" menu (the rest of 12 is open) | Aheed, `8ebcbdb` |
 
 Audit bugs fixed (part of item 17), all Aheed:
 
@@ -303,6 +311,16 @@ since the meeting is in this section: the first four parts are for the meeting, 
   - AI → Coding Rules → the pencil on a rule changes the account it posts to.
 - **Integration Transactions.** Accounting → Integration Transactions → Categorize
   shows the same suggestion as Bank Transactions.
+- **Audit history (item 13).** Open a journal entry made in the app → More → Audit
+  history: who created, posted or edited it and when. A bank deposit has the same.
+  Entries that came with the demo data have no history to show.
+- **Copy a bank deposit (item 13).** Open a deposit → More → Copy: a new deposit
+  with the same bank account, memo and lines, dated today.
+- **Emailing vendors (item 33).** Accounts Payable → Vendors. Tick a few vendors →
+  Batch actions → Email: the mail program opens with them in BCC. On a row's menu,
+  Ask vendor for info opens a ready-written request for their W-9 and details. A
+  vendor with no email address gets a message saying so.
+- **Check in + New (item 12).** + New → Check, under Vendors.
 
 ### Other fixes worth a minute
 
