@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FileText, ReceiptText, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { roleAtLeast, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } from '@/components/ui/detail-page';
@@ -51,6 +52,13 @@ type Vendor = { id: string; name: string; company_name?: string | null; email?: 
 export default function BillDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
+  // What the API allows: staff can pay a bill, an accountant posts and voids, a client or view-only login reads.
+  const role = useEffectiveRole();
+  const isStaff = roleAtLeast(role, 'staff');
+  // Links are offered where the page behind them can be opened (not for a client).
+  const canOpen = useCanOpen();
+  const linksOut = canOpen('/ap/vendors');
+  const isAccountant = roleAtLeast(role, 'accountant');
   const [data, setData] = useState<BillDetail | null>(null);
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -91,16 +99,16 @@ export default function BillDetailPage() {
   if (!data) return <div>Loading...</div>;
   const bill = data.bill;
   const paid = Number(bill.total) - Number(data.amount_due);
-  const canPost = bill.status === 'draft';
-  const canPay = bill.status === 'posted' && Number(data.amount_due) > 0;
-  const canVoid = bill.status === 'posted' || bill.status === 'paid';
+  const canPost = isAccountant && bill.status === 'draft';
+  const canPay = isStaff && bill.status === 'posted' && Number(data.amount_due) > 0;
+  const canVoid = isAccountant && (bill.status === 'posted' || bill.status === 'paid');
 
   return (
     <div className="space-y-6">
       <DetailPageHeader
         eyebrow="Bill"
         title={bill.bill_number}
-        subtitle={vendor ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : 'Vendor'}
+        subtitle={!vendor ? 'Vendor' : linksOut ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : vendor.name}
         status={bill.status}
         totalLabel="Amount due"
         total={fmtMoney(data.amount_due)}
@@ -124,7 +132,7 @@ export default function BillDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Bill details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <DetailField label="Vendor" value={vendor ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : bill.vendor_id} />
+            <DetailField label="Vendor" value={!vendor ? null : linksOut ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : vendor.name} />
             <DetailField label="Vendor email" value={vendor?.email} />
             <DetailField label="Bill date" value={fmtLongDate(bill.bill_date)} />
             <DetailField label="Due date" value={fmtLongDate(bill.due_date)} />
@@ -146,7 +154,8 @@ export default function BillDetailPage() {
                 { label: 'Voided', value: bill.voided_at ? fmtDateTime(bill.voided_at) : null },
                 {
                   label: 'Journal entry',
-                  value: bill.posted_journal_entry_id
+                  // The journal is not part of a client login.
+                  value: bill.posted_journal_entry_id && canOpen('/journal')
                     ? <Link className="font-mono text-primary hover:underline" to={`/journal/${bill.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },

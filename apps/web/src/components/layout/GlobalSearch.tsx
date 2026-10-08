@@ -11,6 +11,8 @@ type Page = { label: string; group: string; to: string };
 
 const ALL_PAGES: Page[] = [
   { label: 'Dashboard', group: 'Dashboard', to: '/' },
+  { label: 'Messages', group: 'Dashboard', to: '/messages' },
+  { label: 'Send documents', group: 'Dashboard', to: '/documents/send' },
   // Accounts Receivable
   { label: 'Customers', group: 'Accounts Receivable', to: '/customers' },
   { label: 'Invoices', group: 'Accounts Receivable', to: '/invoices' },

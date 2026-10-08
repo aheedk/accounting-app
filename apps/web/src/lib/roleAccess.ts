@@ -24,7 +24,12 @@ const CLIENT_PAGES = [
   '/reports/trial-balance',
   '/reports/aging',
   '/reports/ap-aging',
+  '/messages',
+  '/documents/send',
 ];
+
+// Sending documents in is the client's page. The firm uploads from the AI inbox.
+const CLIENT_ONLY_PAGES = ['/documents/send'];
 
 // Pages where everything on them is for a firm admin. Hidden from the others
 // rather than opened and left to fail.
@@ -45,10 +50,12 @@ export function canOpenPage(role: Role | null, pathname: string, access: { payro
   if (role === 'client') {
     // The dashboard, and the person's own login (password, second step, sessions).
     if (pathname === '/' || pathname === '/account') return true;
-    // The list and one invoice, but not the form that writes a new one.
+    // The list and one invoice or bill, but not the forms that write a new one.
     if (pathname === '/invoices' || (pathname.startsWith('/invoices/') && pathname !== '/invoices/new')) return true;
+    if (pathname === '/ap/bills' || (pathname.startsWith('/ap/bills/') && pathname !== '/ap/bills/new')) return true;
     return CLIENT_PAGES.some(page => under(pathname, page));
   }
+  if (CLIENT_ONLY_PAGES.some(page => under(pathname, page))) return false;
   // A view-only login opens every page staff can, except the forms that add something.
   if (role === 'viewer' && /\/(new|import)(\/|$)/.test(pathname)) return false;
   if (FIRM_ADMIN_PAGES.some(page => under(pathname, page))) return role === 'firm_admin';

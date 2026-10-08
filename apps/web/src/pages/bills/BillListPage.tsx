@@ -4,6 +4,7 @@ import { AlertCircle, ChevronDown, FileDown, Printer, Settings, X } from 'lucide
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
+import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -52,6 +53,8 @@ function dateRangeBounds(value: string): { from: string; to: string } | null {
 
 export default function BillListPage() {
   const [bizId] = useActiveBusinessId();
+  // A client or view-only login reads bills; entering and paying them is for staff and up.
+  const canEnter = roleAtLeast(useEffectiveRole(), 'staff');
   const [items, setItems] = useState<BillSummary[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -127,8 +130,8 @@ export default function BillListPage() {
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
           </div>
-          <Button asChild variant="outline"><Link to="/ap/bill-payments/new">Pay bills</Link></Button>
-          <Button asChild><Link to="/ap/bills/new">Add bill</Link></Button>
+          {canEnter && <Button asChild variant="outline"><Link to="/ap/bill-payments/new">Pay bills</Link></Button>}
+          {canEnter && <Button asChild><Link to="/ap/bills/new">Add bill</Link></Button>}
         </div>
       </div>
 
@@ -178,17 +181,17 @@ export default function BillListPage() {
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="inline-flex items-center gap-2">
-              <Link className="text-primary hover:underline" to={`/ap/bills/${r.id}`}>View/Edit</Link>
-              {r.status === 'posted' && (
+              <Link className="text-primary hover:underline" to={`/ap/bills/${r.id}`}>{canEnter ? 'View/Edit' : 'View'}</Link>
+              {canEnter && r.status === 'posted' && (
                 <>
                   <span className="text-muted-foreground/50">|</span>
                   <Link className="text-primary hover:underline" to={`/ap/bill-payments/new?vendor_id=${r.vendor_id}&bill_id=${r.id}`}>Pay bill</Link>
                 </>
               )}
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              {canEnter && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
             </span>
           )}
-          emptyMessage={<EmptyState title="No bills found" hint="Adjust the filters above, or enter a bill to schedule a payment." actionLabel="Add bill" actionTo="/ap/bills/new" />}
+          emptyMessage={<EmptyState title="No bills found" hint={canEnter ? 'Adjust the filters above, or enter a bill to schedule a payment.' : 'Nothing matches the filters above.'} {...(canEnter ? { actionLabel: 'Add bill', actionTo: '/ap/bills/new' } : {})} />}
         />
       </CardContent></Card>
     </div>

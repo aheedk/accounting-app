@@ -9,6 +9,8 @@ import {
   FileBarChart,
   LayoutDashboard,
   ListChecks,
+  MessageSquare,
+  Upload,
   Package,
   Settings,
   Users,
@@ -22,6 +24,7 @@ import { BookmarkMenu } from './BookmarkMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
 import { usePendingImportCount } from '@/lib/usePendingImportCount';
 import { useCanOpen } from '@/lib/roleAccess';
+import { useUnreadMessages } from '@/lib/useUnreadMessages';
 
 type NavChild = { to: string; label: string };
 type NavGroup = {
@@ -38,6 +41,19 @@ const ALL_GROUPS: NavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     to: '/',
+  },
+  {
+    id: 'messages',
+    label: 'Messages',
+    icon: MessageSquare,
+    to: '/messages',
+  },
+  {
+    // A client's page; the firm uploads from the AI inbox.
+    id: 'send-documents',
+    label: 'Send documents',
+    icon: Upload,
+    to: '/documents/send',
   },
   {
     id: 'transactions',
@@ -201,6 +217,13 @@ type SidebarNavProps = {
 };
 
 const AI_INBOX_PATH = '/ai/inbox';
+const MESSAGES_PATH = '/messages';
+
+/** The count beside Messages: what this person has not read on the open company's thread. */
+function UnreadPill({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return <span className="ml-auto rounded-full bg-gold px-1.5 text-xs font-semibold text-sidebar" title={`${count} unread`}>{count}</span>;
+}
 
 // Portal keeps flyouts outside the sidebar's scroll clipping without moving its rows.
 function DesktopSidebarNav() {
@@ -208,6 +231,7 @@ function DesktopSidebarNav() {
   const groups = useNavGroups();
   const [openId, setOpenId] = useState<string | null>(null);
   const pendingImports = usePendingImportCount();
+  const unreadMessages = useUnreadMessages();
   const [position, setPosition] = useState({ left: 256, top: 8 });
   const navRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -265,7 +289,7 @@ function DesktopSidebarNav() {
         const Icon = item.icon;
         const active = item.children?.some(child => pathMatchesChild(pathname, child)) ?? pathname === item.to;
         const rowClass = cn('flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-hover hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', active || openId === item.id ? 'bg-sidebar-active text-white' : 'text-sidebar-muted');
-        if (!item.children) return <NavLink key={item.id} to={item.to ?? '/'} end className={rowClass} onClick={closeGroup} onMouseEnter={() => { if (!pinnedRef.current) closeGroup(); }}><Icon className="h-4 w-4 shrink-0" />{item.label}</NavLink>;
+        if (!item.children) return <NavLink key={item.id} to={item.to ?? '/'} end className={rowClass} onClick={closeGroup} onMouseEnter={() => { if (!pinnedRef.current) closeGroup(); }}><Icon className="h-4 w-4 shrink-0" />{item.label}{item.to === MESSAGES_PATH && <UnreadPill count={unreadMessages} />}</NavLink>;
         return (
           <button key={item.id} type="button" className={rowClass} aria-expanded={openId === item.id} aria-controls={openId === item.id ? 'sidebar-flyout' : undefined}
             onMouseEnter={event => { if (!pinnedRef.current) openGroup(item.id, event.currentTarget); }} onMouseLeave={scheduleClose}
@@ -311,6 +335,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
   const pathname = location.pathname;
   const groups = useNavGroups();
   const pendingImports = usePendingImportCount();
+  const unreadMessages = useUnreadMessages();
 
   const activeGroupId = useMemo(() => {
     for (const g of groups) {
@@ -364,6 +389,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span>{group.label}</span>
+              {to === MESSAGES_PATH && <UnreadPill count={unreadMessages} />}
             </NavLink>
           );
         }
