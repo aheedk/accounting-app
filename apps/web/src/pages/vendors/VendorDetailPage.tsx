@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, Menu, Plus, Search } from 'lucide-react';
+import { ChevronLeft, PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -91,22 +91,22 @@ function VendorSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-12 shrink-0 border-r pt-1">
+      <div className="sticky top-4 w-12 shrink-0 border-r pt-1 lg:top-6">
         <button type="button" onClick={onToggleCollapsed} aria-label="Show vendor list" className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-          <Menu className="h-4 w-4" />
+          <PanelLeftOpen className="h-4 w-4" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex w-64 shrink-0 flex-col border-r pr-3">
+    <div className="sticky top-4 flex max-h-[calc(100vh-2rem)] w-64 shrink-0 flex-col border-r pr-3 lg:top-6 lg:max-h-[calc(100vh-3rem)]">
       <div className="mb-3 flex items-center justify-end gap-1">
         <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
           <Link to="/ap/vendors/new" aria-label="New vendor"><Plus className="h-4 w-4" /></Link>
         </Button>
         <button type="button" onClick={onToggleCollapsed} aria-label="Hide vendor list" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-          <Menu className="h-4 w-4" />
+          <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
       <div className="relative mb-2">
