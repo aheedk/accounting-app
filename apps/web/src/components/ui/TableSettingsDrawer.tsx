@@ -27,8 +27,8 @@ type Props = {
 };
 
 function Section({
-  title, badge, isOpen, onToggle, children,
-}: { title: string; badge?: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
+  title, isOpen, onToggle, children,
+}: { title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="border-b py-3 first:pt-0 last:border-b-0">
       <button
@@ -38,7 +38,6 @@ function Section({
       >
         <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''}`} />
         {title}
-        {badge && <span className="rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">{badge}</span>}
       </button>
       {isOpen && <div className="mt-3 pl-6">{children}</div>}
     </div>
@@ -209,7 +208,7 @@ export function TableSettingsDrawer({ open, onClose, columns, sortFields, defaul
           </Section>
 
           {availableFilters && availableFilters.length > 0 && (
-            <Section title="Filters" badge="NEW" isOpen={openSections.has('filters')} onToggle={() => toggleSection('filters')}>
+            <Section title="Filters" isOpen={openSections.has('filters')} onToggle={() => toggleSection('filters')}>
               <p className="mb-2 text-xs text-muted-foreground">Drag to change the order of filters.</p>
               <div className="space-y-1">
                 {filterKeys.map((key, i) => (
