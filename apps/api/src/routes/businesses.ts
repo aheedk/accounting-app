@@ -68,6 +68,7 @@ router.patch('/businesses/:businessId', requireMinRole('firm_admin'), async (req
     if (body.address !== undefined) patch.address = body.address ?? null;
     if (body.import_email !== undefined) patch.import_email = body.import_email ?? null;
     if (body.ai_auto_post_enabled !== undefined) patch.ai_auto_post_enabled = body.ai_auto_post_enabled;
+    if (body.staff_entries_need_approval !== undefined) patch.staff_entries_need_approval = body.staff_entries_need_approval;
     if (body.capitalization_threshold !== undefined) patch.capitalization_threshold = body.capitalization_threshold.toFixed(2);
 
     const updated = await db.transaction().execute(trx =>

@@ -248,9 +248,10 @@ describe('role matrix', () => {
     expect(staffWrites).toEqual([...STAFF_MAY_WRITE].sort());
   });
 
-  it('staff can read everything an accountant can, except the activity log', () => {
+  it('staff can read everything an accountant can, except the activity log and the count of what waits for approval', () => {
     // The log shows what everyone did, with each record before and after.
-    expect(rows.filter(r => r.method === 'GET' && r.staff === 403 && r.accountant !== 403).map(name)).toEqual(['GET ~/activity-log']);
+    expect(rows.filter(r => r.method === 'GET' && r.staff === 403 && r.accountant !== 403).map(name).sort())
+      .toEqual(['GET ~/activity-log', 'GET ~/approvals/pending-count']);
   });
 
   it('only a firm admin may do exactly what is listed', () => {

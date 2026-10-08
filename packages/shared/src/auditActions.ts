@@ -232,6 +232,11 @@ export const AUDIT = {
 
   // Messages between a client and the firm
   MESSAGE_CREATE: 'message.create',
+
+  // The approval step: staff entries that wait for an accountant
+  APPROVAL_REQUEST: 'approval.request',
+  APPROVAL_APPROVE: 'approval.approve',
+  APPROVAL_REJECT: 'approval.reject',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

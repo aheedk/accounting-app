@@ -14,6 +14,8 @@ export type BusinessPatch = {
   address?: BusinessAddress | null;
   import_email?: string | null;
   ai_auto_post_enabled?: boolean;
+  /** Staff entries that would post at once wait for an accountant. */
+  staff_entries_need_approval?: boolean;
   /** Invoice lines at or above this amount are coded to a fixed asset, not expensed. */
   capitalization_threshold?: string;
 };
@@ -29,7 +31,7 @@ export type BusinessCreateInput = {
 const BUSINESS_COLUMNS = [
   'id', 'firm_id', 'name', 'legal_name', 'tax_id',
   'fiscal_year_start_month', 'address', 'import_email',
-  'ai_auto_post_enabled', 'capitalization_threshold', 'created_at', 'updated_at',
+  'ai_auto_post_enabled', 'staff_entries_need_approval', 'capitalization_threshold', 'created_at', 'updated_at',
 ] as const;
 
 // Creates a new client business under the caller's firm, seeds it with the
@@ -123,6 +125,7 @@ export async function updateBusiness(
     address?: string | null;
     import_email?: string | null;
     ai_auto_post_enabled?: boolean;
+    staff_entries_need_approval?: boolean;
     capitalization_threshold?: string;
   } = {};
   if (input.patch.name !== undefined) updateSet.name = input.patch.name;
@@ -139,6 +142,7 @@ export async function updateBusiness(
   // switch never saved (and an update of nothing else failed outright).
   if (input.patch.ai_auto_post_enabled !== undefined) updateSet.ai_auto_post_enabled = input.patch.ai_auto_post_enabled;
   if (input.patch.capitalization_threshold !== undefined) updateSet.capitalization_threshold = input.patch.capitalization_threshold;
+  if (input.patch.staff_entries_need_approval !== undefined) updateSet.staff_entries_need_approval = input.patch.staff_entries_need_approval;
   if (Object.keys(updateSet).length === 0) return getBusiness(trx, input.business_id);
 
   const updated = await trx.updateTable('businesses')

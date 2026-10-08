@@ -31,6 +31,8 @@ export interface BusinessesTable {
   import_email: string | null;
   /** Firm policy: auto-post high-confidence AI suggestions without review. */
   ai_auto_post_enabled: Generated<boolean>;
+  /** With this on, staff entries that would post at once wait for an accountant (migration 0095). */
+  staff_entries_need_approval: Generated<boolean>;
   /** Amount at or above which a long-lived tangible item is capitalized. */
   capitalization_threshold: ColumnType<string, string | number | undefined, string | number>;
   created_at: Generated<Timestamp>;
@@ -1017,6 +1019,25 @@ export interface NumberingCountersTable {
   last_value: ColumnType<string, string | number | undefined, string | number>;
 }
 
+// A staff entry waiting for an accountant (migration 0095).
+export interface ApprovalRequestsTable {
+  id: Generated<string>;
+  business_id: string;
+  requested_by_user_id: string;
+  action: string;
+  method: string;
+  path: string;
+  payload: ColumnType<unknown, string, string>;
+  summary: string;
+  amount: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  status: Generated<string>;
+  decided_by_user_id: string | null;
+  decided_at: Timestamp | null;
+  decision_note: string | null;
+  result: ColumnType<unknown, string | null | undefined, string | null>;
+  created_at: Generated<Timestamp>;
+}
+
 // The thread between a client and the firm (migration 0094).
 export interface MessagesTable {
   id: Generated<string>;
@@ -1100,6 +1121,7 @@ export interface DB {
   bank_deposit_lines: BankDepositLinesTable;
   messages: MessagesTable;
   message_reads: MessageReadsTable;
+  approval_requests: ApprovalRequestsTable;
 }
 
 export interface InvoiceImportStagingTable {

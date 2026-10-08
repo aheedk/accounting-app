@@ -73,6 +73,9 @@ import { requireAuth } from './middleware/auth.js';
 import { PAYROLL_PATHS, requirePayrollAccess } from './middleware/payrollAccess.js';
 import activityLogRouter from './routes/activityLog.js';
 import messagesRouter from './routes/messages.js';
+import approvalsRouter from './routes/approvals.js';
+import { resolveBusiness } from './middleware/tenancy.js';
+import { holdStaffEntries } from './middleware/approvalHold.js';
 
 export function makeApp(): Express {
   const app = express();
@@ -94,6 +97,9 @@ export function makeApp(): Express {
   app.use(meRoutes);
   // In front of every router: payroll is closed to a login it has been switched off for.
   app.use(PAYROLL_PATHS, requireAuth, requirePayrollAccess);
+  // Also in front of every router: in a company that asks for it, a staff
+  // login's entries that would post at once wait for an accountant instead.
+  app.use('/businesses/:businessId', requireAuth, resolveBusiness, holdStaffEntries);
   app.use(coaRoutes);
   app.use(periodRoutes);
   app.use(journalEntryRoutes);
@@ -155,6 +161,7 @@ app.use(searchRouter);
 app.use(transfersRouter);
   app.use(activityLogRouter);
   app.use(messagesRouter);
+  app.use(approvalsRouter);
   app.use(errorHandler);
   return app;
 }

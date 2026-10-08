@@ -52,6 +52,7 @@ export async function stopTestDb(): Promise<void> {
 export async function truncateAll(db: Kysely<DB>) {
   await sql`
     TRUNCATE
+      approval_requests,
       message_reads,
       messages,
       check_lines,
