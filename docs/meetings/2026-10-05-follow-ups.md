@@ -123,41 +123,44 @@ Audit bugs fixed (part of item 17), all Aheed:
 | Management Reports shows revenue by month (every month read 0.00) | `8d33f9a` |
 | Net Operating Income on the Profit & Loss takes operating expenses off | `95b12eb` |
 | Bank Transactions → Categorize starts with no account chosen | `614d5d4` |
-| A/P Aging report; both aging reports split 61–90 / 91+ and equal the ledger | `5099ac8` |
-| Statement of Cash Flows (operating, investing, financing) | `8ab2737` |
-| P&L and three other reports count reversing entries | `bd80fcb` |
-| Balance sheet still balances after year end; year to date follows the fiscal year | `f6101a7` |
-| Client Overview and A/P Overview agree with the ledger | `556aeaa` |
-| Payments, Credit Memos, Bill Payments and Vendor Credits open on This year | `7ed7be7` |
-| Vendor page counts, Books Review month, recurring template amounts | `26e921a` |
-| Fixed Assets says when the register and the ledger differ | `70a62f8` |
-| Contractors → Create bill keeps the contractor; Copy link confirms; journal entry links to its source | `528485e` |
-| Codes read as words, quantities lose their padding, Ctrl K on Windows | `c91f78a` |
-| The auto-post switch saves (it never had); capitalization threshold has a setting | `34eee11` |
-| Bank Accounts shows book balances; pages print without the sidebar and top bar | `c1f13f0` |
-| The search box finds customers, vendors, invoices and bills | `e6e6bb4` |
-| Bank Transactions → Categorize shows the coding engine's suggestion | `7eb3667` |
+| A/P Aging report; both aging reports split 61–90 / 91+ and equal the ledger | `861868f` |
+| Statement of Cash Flows (operating, investing, financing) | `ad9deca` |
+| P&L and three other reports count reversing entries | `0ebf728` |
+| Balance sheet still balances after year end; year to date follows the fiscal year | `0115d24` |
+| Client Overview and A/P Overview agree with the ledger | `460abea` |
+| Payments, Credit Memos, Bill Payments and Vendor Credits open on This year | `cb49588` |
+| Vendor page counts, Books Review month, recurring template amounts | `f23ed00` |
+| Fixed Assets says when the register and the ledger differ | `453a0fe` |
+| Contractors → Create bill keeps the contractor; Copy link confirms; journal entry links to its source | `d7241c6` |
+| Codes read as words, quantities lose their padding, Ctrl K on Windows | `4f32db4` |
+| The auto-post switch saves (it never had); capitalization threshold has a setting | `9666e52` |
+| Bank Accounts shows book balances; pages print without the sidebar and top bar | `551ad65` |
+| The search box finds customers, vendors, invoices and bills | `a0bdc04` |
+| Bank Transactions → Categorize shows the coding engine's suggestion | `4cb59f6` |
 
 Features the audit listed as missing (part of item 17), all Aheed:
 
 | What | Where |
 |---|---|
-| Integration Transactions → Categorize shows the coding engine's suggestion | `722854f` |
-| An invoice saves as a PDF | `af20355` |
-| Transfer between two accounts | `f029fb5` |
-| Pay Bills: every unpaid bill, several vendors at once | `f09908a` |
-| Run payroll from the app | `20582eb` |
-| Inventory reaches the ledger: cost of goods sold, opening stock, adjustments | `a85d9cd` |
-| A journal entry's Class column picks a cost center | `7bf3fec` |
-| Edit an employee, a recurring template, a tax code, a learned coding rule | `bf16625`, `f988164`, `7d397b4`, `dfc6204` |
-| Correct a posted invoice | `8bab211` |
-| No ids on shipping labels, Receipts or Fixed Assets | `e905dcb`, `bf1debe` |
-| Dashboard shows cash, owed to you, you owe, and profit this month | `3c1ec9d` |
-| Table headers all in capitals; Employee, Fixed Asset and Purchase Order pages restyled | `306bf09`, `bf1debe` |
+| Integration Transactions → Categorize shows the coding engine's suggestion | `6587a79` |
+| An invoice saves as a PDF | `6a6070a` |
+| Transfer between two accounts | `c71ccb4` |
+| Pay Bills: every unpaid bill, several vendors at once | `5f9fa96` |
+| Run payroll from the app | `d069f4b` |
+| Inventory reaches the ledger: cost of goods sold, opening stock, adjustments | `a1a6073` |
+| A journal entry's Class column picks a cost center | `20b1e25` |
+| Edit an employee, a recurring template, a tax code, a learned coding rule | `454f93f`, `59c6abc`, `99081d8`, `3c9bb88` |
+| Correct a posted invoice | `2ca153d` |
+| No ids on shipping labels, Receipts or Fixed Assets | `4d791cc`, `c3cd71f` |
+| Dashboard shows cash, owed to you, you owe, and profit this month | `37033c9` |
+| Table headers all in capitals; Employee, Fixed Asset and Purchase Order pages restyled | `f687b0b`, `c3cd71f` |
 
 Also added by Riham since the meeting: Write Check (Accounts Payable → Checks),
 the Transactions page, the table-settings gear on list pages, vendor batch
 actions with active / inactive, and a fuller add-vendor popup in the AI inbox.
+Pulled 2026-10-08: date-range and amount filters, Due date and Balance columns,
+and print / CSV on the Transactions page; and a vendor's page now lists every
+kind of transaction, with a vendor list down the side that folds away.
 
 After pulling, run `npm run db:migrate` (migrations `0084`–`0090`).
 
