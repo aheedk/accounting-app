@@ -71,6 +71,7 @@ describe('VendorDetailPage', () => {
       if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: v });
       if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
       if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
+      if (url.endsWith('/transactions')) return Promise.resolve({ data: { transactions: [], total: 0 } });
       return Promise.resolve({ data: {} });
     });
     await act(async () => {
@@ -130,5 +131,43 @@ describe('VendorDetailPage', () => {
   it('shows an Inactive badge next to the name for a deactivated vendor', async () => {
     await render(vendor({ is_active: false }));
     expect(container.textContent).toContain('Inactive');
+  });
+
+  it('has a back link to the vendor list', async () => {
+    await render();
+    const back = Array.from(container.querySelectorAll('a')).find(a => a.textContent?.includes('Back to vendors'));
+    expect(back?.getAttribute('href')).toBe('/ap/vendors');
+  });
+
+  it('lists transactions from the unified transactions endpoint (not just bills), linking to each one\'s own page', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: vendor() });
+      if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
+      if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
+      if (url.endsWith('/transactions')) {
+        return Promise.resolve({
+          data: {
+            total: 1,
+            transactions: [{
+              id: 'c1', type: 'check', date: '2026-08-11', ref_no: '5545', total_amount: '80.0000',
+              status: 'posted', updated_at: '2026-08-11T00:00:00Z', path: '/accounting/checks/c1',
+            }],
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/ap/vendors/v2']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes><Route path="/ap/vendors/:id" element={<VendorDetailPage />} /></Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).toContain('Check');
+    expect(container.textContent).toContain('5545');
+    const link = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'View/Edit');
+    expect(link?.getAttribute('href')).toBe('/accounting/checks/c1');
   });
 });

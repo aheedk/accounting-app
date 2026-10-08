@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -10,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { fmtDateTime, todayLocal } from '@/lib/dates';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Vendor = {
@@ -40,6 +41,19 @@ type Vendor = {
 };
 type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string };
 type Account = { id: string; name: string };
+// Every transaction type this vendor can appear on (bills, checks, expenses,
+// journal entries, ...) — the unified transactions endpoint's contact_id
+// filter, not just the AP-specific bills list, so Checks/Expenses actually
+// show up here instead of only Bills.
+type VendorTransaction = {
+  id: string; type: string; date: string; ref_no: string | null;
+  total_amount: string; status: string; updated_at: string; path: string;
+};
+
+const TX_TYPE_LABELS: Record<string, string> = {
+  deposit: 'Deposit', expense: 'Expense', check: 'Check', journal: 'Journal Entry',
+  bill: 'Bill', payment: 'Payment', credit_memo: 'Credit Memo',
+};
 
 const TABS = [
   { value: 'transactions', label: 'Transaction list' },
@@ -70,6 +84,7 @@ export default function VendorDetailPage() {
   const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [bills, setBills] = useState<BillSummary[]>([]);
+  const [transactions, setTransactions] = useState<VendorTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<string>('transactions');
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -80,6 +95,8 @@ export default function VendorDetailPage() {
     api.get(`/businesses/${bizId}/vendors/${id}`).then(r => setVendor(r.data));
     api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: id, limit: 1000 } }).then(r => setBills(r.data.bills));
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts));
+    api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
+      .then(r => setTransactions(r.data.transactions));
   }, [bizId, id]);
 
   async function deleteVendor() {
@@ -114,6 +131,10 @@ export default function VendorDetailPage() {
   if (!vendor) return <div>Loading…</div>;
   return (
     <div className="space-y-6">
+      <Link to="/ap/vendors" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Back to vendors
+      </Link>
+
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</div>
@@ -169,10 +190,10 @@ export default function VendorDetailPage() {
 
       {tab === 'transactions' && (
         <Card><CardContent className="p-0">
-          {bills.length === 0 ? (
+          {transactions.length === 0 ? (
             <EmptyState
               title="No transactions yet"
-              hint="Bills and payments for this vendor will show up here."
+              hint="Bills, checks, expenses and payments for this vendor will show up here."
               actionLabel="Create bill"
               actionTo={`/ap/bills/new?vendor_id=${vendor.id}`}
             />
@@ -180,24 +201,26 @@ export default function VendorDetailPage() {
             <table className="w-full text-sm">
               <thead className="border-b">
                 <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <th className="p-3 text-left">No.</th>
                   <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-left">Due date</th>
+                  <th className="p-3 text-left">Type</th>
+                  <th className="p-3 text-left">No.</th>
                   <th className="p-3 text-left">Status</th>
                   <th className="p-3 text-right">Total</th>
+                  <th className="p-3 text-left">Last modified</th>
                   <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {bills.map(b => (
-                  <tr key={b.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="p-3 font-mono">{b.bill_number}</td>
-                    <td className="p-3 whitespace-nowrap">{b.bill_date}</td>
-                    <td className="p-3 whitespace-nowrap">{b.due_date}</td>
-                    <td className="p-3 capitalize">{b.status === 'posted' ? 'Open' : b.status}</td>
-                    <td className="p-3 text-right font-mono">{fmtMoney(b.total)}</td>
+                {transactions.map(tx => (
+                  <tr key={`${tx.type}:${tx.id}`} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 whitespace-nowrap">{tx.date}</td>
+                    <td className="p-3">{TX_TYPE_LABELS[tx.type] ?? tx.type}</td>
+                    <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="p-3 capitalize">{tx.status}</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
+                    <td className="p-3 whitespace-nowrap text-muted-foreground">{fmtDateTime(tx.updated_at)}</td>
                     <td className="p-3 text-right">
-                      <Link className="text-primary hover:underline" to={`/ap/bills/${b.id}`}>View/Edit</Link>
+                      <Link className="text-primary hover:underline" to={tx.path}>View/Edit</Link>
                     </td>
                   </tr>
                 ))}
