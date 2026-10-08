@@ -39,7 +39,8 @@ Production-grade accounting system for an accounting firm.
 
 ### Routes
 - Mount: `router.use('/businesses/:businessId', requireAuth, resolveBusiness);` — `:businessId` MUST be in the mount path so the param is captured before middleware runs.
-- Use `requireRole('accountant')` or `requireRole('firm_admin')` for state-changing endpoints; reads usually allow `staff+`.
+- Guard every state-changing endpoint with `requireMinRole('staff' | 'accountant' | 'firm_admin')`. Reads are open to staff and up. A `client` is refused everything not listed in `apps/api/src/lib/clientAccess.ts`, so a new route is closed to clients by default.
+- `tests/integration/roleMatrix.test.ts` calls every route as every role. A new state-changing route fails it until the route is added to that file's list of what staff may change or what only a firm admin may do. Add it on purpose.
 
 ### TypeScript
 - `no-explicit-any: error`. Use `catch (e: unknown)` with typed narrowing.
@@ -58,6 +59,8 @@ Production-grade accounting system for an accounting firm.
 ### RBAC
 - Roles in `packages/shared/src/roles.ts`: `firm_admin` (40) > `accountant` (30) > `staff` (20) > `client` (10).
 - Use `hasMinRole(actual, min)` from `@accounting/shared`.
+- Web: read the role with `useEffectiveRole()` from `@/lib/roleAccess`, never `user.role`. A role given for one company overrides the firm-wide one, and it is the one the API checks. `canOpenPage(role, path)` in the same file decides what the sidebar, + New and search offer.
+- What each role can do, and the decisions still open: `docs/qa/2026-10-08-role-audit.md`.
 
 ### Audit + schemas
 - Audit actions live in `packages/shared/src/auditActions.ts` — append, never reorder.

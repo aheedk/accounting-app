@@ -68,6 +68,12 @@ Every bug, wrong number and missing feature in the audit is done, except:
 - **1099 and card payments.** Payments made to a contractor by card are now left
   off the 1099, because the card processor reports them on a 1099-K. Confirm that
   is how the firm files.
+- **What each role may do.** The other three roles were tested on 10-08
+  (`docs/qa/2026-10-08-role-audit.md`). Five things need the firm's answer: staff can
+  record expenses, checks and deposits, which post at once; staff can add a customer
+  but not edit one; an accountant cannot add an employee, a bank account or a tax
+  code; what a client should see beyond invoices and six reports; and who may
+  connect the firm's Gmail.
 - **Email from the app.** Emailing vendors now opens the user's own mail program
   with the message started. Is that enough, or should the app send the email
   itself? That needs a mail service, and so does emailing an invoice.
@@ -95,7 +101,7 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 25 | Modules per client, priced separately (bookkeeping vs. AR, AP and the rest) |
 | 26 | Sign in with Microsoft 365 or Google |
 | 27 | One login shared with the practice management software |
-| 28 | Security review and testing |
+| 28 | Security review and testing. Roles were covered on 10-08 (`docs/qa/2026-10-08-role-audit.md`); that audit also lists what is missing: removing a user, changing or resetting a password, a limit on wrong passwords, two-step sign-in |
 | 29 | Mobile app, last |
 | 30 | Moving the practice management software off Base44 (separate project) |
 
@@ -123,6 +129,7 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 13 | Audit history on Journal Entry and Bank Deposit, and Copy on Bank Deposit, work | Aheed, `11452ee` |
 | 33 | Vendors list: Email and "Ask vendor for info" start a message in the user's mail program | Aheed, `258cdef` |
 | 12 | Check is in the "+ New" menu (the rest of 12 is open) | Aheed, `8ebcbdb` |
+| — | Role audit: a client login sees only its reports and invoices (it could read almost everything), menus and buttons follow the role, a firm admin keeps every client after a reload | Aheed, `d08f828`, `f894249`, `06ac174`, `88de457`, `bcc694d` |
 
 Audit bugs fixed (part of item 17), all Aheed:
 
@@ -321,6 +328,24 @@ since the meeting is in this section: the first four parts are for the meeting, 
   Ask vendor for info opens a ready-written request for their W-9 and details. A
   vendor with no email address gets a message saying so.
 - **Check in + New (item 12).** + New → Check, under Vendors.
+
+### Roles (tested 10-08)
+
+Run `npm run db:role-users` first. It makes three logins for Green Gadgets and prints
+their password.
+
+- **Client.** Sign in as `client@roletest.local`. The sidebar has only Dashboard,
+  Accounts Receivable (Invoices, Aging), Accounts Payable (Aging) and Reports. There is
+  no + New. Open an invoice: Print and Save as PDF, nothing that changes it. Type
+  `/payroll/employees` in the address bar: "This page is not part of your access".
+  Before, this login could open payroll, bank lines and the AI inbox.
+- **Staff.** Sign in as `staff@roletest.local`. + New lists only what staff can save
+  (no Journal entry, Transfer, Run payroll, Credit memo). Accounting → Recurring
+  Transactions → Run now: "This needs an accountant or a firm admin."
+- **Accountant.** Sign in as `accountant@roletest.local`. Setup has no Users. Setup →
+  Tax Codes has no New tax code, and Accounting → Bank Accounts no Add bank account:
+  those are for a firm admin.
+- Ask the roles question from "Questions for the firm" here.
 
 ### Other fixes worth a minute
 

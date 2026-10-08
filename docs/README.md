@@ -10,7 +10,7 @@ to run the app.
 | [`guides/`](./guides/) | How-to guides. [`running-locally.md`](./guides/running-locally.md) starts the app and covers developer gotchas. |
 | [`specs/`](./specs/) | Design specs: how a feature is meant to work and why. Named `YYYY-MM-DD-<topic>-design.md`. |
 | `plans/` | Step-by-step implementation plans for work in progress (created as needed; removed once the work ships — git history keeps them). |
-| [`qa/`](./qa/) | Testing: the full-app audit (bugs by priority) and the Chart of Accounts test guide. |
+| [`qa/`](./qa/) | Testing: the full-app audit (bugs by priority), the role audit (what a client, staff, an accountant and a firm admin can each see and do), and the Chart of Accounts test guide. |
 
 ## Specs
 
