@@ -194,12 +194,56 @@ describe('VendorDetailPage', () => {
       );
     });
 
-    const otherLink = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'Other Vendor');
+    const otherLink = Array.from(container.querySelectorAll('a')).find(a => a.textContent?.includes('Other Vendor'));
     expect(otherLink?.getAttribute('href')).toBe('/ap/vendors/v3');
 
     const toggle = container.querySelector('button[aria-label="Hide vendor list"]') as HTMLButtonElement;
     await click(toggle);
     expect(container.querySelector('button[aria-label="Show vendor list"]')).toBeTruthy();
-    expect(Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'Other Vendor')).toBeUndefined();
+    expect(Array.from(container.querySelectorAll('a')).find(a => a.textContent?.includes('Other Vendor'))).toBeUndefined();
+  });
+
+  it('sorts the sidebar by open balance, computed from posted bills', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: vendor() });
+      if (url.endsWith('/vendors')) {
+        return Promise.resolve({
+          data: { vendors: [{ id: 'v2', name: 'Clean Vendor', is_active: true }, { id: 'v3', name: 'Other Vendor', is_active: true }] },
+        });
+      }
+      if (url.endsWith('/bills')) {
+        return Promise.resolve({
+          data: {
+            bills: [
+              { id: 'b1', vendor_id: 'v2', status: 'posted', total: '50.00' },
+              { id: 'b2', vendor_id: 'v3', status: 'posted', total: '500.00' },
+              { id: 'b3', vendor_id: 'v3', status: 'paid', total: '9999.00' },
+            ],
+          },
+        });
+      }
+      if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
+      if (url.endsWith('/transactions')) return Promise.resolve({ data: { transactions: [], total: 0 } });
+      return Promise.resolve({ data: {} });
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/ap/vendors/v2']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes><Route path="/ap/vendors/:id" element={<VendorDetailPage />} /></Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    const select = container.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
+    await click(select);
+    const balanceOption = Array.from(container.querySelectorAll('[role="option"]')).find(o => o.textContent?.includes('open balance')) as HTMLElement;
+    await click(balanceOption);
+
+    const names = Array.from(container.querySelectorAll('a')).map(a => a.textContent).filter((t): t is string => !!t && (t.includes('Vendor')));
+    const otherIdx = names.findIndex(t => t.includes('Other Vendor'));
+    const cleanIdx = names.findIndex(t => t.includes('Clean Vendor'));
+    // Other Vendor has $500 open (the $9999 bill is paid, excluded); Clean Vendor has $50 — Other sorts first.
+    expect(otherIdx).toBeGreaterThanOrEqual(0);
+    expect(otherIdx).toBeLessThan(cleanIdx);
   });
 });

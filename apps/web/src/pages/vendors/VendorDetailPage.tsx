@@ -6,6 +6,7 @@ import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
+import { AppSelect } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,8 @@ type Vendor = {
   has_transactions: boolean;
 };
 type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string };
+// For the sidebar's "Sort by open balance" — business-wide, not just this vendor's.
+type VendorBillSummary = { vendor_id: string; status: string; total: string };
 type Account = { id: string; name: string };
 // Every transaction type this vendor can appear on (bills, checks, expenses,
 // journal entries, ...) — the unified transactions endpoint's contact_id
@@ -78,16 +81,35 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+type VendorSortKey = 'name' | 'balance';
+
 function VendorSidebar({
-  vendors, activeId, collapsed, onToggleCollapsed,
-}: { vendors: VendorListItem[]; activeId: string | undefined; collapsed: boolean; onToggleCollapsed: () => void }) {
+  vendors, bills, activeId, collapsed, onToggleCollapsed,
+}: {
+  vendors: VendorListItem[]; bills: VendorBillSummary[]; activeId: string | undefined;
+  collapsed: boolean; onToggleCollapsed: () => void;
+}) {
   const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<VendorSortKey>('name');
+
+  const openBalanceByVendor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of bills) {
+      if (b.status !== 'posted') continue;
+      m.set(b.vendor_id, (m.get(b.vendor_id) ?? 0) + Number(b.total));
+    }
+    return m;
+  }, [bills]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q ? vendors.filter(v => v.name.toLowerCase().includes(q)) : vendors;
-    return [...list].sort((a, b) => a.name.localeCompare(b.name));
-  }, [vendors, query]);
+    return [...list].sort((a, b) => (
+      sortKey === 'balance'
+        ? (openBalanceByVendor.get(b.id) ?? 0) - (openBalanceByVendor.get(a.id) ?? 0)
+        : a.name.localeCompare(b.name)
+    ));
+  }, [vendors, query, sortKey, openBalanceByVendor]);
 
   if (collapsed) {
     return (
@@ -111,8 +133,12 @@ function VendorSidebar({
       </div>
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input className="h-9 pl-8 text-sm" placeholder="Filter by name" value={query} onChange={e => setQuery(e.target.value)} />
+        <Input className="h-9 pl-8 text-sm" placeholder="Search" value={query} onChange={e => setQuery(e.target.value)} />
       </div>
+      <AppSelect className="mb-2 h-9 rounded-md border bg-background px-3 text-sm font-medium" value={sortKey} onChange={e => setSortKey(e.target.value as VendorSortKey)}>
+        <option value="name">Sort by name</option>
+        <option value="balance">Sort by open balance</option>
+      </AppSelect>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {filtered.map(v => (
           <Link
@@ -120,8 +146,10 @@ function VendorSidebar({
             to={`/ap/vendors/${v.id}`}
             className={`block truncate rounded-md px-2 py-2 text-sm ${v.id === activeId ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
           >
-            {v.name}
-            {!v.is_active && <span className="ml-1.5 text-xs text-muted-foreground">(inactive)</span>}
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate">{v.name}{!v.is_active && <span className="ml-1.5 text-xs text-muted-foreground">(inactive)</span>}</span>
+            </div>
+            <div className="font-mono text-xs text-muted-foreground">{fmtMoney(String(openBalanceByVendor.get(v.id) ?? 0))}</div>
           </Link>
         ))}
         {filtered.length === 0 && <div className="px-2 py-2 text-sm text-muted-foreground">No vendors found</div>}
@@ -145,6 +173,7 @@ export default function VendorDetailPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [vendorList, setVendorList] = useState<VendorListItem[]>([]);
+  const [allBills, setAllBills] = useState<VendorBillSummary[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
@@ -161,6 +190,7 @@ export default function VendorDetailPage() {
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/vendors`, { params: { include_inactive: 'true' } }).then(r => setVendorList(r.data.vendors));
+    api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setAllBills(r.data.bills));
   }, [bizId]);
 
   async function deleteVendor() {
@@ -197,6 +227,7 @@ export default function VendorDetailPage() {
     <div className="flex items-start gap-6">
       <VendorSidebar
         vendors={vendorList}
+        bills={allBills}
         activeId={vendor.id}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(c => !c)}
