@@ -25,6 +25,8 @@ type TransactionRow = {
   ref_no: string | null;
   contact_id: string | null;
   contact_name: string | null;
+  due_date: string | null;
+  balance: string;
   payment_account_name: string | null;
   total_amount: string;
   memo: string | null;
@@ -452,10 +454,13 @@ export default function TransactionsPage() {
     { key: 'type', header: 'Type', sortable: true, sortValue: r => TYPE_LABELS[r.type], render: r => TYPE_LABELS[r.type] },
     { key: 'ref_no', header: 'Ref No.', sortable: true, sortValue: r => r.ref_no ?? '', render: r => r.ref_no ?? <span className="text-muted-foreground">—</span> },
     {
-      key: 'contact_name', header: 'Payee/Contact', sortable: true, sortValue: r => r.contact_name ?? '',
+      key: 'contact_name', header: 'Contact', sortable: true, sortValue: r => r.contact_name ?? '',
       render: r => r.contact_name ? <span className="text-blue-600">{r.contact_name}</span> : <span className="text-muted-foreground">—</span>,
     },
-    { key: 'payment_account_name', header: 'Payment Account', sortable: true, sortValue: r => r.payment_account_name ?? '', render: r => r.payment_account_name ?? <span className="text-muted-foreground">—</span> },
+    // Only bills carry a real due date in this unified view (see
+    // transactionsService.ts) — every other type renders a dash.
+    { key: 'due_date', header: 'Due Date', sortable: true, sortValue: r => r.due_date ?? '', render: r => r.due_date ?? <span className="text-muted-foreground">—</span> },
+    { key: 'balance', header: 'Balance', align: 'right', sortable: true, sortValue: r => Number(r.balance), render: r => <span className="font-mono">{fmtMoney(r.balance)}</span> },
     { key: 'total_amount', header: 'Total Amount', align: 'right', sortable: true, sortValue: r => Number(r.total_amount), render: r => <span className="font-mono">{fmtMoney(r.total_amount)}</span> },
     { key: 'memo', header: 'Memo', sortable: true, sortValue: r => r.memo ?? '', render: r => r.memo || <span className="text-muted-foreground">—</span> },
     { key: 'updated_at', header: 'Last Modified', sortable: true, sortValue: r => r.updated_at, render: r => <span className="whitespace-nowrap text-muted-foreground">{fmtDateTime(r.updated_at)}</span> },
@@ -551,17 +556,22 @@ export default function TransactionsPage() {
           tableSettingsPageId="transactions"
           externalSettingsOpen={settingsOpen}
           onExternalSettingsOpenChange={setSettingsOpen}
-          // QBO's own "Sort by" list (Date/Type/Ref no./Due date/Balance/Total
-          // amount/Last modified date), trimmed to the fields this unified row
-          // actually carries — Due date and Balance aren't tracked across all
-          // 7 source types here, so they're left out rather than faked.
+          // QBO's own "Sort by" list, in its own order.
           sortableFields={[
             { key: 'date', label: 'Date' },
             { key: 'type', label: 'Type' },
             { key: 'ref_no', label: 'Ref no.' },
+            { key: 'due_date', label: 'Due date' },
+            { key: 'balance', label: 'Balance' },
             { key: 'total_amount', label: 'Total amount' },
             { key: 'updated_at', label: 'Last modified date' },
           ]}
+          // QBO's own available-filters list. Date range/Transaction
+          // type/Reference number/Contact/Amount are wired to real filter
+          // bar controls above; Memo/Description/Tracking number/Address/
+          // Products & services/Accounts/Project/P.O. Number are listed (and
+          // reorderable/hideable here) for parity but have no backing filter
+          // control yet — see docs/backlog.md.
           availableFilters={[
             { key: 'date_range', label: 'Date range' },
             { key: 'transaction_type', label: 'Transaction type' },
@@ -569,6 +579,13 @@ export default function TransactionsPage() {
             { key: 'contact', label: 'Contact' },
             { key: 'amount', label: 'Amount' },
             { key: 'memo', label: 'Memo' },
+            { key: 'description', label: 'Description' },
+            { key: 'tracking_number', label: 'Tracking number' },
+            { key: 'address', label: 'Address' },
+            { key: 'products_services', label: 'Products & services' },
+            { key: 'accounts', label: 'Accounts' },
+            { key: 'project', label: 'Project' },
+            { key: 'po_number', label: 'P.O. Number' },
           ]}
           emptyMessage={<EmptyState title="No transactions found" hint="Adjust the filters above." />}
         />

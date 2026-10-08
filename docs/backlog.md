@@ -117,8 +117,15 @@ adding one is the same UNION ALL branch pattern as any existing type in
   "Total" today. Adding real line-amount filtering means collecting line
   amounts per type in the UNION (each type's own lines table) and matching
   against `ANY(lines)` instead of the total.
+- The Table Settings Filters section lists QBO's full filter taxonomy (Date
+  range/Transaction type/Reference number/Contact/Amount are real, backed
+  controls; Memo/Description/Tracking number/Address/Products & services/
+  Accounts/Project/P.O. Number are listed, reorderable and hideable for
+  parity with QBO's own panel, but have no actual filter-bar control — most
+  of those concepts (tracking numbers, line-item products/services, PO
+  numbers) don't exist on most of the 7 unified types at all).
 
-**Priority:** low — all three are visible-but-inert/approximated rather than
+**Priority:** low — all four are visible-but-inert/approximated rather than
 broken; flagged here rather than fixed without being asked, per scope
 discipline.
 

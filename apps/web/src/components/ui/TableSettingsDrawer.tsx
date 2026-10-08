@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronRight, Settings, SlidersHorizontal, X, GripVertical, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppSelect } from '@/components/ui/select';
-import type { TableSettings, TableSortRule, TableRowHeight } from '@/lib/tableSettings';
+import { PAGE_SIZES, type TableSettings, type TableSortRule, type TableRowHeight } from '@/lib/tableSettings';
 
 export type TableColumnDef = { key: string; label: string };
 
@@ -46,11 +46,11 @@ function Section({
 }
 
 const ROW_HEIGHTS: { value: TableRowHeight; label: string }[] = [
-  { value: 'compact', label: 'Compact' },
+  { value: 'roomy', label: 'Roomy' },
   { value: 'comfortable', label: 'Comfortable' },
-  { value: 'spacious', label: 'Spacious' },
+  { value: 'cozy', label: 'Cozy' },
+  { value: 'compact', label: 'Compact' },
 ];
-const PAGE_SIZES = [10, 25, 50, 100, 150];
 
 function labelOf(columns: TableColumnDef[], key: string): string {
   return columns.find(c => c.key === key)?.label ?? key;
@@ -115,6 +115,11 @@ export function TableSettingsDrawer({ open, onClose, columns, sortFields, defaul
     if (moved) order.splice(to, 0, moved);
     onChange({ ...settings, filterOrder: order });
   }
+  function toggleFilter(key: string) {
+    const hidden = new Set(settings.hiddenFilters);
+    if (hidden.has(key)) hidden.delete(key); else hidden.add(key);
+    onChange({ ...settings, hiddenFilters: [...hidden] });
+  }
 
   const orderedColumns = settings.columnOrder.map(key => columns.find(c => c.key === key)).filter((c): c is TableColumnDef => !!c);
   const filterKeys = availableFilters
@@ -168,18 +173,13 @@ export function TableSettingsDrawer({ open, onClose, columns, sortFields, defaul
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">Row height</label>
-                <div className="flex gap-1.5">
-                  {ROW_HEIGHTS.map(h => (
-                    <button
-                      key={h.value}
-                      type="button"
-                      onClick={() => onChange({ ...settings, rowHeight: h.value })}
-                      className={`rounded-md border px-2.5 py-1 text-xs ${settings.rowHeight === h.value ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
-                    >
-                      {h.label}
-                    </button>
-                  ))}
-                </div>
+                <AppSelect
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={settings.rowHeight}
+                  onChange={e => onChange({ ...settings, rowHeight: e.target.value as TableRowHeight })}
+                >
+                  {ROW_HEIGHTS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
+                </AppSelect>
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={settings.alternateRowColor} onChange={e => onChange({ ...settings, alternateRowColor: e.target.checked })} />
@@ -189,6 +189,7 @@ export function TableSettingsDrawer({ open, onClose, columns, sortFields, defaul
           </Section>
 
           <Section title="Columns" isOpen={openSections.has('columns')} onToggle={() => toggleSection('columns')}>
+            <p className="mb-2 text-xs text-muted-foreground">Drag to change the order of columns.</p>
             <div className="space-y-1">
               {orderedColumns.map((col, i) => (
                 <div
@@ -209,7 +210,7 @@ export function TableSettingsDrawer({ open, onClose, columns, sortFields, defaul
 
           {availableFilters && availableFilters.length > 0 && (
             <Section title="Filters" badge="NEW" isOpen={openSections.has('filters')} onToggle={() => toggleSection('filters')}>
-              <p className="mb-2 text-xs text-muted-foreground">Drag to set the order filters appear in on the filter bar.</p>
+              <p className="mb-2 text-xs text-muted-foreground">Drag to change the order of filters.</p>
               <div className="space-y-1">
                 {filterKeys.map((key, i) => (
                   <div
@@ -221,6 +222,7 @@ export function TableSettingsDrawer({ open, onClose, columns, sortFields, defaul
                     className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/60"
                   >
                     <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50" />
+                    <input type="checkbox" checked={!settings.hiddenFilters.includes(key)} onChange={() => toggleFilter(key)} />
                     <span className="text-sm">{labelOf(availableFilters, key)}</span>
                   </div>
                 ))}

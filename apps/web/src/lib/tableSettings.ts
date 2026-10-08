@@ -5,7 +5,8 @@
 // the simplest option that needs no new infra (CLAUDE.md ambiguity rule #3).
 
 export type TableSortRule = { columnKey: string; direction: 'asc' | 'desc' };
-export type TableRowHeight = 'compact' | 'comfortable' | 'spacious';
+export type TableRowHeight = 'roomy' | 'comfortable' | 'cozy' | 'compact';
+export const PAGE_SIZES = [10, 25, 100, 200] as const;
 
 export type TableSettings = {
   sort: TableSortRule[];
@@ -15,6 +16,10 @@ export type TableSettings = {
   columnOrder: string[];
   visibleColumns: string[];
   filterOrder: string[];
+  // Filter keys the user unchecked in the drawer's Filters section. Empty =
+  // everything visible, mirroring visibleColumns' "all shown by default"
+  // default without needing the full available-filters key list up front.
+  hiddenFilters: string[];
 };
 
 export function defaultTableSettings(allColumnKeys: string[]): TableSettings {
@@ -26,6 +31,7 @@ export function defaultTableSettings(allColumnKeys: string[]): TableSettings {
     columnOrder: [...allColumnKeys],
     visibleColumns: [...allColumnKeys],
     filterOrder: [],
+    hiddenFilters: [],
   };
 }
 
@@ -55,9 +61,10 @@ export function normalizeTableSettings(value: unknown, allColumnKeys: string[]):
     .filter(r => typeof r['columnKey'] === 'string' && allColumnKeys.includes(r['columnKey'] as string))
     .map(r => ({ columnKey: r['columnKey'] as string, direction: r['direction'] === 'desc' ? 'desc' : 'asc' }));
 
-  const pageSize = typeof value['pageSize'] === 'number' && [10, 25, 50, 100, 150].includes(value['pageSize'])
+  const pageSize = typeof value['pageSize'] === 'number' && (PAGE_SIZES as readonly number[]).includes(value['pageSize'])
     ? value['pageSize'] : defaults.pageSize;
-  const rowHeight = value['rowHeight'] === 'compact' || value['rowHeight'] === 'spacious' ? value['rowHeight'] : defaults.rowHeight;
+  const rowHeight = value['rowHeight'] === 'roomy' || value['rowHeight'] === 'cozy' || value['rowHeight'] === 'compact'
+    ? value['rowHeight'] : defaults.rowHeight;
 
   return {
     sort,
@@ -67,6 +74,7 @@ export function normalizeTableSettings(value: unknown, allColumnKeys: string[]):
     columnOrder,
     visibleColumns,
     filterOrder: Array.isArray(value['filterOrder']) ? value['filterOrder'].filter((v): v is string => typeof v === 'string') : [],
+    hiddenFilters: Array.isArray(value['hiddenFilters']) ? value['hiddenFilters'].filter((v): v is string => typeof v === 'string') : [],
   };
 }
 
@@ -103,7 +111,8 @@ export function moveTableColumn(order: string[], key: string, direction: -1 | 1)
 }
 
 export const ROW_HEIGHT_CLASS: Record<TableRowHeight, string> = {
-  compact: 'py-1',
+  roomy: 'py-5',
   comfortable: 'py-3',
-  spacious: 'py-5',
+  cozy: 'py-2',
+  compact: 'py-1',
 };

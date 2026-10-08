@@ -21,6 +21,8 @@ export type TransactionRow = {
   ref_no: string | null;
   contact_id: string | null;
   contact_name: string | null;
+  due_date: string | null;
+  balance: string;
   payment_account_name: string | null;
   total_amount: string;
   memo: string | null;
@@ -29,7 +31,7 @@ export type TransactionRow = {
   path: string;
 };
 
-export type TransactionSortKey = 'date' | 'type' | 'ref_no' | 'total_amount' | 'updated_at';
+export type TransactionSortKey = 'date' | 'type' | 'ref_no' | 'due_date' | 'balance' | 'total_amount' | 'updated_at';
 
 export type ListTransactionsQuery = {
   business_id: string;
@@ -51,18 +53,29 @@ const SORT_COLUMNS: Record<TransactionSortKey, string> = {
   date: 'date',
   type: 'type',
   ref_no: 'ref_no',
+  due_date: 'due_date',
+  balance: 'balance',
   total_amount: 'total_amount',
   updated_at: 'updated_at',
 };
 
-// One UNION ALL branch per type, each projecting the same 11 columns. Every
+// One UNION ALL branch per type, each projecting the same columns. Every
 // branch is scoped to business_id directly (cheaper than filtering after the
 // union); every other filter (type/date/ref/contact/amount) is applied once,
 // outside the union, below.
+//
+// due_date is only a real concept for bills; every other type is NULL.
+// balance is each type's own "still outstanding" figure (unapplied payment,
+// remaining credit memo, unpaid bill) — deposit/expense/check/journal are
+// always paid in full at posting time, so their balance is always 0. Bills
+// have no partial-payment status in this schema (BillStatus is only
+// draft/posted/paid/voided), so total-vs-0 on `status` is exact, not an
+// approximation.
 function unionSql(business_id: string) {
   return sql`
     SELECT 'deposit' AS type, d.id, d.deposit_date AS date, d.deposit_number AS ref_no,
       NULL::uuid AS contact_id, NULL::text AS contact_name,
+      NULL::date AS due_date, '0.00' AS balance,
       ba.name AS payment_account_name, d.total_amount::text AS total_amount, d.memo,
       (CASE WHEN d.voided_at IS NOT NULL THEN 'voided' ELSE 'posted' END) AS status,
       d.updated_at, ('/accounting/bank-deposits/' || d.id) AS path
@@ -74,6 +87,7 @@ function unionSql(business_id: string) {
 
     SELECT 'expense', e.id, e.transaction_date, e.reference,
       COALESCE(e.vendor_id, e.customer_id), COALESCE(v.name, c.name, e.payee_text),
+      NULL::date, '0.00',
       pa.name, e.total_amount::text, e.memo, e.status::text,
       e.updated_at, ('/accounting/expenses/' || e.id)
     FROM expense_transactions e
@@ -86,6 +100,7 @@ function unionSql(business_id: string) {
 
     SELECT 'check', ch.id, ch.payment_date, ch.check_number,
       ch.payee_id, COALESCE(v2.name, cu2.name, ch.payee_text),
+      NULL::date, '0.00',
       ba2.name, ch.total_amount::text, ch.memo, ch.status::text,
       ch.updated_at, ('/accounting/checks/' || ch.id)
     FROM checks ch
@@ -101,6 +116,7 @@ function unionSql(business_id: string) {
     -- real checks-table row without voiding and reposting it).
     SELECT 'check', e2.id, e2.transaction_date, e2.reference,
       e2.vendor_id, COALESCE(v3.name, e2.payee_text),
+      NULL::date, '0.00',
       COALESCE(ba3.name, pa2.name), e2.total_amount::text, e2.memo, e2.status::text,
       e2.updated_at, ('/accounting/expenses/' || e2.id)
     FROM expense_transactions e2
@@ -113,6 +129,7 @@ function unionSql(business_id: string) {
 
     SELECT 'journal', je.id, je.entry_date, je.journal_number,
       NULL::uuid, NULL::text,
+      NULL::date, '0.00',
       NULL::text, COALESCE((SELECT SUM(jel.debit) FROM journal_entry_lines jel WHERE jel.journal_entry_id = je.id), 0)::text,
       je.memo, je.status::text, je.updated_at, ('/journal/' || je.id)
     FROM journal_entries je
@@ -122,6 +139,7 @@ function unionSql(business_id: string) {
 
     SELECT 'bill', b.id, b.bill_date, b.bill_number,
       b.vendor_id, v4.name,
+      b.due_date, (CASE WHEN b.status = 'paid' THEN '0.00' ELSE b.total::text END),
       NULL::text, b.total::text, b.memo, b.status::text,
       b.updated_at, ('/ap/bills/' || b.id)
     FROM bills b
@@ -132,6 +150,7 @@ function unionSql(business_id: string) {
 
     SELECT 'payment', p.id, p.payment_date, p.reference,
       p.customer_id, c2.name,
+      NULL::date, p.unapplied_amount::text,
       coa.name, p.amount::text, p.memo, p.status::text,
       p.updated_at, ('/payments/' || p.id)
     FROM payments p
@@ -143,6 +162,7 @@ function unionSql(business_id: string) {
 
     SELECT 'credit_memo', cm.id, cm.memo_date, cm.credit_memo_number,
       cm.customer_id, c3.name,
+      NULL::date, cm.remaining_amount::text,
       NULL::text, cm.amount::text, cm.memo, cm.status::text,
       cm.updated_at, ('/credit-memos/' || cm.id)
     FROM credit_memos cm

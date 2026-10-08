@@ -8,7 +8,7 @@ const router = Router({ mergeParams: true });
 
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
-const SORT_KEYS: TransactionSortKey[] = ['date', 'type', 'ref_no', 'total_amount', 'updated_at'];
+const SORT_KEYS: TransactionSortKey[] = ['date', 'type', 'ref_no', 'due_date', 'balance', 'total_amount', 'updated_at'];
 
 function isTransactionType(v: unknown): v is TransactionType {
   return typeof v === 'string' && (TRANSACTION_TYPES as readonly string[]).includes(v);

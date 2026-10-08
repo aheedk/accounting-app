@@ -9,16 +9,16 @@ describe('generic table settings', () => {
       columnOrder: ['amount', 'unknown', 'date', 'amount'],
       visibleColumns: ['amount', 'unknown'],
       sort: [{ columnKey: 'amount', direction: 'desc' }, { columnKey: 'unknown', direction: 'asc' }],
-      pageSize: 50,
-      rowHeight: 'spacious',
+      pageSize: 100,
+      rowHeight: 'roomy',
       alternateRowColor: true,
     }, COLS);
 
     expect(settings.columnOrder).toEqual(['amount', 'date', 'type', 'ref_no', 'status']);
     expect(settings.visibleColumns).toEqual(['amount']);
     expect(settings.sort).toEqual([{ columnKey: 'amount', direction: 'desc' }]);
-    expect(settings.pageSize).toBe(50);
-    expect(settings.rowHeight).toBe('spacious');
+    expect(settings.pageSize).toBe(100);
+    expect(settings.rowHeight).toBe('roomy');
     expect(settings.alternateRowColor).toBe(true);
   });
 
@@ -33,6 +33,12 @@ describe('generic table settings', () => {
     expect(defaults.columnOrder).toEqual(COLS);
     expect(defaults.visibleColumns).toEqual(COLS);
     expect(defaults.sort).toEqual([]);
+    expect(defaults.hiddenFilters).toEqual([]);
+  });
+
+  it('preserves hiddenFilters', () => {
+    const settings = normalizeTableSettings({ hiddenFilters: ['memo', 42] }, COLS);
+    expect(settings.hiddenFilters).toEqual(['memo']);
   });
 
   it('moves a column without mutating the original order', () => {
