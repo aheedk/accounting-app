@@ -101,13 +101,13 @@ function VendorSidebar({
 
   return (
     <div className="flex w-64 shrink-0 flex-col border-r pr-3">
-      <div className="mb-3 flex items-center justify-between">
-        <button type="button" onClick={onToggleCollapsed} aria-label="Hide vendor list" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-          <Menu className="h-4 w-4" />
-        </button>
+      <div className="mb-3 flex items-center justify-end gap-1">
         <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
           <Link to="/ap/vendors/new" aria-label="New vendor"><Plus className="h-4 w-4" /></Link>
         </Button>
+        <button type="button" onClick={onToggleCollapsed} aria-label="Hide vendor list" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+          <Menu className="h-4 w-4" />
+        </button>
       </div>
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
