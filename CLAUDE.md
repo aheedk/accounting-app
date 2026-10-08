@@ -18,7 +18,7 @@ The only acceptable reason to interrupt the user is: a destructive irreversible 
 
 Production-grade accounting system for an accounting firm.
 
-- **Slices 1–13 shipped.** All 23 originally-stubbed ComingSoon tabs replaced, full sidebar coverage. As of 2026-10-07: 99 migration files (numbered through `0090`) and roughly 400 API tests. The per-slice implementation plans were removed once shipped; they remain in git history.
+- **Slices 1–13 shipped.** All 23 originally-stubbed ComingSoon tabs replaced, full sidebar coverage. As of 2026-10-08: 104 migration files (numbered through `0095`) and roughly 440 API tests. The per-slice implementation plans were removed once shipped; they remain in git history.
 - **QBO-style revamp.** Every sidebar tab restyled to match QuickBooks Online (shared `MoneyBar` / `ReportCard` / `EmptyState` / `DataTable`, status pills, local dates, `fmtMoney` with no `$`). Both waves are merged to `main` (the second covered Accounting/Reports/Payroll/Inventory/Setup + the QBO company switcher + the Add-client flow).
 - **AI auto-coding.** Top-level `AI` sidebar area (`/ai/inbox`, `/ai/coding-rules`). Documents arrive by email or direct PDF upload and are coded by a layered engine with a confidence score: learned client rule → deterministic accounting rule → vendor default → prior coding history → the extraction model's proposal. Bank transactions use `services/ai/autoCodingService.ts`; invoice/bill lines use the sibling `services/ai/invoiceCodingService.ts` (keyed on vendor + line, and owns the capitalization rule). Spec: `docs/specs/2026-09-24-ai-auto-coding-design.md`. Two rules worth knowing before changing any of it:
   - The model may only **rank the client's existing accounts**. An account name it invents is discarded and the row is left unclassified — never posted.
@@ -26,6 +26,10 @@ Production-grade accounting system for an accounting firm.
   - **Unknowns go to Suspense**, never a guess: a line no layer could code is preselected to the client's Suspense account (found by `detail_type = 'Suspense'`), cleared from `/ai/suspense`, and blocks period close. Spec: `docs/specs/2026-10-04-suspense-account-design.md`.
 - **Inventory in the ledger.** Every change in stock goes through `services/inventory/stockMovementService.adjustStock`, which costs the movement (stock leaves at average cost) and posts it for items that have an Inventory asset account. A receipt is the exception: the bill it raises already debits Inventory, so the movement is linked to that entry instead of posting again. Spec: `docs/specs/2026-10-07-inventory-ledger-design.md`.
 - **Posted documents are corrected, not rewritten.** A posted invoice is changed with `invoiceService.reissueInvoice`: the original is voided and the corrected one posted in the same transaction.
+- **Accounts and roles.** Five roles: `firm_admin` > `accountant` > `staff` > `viewer` (reads, changes nothing) > `client` (its reports, invoices, bills and messages). A login can be switched off, held after wrong passwords, and given two-step sign-in; payroll can be closed to a login; a company can make staff entries wait for an accountant. Spec: `docs/specs/2026-10-08-accounts-and-roles-design.md`. Three things to know before adding a route:
+  - A `client` is refused everything not listed in `apps/api/src/lib/clientAccess.ts`.
+  - Anything under the paths in `middleware/payrollAccess.ts` is payroll, and closed to a login it was switched off for.
+  - A staff-level route that posts to the ledger as it saves belongs in `HELD_ACTIONS` in `services/core/approvalService.ts`, or it will skip the approval step.
 - Docs are indexed in `docs/README.md`. Design specs live in `docs/specs/`, implementation plans in `docs/plans/` (use these instead of the superpowers default `docs/superpowers/...`; delete a plan once its work ships). Open work: `docs/backlog.md` and `docs/meetings/`; known bugs: `docs/qa/`.
 - New features beyond the 23 tabs: write a fresh spec → plan → impl following the same pattern documented here.
 
@@ -57,9 +61,9 @@ Production-grade accounting system for an accounting firm.
 - Posted-period guard: services that mutate JE-bearing entities check the period is not closed before posting.
 
 ### RBAC
-- Roles in `packages/shared/src/roles.ts`: `firm_admin` (40) > `accountant` (30) > `staff` (20) > `client` (10).
+- Roles in `packages/shared/src/roles.ts`: `firm_admin` (40) > `accountant` (30) > `staff` (20) > `viewer` (15) > `client` (10).
 - Use `hasMinRole(actual, min)` from `@accounting/shared`.
-- Web: read the role with `useEffectiveRole()` from `@/lib/roleAccess`, never `user.role`. A role given for one company overrides the firm-wide one, and it is the one the API checks. `canOpenPage(role, path)` in the same file decides what the sidebar, + New and search offer.
+- Web: read the role with `useEffectiveRole()` from `@/lib/roleAccess`, never `user.role`. A role given for one company overrides the firm-wide one, and it is the one the API checks. `useCanOpen()` in the same file decides what the sidebar, + New and search offer. On a page, take a button or form the role cannot use off it with `useCan()` and `{...hideUnless(can.accountant)}`.
 - What each role can do, and the decisions still open: `docs/qa/2026-10-08-role-audit.md`.
 
 ### Audit + schemas

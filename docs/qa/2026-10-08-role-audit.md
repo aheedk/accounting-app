@@ -13,17 +13,22 @@ and what is still missing.
    accountant, and opened all 86 pages, watching for refused or failed requests.
 3. **The code.** Every place the web app checks a role.
 
-## The four roles today
+## The roles
+
+As found on the day of the audit, there were four. A fifth, View only, was added
+afterwards (see "Features there should be"). This is how they stand now:
 
 | Role | Can read | Can change |
 |---|---|---|
-| **Client** | The dashboard figures, its invoices, and six reports: Profit & Loss, Balance Sheet, Cash Flows, Trial Balance, A/R Aging, A/P Aging | Nothing |
-| **Staff** | Everything except a full social security number, a vendor's tax id, and the firm's user list | Data entry: customers, vendors and items; invoice, bill and payment drafts; expenses, checks and deposits; categorizing bank lines; purchase and sales orders; attachments |
-| **Accountant** | The same as staff | Everything staff can, plus posting and voiding, journal entries, credit memos, vendor credits, transfers, Pay Bills, payroll, recurring templates, reconciliation, closing a period, budgets, the chart of accounts, the AI inbox and coding rules |
+| **Client** | The dashboard figures, its invoices and bills, customer statements, six reports (Profit & Loss, Balance Sheet, Cash Flows, Trial Balance, A/R Aging, A/P Aging), and its messages | Nothing in the books. It can send documents in and write messages |
+| **View only** | Everything staff read | Nothing |
+| **Staff** | Everything except a full social security number, a vendor's tax id, the firm's user list and the activity log | Data entry: customers, vendors and items; invoice, bill and payment drafts; expenses, checks and deposits; categorizing bank lines; purchase and sales orders; attachments |
+| **Accountant** | The same as staff, and the activity log | Everything staff can, plus posting and voiding, journal entries, credit memos, vendor credits, transfers, Pay Bills, payroll, recurring templates, reconciliation, closing a period, budgets, the chart of accounts, the AI inbox, coding rules and approvals |
 | **Firm admin** | Everything | Everything, including users, clients, company settings, bank accounts, tax codes, adding and deleting employees, deleting records, and reopening a period |
 
-In numbers: a client is let into 13 of the 113 read routes and none of the 141 that
-change something; staff into 44 of the 141; an accountant into 120; a firm admin into all.
+On the day of the audit, in numbers: a client was let into 13 of the 113 read routes
+and none of the 141 that change something; staff into 44 of the 141; an accountant into
+120; a firm admin into all.
 
 ## Found and fixed
 
@@ -41,71 +46,74 @@ change something; staff into 44 of the 141; an accountant into 120; a firm admin
 
 Nothing returned a server error for any role, before or after.
 
-## Not changed: decisions for the firm
+## Decisions for the firm
 
 1. **Staff post to the ledger.** The original design says staff make drafts and an
    accountant posts. That holds for invoices, bills and payments. It does not hold for
    expenses, checks, bank deposits, categorizing a bank or integration line, item
    receipts and stock adjustments: these have no draft, so they are in the books the
-   moment staff save them. Is that what a staff login should be able to do?
+   moment staff save them. *There is now a switch for it:* with approval turned on for
+   a company (Accounting → Approvals), those wait for an accountant. It is off by
+   default. Should it be on for the firm's clients?
 2. **Staff can add a customer or a vendor but cannot edit one.** Fixing a typo in a
    name needs an accountant.
 3. **What only a firm admin can do.** An accountant can run payroll and edit an
    employee but cannot add one. An accountant also cannot add a bank account or a tax
    code, delete any record, or change company settings (the AI auto-post switch and the
    capitalization threshold among them). Confirm each of these is meant.
-4. **What a client should see.** Today: invoices and six reports. Not bills, not bank
-   balances, not the General Ledger.
+4. **What a client should see.** Now: invoices, bills, customer statements, six reports
+   and messages, and it can send documents in. Not bank balances, not the General
+   Ledger.
 5. **Connecting the firm's Gmail needs no sign-in.** The address that starts it
    (`/auth/gmail`) and the one Google returns to can be opened by anyone who can reach
    the API, and whoever completes Google's consent becomes the mailbox the AI inbox
    reads. It should be for a firm admin only. Left alone because it is the firm's own
    setup step, and how that is done in production has to be known before it is locked.
-6. **Buttons a role cannot use are still on many pages**: Reject in the AI inbox, Void
-   on a pay run, Delete on a rule, Post on a bill. They now answer with a clear
-   sentence. Hiding them page by page is in the list below.
 
 ## Features there should be
 
+The audit listed these as missing. All but three are now built
+(`docs/specs/2026-10-08-accounts-and-roles-design.md`). Each is off, or unchanged,
+until someone turns it on.
+
 **Accounts and signing in**
 
-- **Remove or switch off a user.** A user's role can be changed and their clients taken
-  away, but nobody can be removed. Someone who leaves the firm keeps a working login.
-- **Change your own password, and reset a forgotten one.** The only password is the one
-  shown once when the user is created. Not even a firm admin can reset it.
-- **A limit on wrong passwords.** Failed sign-ins are recorded but never slowed or locked.
-- **Two-step sign-in**, at least for firm admins.
-- **Sign out everywhere**, and a list of where a user is signed in. A login lasts up to
-  180 days.
-- **Invite by email** instead of reading a password off the screen. Needs a mail service.
+| What | Now |
+|---|---|
+| Remove or switch off a user | **Built.** Setup → Users → Switch off. It ends the person's sessions at once and can be switched back on. `800c463`, `63ee0d5` |
+| Change your own password; reset a forgotten one | **Built.** My account → Password. A firm admin can give a login a new one-time password. An emailed reset link is not built (no mail service) |
+| A limit on wrong passwords | **Built.** Five in a row hold a login for fifteen minutes |
+| Two-step sign-in | **Built.** Each person turns it on under My account, with any authenticator app. Requiring it for a role is not built |
+| Sign out everywhere; where a user is signed in | **Built.** My account → Where you are signed in. Signing out also stops a session at once |
+| Invite by email | **Not built.** Needs a mail service |
 
 **Roles and permissions**
 
-- **Hide what a role cannot use on every page**, not only in the menus.
-- **A view-only role** for a reviewer or an auditor: reads everything, changes nothing.
-  The nearest today is client, which sees very little.
-- **An approval step**: staff enter, an accountant approves, then it posts. This is what
-  "staff make drafts" would mean for expenses, checks and deposits.
-- **Access by area.** Payroll, with pay rates and the last four digits of each social
-  security number, is open to every staff login. A firm will want payroll limited to
-  the people who run it.
-- **A log of who did what**, for a whole company. The record is kept; it can only be
-  seen one record at a time, on four screens.
+| What | Now |
+|---|---|
+| Hide what a role cannot use on every page | **Built.** Thirty more pages; forms only an accountant can save are closed to staff. `0c440b4` |
+| A view-only role | **Built.** "View only": reads what staff read, changes nothing. `5e9e1f7` |
+| An approval step | **Built.** A switch per company on Accounting → Approvals. `f6673bd`, `4ef7dcc` |
+| Access by area | **Built for payroll.** Setup → Users, the Payroll tick box. `f083cf8` |
+| A log of who did what | **Built.** Setup → Activity Log, for an accountant and up. `3411d48` |
 
 **For a client login**
 
-- **Upload documents** (statements, receipts, bills) straight into the AI inbox.
-- **See what they owe in detail**: bills, and statements for their customers.
-- **Pay and be paid online** (the Stripe item from the 10-05 meeting).
-- **Messages** between the client and their accountant.
+| What | Now |
+|---|---|
+| Upload documents | **Built.** Send documents; they wait in the AI inbox for an accountant. `9d0af37`, `46c1456` |
+| See what they owe in detail | **Built.** Bills, and Accounts Receivable → Statements for their customers. `58f4fa2` |
+| Pay and be paid online | **Not built.** Needs a Stripe account |
+| Messages | **Built.** One thread per company, with an unread count |
 
 ## Checking it again
 
-- `npm run db:role-users` makes accountant, staff and client logins on a local database
-  and prints a new password for them.
-- In `apps/api`: `npx vitest run tests/integration/roleMatrix.test.ts`. The two lists in
-  that file, what staff may change and what only a firm admin may do, are the permission
-  table. A new route fails the test until it is put in one of them on purpose.
+- `npm run db:role-users` makes accountant, staff, view-only and client logins on a
+  local database and prints a new password for them.
+- In `apps/api`: `npx vitest run tests/integration/roleMatrix.test.ts`. It calls every
+  route as all five roles. The two lists in that file, what staff may change and what
+  only a firm admin may do, are the permission table. A new route fails the test until
+  it is put in one of them on purpose.
 - What a client may open is in two places that have to agree:
   `apps/api/src/lib/clientAccess.ts` (enforced) and `apps/web/src/lib/roleAccess.ts`
   (what the menus show).

@@ -68,12 +68,16 @@ Every bug, wrong number and missing feature in the audit is done, except:
 - **1099 and card payments.** Payments made to a contractor by card are now left
   off the 1099, because the card processor reports them on a 1099-K. Confirm that
   is how the firm files.
-- **What each role may do.** The other three roles were tested on 10-08
-  (`docs/qa/2026-10-08-role-audit.md`). Five things need the firm's answer: staff can
-  record expenses, checks and deposits, which post at once; staff can add a customer
-  but not edit one; an accountant cannot add an employee, a bank account or a tax
-  code; what a client should see beyond invoices and six reports; and who may
-  connect the firm's Gmail.
+- **What each role may do.** The other roles were tested on 10-08
+  (`docs/qa/2026-10-08-role-audit.md`). Five things need the firm's answer:
+  - Staff can record expenses, checks and deposits, which post at once. There is now
+    an approval step that makes those wait for an accountant. It is off. Should it be
+    on for the firm's clients?
+  - Staff can add a customer but not edit one.
+  - An accountant cannot add an employee, a bank account or a tax code.
+  - What a client should see. It now gets invoices, bills, statements, six reports and
+    messages, and can send documents in.
+  - Who may connect the firm's Gmail. Today anyone who can reach the API can.
 - **Email from the app.** Emailing vendors now opens the user's own mail program
   with the message started. Is that enough, or should the app send the email
   itself? That needs a mail service, and so does emailing an invoice.
@@ -101,7 +105,7 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 25 | Modules per client, priced separately (bookkeeping vs. AR, AP and the rest) |
 | 26 | Sign in with Microsoft 365 or Google |
 | 27 | One login shared with the practice management software |
-| 28 | Security review and testing. Roles were covered on 10-08 (`docs/qa/2026-10-08-role-audit.md`); that audit also lists what is missing: removing a user, changing or resetting a password, a limit on wrong passwords, two-step sign-in |
+| 28 | Security review and testing. Roles were covered on 10-08 (`docs/qa/2026-10-08-role-audit.md`), and what that audit found missing is built: switching a login off, passwords, a limit on wrong passwords, two-step sign-in, sessions. A full review is still to do; one open hole is that connecting the firm's Gmail needs no sign-in |
 | 29 | Mobile app, last |
 | 30 | Moving the practice management software off Base44 (separate project) |
 
@@ -130,6 +134,10 @@ None of these are in the code yet. Most need a decision from the firm first.
 | 33 | Vendors list: Email and "Ask vendor for info" start a message in the user's mail program | Aheed, `258cdef` |
 | 12 | Check is in the "+ New" menu (the rest of 12 is open) | Aheed, `8ebcbdb` |
 | — | Role audit: a client login sees only its reports and invoices (it could read almost everything), menus and buttons follow the role, a firm admin keeps every client after a reload | Aheed, `d08f828`, `f894249`, `06ac174`, `88de457`, `bcc694d` |
+| — | Signing in: switch a login off, change or reset a password, a hold after five wrong passwords, two-step sign-in, see and end sessions | Aheed, `800c463`, `63ee0d5` |
+| — | A View only role; payroll can be closed to a login; Activity Log; buttons a role cannot use are off every page | Aheed, `5e9e1f7`, `f083cf8`, `3411d48`, `0c440b4` |
+| — | Approval step: staff entries can wait for an accountant (off until a firm admin turns it on for a company) | Aheed, `f6673bd`, `4ef7dcc` |
+| — | For a client: send documents, see bills, messages with the firm. Customer statements for everyone | Aheed, `9d0af37`, `46c1456`, `58f4fa2` |
 
 Audit bugs fixed (part of item 17), all Aheed:
 
@@ -182,7 +190,7 @@ filters, and print / CSV; a vendor's page now lists every kind of transaction, w
 a searchable vendor list down the side that folds away and sorts by open balance;
 and long options in dropdowns are no longer cut off.
 
-After pulling, run `npm run db:migrate` (migrations `0084`–`0090`).
+After pulling, run `npm run db:migrate` (migrations `0084`–`0095`).
 
 ## Decided — no work
 
@@ -329,23 +337,60 @@ since the meeting is in this section: the first four parts are for the meeting, 
   vendor with no email address gets a message saying so.
 - **Check in + New (item 12).** + New → Check, under Vendors.
 
-### Roles (tested 10-08)
+### Roles and accounts (10-08)
 
-Run `npm run db:role-users` first. It makes three logins for Green Gadgets and prints
-their password.
+Run `npm run db:role-users` first. It makes four logins for Green Gadgets (accountant,
+staff, viewer, client) and prints their password. Everything below is off, or unchanged,
+until someone turns it on.
 
-- **Client.** Sign in as `client@roletest.local`. The sidebar has only Dashboard,
-  Accounts Receivable (Invoices, Aging), Accounts Payable (Aging) and Reports. There is
-  no + New. Open an invoice: Print and Save as PDF, nothing that changes it. Type
-  `/payroll/employees` in the address bar: "This page is not part of your access".
-  Before, this login could open payroll, bank lines and the AI inbox.
+**Each role**
+
+- **Client.** Sign in as `client@roletest.local`. The sidebar has Dashboard, Messages,
+  Send documents, Accounts Receivable (Invoices, Aging, Statements), Accounts Payable
+  (Bills, Aging) and Reports. There is no + New. Open an invoice or a bill: nothing
+  that changes it. Type `/payroll/employees` in the address bar: "This page is not
+  part of your access". Before, this login could open payroll, bank lines and the AI
+  inbox.
 - **Staff.** Sign in as `staff@roletest.local`. + New lists only what staff can save
-  (no Journal entry, Transfer, Run payroll, Credit memo). Accounting → Recurring
-  Transactions → Run now: "This needs an accountant or a firm admin."
+  (no Journal entry, Transfer, Run payroll, Credit memo). Open AI → Document Inbox and
+  review a statement: there is no Approve or Reject. Those are an accountant's.
+- **View only** (new). Sign in as `viewer@roletest.local`. Every page opens, and none
+  has a button that changes anything; there is no + New.
 - **Accountant.** Sign in as `accountant@roletest.local`. Setup has no Users. Setup →
   Tax Codes has no New tax code, and Accounting → Bank Accounts no Add bank account:
   those are for a firm admin.
-- Ask the roles question from "Questions for the firm" here.
+
+**Signing in** (as a firm admin, with a second browser for the other login)
+
+- **My account.** Click your name, top right. Change your password; see where you are
+  signed in, and Sign out everywhere else.
+- **Two-step sign-in.** My account → Second step → Set it up. Type the key into an
+  authenticator app, enter the code, Turn on. Sign out and back in: it asks for the
+  code after the password.
+- **Wrong passwords.** Sign in as the staff login with a wrong password five times: it
+  is held for fifteen minutes, even with the right one. Setup → Users shows "Held".
+  Reset password lifts it and shows a new password once.
+- **Switch a login off.** Setup → Users → Switch off on the staff login. In the other
+  browser, that login is signed out at its next click and cannot sign back in. Switch
+  back on restores it.
+- **Payroll for one login.** Setup → Users, untick Payroll on the staff login. Its
+  Payroll menu is gone and the payroll pages are closed to it.
+
+**The rest**
+
+- **Activity Log.** Setup → Activity Log: who did what in this company, newest first.
+  Show on a row gives the record before and after. Switch to "Sign-ins and users" for
+  the firm's own log.
+- **Approval step.** Accounting → Approvals → Turn on. As staff, + New → Expense and
+  save: "Sent for approval", and nothing is in the books. As an accountant, Accounting
+  → Approvals lists it; Approve records it, Reject asks why. Turn it off again
+  afterwards. Ask the staff question from "Questions for the firm" here.
+- **Messages.** As the client, Messages → write one. As the accountant, the sidebar
+  shows a count beside Messages; open it and reply.
+- **Send documents.** As the client, Send documents → drop in a statement PDF. As the
+  accountant it is waiting in AI → Document Inbox.
+- **Customer statement.** Accounts Receivable → Statements → pick Contoso Ltd: balance
+  forward, each invoice and payment, and the amount due. Print it.
 
 ### Other fixes worth a minute
 
