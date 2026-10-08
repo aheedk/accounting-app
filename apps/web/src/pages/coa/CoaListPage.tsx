@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { ChevronDown, ChevronLeft, ChevronRight, FileDown, Landmark, Lock, Pencil, Printer, Search, Settings2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -120,6 +121,8 @@ type Account = {
 };
 
 export default function CoaListPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Balance sources for the chart-format columns. null = source unavailable
@@ -591,7 +594,7 @@ export default function CoaListPage() {
           <div className="flex items-center" ref={newDropdownRef}>
             <Button
               className="rounded-r-none border-r border-primary-foreground/20"
-              onClick={() => { setCreateParentId(null); setCreateAccountType(''); setShowCreate(true); }}
+              {...hideUnless(can.accountant)} onClick={() => { setCreateParentId(null); setCreateAccountType(''); setShowCreate(true); }}
             >
               New account
             </Button>
@@ -631,21 +634,21 @@ export default function CoaListPage() {
                 <button
                   className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
                   disabled={batchBusy || checkedActiveIds.length === 0}
-                  onClick={() => void batchPatch({ is_active: false }, checkedActiveIds)}
+                  {...hideUnless(can.accountant)} onClick={() => void batchPatch({ is_active: false }, checkedActiveIds)}
                 >
                   Make inactive ({checkedActiveIds.length})
                 </button>
                 <button
                   className="w-full px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
                   disabled={batchBusy || checkedInactiveIds.length === 0}
-                  onClick={() => void batchPatch({ is_active: true }, checkedInactiveIds)}
+                  {...hideUnless(can.accountant)} onClick={() => void batchPatch({ is_active: true }, checkedInactiveIds)}
                 >
                   Make active ({checkedInactiveIds.length})
                 </button>
                 <button
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-accent disabled:opacity-50"
                   disabled={batchBusy}
-                  onClick={() => void batchPatch({ is_locked: true })}
+                  {...hideUnless(can.accountant)} onClick={() => void batchPatch({ is_locked: true })}
                 >
                   <Lock className="h-4 w-4 text-muted-foreground" />
                   Lock accounts ({checkedIds.size})
@@ -695,7 +698,7 @@ export default function CoaListPage() {
               <div className="flex items-center gap-2">
                 {batchEditErr && <span className="max-w-[26rem] truncate text-xs text-destructive" title={batchEditErr}>{batchEditErr}</span>}
                 <Button variant="outline" className="h-9" disabled={batchSaveBusy} onClick={cancelBatchEdit}>Cancel</Button>
-                <Button className="h-9" disabled={batchSaveBusy} onClick={() => void saveBatchEdit()}>
+                <Button className="h-9" disabled={batchSaveBusy} {...hideUnless(can.accountant)} onClick={() => void saveBatchEdit()}>
                   {batchSaveBusy ? 'Saving…' : 'Save'}
                 </Button>
               </div>
@@ -705,7 +708,7 @@ export default function CoaListPage() {
             <button
               className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-emerald-700 hover:bg-muted/50 transition-colors"
               title="Edit account numbers and names inline"
-              onClick={enterBatchEdit}
+              {...hideUnless(can.accountant)} onClick={enterBatchEdit}
             >
               <Pencil className="h-4 w-4" />
               Batch edit
@@ -993,7 +996,7 @@ export default function CoaListPage() {
                             className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                             disabled={acct.is_locked}
                             title={acct.is_locked ? 'Unlock the account first' : undefined}
-                            onClick={() => { setOpenRowMenu(null); openEdit(acct); }}
+                            {...hideUnless(can.accountant)} onClick={() => { setOpenRowMenu(null); openEdit(acct); }}
                           >
                             Edit
                           </button>
@@ -1012,7 +1015,7 @@ export default function CoaListPage() {
                             className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                             disabled={acct.is_locked}
                             title={acct.is_locked ? 'Unlock the account first' : undefined}
-                            onClick={() => { setOpenRowMenu(null); void toggleActive(acct); }}
+                            {...hideUnless(can.accountant)} onClick={() => { setOpenRowMenu(null); void toggleActive(acct); }}
                           >
                             {acct.is_active ? 'Make inactive (reduces usage)' : 'Make active'}
                           </button>
@@ -1335,7 +1338,7 @@ export default function CoaListPage() {
               <Button variant="outline" onClick={() => { setShowImport(false); setImportRows([]); setImportDone(false); }}>Cancel</Button>
               {importRows.length === 0 && <Button onClick={() => importFileRef.current?.click()}>Next</Button>}
               {importRows.length > 0 && !importDone && (
-                <Button onClick={() => void runImport()} disabled={importBusy || validImportCount === 0}>
+                <Button {...hideUnless(can.accountant)} onClick={() => void runImport()} disabled={importBusy || validImportCount === 0}>
                   {importBusy ? 'Importing…' : `Import ${validImportCount} record${validImportCount === 1 ? '' : 's'}`}
                 </Button>
               )}

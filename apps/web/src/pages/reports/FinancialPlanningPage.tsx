@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,8 @@ function statusBadge(status: 'draft' | 'active' | 'archived') {
 }
 
 export default function FinancialPlanningPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -210,7 +213,7 @@ export default function FinancialPlanningPage() {
           <Card>
             <CardHeader><CardTitle>New budget</CardTitle></CardHeader>
             <CardContent>
-              <form className="space-y-3" onSubmit={createBudget}>
+              <form className="space-y-3" {...hideUnless(can.accountant)} onSubmit={createBudget}>
                 <div>
                   <Label>Name</Label>
                   <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="FY26 Plan" />
@@ -292,7 +295,7 @@ export default function FinancialPlanningPage() {
                         <option value="active">active</option>
                         <option value="archived">archived</option>
                       </AppSelect>
-                      <Button variant="outline" onClick={deleteBudget}>Delete</Button>
+                      <Button variant="outline" {...hideUnless(can.admin)} onClick={deleteBudget}>Delete</Button>
                     </div>
                   </div>
                 </CardHeader>

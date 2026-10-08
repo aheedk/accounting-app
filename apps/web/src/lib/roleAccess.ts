@@ -33,10 +33,20 @@ const CLIENT_ONLY_PAGES = ['/documents/send'];
 
 // Pages where everything on them is for a firm admin. Hidden from the others
 // rather than opened and left to fail.
-const FIRM_ADMIN_PAGES = ['/setup/users', '/clients/new', '/accounting/client-overview'];
+const FIRM_ADMIN_PAGES = ['/setup/users', '/clients/new', '/accounting/client-overview', '/payroll/employees/new'];
 
-// Pages for an accountant and up. The activity log shows every record before and after each change.
-const ACCOUNTANT_PAGES = ['/setup/activity'];
+// Pages for an accountant and up. The activity log shows every record before and
+// after each change; the rest are forms the API takes only from an accountant, so
+// staff are not handed a form they cannot save.
+const ACCOUNTANT_PAGES = [
+  '/setup/activity',
+  '/journal/new',
+  '/accounting/transfers/new',
+  '/credit-memos/new',
+  '/ap/vendor-credits/new',
+  '/ap/pay-bills',
+  '/payroll/pay-runs/new',
+];
 
 const under = (pathname: string, page: string) => pathname === page || pathname.startsWith(`${page}/`);
 
@@ -83,4 +93,19 @@ export function useCanOpen(): (pathname: string) => boolean {
   // Absent on a session from before the switch existed: that login keeps payroll until it next signs in.
   const payroll = user?.payroll_access !== false;
   return useCallback((pathname: string) => canOpenPage(role, pathname, { payroll }), [role, payroll]);
+}
+
+/** What the signed-in login may do on the open company, for showing or hiding a button. */
+export function useCan(): { staff: boolean; accountant: boolean; admin: boolean } {
+  const role = useEffectiveRole();
+  return { staff: roleAtLeast(role, 'staff'), accountant: roleAtLeast(role, 'accountant'), admin: role === 'firm_admin' };
+}
+
+/**
+ * Props that take an element off the page when `allowed` is false, to spread on
+ * a button or a form: `<Button {...hideUnless(can.accountant)} onClick={post}>`.
+ * An inline style, because it wins over the display classes buttons carry.
+ */
+export function hideUnless(allowed: boolean): { style?: { display: 'none' } } {
+  return allowed ? {} : { style: { display: 'none' } };
 }

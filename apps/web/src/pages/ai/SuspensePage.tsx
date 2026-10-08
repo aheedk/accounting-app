@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link } from 'react-router-dom';
 import { HelpCircle, CheckCircle } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -34,6 +35,8 @@ function fmtDate(iso: string): string {
  * Spec: docs/specs/2026-10-04-suspense-account-design.md
  */
 export default function SuspensePage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<SuspenseItem[]>([]);
   const [suspenseId, setSuspenseId] = useState<string | null>(null);
@@ -184,7 +187,7 @@ export default function SuspensePage() {
                       />
                       <button
                         type="button"
-                        onClick={() => { void reclassify(item); }}
+                        {...hideUnless(can.accountant)} onClick={() => { void reclassify(item); }}
                         disabled={!choice[item.journal_entry_id] || busyId === item.journal_entry_id}
                         className="inline-flex h-9 shrink-0 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                       >

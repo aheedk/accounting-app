@@ -23,6 +23,15 @@ describe('canOpenPage', () => {
     }
   });
 
+  it('closes the forms only an accountant can save to staff', () => {
+    for (const page of ['/journal/new', '/accounting/transfers/new', '/credit-memos/new', '/ap/vendor-credits/new', '/ap/pay-bills', '/payroll/pay-runs/new']) {
+      expect(canOpenPage('staff', page), page).toBe(false);
+      expect(canOpenPage('accountant', page), page).toBe(true);
+    }
+    expect(canOpenPage('accountant', '/payroll/employees/new')).toBe(false);
+    expect(canOpenPage('firm_admin', '/payroll/employees/new')).toBe(true);
+  });
+
   it('keeps the activity log for an accountant and up', () => {
     expect(canOpenPage('staff', '/setup/activity')).toBe(false);
     expect(canOpenPage('accountant', '/setup/activity')).toBe(true);
@@ -35,7 +44,7 @@ describe('canOpenPage', () => {
   });
 
   it('opens the rest of the app to staff and accountants', () => {
-    for (const page of ['/', '/messages', '/invoices/new', '/payroll/pay-runs', '/ai/inbox', '/settings/tax-codes']) {
+    for (const page of ['/', '/messages', '/invoices/new', '/ap/bills/new', '/payroll/pay-runs', '/ai/inbox', '/settings/tax-codes']) {
       expect(canOpenPage('staff', page), page).toBe(true);
       expect(canOpenPage('accountant', page), page).toBe(true);
     }

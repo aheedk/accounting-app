@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -23,6 +24,8 @@ type VendorCredit = {
 type OpenBill = { id: string; bill_number: string; total: string };
 
 export default function VendorCreditDetailPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const [data, setData] = useState<VendorCredit | null>(null);
@@ -81,8 +84,8 @@ export default function VendorCreditDetailPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Vendor Credit{data.vendor_credit_number ? ` ${data.vendor_credit_number}` : ''}</h1>
         <div className="flex gap-2">
-          {data.status === 'draft' && <Button disabled={busy} onClick={post}>Post</Button>}
-          {(data.status === 'posted' || data.status === 'applied') && <Button variant="destructive" disabled={busy} onClick={voidIt}>Void</Button>}
+          {data.status === 'draft' && <Button disabled={busy} {...hideUnless(can.accountant)} onClick={post}>Post</Button>}
+          {(data.status === 'posted' || data.status === 'applied') && <Button variant="destructive" disabled={busy} {...hideUnless(can.accountant)} onClick={voidIt}>Void</Button>}
         </div>
       </div>
       <Card><CardHeader><CardTitle>Details</CardTitle></CardHeader>
@@ -97,7 +100,7 @@ export default function VendorCreditDetailPage() {
       {data.status === 'posted' && parseFloat(data.remaining_amount) > 0 && (
         <Card><CardHeader><CardTitle>Apply to bill</CardTitle></CardHeader>
           <CardContent>
-            <form className="grid grid-cols-12 gap-2 items-end" onSubmit={apply}>
+            <form className="grid grid-cols-12 gap-2 items-end" {...hideUnless(can.accountant)} onSubmit={apply}>
               <div className="col-span-7"><label className="text-sm">Bill</label>
                 <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.bill_id} onChange={e => setApplyForm(f => ({ ...f, bill_id: e.target.value }))} required>
                   <option value="">Select…</option>{openBills.map(b => <option key={b.id} value={b.id}>{b.bill_number} — {fmtMoney(b.total)}</option>)}

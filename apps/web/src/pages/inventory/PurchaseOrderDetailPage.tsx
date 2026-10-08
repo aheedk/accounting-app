@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCan } from '@/lib/roleAccess';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PackageCheck, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -44,6 +45,8 @@ function lineTotal(qty: string, unit: string): number {
 }
 
 export default function PurchaseOrderDetailPage() {
+  // Voiding is for an accountant; receiving is for staff and up.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
@@ -106,8 +109,8 @@ export default function PurchaseOrderDetailPage() {
   if (!bizId) return <div>Pick a business.</div>;
   if (!data) return <div>{err ?? 'Loading…'}</div>;
 
-  const canVoid = data.status !== 'void' && data.status !== 'received';
-  const canReceive = data.status !== 'void' && data.status !== 'received' && data.status !== 'closed';
+  const canVoid = can.accountant && data.status !== 'void' && data.status !== 'received';
+  const canReceive = can.staff && data.status !== 'void' && data.status !== 'received' && data.status !== 'closed';
   const total = data.lines.reduce((acc, l) => acc + lineTotal(l.quantity, l.unit_cost), 0);
 
   return (

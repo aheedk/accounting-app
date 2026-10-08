@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -29,6 +30,8 @@ type CodingRule = {
 type Account = { id: string; code: string; name: string; is_active?: boolean };
 
 export default function CodingRulesPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [rules, setRules] = useState<CodingRule[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -178,7 +181,7 @@ export default function CodingRulesPage() {
                           </AppSelect>
                         ))}
                         <div className="flex gap-2">
-                          <Button size="sm" disabled={saving} onClick={() => void saveEdit(rule)}>{saving ? 'Saving…' : 'Save'}</Button>
+                          <Button size="sm" disabled={saving} {...hideUnless(can.accountant)} onClick={() => void saveEdit(rule)}>{saving ? 'Saving…' : 'Save'}</Button>
                           <Button size="sm" variant="ghost" disabled={saving} onClick={() => setEditingId(null)}>Cancel</Button>
                         </div>
                       </div>
@@ -195,7 +198,7 @@ export default function CodingRulesPage() {
                       variant="ghost"
                       size="sm"
                       aria-label={`Change the account for ${rule.normalized_vendor}`}
-                      onClick={() => startEdit(rule)}
+                      {...hideUnless(can.accountant)} onClick={() => startEdit(rule)}
                     >
                       <Pencil className="h-4 w-4 text-muted-foreground" />
                     </Button>
@@ -203,7 +206,7 @@ export default function CodingRulesPage() {
                       variant="ghost"
                       size="sm"
                       aria-label={`Delete rule for ${rule.normalized_vendor}`}
-                      onClick={() => void remove(rule)}
+                      {...hideUnless(can.accountant)} onClick={() => void remove(rule)}
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
                     </Button>

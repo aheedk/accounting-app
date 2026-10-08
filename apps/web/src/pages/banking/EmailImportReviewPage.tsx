@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, Landmark, RefreshCw, History, ExternalLink, Sparkles, Info, Receipt } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -202,6 +203,8 @@ function deriveBankSubtitle(imp: StagedImport): string {
 type TopTab = 'bank' | 'invoice' | 'stubs' | 'history';
 
 export default function EmailImportReviewPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [topTab, setTopTab] = useState<TopTab>('bank');
@@ -755,7 +758,7 @@ export default function EmailImportReviewPage() {
                         className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
                         Review
                       </button>
-                      <button type="button" onClick={() => handleBankReject(imp)}
+                      <button type="button" {...hideUnless(can.accountant)} onClick={() => handleBankReject(imp)}
                         disabled={rejectingId === imp.id || bankPosting}
                         className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
                         {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
@@ -1020,13 +1023,13 @@ export default function EmailImportReviewPage() {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <button type="button" onClick={() => handleBankReject(selectedBank)}
+                <button type="button" {...hideUnless(can.accountant)} onClick={() => handleBankReject(selectedBank)}
                   disabled={!!rejectingId || bankPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
                   <XCircle className="h-4 w-4" />
                   {rejectingId === selectedBank.id ? 'Rejecting…' : 'Reject all'}
                 </button>
-                <button type="button" onClick={handleBankApprove} disabled={bankPosting}
+                <button type="button" {...hideUnless(can.accountant)} onClick={handleBankApprove} disabled={bankPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
                   <CheckCircle className="h-4 w-4" />
                   {bankPosting ? 'Posting…' : `Post ${Object.values(included).filter(Boolean).length} journal entries`}
@@ -1247,7 +1250,7 @@ export default function EmailImportReviewPage() {
                         className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
                         Review
                       </button>
-                      <button type="button" onClick={() => handleInvoiceReject(imp)}
+                      <button type="button" {...hideUnless(can.accountant)} onClick={() => handleInvoiceReject(imp)}
                         disabled={rejectingId === imp.id || invPosting}
                         className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
                         {rejectingId === imp.id ? 'Rejecting…' : 'Reject'}
@@ -1417,13 +1420,13 @@ export default function EmailImportReviewPage() {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <button type="button" onClick={() => handleInvoiceReject(selectedInvoice)}
+                <button type="button" {...hideUnless(can.accountant)} onClick={() => handleInvoiceReject(selectedInvoice)}
                   disabled={!!rejectingId || invPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">
                   <XCircle className="h-4 w-4" />
                   {rejectingId === selectedInvoice.id ? 'Rejecting…' : 'Reject'}
                 </button>
-                <button type="button" onClick={handleInvoiceApprove} disabled={invPosting}
+                <button type="button" {...hideUnless(can.accountant)} onClick={handleInvoiceApprove} disabled={invPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
                   <CheckCircle className="h-4 w-4" />
                   {invPosting ? 'Posting…' : selectedInvoice.invoice_type === 'ap' ? 'Post as Bill' : 'Post as Invoice'}

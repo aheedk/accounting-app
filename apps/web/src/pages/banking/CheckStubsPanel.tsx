@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link } from 'react-router-dom';
 import { Receipt, ExternalLink } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -52,6 +53,8 @@ function fmtDate(iso: string | null): string {
  * already in the books -- by "Apply" here.
  */
 export default function CheckStubsPanel({ accounts }: { accounts: Account[] }) {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [stubs, setStubs] = useState<CheckStub[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +188,7 @@ export default function CheckStubsPanel({ accounts }: { accounts: Account[] }) {
                     {stub.status === 'unmatched' && !stub.posted_check && (
                       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span>Waiting for this check on a bank statement.</span>
-                        <button type="button" onClick={() => { void dismiss(stub); }} disabled={busyId === stub.id}
+                        <button type="button" {...hideUnless(can.accountant)} onClick={() => { void dismiss(stub); }} disabled={busyId === stub.id}
                           className="shrink-0 text-destructive hover:underline disabled:opacity-50">Dismiss</button>
                       </div>
                     )}
@@ -205,11 +208,11 @@ export default function CheckStubsPanel({ accounts }: { accounts: Account[] }) {
                           {categoryAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                         </AppSelect>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => { void apply(stub); }} disabled={busyId === stub.id}
+                          <button type="button" {...hideUnless(can.accountant)} onClick={() => { void apply(stub); }} disabled={busyId === stub.id}
                             className="inline-flex h-7 items-center rounded-md bg-primary px-3 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                             {busyId === stub.id ? 'Applying…' : 'Apply payee and category'}
                           </button>
-                          <button type="button" onClick={() => { void dismiss(stub); }} disabled={busyId === stub.id}
+                          <button type="button" {...hideUnless(can.accountant)} onClick={() => { void dismiss(stub); }} disabled={busyId === stub.id}
                             className="text-destructive hover:underline disabled:opacity-50">Dismiss</button>
                         </div>
                       </div>

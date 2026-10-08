@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link } from 'react-router-dom';
 import { FileDown, Printer, Package, CheckCircle2 } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
@@ -45,6 +46,8 @@ const CARRIERS = [
 ];
 
 export default function ShippingLabelListPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [labels, setLabels] = useState<ShippingLabel[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
@@ -242,7 +245,7 @@ export default function ShippingLabelListPage() {
               defaultSortKey="shipped_at"
               defaultSortDir="desc"
               actions={r => (
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => deleteLabel(r.id)}>
+                <Button size="sm" variant="outline" disabled={busy} {...hideUnless(can.accountant)} onClick={() => deleteLabel(r.id)}>
                   Delete
                 </Button>
               )}

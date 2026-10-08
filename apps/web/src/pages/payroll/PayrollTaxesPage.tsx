@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -55,6 +56,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function PayrollTaxesPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const today = todayLocal();
 
@@ -230,7 +233,7 @@ export default function PayrollTaxesPage() {
       <Card>
         <CardHeader><CardTitle>Record liability</CardTitle></CardHeader>
         <CardContent>
-          <form className="grid grid-cols-1 sm:grid-cols-2 gap-3" onSubmit={submitCreate}>
+          <form className="grid grid-cols-1 sm:grid-cols-2 gap-3" {...hideUnless(can.accountant)} onSubmit={submitCreate}>
             <div>
               <Label>Period</Label>
               <AppSelect
@@ -363,7 +366,7 @@ export default function PayrollTaxesPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Pay liability</DialogTitle></DialogHeader>
             <div className="p-6">
-              <form className="space-y-3" onSubmit={submitPay}>
+              <form className="space-y-3" {...hideUnless(can.accountant)} onSubmit={submitPay}>
                 <p className="text-sm text-muted-foreground">
                   <span className="capitalize">{payTarget.period}</span> · {fmtShortDate(payTarget.period_start)} → {fmtShortDate(payTarget.period_end)} ·{' '}
                   <span className="font-mono">{fmtMoney(payTarget.amount)}</span>

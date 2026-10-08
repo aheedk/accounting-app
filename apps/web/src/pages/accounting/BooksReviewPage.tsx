@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,8 @@ function taskStatusBadge(status: TaskStatus) {
 
 
 export default function BooksReviewPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState<string>('');
@@ -205,7 +208,7 @@ export default function BooksReviewPage() {
 
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       {t.status !== 'done' ? (
-                        <Button size="sm" onClick={() => void patchTask(t.id, { status: 'done' })}>
+                        <Button size="sm" {...hideUnless(can.accountant)} onClick={() => void patchTask(t.id, { status: 'done' })}>
                           Sign off
                         </Button>
                       ) : <span />}

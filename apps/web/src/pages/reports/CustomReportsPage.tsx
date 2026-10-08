@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { DateInput } from '@/components/ui/date-input';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -89,6 +90,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function CustomReportsPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -332,7 +335,7 @@ export default function CustomReportsPage() {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={deleteSelected}
+                  {...hideUnless(can.accountant)} onClick={deleteSelected}
                   disabled={busy !== 'idle'}
                 >
                   Delete

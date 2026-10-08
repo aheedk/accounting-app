@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link } from 'react-router-dom';
 import { FileDown, Printer, CheckCircle2 } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
@@ -50,6 +51,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function SalesOrderListPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<SalesOrderRow[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
@@ -272,12 +275,12 @@ export default function SalesOrderListPage() {
                       <span className="inline-flex items-center gap-2">
                         <Link className="text-primary underline" to={`/inventory/sales-orders/${r.id}`}>view</Link>
                         {canFulfill && (
-                          <Button size="sm" disabled={busy} onClick={() => fulfill(r.id)}>
+                          <Button size="sm" disabled={busy} {...hideUnless(can.accountant)} onClick={() => fulfill(r.id)}>
                             {busy ? 'Working…' : 'Fulfill'}
                           </Button>
                         )}
                         {canVoid && (
-                          <Button size="sm" variant="destructive" disabled={busy} onClick={() => voidIt(r.id)}>
+                          <Button size="sm" variant="destructive" disabled={busy} {...hideUnless(can.accountant)} onClick={() => voidIt(r.id)}>
                             Void
                           </Button>
                         )}

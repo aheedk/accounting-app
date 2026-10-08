@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -74,6 +75,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function SalesOrderDetailPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
@@ -168,12 +171,12 @@ export default function SalesOrderDetailPage() {
         <div className="flex items-center gap-2">
           <span className={`${statusBadgeClass(data.status)} capitalize`}>{data.status}</span>
           {canFulfill && (
-            <Button disabled={busy} onClick={fulfill}>
+            <Button disabled={busy} {...hideUnless(can.accountant)} onClick={fulfill}>
               {busy ? 'Working…' : 'Fulfill'}
             </Button>
           )}
           {canVoid && (
-            <Button variant="destructive" disabled={busy} onClick={voidIt}>
+            <Button variant="destructive" disabled={busy} {...hideUnless(can.accountant)} onClick={voidIt}>
               Void
             </Button>
           )}

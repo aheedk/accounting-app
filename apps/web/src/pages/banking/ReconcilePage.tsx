@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { DateInput } from '@/components/ui/date-input';
@@ -64,6 +65,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function ReconcilePage() {
+  // Finishing a reconciliation is for an accountant.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const today = todayLocal();
 
@@ -322,7 +325,7 @@ export default function ReconcilePage() {
           </Card>
 
           <div className="flex gap-2">
-            <Button type="submit" disabled={!canSubmit}>
+            <Button type="submit" {...hideUnless(can.accountant)} disabled={!canSubmit}>
               {busy ? 'Reconciling…' : 'Create reconciliation'}
             </Button>
           </div>

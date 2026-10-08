@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -38,6 +39,8 @@ type BillPaymentDetail = {
 type OpenBill = { id: string; bill_number: string; total: string };
 
 export default function BillPaymentDetailPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const [data, setData] = useState<BillPaymentDetail | null>(null);
@@ -103,8 +106,8 @@ export default function BillPaymentDetailPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bill Payment {p.payment_date}</h1>
         <div className="flex gap-2">
-          {p.status === 'draft' && <Button disabled={busy} onClick={post}>Post</Button>}
-          {p.status === 'posted' && <Button variant="destructive" disabled={busy} onClick={voidIt}>Void</Button>}
+          {p.status === 'draft' && <Button disabled={busy} {...hideUnless(can.accountant)} onClick={post}>Post</Button>}
+          {p.status === 'posted' && <Button variant="destructive" disabled={busy} {...hideUnless(can.accountant)} onClick={voidIt}>Void</Button>}
         </div>
       </div>
       <Card><CardHeader><CardTitle>Details</CardTitle></CardHeader>
@@ -123,7 +126,7 @@ export default function BillPaymentDetailPage() {
                 <td className="p-3 font-mono">{a.bill_number}</td>
                 <td className="p-3 text-right">{fmtMoney(a.applied_amount)}</td>
                 <td className="p-3">{new Date(a.applied_at).toLocaleString()}</td>
-                <td className="p-3"><Button size="sm" variant="ghost" onClick={() => unapply(a.id)} disabled={busy}>Unapply</Button></td>
+                <td className="p-3"><Button size="sm" variant="ghost" {...hideUnless(can.accountant)} onClick={() => unapply(a.id)} disabled={busy}>Unapply</Button></td>
               </tr>
             ))}</tbody>
           </table>

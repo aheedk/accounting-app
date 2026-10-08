@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { FileDown, Printer } from 'lucide-react';
 import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -116,6 +117,8 @@ function fmtDate(iso: string | null): string {
 }
 
 export default function RecurringTransactionsPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -452,7 +455,7 @@ export default function RecurringTransactionsPage() {
             </ul>
           )}
           <div className="flex items-center gap-3 pt-2">
-            <Button onClick={runDue} disabled={running || due.length === 0}>
+            <Button {...hideUnless(can.accountant)} onClick={runDue} disabled={running || due.length === 0}>
               {running ? 'Running…' : 'Run all due'}
             </Button>
             {runResult && <span className="text-sm text-green-600">{runResult}</span>}
@@ -471,7 +474,7 @@ export default function RecurringTransactionsPage() {
             </span>
             <Button
               size="sm"
-              onClick={() => { setShowForm((s) => !s); if (showForm) resetForm(); }}
+              {...hideUnless(can.accountant)} onClick={() => { setShowForm((s) => !s); if (showForm) resetForm(); }}
             >
               {showForm ? 'Cancel' : '+ New template'}
             </Button>
@@ -649,14 +652,14 @@ export default function RecurringTransactionsPage() {
                         variant="ghost"
                         className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary"
                         disabled={runNowBusyId === t.id}
-                        onClick={() => void runNow(t.id)}
+                        {...hideUnless(can.accountant)} onClick={() => void runNow(t.id)}
                       >
                         {runNowBusyId === t.id ? 'Running…' : 'Run now'}
                       </Button>
-                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => startEdit(t)}>
+                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary" {...hideUnless(can.accountant)} onClick={() => startEdit(t)}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" onClick={() => deleteTemplate(t.id)}>
+                      <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" {...hideUnless(can.accountant)} onClick={() => deleteTemplate(t.id)}>
                         Delete
                       </Button>
                     </td>

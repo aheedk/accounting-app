@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { FileDown, GripVertical, Printer } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -166,6 +167,8 @@ function formToPatchBody(form: RuleFormState): PatchBody {
 }
 
 export default function RulesPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [rules, setRules] = useState<Rule[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -467,7 +470,7 @@ export default function RulesPage() {
           <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-3">
             <span className="text-sm font-medium">{selectedIds.size} rule{selectedIds.size !== 1 ? 's' : ''} selected</span>
             <button
-              onClick={() => bulkDelete()}
+              {...hideUnless(can.accountant)} onClick={() => bulkDelete()}
               disabled={bulkBusy}
               className="border border-white/40 px-3 py-1 rounded text-sm hover:bg-white/10 disabled:opacity-50"
             >Delete</button>
@@ -588,7 +591,7 @@ export default function RulesPage() {
                           <span className="text-muted-foreground">|</span>
                           <button
                             className="text-destructive hover:underline text-sm"
-                            onClick={() => remove(r)}
+                            {...hideUnless(can.accountant)} onClick={() => remove(r)}
                             disabled={isRowBusy}
                           >
                             Delete

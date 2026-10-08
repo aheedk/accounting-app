@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link } from 'react-router-dom';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
@@ -52,6 +53,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function PurchaseOrderListPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<PurchaseOrder[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
@@ -218,7 +221,7 @@ export default function PurchaseOrderListPage() {
                     type="button"
                     className="text-destructive underline disabled:opacity-50"
                     disabled={busyId === r.id}
-                    onClick={() => voidIt(r.id)}
+                    {...hideUnless(can.accountant)} onClick={() => voidIt(r.id)}
                   >
                     {busyId === r.id ? 'voiding…' : 'void'}
                   </button>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -23,6 +24,8 @@ type CreditMemo = {
 type OpenInvoice = { id: string; invoice_number: string; total: string };
 
 export default function CreditMemoDetailPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const [data, setData] = useState<CreditMemo | null>(null);
@@ -81,8 +84,8 @@ export default function CreditMemoDetailPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Credit Memo{data.credit_memo_number ? ` ${data.credit_memo_number}` : ''}</h1>
         <div className="flex gap-2">
-          {data.status === 'draft' && <Button disabled={busy} onClick={post}>Post</Button>}
-          {(data.status === 'posted' || data.status === 'applied') && <Button variant="destructive" disabled={busy} onClick={voidIt}>Void</Button>}
+          {data.status === 'draft' && <Button disabled={busy} {...hideUnless(can.accountant)} onClick={post}>Post</Button>}
+          {(data.status === 'posted' || data.status === 'applied') && <Button variant="destructive" disabled={busy} {...hideUnless(can.accountant)} onClick={voidIt}>Void</Button>}
         </div>
       </div>
       <Card><CardHeader><CardTitle>Details</CardTitle></CardHeader>
@@ -97,7 +100,7 @@ export default function CreditMemoDetailPage() {
       {data.status === 'posted' && parseFloat(data.remaining_amount) > 0 && (
         <Card><CardHeader><CardTitle>Apply to invoice</CardTitle></CardHeader>
           <CardContent>
-            <form className="grid grid-cols-12 gap-2 items-end" onSubmit={apply}>
+            <form className="grid grid-cols-12 gap-2 items-end" {...hideUnless(can.accountant)} onSubmit={apply}>
               <div className="col-span-7"><label className="text-sm">Invoice</label>
                 <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={applyForm.invoice_id} onChange={e => setApplyForm(f => ({ ...f, invoice_id: e.target.value }))} required>
                   <option value="">Select…</option>{openInvoices.map(i => <option key={i.id} value={i.id}>{i.invoice_number} — {fmtMoney(i.total)}</option>)}

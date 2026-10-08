@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, CheckCircle, XCircle } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -40,6 +41,8 @@ function fmtDate(iso: string) {
 }
 
 export default function InvoiceImportReviewPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
 
@@ -204,7 +207,7 @@ export default function InvoiceImportReviewPage() {
                   className="inline-flex h-8 items-center rounded-md bg-primary text-primary-foreground px-3 text-sm font-medium hover:bg-primary/90">
                   Review
                 </button>
-                <button type="button" onClick={() => handleReject(imp)}
+                <button type="button" {...hideUnless(can.accountant)} onClick={() => handleReject(imp)}
                   className="inline-flex h-8 items-center rounded-md border px-3 text-sm text-destructive hover:bg-destructive/10">
                   Reject
                 </button>
@@ -342,11 +345,11 @@ export default function InvoiceImportReviewPage() {
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <button type="button" onClick={() => handleReject(selectedImport)}
+            <button type="button" {...hideUnless(can.accountant)} onClick={() => handleReject(selectedImport)}
               className="inline-flex items-center gap-1.5 h-9 rounded-md border px-4 text-sm text-destructive hover:bg-destructive/10">
               <XCircle className="h-4 w-4" />Reject
             </button>
-            <button type="button" onClick={handleApprove} disabled={posting}
+            <button type="button" {...hideUnless(can.accountant)} onClick={handleApprove} disabled={posting}
               className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
               <CheckCircle className="h-4 w-4" />
               {posting ? 'Posting…' : `Post Journal Entry`}

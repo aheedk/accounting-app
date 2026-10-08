@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FileText, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -51,6 +52,8 @@ type Account = { id: string; code: string; name: string };
 
 
 export default function PaymentDetailPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
@@ -122,8 +125,8 @@ export default function PaymentDetailPage() {
   if (!data) return <div>Loading...</div>;
   const p = data.payment;
   const applied = Number(p.amount) - Number(p.unapplied_amount);
-  const canPost = p.status === 'draft';
-  const canVoid = p.status === 'posted';
+  const canPost = can.accountant && p.status === 'draft';
+  const canVoid = can.accountant && p.status === 'posted';
 
   return (
     <div className="space-y-6">
@@ -205,7 +208,7 @@ export default function PaymentDetailPage() {
                     <td className="p-3 text-right font-mono">{fmtMoney(a.applied_amount)}</td>
                     <td className="p-3">{fmtDateTime(a.applied_at)}</td>
                     <td className="p-3 text-right">
-                      <Button size="sm" variant="ghost" onClick={() => unapply(a.id)} disabled={busy}>Unapply</Button>
+                      <Button size="sm" variant="ghost" {...hideUnless(can.accountant)} onClick={() => unapply(a.id)} disabled={busy}>Unapply</Button>
                     </td>
                   </tr>
                 ))}

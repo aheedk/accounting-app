@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { DateInput } from '@/components/ui/date-input';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
@@ -49,6 +50,8 @@ function lastDayOfCurrentMonth(): string {
 }
 
 export default function FixedAssetDetailPage() {
+  // Depreciation posts to the ledger, which is for an accountant.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
@@ -173,7 +176,7 @@ export default function FixedAssetDetailPage() {
         </Card>
       )}
 
-      <Card>
+      <Card {...hideUnless(can.accountant)}>
         <CardHeader>
           <CardTitle>Run depreciation</CardTitle>
         </CardHeader>

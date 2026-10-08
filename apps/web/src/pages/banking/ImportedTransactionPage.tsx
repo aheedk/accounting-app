@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useCan } from '@/lib/roleAccess';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { History, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -85,6 +86,8 @@ function toForm(txn: ImportedTransaction): Form {
 // Edit screen for a Check / Expense / Deposit that was posted from a bank
 // statement import -- the QBO-style form behind those rows in the ledger.
 export default function ImportedTransactionPage() {
+  // Changing an imported transaction is for an accountant.
+  const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
@@ -399,7 +402,7 @@ export default function ImportedTransactionPage() {
         <Button type="button" variant="outline" onClick={() => nav(-1)}>{readOnly ? 'Back' : 'Cancel'}</Button>
         <Link className="text-sm text-primary hover:underline" to={`/journal/${txn.id}?view=entry`}>View journal entry</Link>
         <div className="flex-1" />
-        {!readOnly && <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>}
+        {!readOnly && can.accountant && <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>}
       </div>
       {addAccount.drawer}
     </form>

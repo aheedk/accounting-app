@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { hideUnless, useCan } from '@/lib/roleAccess';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
@@ -25,6 +26,8 @@ function fmtShortDate(iso: string) {
 }
 
 export default function InventoryOverviewPage() {
+  // What this login may do here; anything it may not is left off the page.
+  const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export default function InventoryOverviewPage() {
               <div className="mb-1 text-xs">Dated</div>
               <DateInput value={openingDate} onChange={e => setOpeningDate(e.target.value)} />
             </div>
-            <Button type="button" onClick={() => { void postOpeningBalance(); }} disabled={posting}>
+            <Button type="button" {...hideUnless(can.accountant)} onClick={() => { void postOpeningBalance(); }} disabled={posting}>
               {posting ? 'Posting…' : 'Post opening balance'}
             </Button>
           </div>
