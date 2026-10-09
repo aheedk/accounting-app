@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, makeCustomer, makeVendor, seedYearPeriods, seedCoa } from '../helpers/factories.js';
+import {
+  makeFirm, makeBusiness, makeUser, makeCustomer, makeVendor, makeBankAccount, seedYearPeriods, seedCoa,
+} from '../helpers/factories.js';
 import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
 import * as billSvc from '../../src/services/ap/billService.js';
+import * as checkSvc from '../../src/services/ap/checkService.js';
+import * as expenseSvc from '../../src/services/ap/expenseTransactionService.js';
 import { searchRecords } from '../../src/services/core/searchService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -24,7 +28,11 @@ describe('searchRecords', () => {
     await seedCoa(t.db, biz.id);
     const account = (code: string) => t.db.selectFrom('chart_of_accounts').selectAll()
       .where('business_id', '=', biz.id).where('code', '=', code).executeTakeFirstOrThrow();
-    return { biz, ctx, revenue: await account('4010'), expense: await account('5010') };
+    const cash = await account('1020');
+    return {
+      biz, ctx, revenue: await account('4010'), expense: await account('5010'), cash,
+      bankAccount: await makeBankAccount(t.db, biz.id, cash.id),
+    };
   }
 
   it('finds customers, vendors, invoices and bills by name or number, inside one company', async () => {
@@ -64,5 +72,31 @@ describe('searchRecords', () => {
     // Another company sees none of it.
     const other = await client('Other Co');
     expect(await searchRecords(t.db, { business_id: other.biz.id, query: 'contoso' })).toEqual([]);
+  });
+
+  it('finds both real checks and legacy checks-as-expenses, each pointing at its own page', async () => {
+    const { biz, ctx, expense, bankAccount } = await client('Search Co');
+    const payee = await makeVendor(t.db, biz.id, { name: 'Contoso Plumbing' });
+
+    const realCheck = await t.db.transaction().execute(trx => checkSvc.createCheck(trx, ctx, {
+      payment_date: '2026-04-15', payee_id: payee.id, payee_type: 'vendor',
+      bank_account_id: bankAccount.id, lines: [{ account_id: expense.id, amount: '120.00' }],
+    }));
+    // From before the Write Check feature existed — an expense paid by check.
+    const legacyCheck = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+      transaction_date: '2026-03-01', vendor_id: payee.id, payment_account_id: bankAccount.cash_account_id,
+      payment_method: 'check', reference: '9042',
+      lines: [{ category_account_id: expense.id, amount: '80.00' }],
+    }));
+
+    const byVendor = await searchRecords(t.db, { business_id: biz.id, query: 'contoso plumbing' });
+    expect(byVendor.map(r => [r.type, r.label, r.detail, r.path])).toEqual(expect.arrayContaining([
+      ['check', `Check ${realCheck.check_number}`, 'Contoso Plumbing', `/accounting/checks/${realCheck.id}`],
+      ['check', 'Check 9042', 'Contoso Plumbing', `/accounting/expenses/${legacyCheck.id}`],
+    ]));
+
+    // By check number too.
+    const byNumber = await searchRecords(t.db, { business_id: biz.id, query: '9042' });
+    expect(byNumber.map(r => r.path)).toEqual([`/accounting/expenses/${legacyCheck.id}`]);
   });
 });

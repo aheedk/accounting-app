@@ -5,12 +5,21 @@ import type { DB } from '../../db/types.js';
 // Read-only, and always inside one business.
 
 export type SearchResult = {
-  type: 'customer' | 'vendor' | 'invoice' | 'bill';
+  type: 'customer' | 'vendor' | 'invoice' | 'bill' | 'check';
   id: string;
   /** What the person typed for: a name, or "Invoice 1042". */
   label: string;
-  /** Who it belongs to, for an invoice or bill. */
+  /** Who it belongs to, for an invoice, bill, or check. */
   detail: string | null;
+  /**
+   * Where this result's own type normally lives (customer/vendor/invoice/
+   * bill). A check is the exception — this business's historical checks are
+   * expense_transactions rows (payment_method='check'), not real `checks`
+   * table rows (the Write Check feature postdates them; see checkService.
+   * listChecks for the same split) — so unlike the other types, a check
+   * result's target page varies per row, not per type.
+   */
+  path: string;
 };
 
 const PER_TYPE = 5;
@@ -27,7 +36,7 @@ export async function searchRecords(
   if (text.length < 2) return [];
   const pattern = likePattern(text);
 
-  const [customers, vendors, invoices, bills] = await Promise.all([
+  const [customers, vendors, invoices, bills, checks, legacyChecks] = await Promise.all([
     db.selectFrom('customers').select(['id', 'name'])
       .where('business_id', '=', q.business_id)
       .where('deleted_at', 'is', null)
@@ -52,12 +61,37 @@ export async function searchRecords(
       .where('b.deleted_at', 'is', null)
       .where(eb => eb.or([eb('b.bill_number', 'ilike', pattern), eb('v.name', 'ilike', pattern)]))
       .orderBy('b.bill_date', 'desc').limit(PER_TYPE).execute(),
+    // Checks written through the Write Check feature.
+    db.selectFrom('checks as ch')
+      .leftJoin('vendors as v', 'v.id', 'ch.payee_id')
+      .select(['ch.id', 'ch.check_number', 'v.name as vendor_name', 'ch.payee_text'])
+      .where('ch.business_id', '=', q.business_id)
+      .where(eb => eb.or([eb('ch.check_number', 'ilike', pattern), eb('ch.payee_text', 'ilike', pattern), eb('v.name', 'ilike', pattern)]))
+      .orderBy('ch.payment_date', 'desc').limit(PER_TYPE).execute(),
+    // This client's historical checks — expense_transactions rows paid by
+    // check, from before the Write Check feature existed (see the `path`
+    // field's doc comment above).
+    db.selectFrom('expense_transactions as e')
+      .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
+      .select(['e.id', 'e.reference', 'v.name as vendor_name', 'e.payee_text'])
+      .where('e.business_id', '=', q.business_id)
+      .where('e.payment_method', '=', 'check')
+      .where(eb => eb.or([eb('e.reference', 'ilike', pattern), eb('e.payee_text', 'ilike', pattern), eb('v.name', 'ilike', pattern)]))
+      .orderBy('e.transaction_date', 'desc').limit(PER_TYPE).execute(),
   ]);
 
   return [
-    ...customers.map(row => ({ type: 'customer' as const, id: row.id, label: row.name, detail: null })),
-    ...vendors.map(row => ({ type: 'vendor' as const, id: row.id, label: row.name, detail: null })),
-    ...invoices.map(row => ({ type: 'invoice' as const, id: row.id, label: `Invoice ${row.invoice_number}`, detail: row.party })),
-    ...bills.map(row => ({ type: 'bill' as const, id: row.id, label: `Bill ${row.bill_number}`, detail: row.party })),
+    ...customers.map(row => ({ type: 'customer' as const, id: row.id, label: row.name, detail: null, path: `/customers/${row.id}` })),
+    ...vendors.map(row => ({ type: 'vendor' as const, id: row.id, label: row.name, detail: null, path: `/ap/vendors/${row.id}` })),
+    ...invoices.map(row => ({ type: 'invoice' as const, id: row.id, label: `Invoice ${row.invoice_number}`, detail: row.party, path: `/invoices/${row.id}` })),
+    ...bills.map(row => ({ type: 'bill' as const, id: row.id, label: `Bill ${row.bill_number}`, detail: row.party, path: `/ap/bills/${row.id}` })),
+    ...checks.map(row => ({
+      type: 'check' as const, id: row.id, label: `Check ${row.check_number}`,
+      detail: row.vendor_name ?? row.payee_text, path: `/accounting/checks/${row.id}`,
+    })),
+    ...legacyChecks.map(row => ({
+      type: 'check' as const, id: row.id, label: row.reference ? `Check ${row.reference}` : 'Check',
+      detail: row.vendor_name ?? row.payee_text, path: `/accounting/expenses/${row.id}`,
+    })),
   ];
 }

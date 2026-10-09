@@ -111,21 +111,23 @@ function highlight(text: string, query: string): React.ReactNode {
   );
 }
 
-type RecordResult = { type: 'customer' | 'vendor' | 'invoice' | 'bill'; id: string; label: string; detail: string | null };
+type RecordResult = {
+  type: 'customer' | 'vendor' | 'invoice' | 'bill' | 'check';
+  id: string; label: string; detail: string | null; path: string;
+};
 
-const RECORD_KINDS: Record<RecordResult['type'], { group: string; path: (id: string) => string }> = {
-  customer: { group: 'Customers', path: id => `/customers/${id}` },
-  vendor: { group: 'Vendors', path: id => `/ap/vendors/${id}` },
-  invoice: { group: 'Invoices', path: id => `/invoices/${id}` },
-  bill: { group: 'Bills', path: id => `/ap/bills/${id}` },
+// A check's own target page varies per row (the real Check form, or a
+// legacy Expense — see the API's SearchResult.path doc comment), so unlike
+// the other types this only needs a group label, not a path builder.
+const RECORD_GROUPS: Record<RecordResult['type'], string> = {
+  customer: 'Customers', vendor: 'Vendors', invoice: 'Invoices', bill: 'Bills', check: 'Checks',
 };
 
 function recordToPage(result: RecordResult): Page {
-  const kind = RECORD_KINDS[result.type];
   return {
     label: result.detail ? `${result.label} · ${result.detail}` : result.label,
-    group: kind.group,
-    to: kind.path(result.id),
+    group: RECORD_GROUPS[result.type],
+    to: result.path,
   };
 }
 

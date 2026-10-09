@@ -612,7 +612,13 @@ export default function ExpensePage() {
             </>
           )}
         </div>
-        <h1 className="text-xl font-semibold">Expense</h1>
+        {/* This business's historical checks are expense_transactions rows
+            (payment_method='check') from before the Write Check feature
+            existed — they can't become real `checks` table rows without
+            voiding and reposting every one (je_protect_posted_row() treats a
+            posted JE's source_type as permanent). Can't change what this
+            form edits, but it can at least call itself what it actually is. */}
+        <h1 className="text-xl font-semibold">{paymentMethod === 'check' ? 'Check' : 'Expense'}</h1>
         {expense && expense.status === 'void' && (
           <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Voided</span>
         )}

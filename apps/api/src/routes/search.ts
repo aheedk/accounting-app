@@ -7,7 +7,7 @@ import { searchRecords } from '../services/core/searchService.js';
 const router = Router({ mergeParams: true });
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
-// The top-bar search: customers, vendors, invoices and bills of the open company.
+// The top-bar search: customers, vendors, invoices, bills and checks of the open company.
 router.get('/businesses/:businessId/search', async (req, res, next) => {
   try {
     const query = typeof req.query['q'] === 'string' ? req.query['q'].slice(0, 100) : '';
