@@ -63,6 +63,17 @@ export async function ingestUploadedPdf(
         'AI document processing is unavailable: the Anthropic API key on this server was rejected. Update ANTHROPIC_API_KEY and restart the API.',
       );
     }
+    // A separate failure mode from an outright-rejected key: the key is
+    // valid but the account/workspace it belongs to has run out of credit
+    // balance. Anthropic returns this as a 400 invalid_request_error, not
+    // the 401 AuthenticationError above — same "Internal server error"
+    // symptom otherwise.
+    if (e instanceof Anthropic.BadRequestError && /credit balance/i.test(e.message)) {
+      throw new BusinessRuleError(
+        ERR.VALIDATION_FAILED,
+        'AI document processing is unavailable: the Anthropic account is out of credit balance. Add credits under Plans & Billing, then try again.',
+      );
+    }
     if (e instanceof ExtractionTooLongError) {
       throw new BusinessRuleError(
         ERR.VALIDATION_FAILED,
