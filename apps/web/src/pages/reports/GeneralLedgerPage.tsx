@@ -459,8 +459,14 @@ export default function GeneralLedgerPage() {
   }, [report]);
 
   useEffect(() => {
+    // report starts null while the first load is in flight, which makes
+    // sourceTypes an empty array — without this guard, a filter restored
+    // from the URL on mount (e.g. coming Back from a transaction) looks
+    // "not in sourceTypes" before the data has even loaded, and gets wiped
+    // back to 'all' immediately.
+    if (!report) return;
     if (sourceFilter !== 'all' && !sourceTypes.includes(sourceFilter)) setSourceFilter('all');
-  }, [sourceFilter, sourceTypes]);
+  }, [report, sourceFilter, sourceTypes]);
 
   const visibleColumns = useMemo(() => (
     preferences.columnOrder.filter(column => preferences.visibleColumns.includes(column))

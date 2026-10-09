@@ -617,8 +617,14 @@ export default function ExpensePage() {
             existed — they can't become real `checks` table rows without
             voiding and reposting every one (je_protect_posted_row() treats a
             posted JE's source_type as permanent). Can't change what this
-            form edits, but it can at least call itself what it actually is. */}
-        <h1 className="text-xl font-semibold">{paymentMethod === 'check' ? 'Check' : 'Expense'}</h1>
+            form edits, but it can at least call itself what it actually is.
+            For an *existing* record, that means waiting for the fetch
+            (`expense`, not the `paymentMethod` state, which starts at its
+            'cash' default) before committing to either word — otherwise a
+            check flashes "Expense" for the ~1-2s the GET takes, then flips. */}
+        <h1 className="text-xl font-semibold">
+          {isNew || expense ? (expense?.payment_method === 'check' ? 'Check' : 'Expense') : ' '}
+        </h1>
         {expense && expense.status === 'void' && (
           <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Voided</span>
         )}
