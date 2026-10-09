@@ -498,6 +498,11 @@ export type WrapImportedExpenseInput = {
   entry_date: string;
   description: string;
   payee_name: string | null;
+  /** The check number, for a check — same value given to the JE's own
+   * reference (see statementImportService.ts's postStatement). Without
+   * this, the wrapper row's own Ref No. stayed blank even once the JE had
+   * it, since nothing here ever passed it through to expense_transactions. */
+  reference?: string | null;
   amount: string;
 };
 
@@ -531,6 +536,7 @@ export async function wrapImportedExpenseJournalEntry(
     payee_text: input.payee_name ?? (input.payment_method === 'check' ? '' : input.description),
     payment_account_id: input.payment_account_id,
     payment_method: input.payment_method,
+    reference: input.reference ?? null,
     memo: input.description,
     total_amount: input.amount,
     status: 'posted',

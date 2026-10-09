@@ -225,6 +225,9 @@ export async function postStatementLines(
         entry_date: posted.entry_date,
         description: line.description,
         payee_name: payee,
+        // Same value the JE itself got above (posted.reference) — keeps the
+        // wrapper row's own Ref No. in sync with it.
+        reference: posted.reference ?? null,
         amount,
       });
     }

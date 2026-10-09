@@ -116,6 +116,27 @@ describe('statement import', () => {
     expect(labels.get(refund!)?.path).toBe(`/transactions/${refund}`);
   });
 
+  it('carries the check number from a bank statement check line into both the JE and its expense wrapper', async () => {
+    const data = await setup(t);
+    const bankStatement: StatementLine[] = [
+      { date: '03/06/2026', description: 'CHECK 5517', amount: '450.00', type: 'check', check_number: '5517' },
+    ];
+    const [checkJeId] = await t.db.transaction().execute(trx => postStatementLines(trx, data.ctx, {
+      staging_id: randomUUID(), statement_kind: 'bank', lines: bankStatement,
+      account_id: data.checking.id, items: [{ index: 0, offset_account_id: data.supplies.id }],
+    }));
+
+    const je = await t.db.selectFrom('journal_entries').select(['reference']).where('id', '=', checkJeId!).executeTakeFirstOrThrow();
+    expect(je.reference).toBe('5517');
+
+    const expense = await t.db.selectFrom('expense_transactions').selectAll()
+      .where('journal_entry_id', '=', checkJeId!).executeTakeFirstOrThrow();
+    // No real payee on a bank statement's check line — blank (not the check
+    // number stuffed into the name), but the number itself carries over too.
+    expect(expense.payee_text).toBe('');
+    expect(expense.reference).toBe('5517');
+  });
+
   it('refuses a card statement on a bank account, and a line coded to the statement account', async () => {
     const data = await setup(t);
     await expect(t.db.transaction().execute(trx => postStatementLines(trx, data.ctx, {

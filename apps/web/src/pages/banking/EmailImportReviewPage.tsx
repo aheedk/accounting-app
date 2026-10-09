@@ -1032,7 +1032,7 @@ export default function EmailImportReviewPage() {
                 <button type="button" {...hideUnless(can.accountant)} onClick={handleBankApprove} disabled={bankPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
                   <CheckCircle className="h-4 w-4" />
-                  {bankPosting ? 'Posting…' : `Post ${Object.values(included).filter(Boolean).length} journal entries`}
+                  {bankPosting ? 'Posting…' : `Post ${Object.values(included).filter(Boolean).length} entries`}
                 </button>
               </div>
             </div>
