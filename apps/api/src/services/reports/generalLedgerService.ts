@@ -40,6 +40,8 @@ export type GeneralLedgerLine = {
   // get a wrapper so they're viewable the same way. Lets the UI drill through to
   // the Bank Deposit page instead of the raw journal entry for any such line.
   bank_deposit_id: string | null;
+  /** True once this line's transaction was cleared and locked by a finished bank reconciliation. */
+  is_reconciled: boolean;
 };
 
 export type GeneralLedgerAccount = {
@@ -130,7 +132,7 @@ export async function generalLedger(
       'jel.id as line_id', 'jel.account_id', 'jel.debit', 'jel.credit', 'jel.memo as line_memo', 'jel.name as line_name',
       'je.id as journal_entry_id', 'je.entry_date', 'je.source_type', 'je.source_id', 'je.journal_number',
       'je.transaction_type', 'je.payee_name', 'je.reference',
-      'je.memo as entry_memo', 'je.status',
+      'je.memo as entry_memo', 'je.status', 'je.reconciliation_status',
     ])
     .where('je.business_id', '=', q.business_id)
     .where('jel.account_id', 'in', accountIds)
@@ -175,13 +177,29 @@ export async function generalLedger(
   }
 
   const depositByJe = new Map<string, string>();
+  const reconciledJeIds = new Set<string>();
   if (jeIds.length > 0) {
     const deposits = await db.selectFrom('bank_deposits')
-      .select(['id', 'journal_entry_id'])
+      .select(['id', 'journal_entry_id', 'reconciliation_status'])
       .where('journal_entry_id', 'in', jeIds)
       .execute();
     for (const d of deposits) {
-      if (d.journal_entry_id) depositByJe.set(d.journal_entry_id, d.id);
+      if (d.journal_entry_id) {
+        depositByJe.set(d.journal_entry_id, d.id);
+        if (d.reconciliation_status === 'reconciled') reconciledJeIds.add(d.journal_entry_id);
+      }
+    }
+    for (const table of ['expense_transactions', 'checks'] as const) {
+      const rows = await db.selectFrom(table)
+        .select(['journal_entry_id', 'reconciliation_status'])
+        .where('journal_entry_id', 'in', jeIds)
+        .where('reconciliation_status', '=', 'reconciled')
+        .execute();
+      for (const r of rows) if (r.journal_entry_id) reconciledJeIds.add(r.journal_entry_id);
+    }
+    // Standalone entries (no wrapper row) carry the flag on journal_entries itself.
+    for (const line of activity) {
+      if (line.reconciliation_status === 'reconciled') reconciledJeIds.add(line.journal_entry_id);
     }
   }
 
@@ -252,6 +270,7 @@ export async function generalLedger(
         credit,
         running_balance: running,
         bank_deposit_id: depositId,
+        is_reconciled: reconciledJeIds.has(line.journal_entry_id),
       };
     });
 

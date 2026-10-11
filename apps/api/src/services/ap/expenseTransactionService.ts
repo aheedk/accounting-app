@@ -1,5 +1,5 @@
 import { sql, type Transaction, type Kysely } from 'kysely';
-import { AUDIT } from '@accounting/shared';
+import { AUDIT, hasMinRole } from '@accounting/shared';
 import type { DB, PaymentMethod } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
@@ -242,6 +242,9 @@ export async function updateExpense(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('expense_transaction', id);
   if (before.status === 'void') throw new PreconditionError('A voided expense cannot be edited');
+  if (before.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'accountant')) {
+    throw new PreconditionError('This expense has been reconciled. Editing it may cause discrepancies in your reconciliation — only an accountant or firm admin can proceed.');
+  }
 
   if (!input.payee_text && !input.vendor_id && !input.customer_id) {
     throw new PreconditionError('A payee is required');
@@ -350,6 +353,9 @@ export async function voidExpense(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('expense_transaction', input.expense_transaction_id);
   if (before.status === 'void') throw new PreconditionError('This expense is already void');
+  if (before.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'firm_admin')) {
+    throw new PreconditionError('This expense has been reconciled. Voiding it will create a discrepancy you will need to resolve in your next reconciliation — only a firm admin can do this.');
+  }
 
   if (before.journal_entry_id) {
     await ledger.voidJournalEntry(trx, ctx, {
@@ -394,8 +400,8 @@ export async function deleteExpense(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('expense_transaction', id);
 
-  if (await isReconciled(trx, before.journal_entry_id)) {
-    throw new PreconditionError('This expense has been reconciled and cannot be deleted.');
+  if (before.reconciliation_status === 'reconciled' || await isReconciled(trx, before.journal_entry_id)) {
+    throw new PreconditionError('This expense has been reconciled and cannot be deleted. Void it instead, or undo the reconciliation first.');
   }
 
   const lines = await trx.selectFrom('expense_transaction_lines').selectAll()
@@ -431,7 +437,7 @@ export async function getExpense(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
       'e.id', 'e.business_id', 'e.transaction_date', 'e.payee_text', 'e.vendor_id', 'e.customer_id',
       'e.payment_account_id', 'e.payment_method', 'e.reference', 'e.memo', 'e.total_amount',
       'e.status', 'e.journal_entry_id', 'e.created_at', 'e.updated_at',
-      'e.posted_at', 'e.voided_at',
+      'e.posted_at', 'e.voided_at', 'e.reconciliation_status',
       'v.name as vendor_name', 'c.name as customer_name',
       'pa.name as payment_account_name',
     ])
@@ -466,7 +472,7 @@ export async function getExpense(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
     payee_name: payeeName(row),
     editable: row.status !== 'void',
     imported,
-    is_reconciled: await isReconciled(db, row.journal_entry_id),
+    is_reconciled: row.reconciliation_status === 'reconciled' || await isReconciled(db, row.journal_entry_id),
     lines,
   };
 }

@@ -1,5 +1,5 @@
 import { sql, type Transaction, type Kysely } from 'kysely';
-import { AUDIT } from '@accounting/shared';
+import { AUDIT, hasMinRole } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import * as ledger from '../core/ledgerService.js';
@@ -243,6 +243,9 @@ export async function updateDeposit(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('bank_deposit', id);
   if (before.voided_at) throw new PreconditionError('A voided deposit cannot be edited');
+  if (before.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'accountant')) {
+    throw new PreconditionError('This deposit has been reconciled. Editing it may cause discrepancies in your reconciliation — only an accountant or firm admin can proceed.');
+  }
 
   const existingLines = await trx.selectFrom('bank_deposit_lines').selectAll()
     .where('deposit_id', '=', id)
@@ -370,7 +373,7 @@ export async function getDeposit(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
       'd.id', 'd.business_id', 'd.bank_account_id', 'd.deposit_date',
       'd.deposit_number', 'd.memo', 'd.total_amount', 'd.journal_entry_id',
       'd.cash_back_account_id', 'd.cash_back_memo', 'd.cash_back_amount',
-      'd.voided_at', 'd.created_at', 'd.updated_at',
+      'd.voided_at', 'd.created_at', 'd.updated_at', 'd.reconciliation_status',
       'ba.name as bank_account_name',
       'coa.name as cash_account_name',
     ])
@@ -391,7 +394,7 @@ export async function getDeposit(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
     imported = je !== undefined && je.source_type !== 'bank_deposit';
   }
   const editable = deposit.voided_at === null;
-  const is_reconciled = await isReconciled(db, deposit.journal_entry_id);
+  const is_reconciled = deposit.reconciliation_status === 'reconciled' || await isReconciled(db, deposit.journal_entry_id);
 
   const lines = await db.selectFrom('bank_deposit_lines as l')
     .leftJoin('chart_of_accounts as a', 'a.id', 'l.account_id')
@@ -549,6 +552,9 @@ export async function voidDeposit(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('bank_deposit', id);
   if (before.voided_at) throw new PreconditionError('This deposit is already void');
+  if (before.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'firm_admin')) {
+    throw new PreconditionError('This deposit has been reconciled. Voiding it will create a discrepancy you will need to resolve in your next reconciliation — only a firm admin can do this.');
+  }
 
   if (before.journal_entry_id) {
     await ledger.voidJournalEntry(trx, ctx, {
@@ -604,8 +610,8 @@ export async function deleteDeposit(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('bank_deposit', id);
 
-  if (await isReconciled(trx, before.journal_entry_id)) {
-    throw new PreconditionError('This deposit has been reconciled and cannot be deleted.');
+  if (before.reconciliation_status === 'reconciled' || await isReconciled(trx, before.journal_entry_id)) {
+    throw new PreconditionError('This deposit has been reconciled and cannot be deleted. Void it instead, or undo the reconciliation first.');
   }
 
   // Un-mark payments so they return to Undeposited Funds

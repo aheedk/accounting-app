@@ -109,7 +109,11 @@ export type JournalEntrySourceType =
   | 'manual' | 'invoice' | 'payment' | 'credit_memo'
   | 'bill' | 'bill_payment' | 'vendor_credit'
   | 'reversal' | 'adjustment' | 'bank_import' | 'invoice_import'
-  | 'bank_deposit' | 'expense' | 'check';
+  | 'bank_deposit' | 'expense' | 'check' | 'reconciliation_adjustment';
+
+export type ReconciliationSessionStatus = 'in_progress' | 'completed' | 'cancelled';
+export type ReconciliationItemType = 'deposit' | 'expense' | 'check' | 'journal_entry' | 'service_charge' | 'interest';
+export type TransactionReconciliationStatus = 'unreconciled' | 'cleared' | 'reconciled';
 
 export interface ChartOfAccountsTable {
   id: Generated<string>;
@@ -165,6 +169,8 @@ export interface JournalEntriesTable {
   created_at: Generated<Timestamp>;
   created_by_user_id: string | null;
   updated_at: Generated<Timestamp>;
+  reconciliation_status: Generated<TransactionReconciliationStatus>;
+  reconciliation_id: string | null;
 }
 
 export interface JournalEntryLinesTable {
@@ -403,6 +409,8 @@ export interface ExpenseTransactionsTable {
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;
   voided_by_user_id: string | null;
+  reconciliation_status: Generated<TransactionReconciliationStatus>;
+  reconciliation_id: string | null;
 }
 
 export interface ExpenseTransactionLinesTable {
@@ -442,6 +450,8 @@ export interface ChecksTable {
   posted_by_user_id: string | null;
   voided_at: Timestamp | null;
   voided_by_user_id: string | null;
+  reconciliation_status: Generated<TransactionReconciliationStatus>;
+  reconciliation_id: string | null;
 }
 
 export interface CheckLinesTable {
@@ -912,6 +922,43 @@ export interface BankReconciliationsTable {
   memo: string | null;
 }
 
+export interface ReconciliationsTable {
+  id: Generated<string>;
+  business_id: string;
+  bank_account_id: string;
+  statement_beginning_balance: ColumnType<string, string | number, string | number>;
+  statement_ending_balance: ColumnType<string, string | number, string | number>;
+  statement_ending_date: ColumnType<string, string, string>;
+  beginning_balance: ColumnType<string, string | number, string | number>;
+  service_charge_amount: ColumnType<string, string | number | undefined, string | number>;
+  service_charge_date: ColumnType<string, string, string> | null;
+  service_charge_account_id: string | null;
+  interest_earned_amount: ColumnType<string, string | number | undefined, string | number>;
+  interest_earned_date: ColumnType<string, string, string> | null;
+  interest_earned_account_id: string | null;
+  status: Generated<ReconciliationSessionStatus>;
+  difference: ColumnType<string, string | number | undefined, string | number>;
+  adjustment_journal_entry_id: string | null;
+  completed_at: Timestamp | null;
+  completed_by_user_id: string | null;
+  created_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ReconciliationItemsTable {
+  id: Generated<string>;
+  reconciliation_id: string;
+  transaction_type: ReconciliationItemType;
+  transaction_id: string;
+  transaction_date: ColumnType<string, string, string>;
+  description: string | null;
+  amount: ColumnType<string, string | number, string | number>;
+  is_cleared: Generated<boolean>;
+  cleared_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+}
+
 export type BankRuleSignFilter = 'any' | 'inflow_only' | 'outflow_only';
 export type FixedAssetStatus = 'active' | 'disposed';
 export type DepreciationMethod = 'straight_line';
@@ -1084,6 +1131,8 @@ export interface DB {
   account_coding_memory: AccountCodingMemoryTable;
   bank_transactions: BankTransactionsTable;
   bank_reconciliations: BankReconciliationsTable;
+  reconciliations: ReconciliationsTable;
+  reconciliation_items: ReconciliationItemsTable;
   bank_transaction_rules: BankTransactionRulesTable;
   fixed_assets: FixedAssetsTable;
   depreciation_entries: DepreciationEntriesTable;
@@ -1225,6 +1274,8 @@ export interface BankDepositsTable {
   voided_by_user_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
+  reconciliation_status: Generated<TransactionReconciliationStatus>;
+  reconciliation_id: string | null;
 }
 
 export interface BankDepositLinesTable {

@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { hideUnless, useCan } from '@/lib/roleAccess';
-import { FileDown, Printer } from 'lucide-react';
-import { downloadAsExcel } from '@/lib/download';
+import { History } from 'lucide-react';
 import { DateInput } from '@/components/ui/date-input';
-import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,160 +13,84 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
-import { printReport } from '@/lib/reportExport';
 
 type BankAccount = {
   id: string;
-  business_id: string;
   name: string;
   institution: string | null;
   account_last_four: string | null;
-  cash_account_id: string;
-  is_active: boolean;
 };
 
-type Reconciliation = {
-  id: string;
-  business_id: string;
-  bank_account_id: string;
-  period_start: string;
-  period_end: string;
-  statement_ending_balance: string;
-  reconciled_at: string;
-  reconciled_by_user_id: string | null;
-  memo: string | null;
-};
-
-type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
-
-type BankTransaction = {
-  id: string;
-  business_id: string;
-  bank_account_id: string;
-  transaction_date: string;
-  description: string;
-  amount: string;
-  status: BankTransactionStatus;
-  is_reconciled: boolean;
-};
-
-
-function inRange(date: string, start: string, end: string): boolean {
-  if (!start || !end) return false;
-  return date >= start && date <= end;
-}
-
-function fmtShortDate(iso: string) {
-  const [y, m, d] = iso.split('-');
-  if (!y || !m || !d) return iso;
-  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
-}
+type CoaAccount = { id: string; code: string; name: string; account_type: string };
 
 export default function ReconcilePage() {
-  // Finishing a reconciliation is for an accountant.
+  // Starting a reconciliation is for an accountant — same bar as finishing one.
   const can = useCan();
+  const navigate = useNavigate();
   const [bizId] = useActiveBusinessId();
   const today = todayLocal();
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [accounts, setAccounts] = useState<CoaAccount[]>([]);
 
-  const [priorRecs, setPriorRecs] = useState<Reconciliation[]>([]);
-  const [unreviewed, setUnreviewed] = useState<BankTransaction[]>([]);
-  const [reviewedUnrecon, setReviewedUnrecon] = useState<BankTransaction[]>([]);
+  const [beginningBalance, setBeginningBalance] = useState('0.00');
+  const [inProgressId, setInProgressId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    period_start: '',
-    period_end: today,
     statement_ending_balance: '0.00',
-    memo: '',
+    statement_ending_date: today,
+    service_charge_amount: '',
+    service_charge_date: today,
+    service_charge_account_id: '',
+    interest_earned_amount: '',
+    interest_earned_date: today,
+    interest_earned_account_id: '',
   });
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [excelBusy, setExcelBusy] = useState(false);
 
-  // Load bank accounts when biz changes.
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/bank-accounts`)
-      .then(r => {
-        const list: BankAccount[] = r.data.bank_accounts;
-        setBankAccounts(list);
-        setBankAccountId(prev => prev && list.some(b => b.id === prev) ? prev : (list[0]?.id ?? ''));
-      })
-      .catch((e: unknown) => setErr(pickErr(e)));
+    api.get(`/businesses/${bizId}/bank-accounts`).then(r => {
+      const list: BankAccount[] = r.data.bank_accounts;
+      setBankAccounts(list);
+      setBankAccountId(prev => prev && list.some(b => b.id === prev) ? prev : (list[0]?.id ?? ''));
+    }).catch((e: unknown) => setErr(pickErr(e)));
+    api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts)).catch(() => {});
   }, [bizId]);
 
-  // Load prior reconciliations + transactions for the selected bank account.
   useEffect(() => {
-    if (!bizId || !bankAccountId) {
-      setPriorRecs([]);
-      setUnreviewed([]);
-      setReviewedUnrecon([]);
-      return;
-    }
+    if (!bizId || !bankAccountId) { setBeginningBalance('0.00'); setInProgressId(null); return; }
     setErr(null);
-    api.get(`/businesses/${bizId}/reconciliations`, { params: { bank_account_id: bankAccountId } })
-      .then(r => setPriorRecs(r.data.reconciliations as Reconciliation[]))
-      .catch((e: unknown) => setErr(pickErr(e)));
-    // Unreviewed txns for this bank account (client-side date filter applied in memo).
-    api.get(`/businesses/${bizId}/bank-transactions`, {
-      params: { bank_account_id: bankAccountId, status: 'unreviewed' },
-    })
-      .then(r => setUnreviewed(r.data.bank_transactions as BankTransaction[]))
-      .catch((e: unknown) => setErr(pickErr(e)));
-    // Reviewed-but-not-yet-reconciled txns (status=matched OR status=categorized AND is_reconciled=false).
-    Promise.all([
-      api.get(`/businesses/${bizId}/bank-transactions`, {
-        params: { bank_account_id: bankAccountId, status: 'matched', is_reconciled: false },
-      }),
-      api.get(`/businesses/${bizId}/bank-transactions`, {
-        params: { bank_account_id: bankAccountId, status: 'categorized', is_reconciled: false },
-      }),
-    ])
-      .then(([m, c]) => {
-        const rows: BankTransaction[] = [
-          ...(m.data.bank_transactions as BankTransaction[]),
-          ...(c.data.bank_transactions as BankTransaction[]),
-        ];
-        setReviewedUnrecon(rows);
-      })
+    api.get(`/businesses/${bizId}/bank-rec/status`, { params: { bank_account_id: bankAccountId } })
+      .then(r => { setBeginningBalance(r.data.beginning_balance); setInProgressId(r.data.in_progress_id); })
       .catch((e: unknown) => setErr(pickErr(e)));
   }, [bizId, bankAccountId]);
 
-  const { unreviewedInRange, reviewedInRange } = useMemo(() => ({
-    unreviewedInRange: unreviewed.filter(t => inRange(t.transaction_date, form.period_start, form.period_end)),
-    reviewedInRange: reviewedUnrecon.filter(t => inRange(t.transaction_date, form.period_start, form.period_end)),
-  }), [unreviewed, reviewedUnrecon, form.period_start, form.period_end]);
-
-  const priorTop10 = priorRecs.slice(0, 10);
+  const expenseAccounts = accounts.filter(a => a.account_type === 'expense');
+  const incomeAccounts = accounts.filter(a => a.account_type === 'revenue' || a.account_type === 'income');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!bizId || !bankAccountId) return;
-    if (unreviewedInRange.length > 0) return;
-    if (!form.period_start || !form.period_end) {
-      setErr('Period start and end are required');
-      return;
-    }
     setErr(null);
     setBusy(true);
     try {
       const body = {
         bank_account_id: bankAccountId,
-        period_start: form.period_start,
-        period_end: form.period_end,
         statement_ending_balance: parseMoneyInput(form.statement_ending_balance),
-        memo: form.memo.trim() ? form.memo.trim() : null,
+        statement_ending_date: form.statement_ending_date,
+        service_charge_amount: form.service_charge_amount ? parseMoneyInput(form.service_charge_amount) : null,
+        service_charge_date: form.service_charge_amount ? form.service_charge_date : null,
+        service_charge_account_id: form.service_charge_amount ? (form.service_charge_account_id || null) : null,
+        interest_earned_amount: form.interest_earned_amount ? parseMoneyInput(form.interest_earned_amount) : null,
+        interest_earned_date: form.interest_earned_amount ? form.interest_earned_date : null,
+        interest_earned_account_id: form.interest_earned_amount ? (form.interest_earned_account_id || null) : null,
       };
-      const r = await api.post(`/businesses/${bizId}/reconciliations`, body);
-      const created: Reconciliation = r.data;
-      setPriorRecs(prev => [created, ...prev]);
-      // Reset form (keep bank account selection).
-      setForm({ period_start: '', period_end: today, statement_ending_balance: '0.00', memo: '' });
-      // The submitted txns just became reconciled — remove them from reviewed-unreconciled cache.
-      setReviewedUnrecon(prev => prev.filter(t => !inRange(t.transaction_date, created.period_start, created.period_end)));
+      const r = await api.post(`/businesses/${bizId}/bank-rec/start`, body);
+      navigate(`/accounting/reconcile/${r.data.id}`);
     } catch (e: unknown) {
       setErr(pickErr(e));
     } finally {
@@ -178,44 +100,18 @@ export default function ReconcilePage() {
 
   if (!bizId) return <div>Pick a business.</div>;
 
-  const datesValid = !!form.period_start && !!form.period_end && form.period_start <= form.period_end;
-  const canSubmit = datesValid && unreviewedInRange.length === 0 && !busy && !!bankAccountId;
+  const needsServiceChargeAccount = !!form.service_charge_amount && !form.service_charge_account_id;
+  const needsInterestAccount = !!form.interest_earned_amount && !form.interest_earned_account_id;
+  const canSubmit = !busy && !!bankAccountId && !!form.statement_ending_date && !needsServiceChargeAccount && !needsInterestAccount;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reconcile</h1>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="relative group">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['Period Start', 'Period End', 'Statement Balance', 'Reconciled At', 'Memo'], priorRecs.map(r => [r.period_start, r.period_end, r.statement_ending_balance, r.reconciled_at, r.memo ?? '']), 'reconciliations', { title: 'Reconciliations' }); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
-                <FileDown className="h-4 w-4" />
-              </button>
-              <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>
-            </div>
-            <div className="relative group">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground" onClick={() => { printReport({ title: 'Reconciliations', headers: ['Period Start', 'Period End', 'Statement Balance', 'Reconciled At', 'Memo'], rows: priorRecs.map(r => [r.period_start, r.period_end, r.statement_ending_balance, r.reconciled_at, r.memo ?? '']) }); }} aria-label="Print">
-                <Printer className="h-4 w-4" />
-              </button>
-              <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
-            </div>
-          </div>
-          <div className="min-w-[16rem]">
-          <Label>Bank account</Label>
-          <AppSelect
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={bankAccountId}
-            onChange={e => setBankAccountId(e.target.value)}
-          >
-            <option value="">Select…</option>
-            {bankAccounts.map(b => (
-              <option key={b.id} value={b.id}>
-                {b.name}{b.account_last_four ? ` •••${b.account_last_four}` : ''}
-              </option>
-            ))}
-          </AppSelect>
-          </div>
-        </div>
+        <Button variant="outline" onClick={() => navigate('/accounting/reconcile/history')}>
+          <History className="mr-2 h-4 w-4" />
+          History by account
+        </Button>
       </div>
 
       {err && (
@@ -225,53 +121,45 @@ export default function ReconcilePage() {
       )}
 
       <Card>
-        <CardHeader><CardTitle>Prior reconciliations</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40">
-              <tr>
-                <th className="text-left p-3">Period</th>
-                <th className="text-right p-3">Statement ending balance</th>
-                <th className="text-left p-3">Reconciled at</th>
-                <th className="text-left p-3">Memo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {priorTop10.length === 0 && (
-                <tr><td className="p-3 text-muted-foreground" colSpan={4}>No prior reconciliations for this account.</td></tr>
-              )}
-              {priorTop10.map(r => (
-                <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                  <td className="p-3 whitespace-nowrap">{fmtShortDate(r.period_start)} — {fmtShortDate(r.period_end)}</td>
-                  <td className="p-3 text-right font-mono">{fmtMoney(r.statement_ending_balance)}</td>
-                  <td className="p-3 whitespace-nowrap">{new Date(r.reconciled_at).toLocaleDateString()}</td>
-                  <td className="p-3">{r.memo ?? <span className="text-muted-foreground">—</span>}</td>
-                </tr>
+        <CardHeader><CardTitle>Which account do you want to reconcile?</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Account</Label>
+            <AppSelect
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              value={bankAccountId}
+              onChange={e => setBankAccountId(e.target.value)}
+            >
+              <option value="">Select…</option>
+              {bankAccounts.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.name}{b.account_last_four ? ` •••${b.account_last_four}` : ''}
+                </option>
               ))}
-            </tbody>
-          </table>
+            </AppSelect>
+          </div>
+
+          {inProgressId && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              A reconciliation is already in progress for this account.{' '}
+              <button type="button" className="font-medium underline" onClick={() => navigate(`/accounting/reconcile/${inProgressId}`)}>
+                Resume it
+              </button>
+              {' '}or finish/cancel it before starting a new one.
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="space-y-6">
         <Card>
-          <CardHeader><CardTitle>New reconciliation</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-4 gap-3">
+          <CardHeader><CardTitle>Add the following information</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-3 gap-4">
             <div>
-              <Label>Period start</Label>
-              <DateInput
-                value={form.period_start}
-                onChange={e => setForm(f => ({ ...f, period_start: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <Label>Period end</Label>
-              <DateInput
-                value={form.period_end}
-                onChange={e => setForm(f => ({ ...f, period_end: e.target.value }))}
-                required
-              />
+              <Label>Beginning balance</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-mono">
+                {fmtMoney(beginningBalance)}
+              </div>
             </div>
             <div>
               <Label>Statement ending balance</Label>
@@ -283,52 +171,84 @@ export default function ReconcilePage() {
               />
             </div>
             <div>
-              <Label>Memo</Label>
-              <Input
-                value={form.memo}
-                onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
-                placeholder="Optional"
+              <Label>Statement ending date</Label>
+              <DateInput
+                value={form.statement_ending_date}
+                onChange={e => setForm(f => ({ ...f, statement_ending_date: e.target.value }))}
+                required
               />
             </div>
           </CardContent>
         </Card>
 
-        <div className="mt-6 space-y-3">
-          <Card>
-            <CardHeader><CardTitle>Preflight check</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {!datesValid ? (
-                <p className="text-muted-foreground">Enter a valid period to see the preflight summary.</p>
-              ) : (
-                <>
-                  <p>
-                    <span className={unreviewedInRange.length > 0 ? 'font-semibold text-destructive' : 'font-semibold text-emerald-600'}>
-                      {unreviewedInRange.length} unreviewed
-                    </span>
-                    {' '}transaction{unreviewedInRange.length === 1 ? '' : 's'} in this period.{' '}
-                    <Link
-                      className="text-primary underline"
-                      to={`/accounting/bank-transactions?bank_account_id=${bankAccountId}&status=unreviewed`}
-                    >
-                      Open inbox
-                    </Link>
-                  </p>
-                  <p className="text-muted-foreground">
-                    {reviewedInRange.length} reviewed transaction{reviewedInRange.length === 1 ? '' : 's'} will be marked reconciled.
-                  </p>
-                  {unreviewedInRange.length > 0 && (
-                    <p className="text-xs text-destructive">Resolve unreviewed transactions before reconciling.</p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader><CardTitle>Service charge, if any</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-3 gap-4">
+            <div>
+              <Label>Date</Label>
+              <DateInput
+                value={form.service_charge_date}
+                onChange={e => setForm(f => ({ ...f, service_charge_date: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Amount</Label>
+              <MoneyInput
+                value={form.service_charge_amount}
+                onChange={e => setForm(f => ({ ...f, service_charge_amount: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>Expense account</Label>
+              <AppSelect
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                value={form.service_charge_account_id}
+                onChange={e => setForm(f => ({ ...f, service_charge_account_id: e.target.value }))}
+              >
+                <option value="">Select…</option>
+                {expenseAccounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+              </AppSelect>
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex gap-2">
-            <Button type="submit" {...hideUnless(can.accountant)} disabled={!canSubmit}>
-              {busy ? 'Reconciling…' : 'Create reconciliation'}
-            </Button>
-          </div>
+        <Card>
+          <CardHeader><CardTitle>Interest earned, if any</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-3 gap-4">
+            <div>
+              <Label>Date</Label>
+              <DateInput
+                value={form.interest_earned_date}
+                onChange={e => setForm(f => ({ ...f, interest_earned_date: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Amount</Label>
+              <MoneyInput
+                value={form.interest_earned_amount}
+                onChange={e => setForm(f => ({ ...f, interest_earned_amount: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>Income account</Label>
+              <AppSelect
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                value={form.interest_earned_account_id}
+                onChange={e => setForm(f => ({ ...f, interest_earned_account_id: e.target.value }))}
+              >
+                <option value="">Select…</option>
+                {incomeAccounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+              </AppSelect>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div>
+          <Button type="submit" {...hideUnless(can.accountant)} disabled={!canSubmit}>
+            {busy ? 'Starting…' : 'Start reconciling'}
+          </Button>
         </div>
       </form>
     </div>

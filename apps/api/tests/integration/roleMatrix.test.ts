@@ -107,6 +107,7 @@ const STAFF_MAY_WRITE = [
 const FIRM_ADMIN_ONLY = [
   'DELETE /me/firm/users/:id/business-access/:businessId',
   'DELETE ~/bank-deposits/:id',
+  'POST ~/bank-rec/:id/undo',
   'DELETE ~/budgets/:id',
   'DELETE ~/checks/:id',
   'DELETE ~/customers/:id',

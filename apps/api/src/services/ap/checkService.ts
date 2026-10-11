@@ -1,5 +1,5 @@
 import { sql, type Transaction, type Kysely } from 'kysely';
-import { AUDIT } from '@accounting/shared';
+import { AUDIT, hasMinRole } from '@accounting/shared';
 import type { DB, CheckPayeeType } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
@@ -269,6 +269,9 @@ export async function updateCheck(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('check', id);
   if (before.status === 'void') throw new PreconditionError('A voided check cannot be edited');
+  if (before.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'accountant')) {
+    throw new PreconditionError('This check has been reconciled. Editing it may cause discrepancies in your reconciliation — only an accountant or firm admin can proceed.');
+  }
 
   if (!input.payee_text && !input.payee_id) {
     throw new PreconditionError('A payee is required');
@@ -370,6 +373,9 @@ export async function voidCheck(
     .executeTakeFirst();
   if (!before) throw new NotFoundError('check', input.check_id);
   if (before.status === 'void') throw new PreconditionError('This check is already void');
+  if (before.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'firm_admin')) {
+    throw new PreconditionError('This check has been reconciled. Voiding it will create a discrepancy you will need to resolve in your next reconciliation — only a firm admin can do this.');
+  }
 
   if (before.journal_entry_id) {
     await ledger.voidJournalEntry(trx, ctx, {
@@ -406,8 +412,8 @@ export async function deleteCheck(trx: Transaction<DB>, ctx: ServiceCtx, id: str
     .executeTakeFirst();
   if (!before) throw new NotFoundError('check', id);
 
-  if (await isReconciled(trx, before.journal_entry_id)) {
-    throw new PreconditionError('This check has been reconciled and cannot be deleted.');
+  if (before.reconciliation_status === 'reconciled' || await isReconciled(trx, before.journal_entry_id)) {
+    throw new PreconditionError('This check has been reconciled and cannot be deleted. Void it instead, or undo the reconciliation first.');
   }
 
   const lines = await trx.selectFrom('check_lines').selectAll()
@@ -442,7 +448,7 @@ export async function getCheck(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
       'c.id', 'c.business_id', 'c.check_number', 'c.payee_id', 'c.payee_type', 'c.payee_text',
       'c.bank_account_id', 'c.payment_date', 'c.mailing_address', 'c.memo', 'c.total_amount',
       'c.print_later', 'c.is_printed', 'c.status', 'c.journal_entry_id', 'c.created_at', 'c.updated_at',
-      'c.posted_at', 'c.voided_at',
+      'c.posted_at', 'c.voided_at', 'c.reconciliation_status',
       'v.name as vendor_name', 'cu.name as customer_name',
       'ba.name as bank_account_name', 'cash.code as cash_account_code', 'cash.name as cash_account_name',
     ])
@@ -465,7 +471,7 @@ export async function getCheck(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
     ...row,
     payee_name: payeeName(row),
     editable: row.status !== 'void',
-    is_reconciled: await isReconciled(db, row.journal_entry_id),
+    is_reconciled: row.reconciliation_status === 'reconciled' || await isReconciled(db, row.journal_entry_id),
     lines,
   };
 }

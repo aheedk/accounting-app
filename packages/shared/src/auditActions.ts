@@ -237,6 +237,13 @@ export const AUDIT = {
   APPROVAL_REQUEST: 'approval.request',
   APPROVAL_APPROVE: 'approval.approve',
   APPROVAL_REJECT: 'approval.reject',
+
+  // Bank reconciliation worksheet (matching the books against a bank statement)
+  BANK_RECONCILIATION_START: 'bank_reconciliation.start',
+  BANK_RECONCILIATION_SAVE: 'bank_reconciliation.save',
+  BANK_RECONCILIATION_FINISH: 'bank_reconciliation.finish',
+  BANK_RECONCILIATION_CANCEL: 'bank_reconciliation.cancel',
+  BANK_RECONCILIATION_UNDO: 'bank_reconciliation.undo',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

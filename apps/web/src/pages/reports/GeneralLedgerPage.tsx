@@ -68,6 +68,7 @@ type GeneralLedgerLine = {
   credit: string;
   running_balance: string;
   bank_deposit_id: string | null;
+  is_reconciled: boolean;
 };
 
 type GeneralLedgerAccount = {
@@ -1125,6 +1126,14 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
         <>
           <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{line.transaction_label}</Link>
           {line.status === 'voided' && <span className="ml-2 text-xs uppercase">Voided</span>}
+          {line.is_reconciled && (
+            <span
+              className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700"
+              title="Reconciled"
+            >
+              R
+            </span>
+          )}
         </>
       );
       break;

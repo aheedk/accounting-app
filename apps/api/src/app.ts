@@ -31,6 +31,7 @@ import tenNinetyNineReportRoutes from './routes/tenNinetyNineReport.js';
 import bankAccountRoutes from './routes/bankAccounts.js';
 import bankTransactionRoutes from './routes/bankTransactions.js';
 import reconciliationRoutes from './routes/reconciliations.js';
+import bankReconciliationWorksheetRoutes from './routes/bankReconciliationWorksheet.js';
 import bankRuleRoutes from './routes/bankRules.js';
 import fixedAssetRoutes from './routes/fixedAssets.js';
 import businessesRoutes from './routes/businesses.js';
@@ -122,6 +123,7 @@ export function makeApp(): Express {
   app.use(bankAccountRoutes);
   app.use(bankTransactionRoutes);
   app.use(reconciliationRoutes);
+  app.use(bankReconciliationWorksheetRoutes);
   app.use(bankRuleRoutes);
   app.use(fixedAssetRoutes);
   app.use(businessesRoutes);

@@ -18,6 +18,7 @@ export * from './tenNinetyNine.js';
 export * from './bankAccount.js';
 export * from './bankTransaction.js';
 export * from './reconciliation.js';
+export * from './bankReconciliationWorksheet.js';
 export * from './financialReports.js';
 export * from './bankTransactionRule.js';
 export * from './fixedAsset.js';

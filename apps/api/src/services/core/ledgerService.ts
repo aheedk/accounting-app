@@ -228,6 +228,12 @@ export async function voidJournalEntry(
       'Source-generated journal entries must be voided from their source transaction',
     );
   }
+  if (!input.source_guard && orig.reconciliation_status === 'reconciled' && !hasMinRole(ctx.effective_role, 'firm_admin')) {
+    throw new BusinessRuleError(
+      ERR.PRECONDITION_FAILED,
+      'This journal entry has been reconciled. Voiding it will create a discrepancy you will need to resolve in your next reconciliation — only a firm admin can do this.',
+    );
+  }
   if (await hasPostedReversal(trx, orig.business_id, orig.id)) {
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'Journal entry has already been reversed');
   }
@@ -618,6 +624,7 @@ type DeletableEntry = {
   source_type: JournalEntrySourceType;
   source_id: string | null;
   reversed_entry_id: string | null;
+  reconciliation_status?: string;
 };
 
 /** True when the guard's source_type/source_id match the entry's own — the
@@ -653,6 +660,9 @@ export async function planJournalEntryDelete(
   // one level above the accountant+ bar that voiding and correcting use.
   if (!hasMinRole(ctx.effective_role, 'firm_admin')) {
     return blocked('Firm admin access is required to delete journal entries.');
+  }
+  if (entry.reconciliation_status === 'reconciled') {
+    return blocked('This journal entry has been reconciled and cannot be deleted. Void it instead, or undo the reconciliation first.');
   }
   const sourceMessage = 'This entry was created by a source transaction. Void or delete the source transaction instead.';
 
