@@ -1,6 +1,9 @@
 # Meeting follow-ups — 2026-10-05
 
-What was asked for in the meeting, checked against the code. Updated 2026-10-07.
+What was asked for in the meeting, checked against the code. Updated 2026-10-08.
+Anything still open here is carried into
+[`2026-10-10-follow-ups.md`](./2026-10-10-follow-ups.md) with the same item
+number; work from that file.
 Item numbers are fixed so they can be divided up; **(10-01)** marks items left
 over from the previous meeting. Aheed's demo walkthrough is at the bottom.
 
