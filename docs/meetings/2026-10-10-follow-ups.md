@@ -30,7 +30,7 @@ mark which meeting an item first came from.
 
 | # | What | Owner |
 |---|---|---|
-| 34 | Go through Faizan's 19-minute video and the files in the Teams chat, and turn each change into an item here. He is recording a second video. This is the largest unknown on the list | Aheed |
+| 34 | Go through Faizan's 19-minute video and the files in the Teams chat, and turn each change into an item here. He is recording a second video. The first video is written up in [`2026-10-12-faizan-video-1.md`](./2026-10-12-faizan-video-1.md) (items 50 to 70); the PDF and the check stubs are still to go through | Aheed |
 | 36 | Pay bills: after paying, offer to print the checks, in a check format that fits check stock. See "Pay bills and checks" below | Aheed, Faizan gives the format |
 | 37 | Year end: net income into Retained Earnings. Faizan says it is not happening. See "Retained Earnings" below | Aheed, Faizan |
 | 38 | Phone numbers: ten digits with the area code, shown the same way everywhere (vendors, customers, the company). The test vendors have seven digits; fix them too | Riham |
