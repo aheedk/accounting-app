@@ -3,49 +3,50 @@
 What Faizan asked for in his first recorded walkthrough, taken from the
 transcript. This is the output of item 34 in
 [`2026-10-10-follow-ups.md`](./2026-10-10-follow-ups.md); item numbers carry on
-from that file. A second video is coming and gets its own file.
+from that file. A second video is coming and gets its own file. The PDF and the
+check stubs he sent with the video are not covered here.
 
-Only the lines marked **(checked)** were looked up in the code. The rest is what
-he said, not yet confirmed on screen. The PDF and the check stubs he sent with
-the video are not covered here.
-
-Nothing is assigned yet; the Owner column is empty on purpose.
+**Status on 2026-10-12, end of day:** 17 of the 21 items are built, 4 turned out
+to be fixed already, and 2 are waiting on Faizan. Everything built passed the
+typecheck and the web tests. **None of it has been clicked through in the
+browser yet**, and the API tests added today for the Balance Sheet were not run
+(Docker was off). Do that before showing it to him.
 
 ## Bugs — something is broken
 
-| # | Where | What | Owner |
+| # | Where | What | Status |
 |---|---|---|---|
-| 50 | Bank deposit | Attachments do not work: neither "Add attachment" nor dropping a file | |
-| 51 | Check | Editing a saved check (he only changed a description) voided the original and posted a new one. It should be changed in place, as was done for changing the vendor on a posted entry (`8ba8a9a`) | |
-| 52 | Journal entry | The up and down arrow keys still raise and lower the debit and credit amounts. The arrows on the box were taken off; the keys should do nothing too | |
-| 53 | Date boxes | Double-click should select the whole date so it can be typed over, as in QuickBooks. Today the date has to be changed piece by piece or from the calendar, and Ctrl+A selects the whole page | |
-| 54 | General Ledger | After opening a transaction from the ledger, Back has to be pressed twice to return. Deleting the transaction does return to the ledger correctly | |
-| 55 | Reports | The report title is printed twice (seen on the Balance Sheet). Keep one header, and show that one on every page | |
-| 56 | Unclear page | A gear icon next to the account and vendor does nothing. See "Unclear" | |
+| 50 | Bank deposit | Attachments do not work: neither "Add attachment" nor dropping a file | **Already fixed** on 10-07 (`9c6edcb`), before this list was written. Retest on the current build |
+| 51 | Check | Editing a saved check (he only changed a description) voided the original and posted a new one | **Already fixed** on 10-08 (`8ba8a9a`): the entry is changed in place. Retest on the current build |
+| 52 | Journal entry | The up and down arrow keys still raise and lower the debit and credit amounts | **Already fixed** on 10-07 (`896e7bb`): the amount box is a text box now. Retest on the current build |
+| 53 | Date boxes | Double-click should select the whole date so it can be typed over, as in QuickBooks | **Done.** Every date box is typed as text (10/12/2026); double-click or Ctrl+A selects all of it, and the calendar is behind a button |
+| 54 | General Ledger | After opening a transaction from the ledger, Back has to be pressed twice | **Done.** Saving was adding the same page to the history again; it replaces it now |
+| 55 | Reports | The report title is shown twice. Keep one header, on every page | **Done.** The page heading above the report header is gone on the eight report pages. On paper the header repeats on every page |
+| 56 | Unclear page | A gear icon next to the account and vendor does nothing | **Waiting on Faizan:** which page |
 
 ## Changes to how things work
 
-| # | Where | What | Owner |
+| # | Where | What | Status |
 |---|---|---|---|
-| 57 | Chart of accounts | Account type and detail type should follow QuickBooks: Bank, Other Current Assets, Fixed Assets; Current Liabilities, Long-term Liabilities; and so on. The Balance Sheet and P&L group by these, so they change with it. See "Account types" below | |
-| 58 | Bank deposit, Expense, Check | The bank account picker should list bank accounts only, not every account. Depends on 57 | |
-| 59 | Expense, Check | When entering several in a row, keep the bank account chosen on the first one, so ten checks need the bank picked once | |
-| 60 | Bank deposit, Expense | "Add new" in the customer / payee picker, as Check and Journal entry already have | |
-| 61 | Journal entry | Reverse should open the entry screen filled in with the reversal, so the date (or anything else) can be changed before posting. Today it asks for a reason and posts on the first day of the next month **(checked: it is a reason prompt, then the void endpoint)** | |
-| 62 | Expense, Check, Bank deposit | A close (X) button on the page, as Journal entry has | |
-| 63 | + New | Each entry should be openable in a new browser tab. Today they cannot be | |
-| 64 | General Ledger | Sort by clicking a column heading: date, transaction type, name, split. Today there is only oldest / newest first **(checked)** | |
-| 65 | Printing reports | Let the user choose landscape or portrait. Today it is picked for them: landscape when a report has more than six columns **(checked, `lib/download.ts`)** | |
-| 66 | Balance Sheet, P&L | Take out the Section column; code and account are enough. **(checked: the downloads have a Section column; whether he meant the screen too is not clear)** | |
+| 57 | Chart of accounts | Account type and detail type as in QuickBooks; Balance Sheet grouped by them | **Done.** See "Account types" below |
+| 58 | Bank deposit, Expense, Check | The bank account picker should list bank accounts only | **Done.** Expense lists bank accounts and credit cards. Check and Bank deposit already listed the Banking accounts only |
+| 59 | Expense, Check | Keep the bank chosen on the first one when entering several | **Done.** "Save and new" keeps it, and a new check, expense or deposit starts on the one last used |
+| 60 | Bank deposit, Expense | "Add new" in the customer / payee picker | **Done.** "Add vendor" and "Add customer" on Check and Expense; "Add new customer" under Received from on a deposit |
+| 61 | Journal entry | Reverse should open the entry screen so the date can be changed before posting | **Done.** See "Reverse" below |
+| 62 | Expense, Check, Bank deposit | A close (X) button on the page | **Done**, on Journal entry too. It, Cancel and "Save and close" go back to the page the record was opened from |
+| 63 | + New | Each entry should be openable in a new browser tab | **Done.** They are links now |
+| 64 | General Ledger | Sort by clicking a column heading | **Done.** First click A to Z, second Z to A, third back to date order. Sorting is inside each account |
+| 65 | Printing reports | Choose landscape or portrait | **Done.** The print page was forcing one, which removes the Layout choice from the browser's print dialog. It no longer forces one |
+| 66 | Balance Sheet, P&L | Take out the Section column | **Done** in the print and the Excel export; each section is a heading row |
 
 ## New things
 
-| # | What | Owner |
+| # | What | Status |
 |---|---|---|
-| 67 | Search box in the client list at the top, to find a client by typing. **(checked: the switcher has none)** | |
-| 68 | A firm dashboard with no client selected, as QuickBooks Accountant has: the client list and the firm's own options. Clicking the logo goes back to it. Today "Dashboard" is always inside one client. Large; needs a short spec | |
-| 69 | Browser tab names: the tab should say which page is open ("Reports", "Profit and Loss"). **(checked: the app never sets the page title)** | |
-| 70 | "Check" under Expenses in the menu. He says it was there on Friday and went away. **(checked: + New has Check under Expense, and the sidebar has Checks under Accounts Payable)** so which menu he means needs asking; see "Unclear" | |
+| 67 | Search box in the client list at the top | **Done** |
+| 68 | A firm dashboard with no client selected; the logo goes back to it | **Partly.** See "Firm dashboard" below |
+| 69 | Browser tab names | **Done.** The tab says the page, then the company |
+| 70 | "Check" under Expenses in the menu | **Already there** in + New, under Expense. If he means the sidebar, ask |
 
 ## To discuss, not to build yet
 
@@ -55,49 +56,74 @@ Nothing is assigned yet; the Owner column is empty on purpose.
 
 ## Notes on the items
 
-**Account types (57).** This is the largest item here and the one other items
-wait on. He asked us to copy the QuickBooks list rather than describe it: open
-the chart of accounts in QuickBooks and take the account types and the detail
-types under each. Two things to settle before touching it: existing clients'
-accounts need to be mapped onto the new types, and the Balance Sheet and P&L
-sections have to be rebuilt from them (Bank, Other Current Assets, Fixed Assets,
-Current Liabilities, Long-term Liabilities). Write a spec first.
+**Already fixed (50, 51, 52).** All three were fixed in `main` on 10-07 and
+10-08. He saw them anyway, so the site he tested was behind `main`, or the video
+is older than it looks. Worth finding out which before the next video, or the
+same thing will happen again.
 
-**Bank accounts only (58).** The statement screens already have a rule for what
-counts as a bank account (`apps/web/src/lib/bankAccountOptions.ts`). The entry
-pages do not use it. Once 57 gives every bank account the Bank type, the picker
-on all three pages can be the accounts of that type. This is also the likely
-home of item 39 (Equipment in the bank picker).
+**Account types (57).** Spec:
+[`../specs/2026-10-12-account-types-design.md`](../specs/2026-10-12-account-types-design.md).
+The QuickBooks list (Bank, Other Current Assets, Fixed Assets, Credit Card, Long
+Term Liabilities and the rest) was already in the add-account form. It is now
+the one list everything reads. The Chart of Accounts shows the account type
+instead of "asset", its edit form picks an account type and then a detail type,
+and the Balance Sheet is laid out as Current Assets (bank, receivable, other
+current), Fixed Assets, Other Assets, then Current and Long-Term Liabilities,
+each with a subtotal. Nothing new is stored: the account type is read from the
+detail type. **An account with no detail type shows under the plainest type**
+(Other Current Assets, Other Current Liabilities) until someone sets one, so the
+test companies' charts need a pass before this looks right in a demo. The P&L
+was already grouped this way.
 
-**Editing a check (51).** Not looked up yet. Compare with what `8ba8a9a` did for
-the vendor change and make every edit of a posted check go the same way.
+**Reverse (61).** A change in behaviour, not a fix. Reverse used to ask for a
+reason and post straight away. It now opens the entry screen as the reversal
+(debits and credits swapped, first day of the next month, the same number with
+an R) and nothing posts until it is saved, so the date or anything else can be
+changed first. The original entry stays posted, as in QuickBooks. The old
+button voided the original; that is no longer offered on a journal entry, where
+Delete and editing in place cover it.
 
-**Reverse (61).** A real change in behaviour, not a fix: the reversal becomes a
-draft the user reviews. The default date can stay the first day of the next
-month.
+**Date boxes (53).** This touches every date box in the app, so it is the first
+thing to try in the browser. Typing 10/12/26, 10-12-2026, 101226 or 10/12 all
+work; something that is not a date goes back to the last good one.
 
-**Close button and new tab (62, 63).** Both are about working like QuickBooks,
-where an entry screen is something opened and closed on top of the page behind
-it. 63 is small if the + New entries become ordinary links.
+**Printing (55, 65).** With no forced orientation the print dialog offers
+Layout again, and it starts on whatever the browser used last. The General
+Ledger used to open in landscape by itself; now that is one click in the dialog.
 
-## Suggested order
+**Firm dashboard (68).** The firm-wide page already existed as Accounting →
+Client Overview: every client with receivables, payables, transactions waiting
+for review, open periods and the last reconciliation, and a click opens that
+client. What was done: the logo at the top of the sidebar goes there for a firm
+admin (to the dashboard for everyone else), and the page has a client search.
+What is not done: the top bar still shows the last client as selected while on
+that page, and the sidebar is still that client's. A true "no client selected"
+state changes the app shell and needs a sketch agreed with the firm first. Also
+open: Client Overview is firm admin only, so an accountant who is not an admin
+gets the client's dashboard from the logo.
 
-1. The bugs that lose or change data: 51 (check voided on edit), 50 (attachments).
-2. The small ones, in one pass: 52, 53, 59, 60, 62, 63, 67, 69, 55, 66.
-3. 64 and 65 (ledger sorting, print orientation), then 61 (reverse) and 54.
-4. 57 with a spec, then 58 on top of it.
-5. 68 after the firm has seen a sketch.
+**Bank accounts only (58).** The rule for what a bank account is now comes from
+the account type list, so it also covers item 39 from the 10-10 notes (Equipment
+in the bank picker): an account shows as a bank only if its detail type is a
+bank type or it is set up under Banking.
 
-## Unclear
+## Still to do
+
+1. Click through all of it in the browser, date boxes first.
+2. Start Docker and run the API tests (`balanceSheetReport.test.ts` has a new one).
+3. Give the test companies' accounts detail types so the Balance Sheet groups properly.
+4. The "no client selected" shell for item 68, after a sketch.
+
+## Ask Faizan
 
 - **Item 56, the gear icon.** The recording says "accountable and vendor here
   the gear icon is not". It comes between the date boxes and the bank picker,
-  so it is probably on the Expense or Check page. Ask which page and what the
-  gear should open.
+  so it is probably on the Expense or Check page. Which page, and what should
+  the gear open?
 - **Item 70, which menu.** Check is already in + New under Expense. If he means
   the sidebar, Checks sits under Accounts Payable and he wants it next to
   Expenses.
-- **Item 66.** Whether "section" is the column in the download or an option on
-  the screen.
-- **Item 54.** He also said an earlier version sent him to a different screen
-  after going back; not clear whether that still happens.
+- **Which site he tests on**, and when the video was recorded (see "Already
+  fixed").
+- **Item 55.** The header was read as "the page title above the report
+  header". If he meant something else on the printed page, say so.

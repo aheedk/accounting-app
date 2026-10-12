@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '@/auth/useAuth';
 import {
   BookOpen,
   Sparkles,
@@ -188,14 +189,23 @@ function useNavGroups(): NavGroup[] {
 }
 
 // Brand header shared by the desktop sidebar and the mobile drawer.
+// The logo is the way home, as in QuickBooks: for the firm, the list of all its
+// clients (Client Overview, which only a firm admin can load); for everyone
+// else, the dashboard of the company that is open.
 export function SidebarBrand() {
+  const { user } = useAuth();
+  const home = user?.role === 'firm_admin' ? '/accounting/client-overview' : '/';
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
+    <Link
+      to={home}
+      title={home === '/' ? 'Dashboard' : 'All clients'}
+      className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4 hover:bg-sidebar-hover"
+    >
       <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
         <BookOpen className="h-4 w-4" />
       </div>
       <span className="font-display text-lg tracking-tight text-white">Accounting</span>
-    </div>
+    </Link>
   );
 }
 

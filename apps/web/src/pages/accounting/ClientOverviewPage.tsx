@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileDown, Printer } from 'lucide-react';
+import { FileDown, Printer, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,7 @@ export default function ClientOverviewPage() {
   const [rows, setRows] = useState<FirmRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [excelBusy, setExcelBusy] = useState(false);
+  const [query, setQuery] = useState('');
 
   const isFirmAdmin = user?.role === 'firm_admin';
 
@@ -92,6 +93,10 @@ export default function ClientOverviewPage() {
   if (error) return <div className="text-sm text-destructive">{error}</div>;
   if (!rows) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
+  // Find a client by typing; the totals above stay those of the whole firm.
+  const needle = query.trim().toLowerCase();
+  const shownRows = needle ? rows.filter(r => r.business_name.toLowerCase().includes(needle)) : rows;
+
   const dlHeaders = ['Business', 'AR Balance', 'AP Balance', 'Unreviewed Bank Txns', 'Open Periods', 'Last Reconciliation'];
   const dlRows = () => rows.map(r => [
     r.business_name,
@@ -116,6 +121,16 @@ export default function ClientOverviewPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Client Overview</h1>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search clients"
+              aria-label="Search clients"
+              className="h-9 w-56 rounded-md border border-input bg-background pl-8 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
           <div className="relative group">
             <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={handleExport} disabled={excelBusy} aria-label="Export to Excel">
               <FileDown className="h-4 w-4" />
@@ -143,14 +158,16 @@ export default function ClientOverviewPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
-          rows={rows}
+          rows={shownRows}
           getRowId={r => r.business_id}
           columns={columns}
           defaultSortKey="business_name"
           defaultSortDir="asc"
           selectable={false}
           downloadable={{ filename: 'client-overview', title: 'Client Overview' }}
-          emptyMessage={<EmptyState title="No businesses in this firm yet" hint="Clients you add to the firm will appear here with their balances and review status." />}
+          emptyMessage={needle
+            ? <EmptyState title={`No client matches "${query.trim()}"`} hint="Check the spelling, or clear the search to see every client." />
+            : <EmptyState title="No businesses in this firm yet" hint="Clients you add to the firm will appear here with their balances and review status." />}
         />
       </CardContent></Card>
     </div>
