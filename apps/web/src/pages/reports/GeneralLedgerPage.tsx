@@ -28,8 +28,11 @@ import {
   defaultGeneralLedgerPreferences,
   loadGeneralLedgerPreferences,
   moveGeneralLedgerColumn,
+  nextColumnSort,
   saveGeneralLedgerPreferences,
+  sortLedgerLines,
   type GeneralLedgerColumnKey,
+  type GeneralLedgerColumnSort,
   type GeneralLedgerPreferences,
 } from '@/lib/generalLedgerCustomization';
 import { fmtMoney } from '@/lib/money';
@@ -253,6 +256,27 @@ function summaryValues(
   });
 }
 
+/** What a line is sorted by when a column heading is clicked: numbers for money, text otherwise. */
+function lineSortValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey): string | number {
+  switch (column) {
+    case 'date': return line.entry_date;
+    case 'transaction': return line.transaction_label;
+    case 'reference': return fmtNum(line);
+    case 'adj': return line.is_adjusting ? 1 : 0;
+    case 'name': return line.name ?? '';
+    case 'memo': return line.memo ?? '';
+    case 'split': return line.split_account ?? '';
+    case 'debit': return Number(line.debit);
+    case 'credit': return Number(line.credit);
+    case 'amount': return Number(line.amount);
+    case 'balance': return Number(line.running_balance);
+    case 'class': return line.class_name ?? '';
+    case 'createDate': return line.created_at;
+    case 'createdBy': return line.created_by ?? '';
+    case 'lastModified': return line.updated_at;
+  }
+}
+
 function lineExportValue(line: GeneralLedgerLine, column: GeneralLedgerColumnKey): string {
   switch (column) {
     case 'date': return line.entry_date;
@@ -359,6 +383,8 @@ export default function GeneralLedgerPage() {
   );
   const [searchText, setSearchText] = useState(() => searchParams.get('q') ?? '');
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(true);
+  // Set by clicking a column heading; null means date order (the Customize setting).
+  const [columnSort, setColumnSort] = useState<GeneralLedgerColumnSort | null>(null);
   const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(() => new Set());
 
   useEffect(() => { saveGeneralLedgerPreferences(preferences); }, [preferences]);
@@ -488,7 +514,10 @@ export default function GeneralLedgerPage() {
           line.transaction_label, fmtNum(line), line.name, line.memo, line.split_account,
           fmtAmount(line.amount), new Decimal(line.amount).toFixed(2),
         ].join(' ').toLowerCase().includes(needle));
-      const lines = preferences.sortDirection === 'oldest' ? matching : [...matching].reverse();
+      const lines = columnSort
+        // Within each account, by the heading that was clicked.
+        ? sortLedgerLines(matching, columnSort.direction, line => lineSortValue(line, columnSort.column))
+        : preferences.sortDirection === 'oldest' ? matching : [...matching].reverse();
       if (!showEmptyAccounts && lines.length === 0) return [];
       return [{
         ...account,
@@ -498,7 +527,7 @@ export default function GeneralLedgerPage() {
         visible_total_amount: sumLines(lines, 'amount'),
       }];
     });
-  }, [accountTypeFilter, adjFilter, preferences.sortDirection, report, searchText, showEmptyAccounts, sourceFilter, statusFilter]);
+  }, [accountTypeFilter, adjFilter, columnSort, preferences.sortDirection, report, searchText, showEmptyAccounts, sourceFilter, statusFilter]);
 
   const reportTotals = useMemo(() => {
     const debit = displayAccounts.reduce((sum, account) => sum.plus(account.visible_total_debit), new Decimal(0)).toFixed(4);
@@ -739,6 +768,10 @@ export default function GeneralLedgerPage() {
               Showing {displayAccounts.length} {displayAccounts.length === 1 ? 'account' : 'accounts'} and{' '}
               {transactionCount} {transactionCount === 1 ? 'transaction' : 'transactions'}
               {activeFilterCount > 0 ? ` with ${activeFilterCount} active ${activeFilterCount === 1 ? 'filter' : 'filters'}` : ''}
+              {columnSort && columnSort.column !== 'date' && (
+                // Out of date order the Balance column no longer runs down the page.
+                <> · sorted by {columnDefinition(columnSort.column).label}; Balance is each line's balance when it posted</>
+              )}
             </span>
             <span className="flex items-center gap-3">
               {displayAccounts.length > 0 && (
@@ -802,8 +835,23 @@ export default function GeneralLedgerPage() {
                     {visibleColumns.map(column => {
                       const definition = columnDefinition(column);
                       return (
-                        <th key={column} className={`whitespace-nowrap ${preferences.density === 'compact' ? 'px-2.5 py-1.5' : 'px-2.5 py-2.5'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}>
-                          {definition.label}
+                        <th
+                          key={column}
+                          aria-sort={columnSort?.column === column ? (columnSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                          className={`whitespace-nowrap ${preferences.density === 'compact' ? 'px-2.5 py-1.5' : 'px-2.5 py-2.5'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}
+                        >
+                          {/* Click to sort each account's lines by this column: A to Z, Z to A, then back to date order. */}
+                          <button
+                            type="button"
+                            onClick={() => setColumnSort(current => nextColumnSort(current, column))}
+                            title={`Sort by ${definition.label}`}
+                            className="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground"
+                          >
+                            {definition.label}
+                            {columnSort?.column === column && (
+                              columnSort.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                            )}
+                          </button>
                         </th>
                       );
                     })}

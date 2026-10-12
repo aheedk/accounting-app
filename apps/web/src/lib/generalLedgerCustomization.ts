@@ -135,3 +135,38 @@ export function moveGeneralLedgerColumn(
   [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
   return next;
 }
+
+// Sorting by a column heading. Not saved with the preferences above: it is a
+// way of looking at the report that is open, and a reload goes back to date order.
+export type GeneralLedgerColumnSort = { column: GeneralLedgerColumnKey; direction: 'asc' | 'desc' };
+
+/** What a click on a heading does: ascending, then descending, then back to date order. */
+export function nextColumnSort(
+  current: GeneralLedgerColumnSort | null, column: GeneralLedgerColumnKey,
+): GeneralLedgerColumnSort | null {
+  if (!current || current.column !== column) return { column, direction: 'asc' };
+  return current.direction === 'asc' ? { column, direction: 'desc' } : null;
+}
+
+/**
+ * The lines in the order asked for. Numbers compare as numbers and text
+ * without regard to case ("JE-9" before "JE-10"). Lines that tie keep the order
+ * they came in, and a line with nothing in the column goes last either way.
+ */
+export function sortLedgerLines<T>(
+  lines: T[], direction: 'asc' | 'desc', valueOf: (line: T) => string | number,
+): T[] {
+  const sign = direction === 'asc' ? 1 : -1;
+  return lines
+    .map((line, index) => ({ line, index, value: valueOf(line) }))
+    .sort((left, right) => {
+      const leftEmpty = left.value === '';
+      const rightEmpty = right.value === '';
+      if (leftEmpty || rightEmpty) return leftEmpty === rightEmpty ? left.index - right.index : leftEmpty ? 1 : -1;
+      const order = typeof left.value === 'number' && typeof right.value === 'number'
+        ? left.value - right.value
+        : String(left.value).localeCompare(String(right.value), undefined, { numeric: true, sensitivity: 'base' });
+      return order !== 0 ? order * sign : left.index - right.index;
+    })
+    .map(entry => entry.line);
+}
