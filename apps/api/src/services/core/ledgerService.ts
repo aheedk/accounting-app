@@ -321,10 +321,22 @@ export async function voidJournalEntry(
   return reversalPosted;
 }
 
+/**
+ * What the user changed on the reversal before posting it. A key that is left
+ * out keeps the default: the first day of the next month, the original's memo
+ * and reference, and the original's lines with debits and credits swapped.
+ */
+export type ReversalOverrides = {
+  entry_date?: string;
+  memo?: string | null;
+  reference?: string | null;
+  lines?: LineInput[];
+};
+
 export async function reverseJournalEntry(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
-  input: { journal_entry_id: string },
+  input: { journal_entry_id: string; overrides?: ReversalOverrides },
 ) {
   if (!hasMinRole(ctx.effective_role, 'accountant')) {
     throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to reverse journal entries');
@@ -351,7 +363,8 @@ export async function reverseJournalEntry(
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'Journal entry has already been reversed');
   }
 
-  const reversalDate = firstDayOfNextMonth(original.entry_date);
+  const overrides = input.overrides ?? {};
+  const reversalDate = overrides.entry_date ?? firstDayOfNextMonth(original.entry_date);
   const reversalJournalNumber = `${original.journal_number}R`;
   if (reversalJournalNumber.length > 100) {
     throw new PreconditionError('This legacy journal number is too long to create a reversal number');
@@ -379,27 +392,19 @@ export async function reverseJournalEntry(
     throw new ClosedPeriodError(reversalPeriod.id, reversalPeriod.closed_at?.toString());
   }
 
-  const lines = await trx.selectFrom('journal_entry_lines').selectAll()
-    .where('journal_entry_id', '=', original.id)
-    .orderBy('line_number')
-    .execute();
-  const reversal = await trx.insertInto('journal_entries').values({
-    business_id: original.business_id,
-    period_id: reversalPeriod.id,
-    entry_date: reversalDate,
-    journal_number: reversalJournalNumber,
-    memo: original.memo,
-    reference: original.reference,
-    status: 'draft',
-    source_type: 'reversal',
-    source_id: original.id,
-    reversed_entry_id: original.id,
-    created_by_user_id: ctx.user_id,
-  }).returningAll().executeTakeFirstOrThrow();
-
-  for (const line of lines) {
-    await trx.insertInto('journal_entry_lines').values({
-      journal_entry_id: reversal.id,
+  // Edited lines are already the reversal as it should post, so they get the
+  // checks any posted entry gets. The default is the original, swapped.
+  let reversalLines: Array<LineInput & { line_number: number }>;
+  if (overrides.lines) {
+    assertBalanced(overrides.lines);
+    await assertPostableAccounts(trx, original.business_id, overrides.lines);
+    reversalLines = overrides.lines.map((line, index) => ({ ...line, line_number: index + 1 }));
+  } else {
+    const lines = await trx.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', original.id)
+      .orderBy('line_number')
+      .execute();
+    reversalLines = lines.map(line => ({
       line_number: line.line_number,
       account_id: line.account_id,
       debit: line.credit,
@@ -407,6 +412,32 @@ export async function reverseJournalEntry(
       memo: line.memo,
       name: line.name,
       class_name: line.class_name,
+    }));
+  }
+  const reversal = await trx.insertInto('journal_entries').values({
+    business_id: original.business_id,
+    period_id: reversalPeriod.id,
+    entry_date: reversalDate,
+    journal_number: reversalJournalNumber,
+    memo: overrides.memo !== undefined ? overrides.memo : original.memo,
+    reference: overrides.reference !== undefined ? overrides.reference : original.reference,
+    status: 'draft',
+    source_type: 'reversal',
+    source_id: original.id,
+    reversed_entry_id: original.id,
+    created_by_user_id: ctx.user_id,
+  }).returningAll().executeTakeFirstOrThrow();
+
+  for (const line of reversalLines) {
+    await trx.insertInto('journal_entry_lines').values({
+      journal_entry_id: reversal.id,
+      line_number: line.line_number,
+      account_id: line.account_id,
+      debit: line.debit,
+      credit: line.credit,
+      memo: line.memo,
+      name: line.name ?? null,
+      class_name: line.class_name ?? null,
     }).execute();
   }
 

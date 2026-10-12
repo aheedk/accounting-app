@@ -118,6 +118,28 @@ export function copyJournalEntryToForm(
   return { ...journalEntryToForm(detail), journalNo: journalNumber };
 }
 
+/** The first day of the month after `iso` (YYYY-MM-DD), where a reversal is dated by default. */
+export function firstDayOfNextMonth(iso: string): string {
+  const [year, month] = iso.split('-').map(Number);
+  if (!year || !month) return iso;
+  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+  return `${String(next.year).padStart(4, '0')}-${String(next.month).padStart(2, '0')}-01`;
+}
+
+/**
+ * The reversal of an entry, ready to be changed before it is posted: debits and
+ * credits swapped, dated the first day of the next month, numbered with an R.
+ */
+export function reverseJournalEntryToForm(detail: JournalEntryDetail): JournalEntryFormValues {
+  const form = journalEntryToForm(detail);
+  return {
+    ...form,
+    date: firstDayOfNextMonth(detail.entry.entry_date),
+    journalNo: `${detail.entry.journal_number}R`,
+    lines: form.lines.map(line => ({ ...line, debit: line.credit, credit: line.debit })),
+  };
+}
+
 export function copyUnsavedJournalEntry(
   form: JournalEntryFormValues,
 ): JournalEntryFormValues {

@@ -354,6 +354,101 @@ describe('ledgerService.postJournalEntry', () => {
       .toBe('0.0000');
   });
 
+  it('posts the reversal as it was edited: its date, memo, reference and lines', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-04-15',
+      source_type: 'manual',
+      memo: 'Accrual to reverse',
+      reference: 'ACC-1',
+      lines: [
+        { account_id: cash.id, debit: '35.0000', credit: '0.0000', memo: 'Debit description' },
+        { account_id: revenue.id, debit: '0.0000', credit: '35.0000', memo: 'Credit description' },
+      ],
+    }));
+
+    const reversal = await t.db.transaction().execute(trx => ledger.reverseJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+      overrides: {
+        entry_date: '2026-04-30',
+        memo: 'Reversed at month end',
+        reference: null,
+        lines: [
+          { account_id: revenue.id, debit: '35.0000', credit: '0.0000', memo: 'Edited' },
+          { account_id: cash.id, debit: '0.0000', credit: '35.0000', memo: null },
+        ],
+      },
+    }));
+
+    // Still a reversal of the original: same number with R, linked back, original untouched.
+    expect(reversal).toMatchObject({
+      entry_date: '2026-04-30',
+      journal_number: `${original.journal_number}R`,
+      memo: 'Reversed at month end',
+      reference: null,
+      source_type: 'reversal',
+      reversed_entry_id: original.id,
+      status: 'posted',
+    });
+    const lines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', reversal.id).orderBy('line_number').execute();
+    expect(lines.map(l => [l.account_id, l.debit, l.credit, l.memo])).toEqual([
+      [revenue.id, '35.0000', '0.0000', 'Edited'],
+      [cash.id, '0.0000', '35.0000', null],
+    ]);
+    expect(await ledger.computeAccountBalance(t.db, { account_id: cash.id, as_of: '2026-04-30' }))
+      .toBe('0.0000');
+  });
+
+  it('keeps the defaults for whatever the edited reversal leaves out', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-04-15', source_type: 'manual', memo: 'Accrual', reference: 'ACC-2',
+      lines: [
+        { account_id: cash.id, debit: '12.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '12.0000', memo: null },
+      ],
+    }));
+
+    const reversal = await t.db.transaction().execute(trx => ledger.reverseJournalEntry(trx, ctx, {
+      journal_entry_id: original.id, overrides: { entry_date: '2026-06-10' },
+    }));
+
+    expect(reversal).toMatchObject({ entry_date: '2026-06-10', memo: 'Accrual', reference: 'ACC-2' });
+    const lines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', reversal.id).orderBy('line_number').execute();
+    expect(lines.map(l => [l.account_id, l.debit, l.credit])).toEqual([
+      [cash.id, '0.0000', '12.0000'],
+      [revenue.id, '12.0000', '0.0000'],
+    ]);
+  });
+
+  it('refuses an edited reversal that does not balance, and posts nothing', async () => {
+    const { biz, ctx, cash, revenue } = await setup(t);
+    const original = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-04-15', source_type: 'manual', memo: null,
+      lines: [
+        { account_id: cash.id, debit: '12.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '12.0000', memo: null },
+      ],
+    }));
+
+    await expect(t.db.transaction().execute(trx => ledger.reverseJournalEntry(trx, ctx, {
+      journal_entry_id: original.id,
+      overrides: {
+        lines: [
+          { account_id: revenue.id, debit: '12.0000', credit: '0.0000', memo: null },
+          { account_id: cash.id, debit: '0.0000', credit: '11.0000', memo: null },
+        ],
+      },
+    }))).rejects.toMatchObject({ code: ERR.UNBALANCED_ENTRY });
+
+    const reversals = await t.db.selectFrom('journal_entries').select('id')
+      .where('reversed_entry_id', '=', original.id).execute();
+    expect(reversals).toHaveLength(0);
+  });
+
   it('allows a 99-character base number and rejects a typed reversal-number collision', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const lines = [

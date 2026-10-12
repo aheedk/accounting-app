@@ -31,6 +31,18 @@ export type JournalEntryCreate = z.infer<typeof journalEntryCreateSchema>;
 export const journalEntryCorrectionSchema = journalEntryCreateSchema;
 export type JournalEntryCorrection = z.infer<typeof journalEntryCorrectionSchema>;
 
+// A reversal as the user left it on the entry screen. Every part is optional:
+// with none of them the reversal is the original with debits and credits
+// swapped, dated the first day of the next month. The number is not here: it is
+// always the original's number followed by R.
+export const journalEntryReverseSchema = z.object({
+  entry_date: dateString.optional(),
+  memo: z.string().max(1000).nullable().optional(),
+  reference: z.string().max(100).nullable().optional(),
+  lines: z.array(journalLineInputSchema).min(2, 'at least two lines required').optional(),
+});
+export type JournalEntryReverse = z.infer<typeof journalEntryReverseSchema>;
+
 export const journalEntryVoidSchema = z.object({
   void_reason: z.string().min(1).max(500),
 });

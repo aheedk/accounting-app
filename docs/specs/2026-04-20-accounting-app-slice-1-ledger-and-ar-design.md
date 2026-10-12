@@ -396,6 +396,7 @@ The contract for the implementation. Every business action that affects books ha
 
 **Reverse / adjusting entry** (`ledgerService.reverseJournalEntry`)
 - Inverts an existing posted entry. Allowed in closed periods only via admin-override path (separate audit action).
+- Since 2026-10-12 the reversal is reviewed before it posts: Reverse on a journal entry opens the entry screen as the reversal (debits and credits swapped, dated the first day of the next month, numbered with an R) and nothing is posted until it is saved. The date, memo, reference and lines can be changed first; they are sent as `overrides` and the edited lines get the same balance and account checks as any posted entry. The original stays posted. An empty request body still gives the plain default reversal.
 
 ---
 

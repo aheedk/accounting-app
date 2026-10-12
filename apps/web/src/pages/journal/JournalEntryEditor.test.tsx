@@ -8,6 +8,7 @@ import JournalEntryEditor from './JournalEntryEditor';
 import type { JournalEntryDetail } from './journalEntryTypes';
 
 const CASH_ID = '11111111-1111-4111-8111-111111111111';
+const REVENUE_ID = '22222222-2222-4222-8222-222222222222';
 const NEW_ACCOUNT_ID = '99999999-9999-4999-8999-999999999999';
 
 const { apiGet, apiPost, apiDelete, periodState } = vi.hoisted(() => ({
@@ -446,28 +447,79 @@ describe('JournalEntryEditor line keyboard navigation', () => {
       .find(anchor => anchor.textContent?.trim() === text);
   }
 
-  it('wires Reverse to the void endpoint, passing the typed reason', async () => {
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Entered twice');
+  it('Reverse posts nothing by itself: it opens the reversal to be edited', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt');
     await renderEditor(editableEntry);
 
     const reverseButton = findButton('Reverse');
     expect(reverseButton).toBeDefined();
     await click(reverseButton!);
 
-    expect(promptSpy).toHaveBeenCalledWith('Reason for reversing this entry?');
-    expect(apiPost).toHaveBeenCalledWith(
-      '/businesses/44444444-4444-4444-8444-444444444444/journal-entries/33333333-3333-4333-8333-333333333333/void',
-      { void_reason: 'Entered twice' },
-    );
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
-  it('does not reverse when the reason prompt is dismissed', async () => {
-    vi.spyOn(window, 'prompt').mockReturnValue(null);
-    await renderEditor(editableEntry);
+  it('grays Reverse out, with the reason, on an entry that cannot be reversed', async () => {
+    await renderEditor({ ...editableEntry, can_reverse: false, reversal_block_reason: 'Journal entry has already been reversed' });
 
-    await click(findButton('Reverse')!);
+    const reverseButton = findButton('Reverse') as HTMLButtonElement;
+    expect(reverseButton.disabled).toBe(true);
+    expect(reverseButton.title).toBe('Journal entry has already been reversed');
+  });
 
-    expect(apiPost).not.toHaveBeenCalledWith(expect.stringContaining('/void'), expect.anything());
+  it('opens a reversal swapped and dated the first of next month, and saves the edited one through /reverse', async () => {
+    const source = {
+      ...editableEntry,
+      entry: { ...editableEntry.entry, entry_date: '2026-12-15', memo: 'Accrual' },
+      lines: [
+        editableEntry.lines[0]!,
+        {
+          ...editableEntry.lines[0]!,
+          id: '99999999-9999-4999-8999-999999999999',
+          line_number: 2,
+          account_id: REVENUE_ID,
+          account_code: '4010',
+          account_name: 'Sales',
+          debit: '0.0000',
+          credit: '10.0000',
+        },
+      ],
+    } satisfies JournalEntryDetail;
+    apiPost.mockResolvedValue({ data: { reversal: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } } });
+    await act(async () => {
+      root.render(
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <JournalEntryEditor reverseSource={source} />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('h1')?.textContent).toBe('Reverse Journal Entry #83R');
+    const date = container.querySelector<HTMLInputElement>("input[data-date-input]")!;
+    // December rolls into January of the next year.
+    expect(date.value).toBe('01/01/2027');
+
+    await act(async () => {
+      date.focus();
+      setFieldValue(date, '12/31/2026');
+      date.blur();
+    });
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => /^Save and (new|close)$/.test(button.textContent?.trim() ?? ''));
+    await click(save!);
+
+    expect(apiPost).toHaveBeenCalledWith(
+      '/businesses/44444444-4444-4444-8444-444444444444/journal-entries/33333333-3333-4333-8333-333333333333/reverse',
+      {
+        entry_date: '2026-12-31',
+        memo: 'Accrual',
+        reference: null,
+        lines: [
+          { account_id: CASH_ID, debit: '0.0000', credit: '10.0000', memo: null, name: null, class_name: null },
+          { account_id: REVENUE_ID, debit: '10.0000', credit: '0.0000', memo: null, name: null, class_name: null },
+        ],
+      },
+    );
   });
 
   it('shows Copy, Delete and Audit history (not Transaction journal) in More for an editable standalone entry', async () => {

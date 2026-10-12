@@ -28,6 +28,7 @@ import {
   newJournalEntryForm,
   shouldAppendJournalLines,
   MIN_BLANK_ROWS,
+  reverseJournalEntryToForm,
   type JournalEntryFormLine,
   type JournalEntryFormValues,
   type JournalAccount,
@@ -39,6 +40,8 @@ import AccountCreateDrawer from '@/pages/coa/AccountCreateDrawer';
 import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
 import { PostErrorNotice, type SaveWarningState } from '@/components/SaveAndPost';
 import { JournalNumberRequestGate } from './journalNumberPreview';
+import { CloseFormButton } from '@/components/ui/CloseFormButton';
+import { useCloseForm } from '@/lib/useCloseForm';
 import {
   JOURNAL_CLOSE_PATH,
   journalDestinationPath,
@@ -48,6 +51,8 @@ import {
 type JournalEntryEditorProps = {
   existing?: JournalEntryDetail;
   copySource?: JournalEntryDetail;
+  /** The entry being reversed: the form opens as its reversal and saves through /reverse. */
+  reverseSource?: JournalEntryDetail;
 };
 
 type FiscalPeriod = {
@@ -63,7 +68,7 @@ function fmtJournalDate(iso: string) {
   return `${Number(month)}/${Number(day)}/${year}`;
 }
 
-export default function JournalEntryEditor({ existing, copySource }: JournalEntryEditorProps) {
+export default function JournalEntryEditor({ existing, copySource, reverseSource }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
   // The role on the open company, which is the one the API checks.
   const role = useEffectiveRole();
@@ -82,13 +87,17 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const [form, setForm] = useState<JournalEntryFormValues>(() => (
     existing
       ? journalEntryToForm(existing)
-      : copySource
-        ? copyJournalEntryToForm(copySource, '')
-        : newJournalEntryForm(todayLocal())
+      : reverseSource
+        ? reverseJournalEntryToForm(reverseSource)
+        : copySource
+          ? copyJournalEntryToForm(copySource, '')
+          : newJournalEntryForm(todayLocal())
   ));
-  const [automaticJournalNumber, setAutomaticJournalNumber] = useState(existing === undefined);
+  // A reversal's number is fixed (the original's, with an R), like a saved entry's.
+  const numberIsFixed = existing !== undefined || reverseSource !== undefined;
+  const [automaticJournalNumber, setAutomaticJournalNumber] = useState(!numberIsFixed);
   const [numberRefresh, setNumberRefresh] = useState(0);
-  const journalNumberEditedRef = useRef(existing !== undefined);
+  const journalNumberEditedRef = useRef(numberIsFixed);
   const journalNumberRequestGateRef = useRef(new JournalNumberRequestGate());
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -106,6 +115,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   const saveMenuRef = useRef<HTMLDivElement>(null);
   const pendingAccountFocusRef = useRef<number | null>(null);
   const navigate = useNavigate();
+  const close = useCloseForm(JOURNAL_CLOSE_PATH);
   const attachments = useAttachments('journal_entry', existing?.entry.id ?? null);
   const readOnly = existing !== undefined && !existing.can_correct;
   const supportsManualActions = journalSupportsManualActions(existing);
@@ -139,7 +149,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
   }, [businessId]);
 
   useEffect(() => {
-    if (!businessId || existing) return;
+    if (!businessId || existing || reverseSource) return;
     const requestGeneration = journalNumberRequestGateRef.current.start();
     api.get<{ journal_number: string }>(`/businesses/${businessId}/journal-entries/next-number`)
       .then(response => {
@@ -158,7 +168,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         }
       });
     return () => journalNumberRequestGateRef.current.invalidate();
-  }, [businessId, existing, numberRefresh]);
+  }, [businessId, existing, reverseSource, numberRefresh]);
 
   useEffect(() => {
     function handle(event: MouseEvent) {
@@ -269,7 +279,14 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         automaticNumber: !existing && automaticJournalNumber,
       });
       let savedId: string;
-      if (existing) {
+      if (reverseSource) {
+        // The reversal as it stands on screen; the server numbers it and links it to the original.
+        const response = await api.post<{ reversal: { id: string } }>(
+          `/businesses/${businessId}/journal-entries/${reverseSource.entry.id}/reverse`,
+          { entry_date: body.entry_date, memo: body.memo, reference: body.reference, lines: body.lines },
+        );
+        savedId = response.data.reversal.id;
+      } else if (existing) {
         const response = await api.put<{ entry: { id: string } }>(
           `/businesses/${businessId}/journal-entries/${existing.entry.id}`,
           body,
@@ -285,12 +302,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       if (attachWarning) {
         // Open the saved entry so the missing files can be re-added there.
         const state: SaveWarningState = { saveWarnings: [attachWarning] };
-        navigate(`/journal/${savedId}`, { state });
+        navigate(`/journal/${savedId}`, { state, replace: true });
         return;
       }
 
       if (destination === 'new') {
-        if (existing) navigate(journalDestinationPath(destination, savedId));
+        if (existing || reverseSource) navigate(journalDestinationPath(destination, savedId));
         else {
           journalNumberRequestGateRef.current.invalidate();
           setForm(newJournalEntryForm(todayLocal()));
@@ -298,8 +315,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
           journalNumberEditedRef.current = false;
           setNumberRefresh(current => current + 1);
         }
+      } else if (destination === 'close') {
+        close();
       } else {
-        navigate(journalDestinationPath(destination, savedId));
+        // Replace: the saved entry takes the place of the form it was saved from (or of
+        // itself), so Back goes to the page before it and is not needed twice.
+        navigate(journalDestinationPath(destination, savedId), { replace: true });
       }
     } catch (requestError: unknown) {
       setError(pickErr(requestError));
@@ -331,25 +352,12 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
     }
   }
 
-  // QBO calls this "Reverse" on a journal entry (distinct from "Void" on
-  // deposits/expenses), but it's the same same-day reversing-entry logic:
-  // ledger.voidJournalEntry, flipping the original to voided.
-  async function reverseEntry() {
-    if (!businessId || !existing?.can_correct) return;
-    const reason = window.prompt('Reason for reversing this entry?');
-    if (!reason) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.post(`/businesses/${businessId}/journal-entries/${existing.entry.id}/void`, {
-        void_reason: reason,
-      });
-      navigate(JOURNAL_CLOSE_PATH);
-    } catch (requestError: unknown) {
-      setError(pickErr(requestError));
-    } finally {
-      setBusy(false);
-    }
+  // Reverse, as QuickBooks does it: nothing is posted yet. The reversal opens on
+  // this screen (debits and credits swapped, dated the first of next month) so
+  // the date or anything else can be changed, and it posts when it is saved.
+  function reverseEntry() {
+    if (!existing?.can_reverse) return;
+    navigate(`/journal/new?reverse=${existing.entry.id}`);
   }
 
   async function deleteEntry() {
@@ -379,7 +387,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       <div className="flex flex-wrap items-center gap-3 border-b bg-background px-6 py-4">
         <RecentJournalEntries businessId={businessId} />
         <h1 className="text-xl font-semibold">
-          Journal Entry{form.journalNo ? ` #${form.journalNo}` : ''}
+          {reverseSource ? 'Reverse ' : ''}Journal Entry{form.journalNo ? ` #${form.journalNo}` : ''}
         </h1>
         {existing && (
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
@@ -393,7 +401,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
         <div className="ml-auto flex flex-wrap gap-3 text-xs text-muted-foreground">
           {/* Copy for an existing entry moves to the More menu below (QBO layout);
               an unsaved draft has nothing to put there yet, so it keeps this button. */}
-          {!existing && (
+          {!existing && !reverseSource && (
             <Button type="button" variant="ghost" size="sm" onClick={copyUnsavedEntry} disabled={busy}>
               <Copy className="mr-2 h-4 w-4" />
               Copy
@@ -410,7 +418,18 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
             </Link>
           )}
         </div>
+        <CloseFormButton onClose={close} className="ml-2" />
       </div>
+
+      {reverseSource && (
+        <div className="mx-6 mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          This reverses{' '}
+          <Link className="font-medium underline" to={`/journal/${reverseSource.entry.id}`}>
+            Journal Entry #{reverseSource.entry.journal_number}
+          </Link>
+          . Nothing is posted yet: change the date or anything else, then save. The original entry stays as it is.
+        </div>
+      )}
 
       {existing && (
         <div className={`mx-6 mt-4 rounded-md border px-4 py-3 text-sm ${
@@ -471,7 +490,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
               updateForm({ journalNo: event.target.value });
             }}
             placeholder="e.g. AJE3"
-            disabled={readOnly}
+            disabled={readOnly || reverseSource !== undefined}
             className="w-44"
           />
         </div>
@@ -481,7 +500,7 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
             type="checkbox"
             checked={form.isAdjusting}
             onChange={event => updateForm({ isAdjusting: event.target.checked })}
-            disabled={readOnly}
+            disabled={readOnly || reverseSource !== undefined}
             className="h-4 w-4 cursor-pointer rounded border-input disabled:cursor-not-allowed"
           />
         </label>
@@ -683,18 +702,25 @@ export default function JournalEntryEditor({ existing, copySource }: JournalEntr
       {notice && <p className="px-6 pb-2 text-sm text-emerald-700">{notice}</p>}
 
       <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
-        <Button type="button" variant="outline" onClick={() => navigate(JOURNAL_CLOSE_PATH)}>
+        <Button type="button" variant="outline" onClick={close}>
           {readOnly ? 'Back' : 'Cancel'}
         </Button>
 
         <div className="mx-auto flex items-center gap-4">
-          {existing?.can_correct && (
-            <Button type="button" variant="outline" size="sm" onClick={() => { void reverseEntry(); }} disabled={busy}>
+          {existing && (existing.can_reverse || existing.can_correct) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={reverseEntry}
+              disabled={busy || !existing.can_reverse}
+              title={existing.can_reverse ? undefined : (existing.reversal_block_reason ?? undefined)}
+            >
               <RotateCcw className="mr-2 h-4 w-4" />
               Reverse
             </Button>
           )}
-          {supportsManualActions && (
+          {supportsManualActions && !reverseSource && (
             <button
               type="button"
               onClick={() => setRecurringOpen(true)}

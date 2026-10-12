@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyJournalNumberSuggestion,
+  firstDayOfNextMonth,
   copyJournalEntryToForm,
   copyUnsavedJournalEntry,
   journalEntryPayload,
@@ -286,5 +287,13 @@ describe('journal entry form mappings', () => {
       expect(pickJournalLineAccount([first, balanced, blank], 2, CASH_ID)[2])
         .toEqual({ ...blank, account_id: CASH_ID, description: '' });
     });
+  });
+});
+
+describe('firstDayOfNextMonth', () => {
+  it('moves to the first of the next month, and into the next year from December', () => {
+    expect(firstDayOfNextMonth('2026-04-15')).toBe('2026-05-01');
+    expect(firstDayOfNextMonth('2026-01-31')).toBe('2026-02-01');
+    expect(firstDayOfNextMonth('2026-12-15')).toBe('2027-01-01');
   });
 });

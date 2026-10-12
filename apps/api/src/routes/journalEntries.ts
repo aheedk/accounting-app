@@ -167,8 +167,24 @@ router.post('/businesses/:businessId/journal-entries/:id/reverse', requireMinRol
     const ctx = ctxFromReq(req);
     const force = req.query['admin_override'] === 'true';
     const reason = (req.body?.admin_override_reason as string | undefined) ?? '';
+    // The body is the reversal as edited on the entry screen; an empty one takes every default.
+    const body = schemas.journalEntryReverseSchema.parse(req.body ?? {});
+    const overrides: ledger.ReversalOverrides = {};
+    if (body.entry_date !== undefined) overrides.entry_date = body.entry_date;
+    if (body.memo !== undefined) overrides.memo = body.memo;
+    if (body.reference !== undefined) overrides.reference = body.reference;
+    if (body.lines !== undefined) {
+      overrides.lines = body.lines.map(l => ({
+        account_id: l.account_id,
+        debit: l.debit,
+        credit: l.credit,
+        memo: l.memo ?? null,
+        name: l.name ?? null,
+        class_name: l.class_name ?? null,
+      }));
+    }
     const work = (trx: Transaction<DB>) =>
-      ledger.reverseJournalEntry(trx, ctx, { journal_entry_id: req.params['id']! });
+      ledger.reverseJournalEntry(trx, ctx, { journal_entry_id: req.params['id']!, overrides });
     const reversal = force
       ? await runWithClosedPeriodOverride(db, ctx, reason, work)
       : await db.transaction().execute(work);
