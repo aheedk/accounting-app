@@ -6,8 +6,9 @@ transcript. This is the output of item 34 in
 from that file. A second video is coming and gets its own file. The PDF and the
 check stubs he sent with the video are not covered here.
 
-**Status on 2026-10-12, end of day:** 17 of the 21 items are built, 4 turned out
-to be fixed already, and 2 are waiting on Faizan. Everything built passed the
+**Status on 2026-10-12, end of day:** of the 21 items, 15 are built, 1 is partly
+built (68), 4 were fixed or in place already (50, 51, 52, 70), and 1 is waiting
+on Faizan (56). Everything built passed the
 typecheck and the web tests. **None of it has been clicked through in the
 browser yet**, and the API tests added today for the Balance Sheet were not run
 (Docker was off). Do that before showing it to him.
