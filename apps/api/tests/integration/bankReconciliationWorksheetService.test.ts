@@ -46,11 +46,11 @@ describe('bank reconciliation worksheet', () => {
       lines: [{ line_type: 'other_funds', received_from: 'A Customer', account_id: d.salesIncome.id, amount: '500.00' }],
     }));
 
-    const status = await recon.getStatus(t.db, d.ctx, d.bankAccount.id);
+    const status = await recon.getStatus(t.db, d.ctx, d.checking.id);
     expect(status).toEqual({ beginning_balance: '0.00', in_progress_id: null });
 
     const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
-      bank_account_id: d.bankAccount.id, statement_ending_balance: '400.00', statement_ending_date: '2026-03-31',
+      account_id: d.checking.id, statement_ending_balance: '400.00', statement_ending_date: '2026-03-31',
     }));
     expect(started.status).toBe('in_progress');
     expect(started.beginning_balance).toBe('0.0000');
@@ -79,7 +79,7 @@ describe('bank reconciliation worksheet', () => {
     expect(depositRow.reconciliation_status).toBe('reconciled');
 
     // The next reconciliation on this account carries this one's ending balance forward.
-    const nextStatus = await recon.getStatus(t.db, d.ctx, d.bankAccount.id);
+    const nextStatus = await recon.getStatus(t.db, d.ctx, d.checking.id);
     expect(nextStatus.beginning_balance).toBe('400.0000');
 
     // A reconciled expense can no longer be deleted, or voided by anyone below a firm admin.
@@ -99,7 +99,7 @@ describe('bank reconciliation worksheet', () => {
     }));
 
     const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
-      bank_account_id: d.bankAccount.id, statement_ending_balance: '0.00', statement_ending_date: '2026-03-31',
+      account_id: d.checking.id, statement_ending_balance: '0.00', statement_ending_date: '2026-03-31',
     }));
     // Nothing checked: cleared balance stays 0, statement says 0 too, so it's already clean —
     // leave the expense unchecked instead, which makes the statement (0) differ from cleared (0) by 0.
@@ -121,7 +121,7 @@ describe('bank reconciliation worksheet', () => {
   it('creates a pre-checked service charge and interest line at Start, and Cancel removes them entirely', async () => {
     const d = await setup(t);
     const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
-      bank_account_id: d.bankAccount.id, statement_ending_balance: '-5.00', statement_ending_date: '2026-03-31',
+      account_id: d.checking.id, statement_ending_balance: '-5.00', statement_ending_date: '2026-03-31',
       service_charge_amount: '15.00', service_charge_date: '2026-03-15', service_charge_account_id: d.bankFees.id,
       interest_earned_amount: '10.00', interest_earned_date: '2026-03-20', interest_earned_account_id: d.interestIncome.id,
     }));
@@ -153,7 +153,7 @@ describe('bank reconciliation worksheet', () => {
       lines: [{ line_type: 'other_funds', received_from: 'A Customer', account_id: d.salesIncome.id, amount: '200.00' }],
     }));
     const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
-      bank_account_id: d.bankAccount.id, statement_ending_balance: '200.00', statement_ending_date: '2026-03-31',
+      account_id: d.checking.id, statement_ending_balance: '200.00', statement_ending_date: '2026-03-31',
     }));
     await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
       { transaction_type: 'deposit', transaction_id: deposit.id, is_cleared: true },
@@ -170,5 +170,73 @@ describe('bank reconciliation worksheet', () => {
     const depositRow = await t.db.selectFrom('bank_deposits').selectAll().where('id', '=', deposit.id).executeTakeFirstOrThrow();
     expect(depositRow.reconciliation_status).toBe('unreconciled');
     expect(depositRow.reconciliation_id).toBeNull();
+  });
+
+  it('lists every reconcilable account with its QuickBooks-style category, not only registered bank accounts', async () => {
+    const d = await setup(t);
+    const card = await makeAccount(t.db, d.business.id, { code: '2100', name: 'Visa Business Card', account_type: 'liability', detail_type: 'Credit Card' });
+    const fixedAsset = await makeAccount(t.db, d.business.id, { code: '1500', name: 'Office Equipment', account_type: 'asset', detail_type: 'Fixed Asset Other Tools Equipment' });
+    const equity = await makeAccount(t.db, d.business.id, { code: '3000', name: "Owner's Equity", account_type: 'equity' });
+    const otherCurrentLiability = await makeAccount(t.db, d.business.id, { code: '2150', name: 'Line of Credit', account_type: 'liability', detail_type: 'Other Current Liability' });
+
+    const accounts = await recon.listReconcilableAccounts(t.db, d.ctx);
+    const byId = new Map(accounts.map(a => [a.id, a]));
+    expect(byId.get(d.checking.id)).toMatchObject({ category: 'Bank' });
+    expect(byId.get(card.id)).toMatchObject({ category: 'Credit Card' });
+    expect(byId.get(fixedAsset.id)).toMatchObject({ category: 'Fixed Asset' });
+    expect(byId.get(equity.id)).toMatchObject({ category: 'Equity' });
+    expect(byId.get(otherCurrentLiability.id)).toMatchObject({ category: 'Other Current Liability' });
+    // Revenue/expense accounts never show up here.
+    expect(byId.has(d.supplies.id)).toBe(false);
+  });
+
+  it('reconciles a credit card directly: a charge increases its balance (the opposite sign from a bank payment), and a bank-paid payment to the card clears it', async () => {
+    const d = await setup(t);
+    const card = await makeAccount(t.db, d.business.id, { code: '2100', name: 'Visa Business Card', account_type: 'liability', detail_type: 'Credit Card' });
+
+    const purchase = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-08', payee_text: 'Office Depot', payment_account_id: card.id, payment_method: 'credit_card',
+      lines: [{ category_account_id: d.supplies.id, amount: '60.00' }],
+    }));
+    // Paying the card down from the bank account: an expense FROM the bank,
+    // categorized TO the card — the card never appears as this expense's own
+    // payment_account_id, only as a line inside its journal entry.
+    const payment = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-20', payee_text: 'Visa', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: card.id, amount: '20.00' }],
+    }));
+
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: card.id, statement_ending_balance: '40.00', statement_ending_date: '2026-03-31',
+    }));
+
+    const worksheet = await recon.getWorksheet(t.db, d.ctx, started.id);
+    expect(worksheet.category).toBe('Credit Card');
+    const purchaseItem = worksheet.items.find(i => i.transaction_id === purchase.id);
+    // A charge increases what's owed on the card — positive, unlike a bank
+    // expense (which is always negative, money leaving an asset account).
+    expect(purchaseItem).toMatchObject({ transaction_type: 'expense', amount: '60.0000', is_cleared: false });
+    const paymentItem = worksheet.items.find(i => i.transaction_id === payment.journal_entry_id);
+    // Paying the card down decreases what's owed — negative — and surfaces
+    // through the generic journal-entry line, not the expense query, since
+    // this expense's own payment_account_id is the bank, not the card.
+    expect(paymentItem).toMatchObject({ transaction_type: 'journal_entry', amount: '-20.0000' });
+
+    await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
+      { transaction_type: 'expense', transaction_id: purchase.id, is_cleared: true },
+      { transaction_type: 'journal_entry', transaction_id: payment.journal_entry_id!, is_cleared: true },
+    ]));
+    const completed = await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+    expect(completed.status).toBe('completed');
+
+    const purchaseRow = await t.db.selectFrom('expense_transactions').selectAll().where('id', '=', purchase.id).executeTakeFirstOrThrow();
+    expect(purchaseRow.reconciliation_status).toBe('reconciled');
+    const paymentJe = await t.db.selectFrom('journal_entries').selectAll().where('id', '=', payment.journal_entry_id!).executeTakeFirstOrThrow();
+    expect(paymentJe.reconciliation_status).toBe('reconciled');
+    // The payment's own expense record (on the bank side) is untouched —
+    // only the journal entry itself was locked, since that's what the card's
+    // worksheet actually reconciled.
+    const paymentRow = await t.db.selectFrom('expense_transactions').selectAll().where('id', '=', payment.id).executeTakeFirstOrThrow();
+    expect(paymentRow.reconciliation_status).toBe('unreconciled');
   });
 });

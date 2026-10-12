@@ -14,12 +14,7 @@ import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 
-type BankAccount = {
-  id: string;
-  name: string;
-  institution: string | null;
-  account_last_four: string | null;
-};
+type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
 type CoaAccount = { id: string; code: string; name: string; account_type: string };
 
@@ -30,8 +25,8 @@ export default function ReconcilePage() {
   const [bizId] = useActiveBusinessId();
   const today = todayLocal();
 
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [reconcilableAccounts, setReconcilableAccounts] = useState<ReconcilableAccount[]>([]);
+  const [accountId, setAccountId] = useState<string>('');
   const [accounts, setAccounts] = useState<CoaAccount[]>([]);
 
   const [beginningBalance, setBeginningBalance] = useState('0.00');
@@ -53,33 +48,33 @@ export default function ReconcilePage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/bank-accounts`).then(r => {
-      const list: BankAccount[] = r.data.bank_accounts;
-      setBankAccounts(list);
-      setBankAccountId(prev => prev && list.some(b => b.id === prev) ? prev : (list[0]?.id ?? ''));
+    api.get(`/businesses/${bizId}/bank-rec/accounts`).then(r => {
+      const list: ReconcilableAccount[] = r.data.accounts;
+      setReconcilableAccounts(list);
+      setAccountId(prev => prev && list.some(a => a.id === prev) ? prev : (list[0]?.id ?? ''));
     }).catch((e: unknown) => setErr(pickErr(e)));
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts)).catch(() => {});
   }, [bizId]);
 
   useEffect(() => {
-    if (!bizId || !bankAccountId) { setBeginningBalance('0.00'); setInProgressId(null); return; }
+    if (!bizId || !accountId) { setBeginningBalance('0.00'); setInProgressId(null); return; }
     setErr(null);
-    api.get(`/businesses/${bizId}/bank-rec/status`, { params: { bank_account_id: bankAccountId } })
+    api.get(`/businesses/${bizId}/bank-rec/status`, { params: { account_id: accountId } })
       .then(r => { setBeginningBalance(r.data.beginning_balance); setInProgressId(r.data.in_progress_id); })
       .catch((e: unknown) => setErr(pickErr(e)));
-  }, [bizId, bankAccountId]);
+  }, [bizId, accountId]);
 
   const expenseAccounts = accounts.filter(a => a.account_type === 'expense');
   const incomeAccounts = accounts.filter(a => a.account_type === 'revenue' || a.account_type === 'income');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!bizId || !bankAccountId) return;
+    if (!bizId || !accountId) return;
     setErr(null);
     setBusy(true);
     try {
       const body = {
-        bank_account_id: bankAccountId,
+        account_id: accountId,
         statement_ending_balance: parseMoneyInput(form.statement_ending_balance),
         statement_ending_date: form.statement_ending_date,
         service_charge_amount: form.service_charge_amount ? parseMoneyInput(form.service_charge_amount) : null,
@@ -102,7 +97,7 @@ export default function ReconcilePage() {
 
   const needsServiceChargeAccount = !!form.service_charge_amount && !form.service_charge_account_id;
   const needsInterestAccount = !!form.interest_earned_amount && !form.interest_earned_account_id;
-  const canSubmit = !busy && !!bankAccountId && !!form.statement_ending_date && !needsServiceChargeAccount && !needsInterestAccount;
+  const canSubmit = !busy && !!accountId && !!form.statement_ending_date && !needsServiceChargeAccount && !needsInterestAccount;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -127,13 +122,13 @@ export default function ReconcilePage() {
             <Label>Account</Label>
             <AppSelect
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={bankAccountId}
-              onChange={e => setBankAccountId(e.target.value)}
+              value={accountId}
+              onChange={e => setAccountId(e.target.value)}
             >
               <option value="">Select…</option>
-              {bankAccounts.map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.name}{b.account_last_four ? ` •••${b.account_last_four}` : ''}
+              {reconcilableAccounts.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.code} {a.name} — {a.category}
                 </option>
               ))}
             </AppSelect>

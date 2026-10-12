@@ -9,12 +9,13 @@ import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 
-type BankAccount = { id: string; name: string; account_last_four: string | null };
+type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
 type HistoryRow = {
   id: string;
-  bank_account_id: string;
-  bank_account_name: string | null;
+  account_id: string;
+  account_code: string | null;
+  account_name: string | null;
   statement_ending_date: string;
   statement_ending_balance: string;
   difference: string;
@@ -35,8 +36,8 @@ function fmtShortDate(iso: string) {
 export default function ReconcileHistoryPage() {
   const can = useCan();
   const [bizId] = useActiveBusinessId();
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [reconcilableAccounts, setReconcilableAccounts] = useState<ReconcilableAccount[]>([]);
+  const [accountId, setAccountId] = useState<string>('');
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailItem[] | null>(null);
@@ -45,19 +46,19 @@ export default function ReconcileHistoryPage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/bank-accounts`).then(r => setBankAccounts(r.data.bank_accounts)).catch((e: unknown) => setErr(pickErr(e)));
+    api.get(`/businesses/${bizId}/bank-rec/accounts`).then(r => setReconcilableAccounts(r.data.accounts)).catch((e: unknown) => setErr(pickErr(e)));
   }, [bizId]);
 
   function reload() {
     if (!bizId) return;
     setErr(null);
-    const params = bankAccountId ? { bank_account_id: bankAccountId } : {};
+    const params = accountId ? { account_id: accountId } : {};
     api.get(`/businesses/${bizId}/bank-rec/history`, { params })
       .then(r => setRows(r.data.reconciliations))
       .catch((e: unknown) => setErr(pickErr(e)));
   }
 
-  useEffect(reload, [bizId, bankAccountId]);
+  useEffect(reload, [bizId, accountId]);
 
   async function toggleExpand(id: string) {
     if (expanded === id) { setExpanded(null); setDetail(null); return; }
@@ -99,9 +100,9 @@ export default function ReconcileHistoryPage() {
       {err && <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div>}
 
       <div className="w-64">
-        <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={bankAccountId} onChange={e => setBankAccountId(e.target.value)}>
+        <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={accountId} onChange={e => setAccountId(e.target.value)}>
           <option value="">All accounts</option>
-          {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.name}{b.account_last_four ? ` •••${b.account_last_four}` : ''}</option>)}
+          {reconcilableAccounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name} — {a.category}</option>)}
         </AppSelect>
       </div>
 
@@ -125,7 +126,7 @@ export default function ReconcileHistoryPage() {
             {rows.map(r => (
               <Fragment key={r.id}>
                 <tr className="cursor-pointer border-b hover:bg-muted/30" onClick={() => void toggleExpand(r.id)}>
-                  <td className="p-3">{r.bank_account_name}</td>
+                  <td className="p-3">{r.account_code} {r.account_name}</td>
                   <td className="p-3 whitespace-nowrap">{fmtShortDate(r.statement_ending_date)}</td>
                   <td className="p-3 text-right font-mono">{fmtMoney(r.statement_ending_balance)}</td>
                   <td className="p-3 text-right">{r.items_cleared}</td>

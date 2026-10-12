@@ -35,8 +35,9 @@ type Summary = {
 };
 
 type Worksheet = {
-  reconciliation: { id: string; bank_account_id: string; status: string; statement_ending_date: string };
-  bank_account: { id: string; name: string };
+  reconciliation: { id: string; account_id: string; status: string; statement_ending_date: string };
+  account: { id: string; name: string };
+  category: string;
   items: WorksheetItem[];
   summary: Summary;
 };
@@ -186,7 +187,7 @@ export default function ReconcileWorksheetPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Reconcile — {data.bank_account.name}</h1>
+          <h1 className="text-2xl font-semibold">Reconcile — {data.account.name}</h1>
           <p className="text-sm text-muted-foreground">Statement ending {fmtShortDate(data.reconciliation.statement_ending_date)}</p>
         </div>
         <Link to="/accounting/reconcile" className="text-sm text-primary underline">Back to Reconcile</Link>

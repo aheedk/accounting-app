@@ -21,18 +21,24 @@ function ctxFromReq(req: Request): ServiceCtx {
 
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
+router.get('/businesses/:businessId/bank-rec/accounts', async (req, res, next) => {
+  try {
+    res.json({ accounts: await reconSvc.listReconcilableAccounts(db, ctxFromReq(req)) });
+  } catch (e) { next(e); }
+});
+
 router.get('/businesses/:businessId/bank-rec/status', async (req, res, next) => {
   try {
-    const bankAccountId = req.query['bank_account_id'];
-    if (typeof bankAccountId !== 'string') { res.status(400).json({ error: 'bank_account_id is required' }); return; }
-    res.json(await reconSvc.getStatus(db, ctxFromReq(req), bankAccountId));
+    const accountId = req.query['account_id'];
+    if (typeof accountId !== 'string') { res.status(400).json({ error: 'account_id is required' }); return; }
+    res.json(await reconSvc.getStatus(db, ctxFromReq(req), accountId));
   } catch (e) { next(e); }
 });
 
 router.get('/businesses/:businessId/bank-rec/history', async (req, res, next) => {
   try {
-    const bankAccountId = req.query['bank_account_id'];
-    const q: { bank_account_id?: string } = typeof bankAccountId === 'string' ? { bank_account_id: bankAccountId } : {};
+    const accountId = req.query['account_id'];
+    const q: { account_id?: string } = typeof accountId === 'string' ? { account_id: accountId } : {};
     res.json({ reconciliations: await reconSvc.listHistory(db, ctxFromReq(req), q) });
   } catch (e) { next(e); }
 });

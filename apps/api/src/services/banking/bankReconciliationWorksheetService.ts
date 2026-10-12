@@ -11,7 +11,7 @@ import { getOrCreateOpeningBalanceEquity } from '../core/chartOfAccountsService.
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type StartReconciliationInput = {
-  bank_account_id: string;
+  account_id: string;
   statement_ending_balance: string;
   statement_ending_date: string;
   service_charge_amount?: string | null;
@@ -36,17 +36,91 @@ export type WorksheetItem = {
   transaction_path: string;
 };
 
-async function resolveBankAccount(db: Kysely<DB> | Transaction<DB>, business_id: string, id: string) {
-  const row = await db.selectFrom('bank_accounts').selectAll()
+/**
+ * The category QuickBooks' own reconcile picker groups an account under.
+ * Bank wins over everything else once a bank_accounts row backs the account
+ * (that's the authoritative signal, not detail_type — a Checking-labelled
+ * account nobody registered as a bank account still reconciles as whichever
+ * of the other seven categories its own type/detail type says it is).
+ */
+const BANK_DETAIL_TYPES = new Set(['Cash on Hand', 'Cash on hand', 'Checking', 'Money Market', 'Rents Held in Trust', 'Savings', 'Trust account']);
+const CREDIT_CARD_DETAIL_TYPES = new Set(['Credit Card']);
+const FIXED_ASSET_DETAIL_TYPES = new Set([
+  'Buildings', 'Depletable Assets', 'Fixed Asset Computers', 'Fixed Asset Copiers', 'Fixed Asset Furniture',
+  'Fixed Asset Other Tools Equipment', 'Fixed Asset Phone', 'Fixed Asset Photo Video', 'Fixed Asset Software',
+  'Furniture & Fixtures', 'Intangible Assets', 'Land', 'Leasehold Improvements', 'Machinery & Equipment',
+  'Other fixed assets', 'Vehicles', 'Fixed Assets',
+]);
+const OTHER_ASSET_DETAIL_TYPES = new Set([
+  'Goodwill', 'Lease Buyout', 'Licenses', 'Organizational Costs', 'Other Long-term Assets', 'Security Deposits', 'Other Assets',
+]);
+const LONG_TERM_LIABILITY_DETAIL_TYPES = new Set(['Notes Payable', 'Other Long Term Liabilities', 'Shareholder Notes Payable']);
+
+export type ReconcilableCategory =
+  | 'Bank' | 'Credit Card' | 'Other Current Asset' | 'Fixed Asset' | 'Other Asset'
+  | 'Other Current Liability' | 'Long-Term Liability' | 'Equity';
+
+export function reconcilableCategory(
+  account: { account_type: string; detail_type: string | null }, hasBankRow: boolean,
+): ReconcilableCategory {
+  if (hasBankRow) return 'Bank';
+  const detail = account.detail_type;
+  if (account.account_type === 'equity') return 'Equity';
+  if (account.account_type === 'asset') {
+    if (detail && BANK_DETAIL_TYPES.has(detail)) return 'Bank';
+    if (detail && FIXED_ASSET_DETAIL_TYPES.has(detail)) return 'Fixed Asset';
+    if (detail && OTHER_ASSET_DETAIL_TYPES.has(detail)) return 'Other Asset';
+    return 'Other Current Asset';
+  }
+  // liability
+  if (detail && CREDIT_CARD_DETAIL_TYPES.has(detail)) return 'Credit Card';
+  if (detail && LONG_TERM_LIABILITY_DETAIL_TYPES.has(detail)) return 'Long-Term Liability';
+  return 'Other Current Liability';
+}
+
+/** Every account the Reconcile picker offers: active asset/liability/equity
+ * accounts, not just ones registered as a bank account. */
+export async function listReconcilableAccounts(db: Kysely<DB>, ctx: ServiceCtx) {
+  const bizId = ctx.business_id!;
+  const accounts = await db.selectFrom('chart_of_accounts')
+    .select(['id', 'code', 'name', 'account_type', 'detail_type'])
+    .where('business_id', '=', bizId)
+    .where('is_active', '=', true)
+    .where('account_type', 'in', ['asset', 'liability', 'equity'])
+    .where('system_key', 'is', null)
+    .orderBy('code')
+    .execute();
+  const bankRows = await db.selectFrom('bank_accounts').select('cash_account_id')
+    .where('business_id', '=', bizId).where('deleted_at', 'is', null).execute();
+  const bankSet = new Set(bankRows.map(r => r.cash_account_id));
+  return accounts.map(a => ({
+    id: a.id, code: a.code, name: a.name,
+    category: reconcilableCategory(a, bankSet.has(a.id)),
+  }));
+}
+
+async function resolveAccount(db: Kysely<DB> | Transaction<DB>, business_id: string, id: string) {
+  const row = await db.selectFrom('chart_of_accounts').selectAll()
     .where('id', '=', id).where('business_id', '=', business_id).executeTakeFirst();
-  if (!row || row.deleted_at) throw new NotFoundError('bank_account', id);
+  if (!row || !row.is_active) throw new NotFoundError('chart_of_accounts', id);
+  if (row.account_type !== 'asset' && row.account_type !== 'liability' && row.account_type !== 'equity') {
+    throw new PreconditionError('Only an asset, liability or equity account can be reconciled');
+  }
   return row;
 }
 
+/** The bank_accounts row backing this account, if the account was registered
+ * as one — deposits and checks only exist for a registered bank account. */
+async function bankAccountFor(db: Kysely<DB> | Transaction<DB>, business_id: string, account_id: string) {
+  return db.selectFrom('bank_accounts').selectAll()
+    .where('cash_account_id', '=', account_id).where('business_id', '=', business_id).where('deleted_at', 'is', null)
+    .executeTakeFirst();
+}
+
 /** The prior completed reconciliation's statement ending balance, or 0 for the first one. */
-async function computeBeginningBalance(db: Kysely<DB> | Transaction<DB>, bank_account_id: string): Promise<string> {
+async function computeBeginningBalance(db: Kysely<DB> | Transaction<DB>, account_id: string): Promise<string> {
   const prior = await db.selectFrom('reconciliations').select('statement_ending_balance')
-    .where('bank_account_id', '=', bank_account_id)
+    .where('account_id', '=', account_id)
     .where('status', '=', 'completed')
     .orderBy('statement_ending_date', 'desc')
     .executeTakeFirst();
@@ -56,13 +130,13 @@ async function computeBeginningBalance(db: Kysely<DB> | Transaction<DB>, bank_ac
 /** What the Setup page needs before it can offer "Start reconciling": the
  * carried-forward beginning balance, and whether one is already in progress
  * (so the page offers "Resume" instead of letting a second one collide with it). */
-export async function getStatus(db: Kysely<DB>, ctx: ServiceCtx, bank_account_id: string) {
-  await resolveBankAccount(db, ctx.business_id!, bank_account_id);
+export async function getStatus(db: Kysely<DB>, ctx: ServiceCtx, account_id: string) {
+  await resolveAccount(db, ctx.business_id!, account_id);
   const inProgress = await db.selectFrom('reconciliations').select('id')
-    .where('bank_account_id', '=', bank_account_id).where('status', '=', 'in_progress')
+    .where('account_id', '=', account_id).where('status', '=', 'in_progress')
     .executeTakeFirst();
   return {
-    beginning_balance: await computeBeginningBalance(db, bank_account_id),
+    beginning_balance: await computeBeginningBalance(db, account_id),
     in_progress_id: inProgress?.id ?? null,
   };
 }
@@ -71,20 +145,21 @@ export async function startReconciliation(
   trx: Transaction<DB>, ctx: ServiceCtx, input: StartReconciliationInput,
 ) {
   const bizId = ctx.business_id!;
-  const bankAccount = await resolveBankAccount(trx, bizId, input.bank_account_id);
+  const account = await resolveAccount(trx, bizId, input.account_id);
+  const bankRow = await bankAccountFor(trx, bizId, account.id);
 
   const inProgress = await trx.selectFrom('reconciliations').select('id')
-    .where('bank_account_id', '=', input.bank_account_id).where('status', '=', 'in_progress')
+    .where('account_id', '=', input.account_id).where('status', '=', 'in_progress')
     .executeTakeFirst();
   if (inProgress) {
     throw new PreconditionError('A reconciliation is already in progress for this account. Finish or cancel it first.', { reconciliation_id: inProgress.id });
   }
 
-  const beginningBalance = await computeBeginningBalance(trx, input.bank_account_id);
+  const beginningBalance = await computeBeginningBalance(trx, input.account_id);
 
   const recon = await trx.insertInto('reconciliations').values({
     business_id: bizId,
-    bank_account_id: input.bank_account_id,
+    account_id: input.account_id,
     statement_beginning_balance: beginningBalance,
     statement_ending_balance: input.statement_ending_balance,
     statement_ending_date: input.statement_ending_date,
@@ -100,19 +175,19 @@ export async function startReconciliation(
   }).returningAll().executeTakeFirstOrThrow();
 
   // A service charge or interest amount creates a real, postable transaction
-  // (through the normal expense / deposit service, so it gets the same ledger
-  // posting, audit trail and void/delete guards as anything else) so it shows
-  // up in the worksheet to be cleared, pre-checked since it exists only to
-  // account for this statement's own fee or interest line.
+  // (through the normal expense / deposit / ledger service, so it gets the
+  // same ledger posting, audit trail and void/delete guards as anything
+  // else) so it shows up in the worksheet to be cleared, pre-checked since it
+  // exists only to account for this statement's own fee or interest line.
   const serviceChargeAmount = parseFloat(input.service_charge_amount ?? '0') || 0;
   if (serviceChargeAmount > 0) {
     if (!input.service_charge_account_id) throw new PreconditionError('An expense account is required for the service charge');
     const expense = await expenseSvc.createExpense(trx, ctx, {
       transaction_date: input.service_charge_date ?? input.statement_ending_date,
-      payee_text: bankAccount.institution || bankAccount.name,
-      payment_account_id: bankAccount.cash_account_id,
+      payee_text: account.name,
+      payment_account_id: account.id,
       payment_method: 'other',
-      memo: `Bank service charge — reconciling ${bankAccount.name} through ${input.statement_ending_date}`,
+      memo: `Service charge — reconciling ${account.name} through ${input.statement_ending_date}`,
       lines: [{ category_account_id: input.service_charge_account_id, amount: serviceChargeAmount.toFixed(2) }],
     });
     await trx.insertInto('reconciliation_items').values({
@@ -130,27 +205,55 @@ export async function startReconciliation(
   const interestAmount = parseFloat(input.interest_earned_amount ?? '0') || 0;
   if (interestAmount > 0) {
     if (!input.interest_earned_account_id) throw new PreconditionError('An income account is required for interest earned');
-    const deposit = await depositSvc.createDeposit(trx, ctx, {
-      bank_account_id: input.bank_account_id,
-      deposit_date: input.interest_earned_date ?? input.statement_ending_date,
-      memo: `Interest earned — reconciling ${bankAccount.name} through ${input.statement_ending_date}`,
-      lines: [{
-        line_type: 'other_funds',
-        account_id: input.interest_earned_account_id,
+    if (bankRow) {
+      const deposit = await depositSvc.createDeposit(trx, ctx, {
+        bank_account_id: bankRow.id,
+        deposit_date: input.interest_earned_date ?? input.statement_ending_date,
+        memo: `Interest earned — reconciling ${account.name} through ${input.statement_ending_date}`,
+        lines: [{
+          line_type: 'other_funds',
+          account_id: input.interest_earned_account_id,
+          description: 'Interest earned',
+          amount: interestAmount.toFixed(2),
+        }],
+      });
+      await trx.insertInto('reconciliation_items').values({
+        reconciliation_id: recon.id,
+        transaction_type: 'interest',
+        transaction_id: deposit.id,
+        transaction_date: deposit.deposit_date,
         description: 'Interest earned',
         amount: interestAmount.toFixed(2),
-      }],
-    });
-    await trx.insertInto('reconciliation_items').values({
-      reconciliation_id: recon.id,
-      transaction_type: 'interest',
-      transaction_id: deposit.id,
-      transaction_date: deposit.deposit_date,
-      description: 'Interest earned',
-      amount: interestAmount.toFixed(2),
-      is_cleared: true,
-      cleared_at: sql`now()`,
-    }).execute();
+        is_cleared: true,
+        cleared_at: sql`now()`,
+      }).execute();
+    } else {
+      // Not a registered bank account (e.g. a credit card or other balance-
+      // sheet account) — bank_deposits requires one, so this posts as a plain
+      // journal entry instead.
+      const je = await ledger.postJournalEntry(trx, ctx, {
+        business_id: bizId,
+        entry_date: input.interest_earned_date ?? input.statement_ending_date,
+        source_type: 'manual',
+        transaction_type: 'journal_entry',
+        memo: `Interest earned — reconciling ${account.name} through ${input.statement_ending_date}`,
+        reference: null,
+        lines: [
+          { account_id: account.id, debit: interestAmount.toFixed(2), credit: '0', memo: 'Interest earned' },
+          { account_id: input.interest_earned_account_id, debit: '0', credit: interestAmount.toFixed(2), memo: 'Interest earned' },
+        ],
+      });
+      await trx.insertInto('reconciliation_items').values({
+        reconciliation_id: recon.id,
+        transaction_type: 'interest',
+        transaction_id: je.id,
+        transaction_date: je.entry_date,
+        description: 'Interest earned',
+        amount: interestAmount.toFixed(2),
+        is_cleared: true,
+        cleared_at: sql`now()`,
+      }).execute();
+    }
   }
 
   await auditRecord(trx, ctx, {
@@ -189,42 +292,74 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
   const recon = await db.selectFrom('reconciliations').selectAll()
     .where('id', '=', id).where('business_id', '=', bizId).executeTakeFirst();
   if (!recon) throw new NotFoundError('reconciliation', id);
-  const bankAccount = await resolveBankAccount(db, bizId, recon.bank_account_id);
+  const account = await resolveAccount(db, bizId, recon.account_id);
+  const bankRow = await bankAccountFor(db, bizId, account.id);
   const saved = await savedClearedState(db, id);
 
   const items: WorksheetItem[] = [];
+  const wrappedJeIds = new Set<string>();
 
-  const deposits = await db.selectFrom('bank_deposits')
-    .select(['id', 'deposit_date', 'deposit_number', 'memo', 'total_amount', 'journal_entry_id'])
-    .where('bank_account_id', '=', recon.bank_account_id)
-    .where('voided_at', 'is', null)
-    .where('reconciliation_status', '!=', 'reconciled')
-    .where('deposit_date', '<=', recon.statement_ending_date)
-    .execute();
-  for (const d of deposits) {
-    // Interest earned, created at Start, is a bank_deposits row under the hood —
-    // its cleared state was saved under the 'interest' item type, not 'deposit'.
-    const isInterest = saved.has(`interest:${d.id}`);
-    const type: ReconciliationItemType = isInterest ? 'interest' : 'deposit';
-    const key = `${type}:${d.id}`;
-    items.push({
-      transaction_type: type, transaction_id: d.id, transaction_date: d.deposit_date,
-      type_label: isInterest ? 'Interest Earned' : 'Deposit', ref_no: d.deposit_number, name: null, description: d.memo,
-      amount: toMoneyString(d.total_amount),
-      is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, d.journal_entry_id),
-      transaction_path: `/accounting/deposits/${d.id}`,
-    });
+  if (bankRow) {
+    const deposits = await db.selectFrom('bank_deposits')
+      .select(['id', 'deposit_date', 'deposit_number', 'memo', 'total_amount', 'journal_entry_id'])
+      .where('bank_account_id', '=', bankRow.id)
+      .where('voided_at', 'is', null)
+      .where('reconciliation_status', '!=', 'reconciled')
+      .where('deposit_date', '<=', recon.statement_ending_date)
+      .execute();
+    for (const d of deposits) {
+      if (d.journal_entry_id) wrappedJeIds.add(d.journal_entry_id);
+      // Interest earned, created at Start, is a bank_deposits row under the hood —
+      // its cleared state was saved under the 'interest' item type, not 'deposit'.
+      const isInterest = saved.has(`interest:${d.id}`);
+      const type: ReconciliationItemType = isInterest ? 'interest' : 'deposit';
+      const key = `${type}:${d.id}`;
+      items.push({
+        transaction_type: type, transaction_id: d.id, transaction_date: d.deposit_date,
+        type_label: isInterest ? 'Interest Earned' : 'Deposit', ref_no: d.deposit_number, name: null, description: d.memo,
+        amount: toMoneyString(d.total_amount),
+        is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, d.journal_entry_id),
+        transaction_path: `/accounting/deposits/${d.id}`,
+      });
+    }
+
+    const checks = await db.selectFrom('checks as c')
+      .leftJoin('vendors as v', 'v.id', 'c.payee_id')
+      .select(['c.id', 'c.payment_date', 'c.check_number', 'c.payee_text', 'v.name as vendor_name', 'c.memo', 'c.total_amount', 'c.journal_entry_id'])
+      .where('c.bank_account_id', '=', bankRow.id)
+      .where('c.status', '=', 'posted')
+      .where('c.reconciliation_status', '!=', 'reconciled')
+      .where('c.payment_date', '<=', recon.statement_ending_date)
+      .execute();
+    for (const c of checks) {
+      if (c.journal_entry_id) wrappedJeIds.add(c.journal_entry_id);
+      const key = `check:${c.id}`;
+      items.push({
+        transaction_type: 'check', transaction_id: c.id, transaction_date: c.payment_date,
+        type_label: 'Check', ref_no: c.check_number, name: c.vendor_name ?? c.payee_text, description: c.memo,
+        amount: toMoneyString(`-${c.total_amount}`),
+        is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, c.journal_entry_id),
+        transaction_path: `/accounting/checks/${c.id}`,
+      });
+    }
   }
 
+  // Expenses paid from this account — works for any asset/liability payment
+  // account (e.g. a credit card purchase), not only a registered bank account.
+  // A charge credits the payment account, which increases a liability's own
+  // balance (what's owed) the opposite way it decreases an asset's (cash on hand).
+  const debitNormal = account.account_type === 'asset';
+  const expenseJeIds = new Set<string>();
   const expenses = await db.selectFrom('expense_transactions as e')
     .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
     .select(['e.id', 'e.transaction_date', 'e.reference', 'e.payee_text', 'v.name as vendor_name', 'e.memo', 'e.total_amount', 'e.journal_entry_id', 'e.payment_method'])
-    .where('e.payment_account_id', '=', bankAccount.cash_account_id)
+    .where('e.payment_account_id', '=', account.id)
     .where('e.status', '=', 'posted')
     .where('e.reconciliation_status', '!=', 'reconciled')
     .where('e.transaction_date', '<=', recon.statement_ending_date)
     .execute();
   for (const e of expenses) {
+    if (e.journal_entry_id) expenseJeIds.add(e.journal_entry_id);
     const isServiceCharge = saved.has(`service_charge:${e.id}`);
     const type: ReconciliationItemType = isServiceCharge ? 'service_charge' : 'expense';
     const key = `${type}:${e.id}`;
@@ -232,51 +367,41 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
     items.push({
       transaction_type: type, transaction_id: e.id, transaction_date: e.transaction_date,
       type_label: isServiceCharge ? 'Service Charge' : (isCheck ? 'Check' : 'Expense'), ref_no: e.reference, name: e.vendor_name ?? e.payee_text, description: e.memo,
-      amount: toMoneyString(`-${e.total_amount}`),
+      amount: toMoneyString(`${debitNormal ? '-' : ''}${e.total_amount}`),
       is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, e.journal_entry_id),
       transaction_path: `/accounting/expenses/${e.id}`,
     });
   }
 
-  const checks = await db.selectFrom('checks as c')
-    .leftJoin('vendors as v', 'v.id', 'c.payee_id')
-    .select(['c.id', 'c.payment_date', 'c.check_number', 'c.payee_text', 'v.name as vendor_name', 'c.memo', 'c.total_amount', 'c.journal_entry_id'])
-    .where('c.bank_account_id', '=', recon.bank_account_id)
-    .where('c.status', '=', 'posted')
-    .where('c.reconciliation_status', '!=', 'reconciled')
-    .where('c.payment_date', '<=', recon.statement_ending_date)
-    .execute();
-  for (const c of checks) {
-    const key = `check:${c.id}`;
-    items.push({
-      transaction_type: 'check', transaction_id: c.id, transaction_date: c.payment_date,
-      type_label: 'Check', ref_no: c.check_number, name: c.vendor_name ?? c.payee_text, description: c.memo,
-      amount: toMoneyString(`-${c.total_amount}`),
-      is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, c.journal_entry_id),
-      transaction_path: `/accounting/checks/${c.id}`,
-    });
-  }
-
-  // Standalone entries (manual/adjustment/reconciliation_adjustment) that hit
-  // the bank's own cash account directly. A deposit/expense/check's own JE
-  // already appears above through its wrapper, so entries wrapped by one of
-  // those source types are excluded here to avoid listing the same money twice.
-  const jeLines = await db.selectFrom('journal_entries as j')
+  // Any other posted entry that touches this account directly: hand-entered
+  // manual/adjusting entries, and — for a non-bank account like a credit card —
+  // the category-side line of a payment made FROM a different account (e.g. a
+  // bank-paid expense categorized to this card, which pays it down). Excludes
+  // journal entries already covered above through their own wrapper, so the
+  // same money is never listed twice.
+  const coveredJeIds = new Set<string>([...wrappedJeIds, ...expenseJeIds]);
+  const jeLinesQuery = db.selectFrom('journal_entries as j')
     .innerJoin('journal_entry_lines as l', 'l.journal_entry_id', 'j.id')
     .select(['j.id', 'j.entry_date', 'j.journal_number', 'j.reference', 'j.payee_name', 'j.memo', 'l.debit', 'l.credit'])
-    .where('l.account_id', '=', bankAccount.cash_account_id)
+    .where('l.account_id', '=', account.id)
     .where('j.status', '=', 'posted')
-    .where('j.source_type', 'in', ['manual', 'adjustment'])
+    .where('j.source_type', '!=', 'reconciliation_adjustment')
     .where('j.reconciliation_status', '!=', 'reconciled')
-    .where('j.entry_date', '<=', recon.statement_ending_date)
-    .execute();
+    .where('j.entry_date', '<=', recon.statement_ending_date);
+  const jeLines = (coveredJeIds.size > 0
+    ? await jeLinesQuery.where('j.id', 'not in', [...coveredJeIds]).execute()
+    : await jeLinesQuery.execute());
   for (const j of jeLines) {
-    const key = `journal_entry:${j.id}`;
-    const amount = toMoneyString(subMoney(toMoneyString(j.debit), toMoneyString(j.credit)));
+    // Interest earned on an account with no bank_accounts row posts as a
+    // plain JE — surface it as 'Interest Earned' the same as a deposit would.
+    const isInterest = saved.has(`interest:${j.id}`);
+    const type: ReconciliationItemType = isInterest ? 'interest' : 'journal_entry';
+    const key = `${type}:${j.id}`;
+    const amount = toMoneyString(debitNormal ? subMoney(toMoneyString(j.debit), toMoneyString(j.credit)) : subMoney(toMoneyString(j.credit), toMoneyString(j.debit)));
     if (isZero(amount)) continue;
     items.push({
-      transaction_type: 'journal_entry', transaction_id: j.id, transaction_date: j.entry_date,
-      type_label: 'Journal Entry', ref_no: j.reference ?? j.journal_number, name: j.payee_name, description: j.memo,
+      transaction_type: type, transaction_id: j.id, transaction_date: j.entry_date,
+      type_label: isInterest ? 'Interest Earned' : 'Journal Entry', ref_no: j.reference ?? j.journal_number, name: j.payee_name, description: j.memo,
       amount,
       is_cleared: saved.get(key) ?? false,
       transaction_path: `/accounting/journal-entries/${j.id}`,
@@ -297,7 +422,8 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
 
   return {
     reconciliation: recon,
-    bank_account: bankAccount,
+    account,
+    category: reconcilableCategory(account, !!bankRow),
     items,
     summary: {
       statement_beginning_balance: toMoneyString(recon.beginning_balance),
@@ -360,14 +486,21 @@ export async function saveProgress(
   return { reconciliation: updated, summary };
 }
 
-const sourceTable: Record<Exclude<ReconciliationItemType, 'service_charge' | 'interest'>, 'bank_deposits' | 'expense_transactions' | 'checks' | 'journal_entries'> = {
-  deposit: 'bank_deposits', expense: 'expense_transactions', check: 'checks', journal_entry: 'journal_entries',
-};
-
-function tableFor(type: ReconciliationItemType): 'bank_deposits' | 'expense_transactions' | 'checks' | 'journal_entries' {
-  if (type === 'service_charge') return 'expense_transactions';
-  if (type === 'interest') return 'bank_deposits';
-  return sourceTable[type];
+/** Which table a reconciliation item's own row lives in. 'check' and
+ * 'journal_entry' are fixed; 'expense'/'service_charge' are always an
+ * expense_transactions row (createExpense works for any payment account, no
+ * bank_accounts row required); 'deposit'/'interest' are usually a
+ * bank_deposits row but interest earned on an account with no bank_accounts
+ * row posts as a plain journal entry instead (see startReconciliation), so
+ * that one case is resolved by checking which table actually has the row. */
+async function resolveItemTable(
+  trx: Transaction<DB>, type: ReconciliationItemType, transaction_id: string,
+): Promise<'bank_deposits' | 'expense_transactions' | 'checks' | 'journal_entries'> {
+  if (type === 'check') return 'checks';
+  if (type === 'journal_entry') return 'journal_entries';
+  if (type === 'expense' || type === 'service_charge') return 'expense_transactions';
+  const dep = await trx.selectFrom('bank_deposits').select('id').where('id', '=', transaction_id).executeTakeFirst();
+  return dep ? 'bank_deposits' : 'journal_entries';
 }
 
 export async function finishReconciliation(
@@ -381,7 +514,7 @@ export async function finishReconciliation(
   if (!recon) throw new NotFoundError('reconciliation', id);
   if (recon.status !== 'in_progress') throw new PreconditionError('This reconciliation is no longer in progress');
 
-  const { items, bank_account, summary } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, id);
+  const { items, account, summary } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, id);
 
   if (!isZero(summary.difference) && !input.accept_difference) {
     throw new PreconditionError(
@@ -406,16 +539,16 @@ export async function finishReconciliation(
       source_type: 'reconciliation_adjustment',
       source_id: recon.id,
       transaction_type: 'reconciliation_adjustment',
-      memo: `Reconciliation adjustment — ${bank_account.name} through ${recon.statement_ending_date}`,
+      memo: `Reconciliation adjustment — ${account.name} through ${recon.statement_ending_date}`,
       reference: null,
       lines: diff > 0
         ? [
-            { account_id: bank_account.cash_account_id, debit: absDiff, credit: '0', memo: 'Reconciliation adjustment' },
+            { account_id: account.id, debit: absDiff, credit: '0', memo: 'Reconciliation adjustment' },
             { account_id: discrepancyAccount.id, debit: '0', credit: absDiff, memo: 'Reconciliation adjustment' },
           ]
         : [
             { account_id: discrepancyAccount.id, debit: absDiff, credit: '0', memo: 'Reconciliation adjustment' },
-            { account_id: bank_account.cash_account_id, debit: '0', credit: absDiff, memo: 'Reconciliation adjustment' },
+            { account_id: account.id, debit: '0', credit: absDiff, memo: 'Reconciliation adjustment' },
           ],
     });
     adjustmentJeId = adjustment.id;
@@ -424,7 +557,8 @@ export async function finishReconciliation(
   // Lock every cleared item's source row as reconciled.
   for (const item of items) {
     if (!item.is_cleared) continue;
-    await trx.updateTable(tableFor(item.transaction_type))
+    const table = await resolveItemTable(trx, item.transaction_type, item.transaction_id);
+    await trx.updateTable(table)
       .set({ reconciliation_status: 'reconciled', reconciliation_id: id })
       .where('id', '=', item.transaction_id)
       .execute();
@@ -487,7 +621,12 @@ export async function cancelReconciliation(trx: Transaction<DB>, ctx: ServiceCtx
     if (item.transaction_type === 'service_charge') {
       await expenseSvc.deleteExpense(trx, deleteCtx, item.transaction_id);
     } else if (item.transaction_type === 'interest') {
-      await depositSvc.deleteDeposit(trx, deleteCtx, item.transaction_id);
+      const table = await resolveItemTable(trx, 'interest', item.transaction_id);
+      if (table === 'bank_deposits') {
+        await depositSvc.deleteDeposit(trx, deleteCtx, item.transaction_id);
+      } else {
+        await ledger.deleteJournalEntry(trx, deleteCtx, { journal_entry_id: item.transaction_id });
+      }
     }
   }
 
@@ -506,14 +645,14 @@ export async function cancelReconciliation(trx: Transaction<DB>, ctx: ServiceCtx
   return cancelled;
 }
 
-export async function listHistory(db: Kysely<DB>, ctx: ServiceCtx, q: { bank_account_id?: string }) {
+export async function listHistory(db: Kysely<DB>, ctx: ServiceCtx, q: { account_id?: string }) {
   let query = db.selectFrom('reconciliations as r')
     .leftJoin('users as u', 'u.id', 'r.completed_by_user_id')
-    .leftJoin('bank_accounts as b', 'b.id', 'r.bank_account_id')
-    .select(['r.id', 'r.bank_account_id', 'b.name as bank_account_name', 'r.statement_ending_date', 'r.statement_ending_balance', 'r.difference', 'r.status', 'r.completed_at', 'u.full_name as completed_by'])
+    .leftJoin('chart_of_accounts as a', 'a.id', 'r.account_id')
+    .select(['r.id', 'r.account_id', 'a.code as account_code', 'a.name as account_name', 'r.statement_ending_date', 'r.statement_ending_balance', 'r.difference', 'r.status', 'r.completed_at', 'u.full_name as completed_by'])
     .where('r.business_id', '=', ctx.business_id!)
     .where('r.status', 'in', ['completed', 'cancelled']);
-  if (q.bank_account_id) query = query.where('r.bank_account_id', '=', q.bank_account_id);
+  if (q.account_id) query = query.where('r.account_id', '=', q.account_id);
   const rows = await query.orderBy('r.statement_ending_date', 'desc').execute();
   if (rows.length === 0) return [];
   const counts = await db.selectFrom('reconciliation_items')
@@ -547,7 +686,7 @@ export async function undoReconciliation(trx: Transaction<DB>, ctx: ServiceCtx, 
   if (recon.status !== 'completed') throw new PreconditionError('Only a completed reconciliation can be undone');
 
   const latest = await trx.selectFrom('reconciliations').select('id')
-    .where('bank_account_id', '=', recon.bank_account_id).where('status', '=', 'completed')
+    .where('account_id', '=', recon.account_id).where('status', '=', 'completed')
     .orderBy('statement_ending_date', 'desc').executeTakeFirst();
   if (latest?.id !== id) {
     throw new PreconditionError('Only the most recent reconciliation on this account can be undone — undo the newer ones first');
@@ -556,7 +695,8 @@ export async function undoReconciliation(trx: Transaction<DB>, ctx: ServiceCtx, 
   const items = await trx.selectFrom('reconciliation_items').selectAll()
     .where('reconciliation_id', '=', id).where('is_cleared', '=', true).execute();
   for (const item of items) {
-    await trx.updateTable(tableFor(item.transaction_type))
+    const table = await resolveItemTable(trx, item.transaction_type, item.transaction_id);
+    await trx.updateTable(table)
       .set({ reconciliation_status: 'unreconciled', reconciliation_id: null })
       .where('id', '=', item.transaction_id)
       .where('reconciliation_id', '=', id)

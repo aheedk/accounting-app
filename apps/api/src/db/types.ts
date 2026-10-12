@@ -925,7 +925,8 @@ export interface BankReconciliationsTable {
 export interface ReconciliationsTable {
   id: Generated<string>;
   business_id: string;
-  bank_account_id: string;
+  /** Any balance-sheet account (asset/liability/equity) — not necessarily one with a bank_accounts row. */
+  account_id: string;
   statement_beginning_balance: ColumnType<string, string | number, string | number>;
   statement_ending_balance: ColumnType<string, string | number, string | number>;
   statement_ending_date: ColumnType<string, string, string>;
