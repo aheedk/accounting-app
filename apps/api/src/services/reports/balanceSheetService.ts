@@ -1,5 +1,5 @@
 import { type Kysely, sql } from 'kysely';
-import { addMoney, subMoney, toMoneyString } from '@accounting/shared';
+import { accountGroup, addMoney, subMoney, toMoneyString, type AccountGroup } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 
 export type BsLine = {
@@ -7,6 +7,12 @@ export type BsLine = {
   account_code: string;
   account_name: string;
   amount: string;
+  /**
+   * The QuickBooks account type the line sits under ("Bank", "Fixed Assets",
+   * "Long Term Liabilities"), read from the account's detail type. The page
+   * groups and subtotals by it; the flat lists and totals here are unchanged.
+   */
+  group: AccountGroup;
 };
 
 export type BalanceSheetReport = {
@@ -64,7 +70,7 @@ export async function balanceSheet(db: Kysely<DB>, q: { business_id: string; as_
     .leftJoin('journal_entry_lines as jel', 'jel.account_id', 'a.id')
     .leftJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select(({ fn }) => [
-      'a.id as account_id', 'a.code', 'a.name', 'a.account_type', 'a.system_key',
+      'a.id as account_id', 'a.code', 'a.name', 'a.account_type', 'a.detail_type', 'a.system_key',
       fn.coalesce(fn.sum<string>('jel.debit'), sql.lit('0')).as('total_debit'),
       fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('total_credit'),
     ])
@@ -78,9 +84,18 @@ export async function balanceSheet(db: Kysely<DB>, q: { business_id: string; as_
         eb('je.entry_date', '<=', q.as_of),
       ]),
     ]))
-    .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type', 'a.system_key'])
+    .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type', 'a.detail_type', 'a.system_key'])
     .orderBy('a.code')
     .execute();
+
+  // An account set up under Banking is a bank account whatever its detail type says.
+  const bankingRows = await db.selectFrom('bank_accounts').select('cash_account_id')
+    .where('business_id', '=', q.business_id).execute();
+  const bankingIds = new Set(bankingRows.map(row => row.cash_account_id));
+  const groupOf = (r: { account_id: string; account_type: string; detail_type: string | null }): AccountGroup => {
+    if (r.account_type === 'asset' && bankingIds.has(r.account_id)) return 'Bank';
+    return accountGroup(r) ?? 'Equity';
+  };
 
   // Profit of earlier fiscal years belongs to Retained Earnings. Nothing posts it
   // there at year end, so it is added here, the way QuickBooks does; without it
@@ -103,25 +118,25 @@ export async function balanceSheet(db: Kysely<DB>, q: { business_id: string; as_
     if (r.account_type === 'asset') {
       const amt = toMoneyString(subMoney(debit, credit));
       if (parseFloat(amt) === 0) continue;
-      assetLines.push({ account_id: r.account_id, account_code: r.code, account_name: r.name, amount: amt });
+      assetLines.push({ account_id: r.account_id, account_code: r.code, account_name: r.name, amount: amt, group: groupOf(r) });
       assetsTotal = toMoneyString(addMoney(assetsTotal, amt));
     } else if (r.account_type === 'liability') {
       const amt = toMoneyString(subMoney(credit, debit));
       if (parseFloat(amt) === 0) continue;
-      liabilityLines.push({ account_id: r.account_id, account_code: r.code, account_name: r.name, amount: amt });
+      liabilityLines.push({ account_id: r.account_id, account_code: r.code, account_name: r.name, amount: amt, group: groupOf(r) });
       liabilitiesTotal = toMoneyString(addMoney(liabilitiesTotal, amt));
     } else if (r.account_type === 'equity') {
       const posted = toMoneyString(subMoney(credit, debit));
       const amt = r.account_id === retainedAccount?.account_id ? toMoneyString(addMoney(posted, priorEarnings)) : posted;
       if (parseFloat(amt) === 0) continue;
-      equityLines.push({ account_id: r.account_id, account_code: r.code, account_name: r.name, amount: amt });
+      equityLines.push({ account_id: r.account_id, account_code: r.code, account_name: r.name, amount: amt, group: 'Equity' });
       equityTotal = toMoneyString(addMoney(equityTotal, amt));
     }
   }
 
   // A chart with no Retained Earnings account still has to carry the earlier years.
   if (!retainedAccount && parseFloat(priorEarnings) !== 0) {
-    equityLines.push({ account_id: '', account_code: '', account_name: 'Retained Earnings', amount: priorEarnings });
+    equityLines.push({ account_id: '', account_code: '', account_name: 'Retained Earnings', amount: priorEarnings, group: 'Equity' });
     equityTotal = toMoneyString(addMoney(equityTotal, priorEarnings));
   }
 

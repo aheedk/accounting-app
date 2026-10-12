@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { FileDown, Printer } from 'lucide-react';
 import { DateInput } from '@/components/ui/date-input';
 import { Decimal } from 'decimal.js';
@@ -14,12 +14,16 @@ import { pickErr } from '@/lib/apiErrors';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 import { printReport } from '@/lib/reportExport';
+import { assetBlocks, liabilityBlocks, type SheetBlock } from '@/lib/balanceSheetLayout';
+import type { AccountGroup } from '@accounting/shared';
 
 type BsLine = {
   account_id: string;
   account_code: string;
   account_name: string;
   amount: string;
+  /** The QuickBooks account type the line sits under, e.g. "Bank" or "Fixed Assets". */
+  group?: AccountGroup | null;
 };
 
 type BalanceSheetReport = {
@@ -83,17 +87,80 @@ export default function BalanceSheetPage() {
     [report.equity_total, report.net_income_ytd],
   );
 
+  // Assets and liabilities under their account types, as QuickBooks lays the sheet out.
+  const assets = useMemo(() => assetBlocks(report.asset_lines), [report.asset_lines]);
+  const liabilities = useMemo(() => liabilityBlocks(report.liability_lines), [report.liability_lines]);
+
   const [excelBusy, setExcelBusy] = useState(false);
   if (!bizId) return <div>Pick a business.</div>;
+
+  function blockExportRows(blocks: SheetBlock<BsLine>[]): string[][] {
+    return blocks.flatMap(block => [
+      ...(block.label ? [['', block.label, '']] : []),
+      ...block.groups.flatMap(group => [
+        ['', group.label, ''],
+        ...group.lines.map(l => [l.account_code, l.account_name, l.amount]),
+        ['', `Total ${group.label}`, group.total],
+      ]),
+      ...(block.label ? [['', `Total ${block.label}`, block.total]] : []),
+    ]);
+  }
+
+  function accountRow(l: BsLine, indent: string) {
+    return (
+      <tr key={l.account_id} className="border-b hover:bg-muted/30">
+        <td className={`p-3 ${indent}`}><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
+        <td className="p-3 text-right font-mono">
+          <ReportAmountLink
+            to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
+            title={`View ${l.account_name} transactions in the General Ledger`}
+          >
+            {fmtMoney(l.amount)}
+          </ReportAmountLink>
+        </td>
+      </tr>
+    );
+  }
+
+  // A block is "Current Assets" with its account types inside it, or one type on its own.
+  function blockRows(blocks: SheetBlock<BsLine>[]) {
+    return blocks.map(block => (
+      <Fragment key={block.label ?? block.groups[0]?.label}>
+        {block.label && (
+          <tr className="border-b">
+            <td colSpan={2} className="p-3 pl-6 font-medium">{block.label}</td>
+          </tr>
+        )}
+        {block.groups.map(group => (
+          <Fragment key={group.label}>
+            <tr className="border-b">
+              <td colSpan={2} className={`p-3 font-medium ${block.label ? 'pl-10' : 'pl-6'}`}>{group.label}</td>
+            </tr>
+            {group.lines.map(l => accountRow(l, block.label ? 'pl-14' : 'pl-10'))}
+            <tr className="border-b font-medium">
+              <td className={`p-3 ${block.label ? 'pl-10' : 'pl-6'}`}>Total {group.label}</td>
+              <td className="p-3 text-right font-mono">{fmtMoney(group.total)}</td>
+            </tr>
+          </Fragment>
+        ))}
+        {block.label && (
+          <tr className="border-b font-semibold">
+            <td className="p-3 pl-6">Total {block.label}</td>
+            <td className="p-3 text-right font-mono">{fmtMoney(block.total)}</td>
+          </tr>
+        )}
+      </Fragment>
+    ));
+  }
 
   // No Section column: each section is a heading row of its own, as on the page.
   const dlHeaders = ['Code', 'Account', 'Amount'];
   const dlRows = () => [
     ['', 'Assets', ''],
-    ...report.asset_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ...blockExportRows(assets),
     ['', 'Total Assets', report.assets_total],
     ['', 'Liabilities', ''],
-    ...report.liability_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ...blockExportRows(liabilities),
     ['', 'Total Liabilities', report.liabilities_total],
     ['', 'Equity', ''],
     ...report.equity_lines.map(l => [l.account_code, l.account_name, l.amount]),
@@ -165,19 +232,7 @@ export default function BalanceSheetPage() {
             {report.asset_lines.length === 0 && (
               <tr className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">No asset balances.</td></tr>
             )}
-            {report.asset_lines.map(l => (
-              <tr key={l.account_id} className="border-b hover:bg-muted/30">
-                <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
-                <td className="p-3 text-right font-mono">
-                  <ReportAmountLink
-                    to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
-                    title={`View ${l.account_name} transactions in the General Ledger`}
-                  >
-                    {fmtMoney(l.amount)}
-                  </ReportAmountLink>
-                </td>
-              </tr>
-            ))}
+            {blockRows(assets)}
             <tr className="border-b font-semibold">
               <td className="p-3">Total Assets</td>
               <td className="p-3 text-right font-mono">{fmtMoney(report.assets_total)}</td>
@@ -189,19 +244,7 @@ export default function BalanceSheetPage() {
             {report.liability_lines.length === 0 && (
               <tr className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">No liability balances.</td></tr>
             )}
-            {report.liability_lines.map(l => (
-              <tr key={l.account_id} className="border-b hover:bg-muted/30">
-                <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{l.account_code}</span>{l.account_name}</td>
-                <td className="p-3 text-right font-mono">
-                  <ReportAmountLink
-                    to={generalLedgerDrilldownUrl({ accountId: l.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: report.as_of })}
-                    title={`View ${l.account_name} transactions in the General Ledger`}
-                  >
-                    {fmtMoney(l.amount)}
-                  </ReportAmountLink>
-                </td>
-              </tr>
-            ))}
+            {blockRows(liabilities)}
             <tr className="border-b font-semibold">
               <td className="p-3">Total Liabilities</td>
               <td className="p-3 text-right font-mono">{fmtMoney(report.liabilities_total)}</td>

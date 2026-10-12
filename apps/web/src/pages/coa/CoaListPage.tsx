@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import AccountCreateDrawer from './AccountCreateDrawer';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { ACCOUNT_TYPE_GROUPS, DETAIL_TYPES, accountGroup, type AccountGroup } from '@accounting/shared';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -85,13 +86,17 @@ const TYPE_ALIASES: Record<string, { type: string; detail?: string }> = {
   'other expenses': { type: 'expense', detail: 'Other Expenses' },
 };
 
-const DETAIL_TYPES: Record<string, string[]> = {
-  asset: ['Checking', 'Savings', 'Money Market', 'Cash on Hand', 'Accounts Receivable', 'Prepaid Expenses', 'Inventory', 'Fixed Assets', 'Buildings', 'Vehicles', 'Equipment', 'Accumulated Depreciation', 'Other Assets'],
-  liability: ['Accounts Payable', 'Credit Card', 'Line of Credit', 'Loan Payable', 'Sales Tax Payable', 'Accrued Liabilities', 'Customer Deposits', 'Notes Payable', 'Mortgage', 'Other Liabilities'],
-  equity: ['Opening Balance Equity', 'Retained Earnings', 'Common Stock', 'Partner Contributions', 'Partner Distributions', 'Paid-In Capital', 'Other Equity'],
-  revenue: ['Sales Income', 'Service Income', 'Interest Earned', 'Dividend Income', 'Other Income', 'Discounts Given'],
-  expense: ['Advertising', 'Auto', 'Bank Charges', 'Cost of Labor', 'Dues & Subscriptions', 'Equipment Rental', 'Insurance', 'Legal & Professional Fees', 'Meals & Entertainment', 'Office Expenses', 'Payroll Expenses', 'Rent', 'Repairs & Maintenance', 'Taxes & Licenses', 'Travel', 'Utilities', 'Other Expenses'],
-};
+// The QuickBooks account type an account shows under ("Bank", "Fixed Assets"):
+// read from its detail type, except that an account set up under Banking is a bank.
+function accountTypeLabel(account: { account_type: string; detail_type: string | null }, isBank: boolean): string {
+  if (isBank && account.account_type === 'asset') return 'Bank';
+  return accountGroup(account) ?? account.account_type;
+}
+
+/** The base type (asset, liability...) a QuickBooks account type belongs to. */
+function baseTypeOf(group: string): string {
+  return ACCOUNT_TYPE_GROUPS.find(entry => (entry.items as readonly string[]).includes(group))?.accountType ?? '';
+}
 
 // Balances display in the account's natural sign (QBO convention): debit-normal
 // for asset/expense, credit-normal for liability/equity/revenue. Trial-balance
@@ -179,6 +184,9 @@ export default function CoaListPage() {
   // Edit slide-over
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [editForm, setEditForm] = useState({ code: '', name: '', account_type: '', detail_type: '', description: '', parent_id: null as string | null, is_subaccount: false });
+  // The account type shown in the edit form, and the detail types that go with it.
+  const editGroup = accountGroup(editForm);
+  const editDetailTypes: string[] = editGroup ? DETAIL_TYPES[editGroup] : [];
   const [editBalance, setEditBalance] = useState<string | null>(null);
   const [editErr, setEditErr] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
@@ -478,7 +486,7 @@ export default function CoaListPage() {
   function exportTable() {
     const headers = ['Number', 'Name', 'Type', 'Detail Type', 'Balance', 'Status'];
     const rows = filtered.map(a => [
-      a.code, a.name, a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1), a.detail_type ?? '',
+      a.code, a.name, accountTypeLabel(a, bankMap.has(a.id)), a.detail_type ?? '',
       displayBalance(a) ?? '', a.is_active ? 'Active' : 'Inactive',
     ]);
     return { headers, rows };
@@ -951,7 +959,7 @@ export default function CoaListPage() {
                   <td className={`px-3 ${pad} text-sm capitalize text-muted-foreground`}>
                     <span className="inline-flex items-center gap-1.5">
                       {bankMap.has(acct.id) && <Landmark className="h-3.5 w-3.5" aria-label="Linked bank account" />}
-                      {acct.account_type}
+                      {accountTypeLabel(acct, bankMap.has(acct.id))}
                     </span>
                   </td>
                 )}
@@ -1101,25 +1109,29 @@ export default function CoaListPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Account type <span className="text-destructive">*</span></Label>
+                    {/* The QuickBooks account type. It is not stored on its own: picking one sets the
+                        base type and a detail type of that kind, and the detail type is what is kept. */}
                     <AppSelect
                       className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70"
-                      value={editForm.account_type}
+                      value={editGroup ?? ''}
                       disabled={editAccount.is_system}
                       onChange={e => {
-                        const nextType = e.target.value;
+                        const nextGroup = e.target.value as AccountGroup;
+                        const nextType = baseTypeOf(nextGroup);
+                        if (!nextType) return;
                         setEditForm(f => ({
                           ...f,
                           account_type: nextType,
                           // A detail type belongs to one account type.
-                          detail_type: (DETAIL_TYPES[nextType] ?? []).includes(f.detail_type) ? f.detail_type : '',
+                          detail_type: DETAIL_TYPES[nextGroup].includes(f.detail_type) ? f.detail_type : (DETAIL_TYPES[nextGroup][0] ?? ''),
                           // A subaccount must share its parent's type.
                           ...(f.parent_id && accounts.find(a => a.id === f.parent_id)?.account_type !== nextType
                             ? { parent_id: null, is_subaccount: false } : {}),
                         }));
                       }}
                     >
-                      {ACCOUNT_TYPES.map(t => (
-                        <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                      {ACCOUNT_TYPE_GROUPS.flatMap(entry => entry.items).map(group => (
+                        <option key={group} value={group}>{group}</option>
                       ))}
                     </AppSelect>
                   </div>
@@ -1133,10 +1145,10 @@ export default function CoaListPage() {
                     >
                       <option value="">— select —</option>
                       {/* Keep a detail type that is not in the standard list (e.g. Suspense) selectable. */}
-                      {editForm.detail_type && !(DETAIL_TYPES[editForm.account_type] ?? []).includes(editForm.detail_type) && (
+                      {editForm.detail_type && !editDetailTypes.includes(editForm.detail_type) && (
                         <option value={editForm.detail_type}>{editForm.detail_type}</option>
                       )}
-                      {(DETAIL_TYPES[editForm.account_type] ?? []).map(dt => (
+                      {editDetailTypes.map(dt => (
                         <option key={dt} value={dt}>{dt}</option>
                       ))}
                     </AppSelect>

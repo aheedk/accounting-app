@@ -10,40 +10,10 @@ import { pickErr } from '@/lib/apiErrors';
 import { todayLocal } from '@/lib/dates';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 import { AppSelect } from '../../components/ui/select';
+import { ACCOUNT_TYPE_GROUPS, DETAIL_TYPES as GROUP_DETAIL_TYPES } from '@accounting/shared';
 
-const ACCOUNT_TYPE_GROUPS = [
-  {
-    heading: 'ASSET',
-    accountType: 'asset',
-    items: ['Bank', 'Accounts receivable (A/R)', 'Other Current Assets', 'Fixed Assets', 'Other Assets'],
-  },
-  {
-    heading: 'LIABILITY',
-    accountType: 'liability',
-    items: ['Credit Card', 'Accounts payable (A/P)', 'Other Current Liabilities', 'Long Term Liabilities'],
-  },
-  { heading: 'EQUITY', accountType: 'equity', items: ['Equity'] },
-  { heading: 'INCOME', accountType: 'revenue', items: ['Income', 'Other Income'] },
-  { heading: 'EXPENSE', accountType: 'expense', items: ['Cost of Goods Sold', 'Expenses', 'Other Expense'] },
-] as const;
-
-const DETAIL_TYPES: Record<string, string[]> = {
-  'Bank': ['Cash on hand', 'Checking', 'Money Market', 'Rents Held in Trust', 'Savings', 'Trust account'],
-  'Accounts receivable (A/R)': ['Accounts receivable (A/R)'],
-  'Other Current Assets': ['Allowance for Bad Debts', 'Development Costs', 'Employee Cash Advances', 'Inventory', 'Investment - Mortgage/Real Estate Loans', 'Investment - Tax-Exempt Securities', 'Investment - U.S. Government Obligations', 'Investments - Other', 'Loans To Officers', 'Loans to Others', 'Loans to Stockholders', 'Other Current Assets', 'Prepaid Expenses', 'Retainage', 'Undeposited Funds'],
-  'Fixed Assets': ['Accumulated Amortization', 'Accumulated Depletion', 'Accumulated Depreciation', 'Buildings', 'Depletable Assets', 'Fixed Asset Computers', 'Fixed Asset Copiers', 'Fixed Asset Furniture', 'Fixed Asset Other Tools Equipment', 'Fixed Asset Phone', 'Fixed Asset Photo Video', 'Fixed Asset Software', 'Furniture & Fixtures', 'Intangible Assets', 'Land', 'Leasehold Improvements', 'Machinery & Equipment', 'Other fixed assets', 'Vehicles'],
-  'Other Assets': ['Accumulated Amortization of Other Assets', 'Goodwill', 'Lease Buyout', 'Licenses', 'Organizational Costs', 'Other Long-term Assets', 'Security Deposits'],
-  'Credit Card': ['Credit Card'],
-  'Accounts payable (A/P)': ['AP'],
-  'Other Current Liabilities': ['Deferred Revenue', 'Federal Income Tax Payable', 'Insurance Payable', 'Line of Credit', 'Loan Payable', 'Other Current Liabilities', 'Payroll Clearing', 'Payroll Tax Payable', 'Prepaid Expenses Payable', 'Rents in trust - Liability', 'Sales Tax Payable', 'State/Local Income Tax Payable', 'Trust Accounts - Liabilities', 'Undistributed Tips'],
-  'Long Term Liabilities': ['Notes Payable', 'Other Long Term Liabilities', 'Shareholder Notes Payable'],
-  'Equity': ['Accumulated Adjustment', 'Common Stock', 'Estimated Taxes', 'Health Insurance Premium', 'Health Savings Account Contribution', 'Opening Balance Equity', "Owner's Equity", 'Paid-In Capital or Surplus', 'Partner Contributions', 'Partner Distributions', "Partner's Equity", 'Personal Expense', 'Personal Income', 'Preferred Stock', 'Retained Earnings', 'Treasury Stock'],
-  'Income': ['Discounts/Refunds Given', 'Non-Profit Income', 'Other Primary Income', 'Sales of Product Income', 'Service/Fee Income', 'Unapplied Cash Payment Income'],
-  'Other Income': ['Dividend Income', 'Interest Earned', 'Other Investment Income', 'Other Miscellaneous Income', 'Tax-Exempt Interest'],
-  'Cost of Goods Sold': ['Cost of labor - COS', 'Equipment Rental - COS', 'Other Costs of Services - COS', 'Shipping, Freight & Delivery - COS', 'Supplies & Materials - COGS'],
-  'Expenses': ['Advertising/Promotional', 'Auto', 'Bad Debts', 'Bank Charges', 'Charitable Contributions', 'Communication', 'Cost of Labor', 'Dues & subscriptions', 'Entertainment', 'Entertainment Meals', 'Equipment Rental', 'Finance costs', 'Insurance', 'Interest Paid', 'Legal & Professional Fees', 'Office/General Administrative Expenses', 'Other Business Expenses', 'Other Miscellaneous Service Cost', 'Payroll Expenses', 'Payroll Tax Expenses', 'Payroll Wage Expenses', 'Promotional Meals', 'Rent or Lease of Buildings', 'Repair & Maintenance', 'Shipping, Freight & Delivery', 'Supplies & Materials', 'Taxes Paid', 'Travel', 'Travel Meals', 'Unapplied Cash Bill Payment Expense', 'Utilities'],
-  'Other Expense': ['Amortization', 'Depreciation', 'Exchange Gain or Loss', 'Gas And Fuel', 'Home Office', 'Homeowner Rental Insurance', 'Mortgage Interest Home Office', 'Other Home Office Expenses', 'Other Miscellaneous Expense', 'Other Vehicle Expenses', 'Parking and Tolls', 'Penalties & Settlements', 'Property Tax Home Office', 'Rent and Lease Home Office', 'Repairs and Maintenance Home Office', 'Utilities Home Office', 'Vehicle', 'Vehicle Insurance', 'Vehicle Lease', 'Vehicle Loan', 'Vehicle Loan Interest', 'Vehicle Registration', 'Vehicle Repairs', 'Wash and Road Services'],
-};
+// Indexed by the label chosen in the Account type menu.
+const DETAIL_TYPES: Record<string, string[]> = GROUP_DETAIL_TYPES;
 
 type AccountOption = {
   id: string;

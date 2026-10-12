@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
-import { makeFirm, makeBusiness, makeUser, makeCustomer, seedYearPeriods, seedCoa } from '../helpers/factories.js';
+import { makeFirm, makeBusiness, makeUser, makeCustomer, makeAccount, makeBankAccount, seedYearPeriods, seedCoa } from '../helpers/factories.js';
 import * as invoiceSvc from '../../src/services/ar/invoiceService.js';
 import * as paymentSvc from '../../src/services/ar/paymentService.js';
 import * as rpt from '../../src/services/reports/balanceSheetService.js';
@@ -137,5 +137,50 @@ describe('Balance Sheet report', () => {
     expect(rpt.fiscalYearStart('2026-03-15', 7)).toBe('2025-07-01');
     expect(rpt.fiscalYearStart('2026-07-01', 7)).toBe('2026-07-01');
     expect(rpt.fiscalYearStart('2026-03-15', 1)).toBe('2026-01-01');
+  });
+  it('puts each line under its QuickBooks account type', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id);
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const checking = await makeAccount(t.db, biz.id, { code: '1010', name: 'Checking', account_type: 'asset', detail_type: 'Checking' });
+    // No bank detail type, but set up under Banking: still a bank account.
+    const payroll = await makeAccount(t.db, biz.id, { code: '1020', name: 'Payroll Account', account_type: 'asset' });
+    await makeBankAccount(t.db, biz.id, payroll.id);
+    const truck = await makeAccount(t.db, biz.id, { code: '1500', name: 'Truck', account_type: 'asset', detail_type: 'Vehicles' });
+    const prepaid = await makeAccount(t.db, biz.id, { code: '1300', name: 'Prepaid', account_type: 'asset' });
+    const card = await makeAccount(t.db, biz.id, { code: '2100', name: 'Amex', account_type: 'liability', detail_type: 'Credit Card' });
+    const note = await makeAccount(t.db, biz.id, { code: '2500', name: 'Truck Note', account_type: 'liability', detail_type: 'Notes Payable' });
+    const equity = await makeAccount(t.db, biz.id, { code: '3000', name: 'Owner Equity', account_type: 'equity' });
+
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-03-01', source_type: 'manual', memo: null,
+      lines: [
+        { account_id: checking.id, debit: '100.0000', credit: '0.0000', memo: null },
+        { account_id: payroll.id, debit: '50.0000', credit: '0.0000', memo: null },
+        { account_id: truck.id, debit: '900.0000', credit: '0.0000', memo: null },
+        { account_id: prepaid.id, debit: '25.0000', credit: '0.0000', memo: null },
+        { account_id: card.id, debit: '0.0000', credit: '75.0000', memo: null },
+        { account_id: note.id, debit: '0.0000', credit: '600.0000', memo: null },
+        { account_id: equity.id, debit: '0.0000', credit: '400.0000', memo: null },
+      ],
+    }));
+
+    const bs = await rpt.balanceSheet(t.db, { business_id: biz.id, as_of: '2026-04-30' });
+    expect(Object.fromEntries(bs.asset_lines.map(l => [l.account_name, l.group]))).toEqual({
+      Checking: 'Bank',
+      'Payroll Account': 'Bank',
+      Prepaid: 'Other Current Assets',
+      Truck: 'Fixed Assets',
+    });
+    expect(Object.fromEntries(bs.liability_lines.map(l => [l.account_name, l.group]))).toEqual({
+      Amex: 'Credit Card',
+      'Truck Note': 'Long Term Liabilities',
+    });
+    expect(bs.equity_lines.map(l => l.group)).toEqual(['Equity']);
+    // The grouping is a label on each line; the totals are what they were.
+    expect(bs.assets_total).toBe('1075.0000');
+    expect(bs.in_balance).toBe(true);
   });
 });
