@@ -636,10 +636,7 @@ export default function GeneralLedgerPage() {
       </div>
 
       {/* Title */}
-      <div>
-        <h1 className="text-2xl font-semibold">General Ledger Report</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Detailed activity and running balance for every ledger account.</p>
-      </div>
+      <h1 className="sr-only">General Ledger</h1>
 
       {/* QBO-style report controls */}
       <div className="rounded-lg border bg-card p-4 shadow-sm">

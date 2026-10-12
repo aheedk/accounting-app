@@ -113,8 +113,8 @@ export default function StatementOfCashFlowsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Statement of Cash Flows</h1>
+      <div className="flex flex-wrap items-end justify-end gap-3">
+        <h1 className="sr-only">Statement of Cash Flows</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">Period start</div>

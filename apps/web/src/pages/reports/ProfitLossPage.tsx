@@ -84,15 +84,18 @@ export default function ProfitLossPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   if (!bizId) return <div>Pick a business.</div>;
 
-  const dlHeaders = ['Section', 'Code', 'Account', 'Amount'];
+  // No Section column: each section is a heading row of its own, as on the page.
+  const dlHeaders = ['Code', 'Account', 'Amount'];
   const dlRows = () => report ? [
-    ...report.revenue_lines.map(l => ['Revenue', l.account_code, l.account_name, l.amount]),
-    ['Income', '', 'Total Income', report.revenue_total],
-    ['Income', '', 'GROSS PROFIT', report.gross_profit],
-    ...report.expense_lines.map(l => ['Expense', l.account_code, l.account_name, l.amount]),
-    ['Expenses', '', 'Total Expenses', report.expense_total],
-    ['Expenses', '', 'NET OPERATING INCOME', report.operating_income],
-    ['', '', 'NET INCOME', report.net_income],
+    ['', 'Income', ''],
+    ...report.revenue_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ['', 'Total Income', report.revenue_total],
+    ['', 'GROSS PROFIT', report.gross_profit],
+    ['', 'Expenses', ''],
+    ...report.expense_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ['', 'Total Expenses', report.expense_total],
+    ['', 'NET OPERATING INCOME', report.operating_income],
+    ['', 'NET INCOME', report.net_income],
   ] : [];
 
   const netIncomeNum = report ? parseFloat(report.net_income) : 0;
@@ -108,8 +111,8 @@ export default function ProfitLossPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Profit &amp; Loss</h1>
+      <div className="flex flex-wrap items-end justify-end gap-3">
+        <h1 className="sr-only">Profit &amp; Loss</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">Period start</div>

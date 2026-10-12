@@ -107,8 +107,12 @@ export function buildPrintHtml(input: PrintReportInput, now: Date = new Date()):
   const amounts = amountColumns(input.headers, rows);
   const dates = input.headers.map(header => DATE_HEADER.test(header));
   const cellClass = (index: number) => amounts[index] ? 'num' : dates[index] ? 'nowrap' : '';
-  const landscape = input.headers.length > 6;
   const running = [company, input.title].filter(Boolean).join(' · ');
+  // The @page rule below sets no `size`: a page that forces portrait or
+  // landscape makes the browser's print dialog take its own Layout choice away.
+  // The company, report name and period are the first row of the table head, so
+  // the browser repeats them at the top of every printed page.
+  const reportHead = `${company ? `<div class="company">${escapeHtml(company)}</div>` : ''}<div class="title">${escapeHtml(input.title)}</div>${input.subtitle ? `<div class="subtitle">${escapeHtml(input.subtitle)}</div>` : ''}`;
 
   const head = input.headers
     .map((header, index) => `<th class="${cellClass(index)}">${escapeHtml(header)}</th>`)
@@ -125,14 +129,13 @@ export function buildPrintHtml(input: PrintReportInput, now: Date = new Date()):
   }).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(running)}</title><style>
-@page { size: ${landscape ? 'landscape' : 'portrait'}; margin: 14mm 12mm 18mm;
-  @bottom-left { content: "${running.replace(/"/g, '\\"')}"; font: 8pt Arial, sans-serif; color: #666; }
+@page { margin: 14mm 12mm 18mm;
   @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt Arial, sans-serif; color: #666; } }
 body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; margin: 0; }
-header { text-align: center; margin-bottom: 14px; }
-header .company { font-size: 16px; font-weight: 700; }
-header .title { font-size: 13px; font-weight: 600; margin-top: 2px; }
-header .subtitle { font-size: 10.5px; color: #444; margin-top: 2px; }
+th.report-head { text-align: center; padding: 0 0 14px; border: 0; text-transform: none; letter-spacing: 0; }
+.company { font-size: 16px; font-weight: 700; }
+.title { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.subtitle { font-size: 10.5px; font-weight: 400; color: #444; margin-top: 2px; }
 table { width: 100%; border-collapse: collapse; }
 thead { display: table-header-group; }
 th { text-align: left; padding: 5px 7px; border-top: 1px solid #111; border-bottom: 1px solid #111; font-size: 9px; text-transform: uppercase; letter-spacing: .03em; }
@@ -144,8 +147,7 @@ tr.total td { font-weight: 700; border-top: 1px solid #111; border-bottom: 1px s
 tr.section td { font-weight: 700; background: #f3f3f3; }
 footer { margin-top: 12px; font-size: 8.5px; color: #666; }
 </style></head><body>
-<header>${company ? `<div class="company">${escapeHtml(company)}</div>` : ''}<div class="title">${escapeHtml(input.title)}</div>${input.subtitle ? `<div class="subtitle">${escapeHtml(input.subtitle)}</div>` : ''}</header>
-<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+<table><thead><tr><th class="report-head" colspan="${input.headers.length}">${reportHead}</th></tr><tr>${head}</tr></thead><tbody>${body}</tbody></table>
 <footer>${escapeHtml(generatedLine(now))}</footer>
 <script>window.onload=function(){window.print()}</script>
 </body></html>`;

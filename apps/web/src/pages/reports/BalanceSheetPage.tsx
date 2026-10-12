@@ -86,16 +86,20 @@ export default function BalanceSheetPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   if (!bizId) return <div>Pick a business.</div>;
 
-  const dlHeaders = ['Section', 'Code', 'Account', 'Amount'];
+  // No Section column: each section is a heading row of its own, as on the page.
+  const dlHeaders = ['Code', 'Account', 'Amount'];
   const dlRows = () => [
-    ...report.asset_lines.map(l => ['Assets', l.account_code, l.account_name, l.amount]),
-    ['Assets', '', 'Total Assets', report.assets_total],
-    ...report.liability_lines.map(l => ['Liabilities', l.account_code, l.account_name, l.amount]),
-    ['Liabilities', '', 'Total Liabilities', report.liabilities_total],
-    ...report.equity_lines.map(l => ['Equity', l.account_code, l.account_name, l.amount]),
-    ['Equity', '—', 'Net Income YTD', report.net_income_ytd],
-    ['Equity', '', 'Total Equity + Net Income', equityPlusNi],
-    ['', '', 'Total Liabilities + Equity', report.liabilities_equity_total],
+    ['', 'Assets', ''],
+    ...report.asset_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ['', 'Total Assets', report.assets_total],
+    ['', 'Liabilities', ''],
+    ...report.liability_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ['', 'Total Liabilities', report.liabilities_total],
+    ['', 'Equity', ''],
+    ...report.equity_lines.map(l => [l.account_code, l.account_name, l.amount]),
+    ['', 'Net Income YTD', report.net_income_ytd],
+    ['', 'Total Equity + Net Income', equityPlusNi],
+    ['', 'Total Liabilities + Equity', report.liabilities_equity_total],
   ];
   function handleExport() {
     setExcelBusy(true);
@@ -108,8 +112,8 @@ export default function BalanceSheetPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Balance Sheet</h1>
+      <div className="flex items-center justify-end">
+        <h1 className="sr-only">Balance Sheet</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">as of</div>

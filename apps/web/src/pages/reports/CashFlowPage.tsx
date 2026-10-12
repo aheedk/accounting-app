@@ -111,8 +111,8 @@ export default function CashFlowPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Cash Activity</h1>
+      <div className="flex flex-wrap items-end justify-end gap-3">
+        <h1 className="sr-only">Cash Activity</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">Period start</div>

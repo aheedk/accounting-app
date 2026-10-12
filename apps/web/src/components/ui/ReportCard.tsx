@@ -3,6 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 
 // QBO-style report frame: centered company name / report title / as-of line,
 // report body (usually a table), and a centered generated-at footer.
+// This is the one visible title of a report page: the page's own <h1> is
+// `sr-only` there, so the report is not named twice.
 export function ReportCard({
   companyName,
   title,

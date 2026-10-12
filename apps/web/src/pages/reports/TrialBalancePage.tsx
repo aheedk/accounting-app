@@ -97,8 +97,8 @@ export default function TrialBalancePage() {
   if (!bizId) return <div>Pick a business.</div>;
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Trial Balance</h1>
+      <div className="flex flex-wrap items-end justify-end gap-3">
+        <h1 className="sr-only">Trial Balance</h1>
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <div className="mb-1 text-xs text-muted-foreground">as of</div>
