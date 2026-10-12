@@ -152,7 +152,7 @@ export default function ReconcilePage() {
           <CardContent className="grid grid-cols-3 gap-4">
             <div>
               <Label>Beginning balance</Label>
-              <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-mono">
+              <div className="flex h-10 items-center text-sm font-mono">
                 {fmtMoney(beginningBalance)}
               </div>
             </div>
