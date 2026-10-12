@@ -20,3 +20,17 @@ export function statementBankAccounts<T extends AccountOption>(
   const selected = assets.find(a => a.id === selectedId);
   return selected && !banks.includes(selected) ? [...banks, selected] : banks;
 }
+
+/**
+ * What an expense can be paid from: the bank accounts, then the credit cards.
+ * The account already on the expense always stays listed, whatever it is.
+ */
+export function expensePaymentAccounts<T extends AccountOption>(
+  accounts: T[], bankingAccountIds: ReadonlySet<string>, selectedId: string,
+): T[] {
+  const banks = statementBankAccounts(accounts, bankingAccountIds, selectedId);
+  const cards = accounts.filter(a => a.account_type === 'liability' && a.detail_type === 'Credit Card');
+  const listed = [...banks, ...cards];
+  const selected = accounts.find(a => a.id === selectedId);
+  return selected && !listed.includes(selected) ? [...listed, selected] : listed;
+}

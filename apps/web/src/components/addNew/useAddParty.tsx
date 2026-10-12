@@ -26,9 +26,10 @@ export function useAddParty<T extends Party>(kind: PartyKind, onCreated: (party:
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function open(pick?: (id: string) => void) {
+  /** `initialName`: what was already typed into the dropdown, so it is not typed twice. */
+  function open(pick?: (id: string) => void, initialName = '') {
     setOnPick(() => pick ?? null);
-    setName('');
+    setName(initialName);
     setEmail('');
     setError(null);
     setIsOpen(true);

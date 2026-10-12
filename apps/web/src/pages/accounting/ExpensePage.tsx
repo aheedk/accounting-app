@@ -13,6 +13,11 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
+import { CloseFormButton } from '@/components/ui/CloseFormButton';
+import { expensePaymentAccounts } from '@/lib/bankAccountOptions';
+import { recallAccount, rememberAccount } from '@/lib/lastUsedAccount';
+import { useCloseForm } from '@/lib/useCloseForm';
 import { AppSelect } from '@/components/ui/select';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
@@ -52,6 +57,7 @@ type ExpenseDetail = {
 };
 
 type RecentExpense = { id: string; transaction_date: string; payee_name: string | null; total_amount: string };
+type PaymentAccount = AccountLike & { detail_type?: string | null };
 
 const PAYMENT_METHODS: Array<{ value: string; label: string }> = [
   { value: 'cash', label: 'Cash' },
@@ -313,7 +319,9 @@ export default function ExpensePage() {
   const { user, businesses } = useAuth();
   const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
 
-  const [accounts, setAccounts] = useState<AccountLike[]>([]);
+  const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
+  // The chart accounts set up under Banking; they count as banks whatever their detail type.
+  const [bankingIds, setBankingIds] = useState<ReadonlySet<string>>(new Set());
   const [parties, setParties] = useState<Party[]>([]);
   const [bookBalance, setBookBalance] = useState<string | null>(null);
   const [expense, setExpense] = useState<ExpenseDetail | null>(null);
@@ -341,7 +349,9 @@ export default function ExpensePage() {
 
   const attachments = useAttachments('expense_transaction', isNew ? null : (id ?? null));
 
-  const paymentAccounts = accounts.filter(a => a.account_type === 'asset' || a.account_type === 'liability');
+  // An expense is paid from a bank account or a credit card, not from any account in the chart.
+  const paymentAccounts = expensePaymentAccounts(accounts, bankingIds, paymentAccountId);
+  const close = useCloseForm('/accounting/expense-transactions');
   // Any account can be a category, but expenses are what you usually want, so they lead
   // (the list was opening on Cash on Hand with the expense accounts 25 rows down).
   const categoryAccounts = [
@@ -355,12 +365,15 @@ export default function ExpensePage() {
 
   const load = useCallback(async () => {
     if (!bizId) return;
-    const [coaData, custData, vendData] = await Promise.all([
-      cachedGet<{ accounts: AccountLike[] }>(`/businesses/${bizId}/coa`),
+    const [coaData, custData, vendData, bankData] = await Promise.all([
+      cachedGet<{ accounts: PaymentAccount[] }>(`/businesses/${bizId}/coa`),
       cachedGet<{ customers: Array<{ id: string; name: string }> }>(`/businesses/${bizId}/customers`),
       cachedGet<{ vendors: Array<{ id: string; name: string }> }>(`/businesses/${bizId}/vendors`),
+      cachedGet<{ bank_accounts: Array<{ cash_account_id: string }> }>(`/businesses/${bizId}/bank-accounts`),
     ]);
+    const banking = new Set((bankData?.bank_accounts ?? []).map(b => b.cash_account_id));
     setAccounts(coaData?.accounts ?? []);
+    setBankingIds(banking);
     setParties([
       ...(vendData?.vendors ?? []).map(v => ({ id: v.id, type: 'vendor' as const, name: v.name })),
       ...(custData?.customers ?? []).map(c => ({ id: c.id, type: 'customer' as const, name: c.name })),
@@ -385,6 +398,9 @@ export default function ExpensePage() {
       // From a vendor's "Create expense" action: pre-select them as payee.
       const vendorId = searchParams.get('vendor_id');
       if (vendorId) { setPayeeId(vendorId); setPayeeType('vendor'); setPayeeText(''); }
+      // Start on the account the last expense was paid from (a copied draft keeps its own).
+      const remembered = recallAccount(bizId, 'expense', expensePaymentAccounts(coaData?.accounts ?? [], banking, ''));
+      if (remembered) setPaymentAccountId(current => current || remembered);
     }
   }, [bizId, id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -425,6 +441,16 @@ export default function ExpensePage() {
     setPayeeType('');
     setPayeeText(text);
   }
+
+  // "Add vendor" / "Add customer" under the payee list: the new one becomes the payee.
+  function partyCreated(type: Party['type'], created: { id: string; name: string }) {
+    const party: Party = { id: created.id, type, name: created.name };
+    setParties(prev => [...prev, party]);
+    if (bizId) invalidateReferenceCache(`/businesses/${bizId}/${type === 'vendor' ? 'vendors' : 'customers'}`);
+    pickParty(party);
+  }
+  const addVendor = useAddParty<{ id: string; name: string }>('vendor', created => partyCreated('vendor', created));
+  const addCustomer = useAddParty<{ id: string; name: string }>('customer', created => partyCreated('customer', created));
 
   function updateLine(idx: number, field: keyof ExpenseLine, value: string) {
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
@@ -471,21 +497,25 @@ export default function ExpensePage() {
 
       if (isNew) {
         const res = await api.post<{ id: string }>(`/businesses/${bizId}/expense-transactions`, body);
+        rememberAccount(bizId, 'expense', paymentAccountId);
         const failedAttach = await attachments.attachTo(res.data.id);
         if (after === 'new') {
           attachments.reset();
           setExpense(null);
           setPayeeId(''); setPayeeType(''); setPayeeText('');
-          setPaymentAccountId(''); setTransactionDate(todayLocal()); setPaymentMethod('cash');
+          // The payment account stays: the next expense is usually paid from the same one.
+          setTransactionDate(todayLocal()); setPaymentMethod('cash');
           setReference(''); setMemo(''); setLines([emptyLine(0), emptyLine(1)]);
           if (failedAttach) setErr(failedAttach);
         } else {
-          nav(`/accounting/expenses/${res.data.id}`);
+          // Replace: Back from the saved expense should not land on the empty form it came from.
+          nav(`/accounting/expenses/${res.data.id}`, { replace: true });
         }
       } else {
         await api.patch(`/businesses/${bizId}/expense-transactions/${id}`, body);
+        rememberAccount(bizId, 'expense', paymentAccountId);
         invalidateReferenceCache(`/businesses/${bizId}/coa/${paymentAccountId}`);
-        if (after === 'close') nav('/accounting/expense-transactions');
+        if (after === 'close') close();
         else if (after === 'new') nav('/accounting/expenses/new');
         else await Promise.all([load(), loadBookBalance()]);
       }
@@ -644,6 +674,7 @@ export default function ExpensePage() {
             Reconciled
           </span>
         )}
+        <CloseFormButton onClose={close} />
       </div>
 
       {expense?.is_reconciled && canEdit && (
@@ -665,6 +696,7 @@ export default function ExpensePage() {
               onTextChange={changePayeeText}
               disabled={!canEdit}
               className="w-56"
+              {...(canEdit ? { onAddNew: (kind: Party['type'], typed: string) => (kind === 'vendor' ? addVendor : addCustomer).open(undefined, typed) } : {})}
             />
           </div>
           <div>
@@ -806,7 +838,7 @@ export default function ExpensePage() {
 
       {/* ── Sticky bottom bar ── */}
       <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
-        <Button type="button" variant="outline" onClick={() => nav('/accounting/expense-transactions')}>
+        <Button type="button" variant="outline" onClick={close}>
           Cancel
         </Button>
 
@@ -905,6 +937,8 @@ export default function ExpensePage() {
       </div>
 
       {addAccount.drawer}
+      {addVendor.dialog}
+      {addCustomer.dialog}
 
       {recurringOpen && bizId && (
         <RecurringDialog

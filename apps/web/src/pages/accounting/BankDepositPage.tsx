@@ -12,6 +12,11 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
 import { AppSelect } from '@/components/ui/select';
+import { ComboInput } from '@/components/ui/ComboInput';
+import { CloseFormButton } from '@/components/ui/CloseFormButton';
+import { useAddParty } from '@/components/addNew/useAddParty';
+import { recallAccount, rememberAccount } from '@/lib/lastUsedAccount';
+import { useCloseForm } from '@/lib/useCloseForm';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { AuditHistoryModal } from '@/components/AuditHistoryModal';
 import { fmtMoney } from '@/lib/money';
@@ -321,6 +326,7 @@ export default function BankDepositPage() {
   const isNew = !id || id === 'new';
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const close = useCloseForm('/accounting/bank-deposits');
   const { user, businesses } = useAuth();
   const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
 
@@ -374,11 +380,15 @@ export default function BankDepositPage() {
     setBankAccounts(bas);
     setAccounts(coaData?.accounts ?? []);
     setUndepositedPayments(Array.isArray(upRes.data) ? upRes.data : []);
-    setContactNames([
+    // One list of names: a customer and a vendor can share one.
+    setContactNames([...new Set([
       ...(custData?.customers ?? []).map(c => c.name),
       ...(vendData?.vendors ?? []).map(v => v.name),
-    ]);
-    if (bas.length > 0 && !bankAccountId && !copiedFrom.current) setBankAccountId(bas[0]!.id);
+    ])]);
+    // Start on the bank the last deposit went into, or the only one there is.
+    if (bas.length > 0 && !bankAccountId && !copiedFrom.current) {
+      setBankAccountId(recallAccount(bizId, 'bank_deposit', bas) || bas[0]!.id);
+    }
 
     if (!isNew && id) {
       const res = await api.get<DepositDetail>(`/businesses/${bizId}/bank-deposits/${id}`);
@@ -476,6 +486,14 @@ export default function BankDepositPage() {
   function updateLine(idx: number, field: keyof OtherFundsLine, value: string) {
     setOtherLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
   }
+
+  // "Add new customer" under the Received from list: the new name goes on the line it was opened from.
+  const addCustomerLine = useRef<number | null>(null);
+  const addCustomer = useAddParty<{ id: string; name: string }>('customer', created => {
+    setContactNames(prev => (prev.includes(created.name) ? prev : [...prev, created.name]));
+    if (bizId) invalidateReferenceCache(`/businesses/${bizId}/customers`);
+    if (addCustomerLine.current !== null) updateLine(addCustomerLine.current, 'received_from', created.name);
+  });
   function removeLine(idx: number) {
     setOtherLines(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx));
   }
@@ -551,12 +569,14 @@ export default function BankDepositPage() {
           ...cashBack,
         };
         const res = await api.post<{ id: string }>(`/businesses/${bizId}/bank-deposits`, body);
+        rememberAccount(bizId, 'bank_deposit', bankAccountId);
         invalidateReferenceCache(`/businesses/${bizId}/bank-accounts/${bankAccountId}`);
         // Files added before the deposit existed are uploaded now that it has an id.
         const failedAttach = await attachments.attachTo(res.data.id);
         attachments.reset();
         if (failedAttach) setErr(failedAttach);
-        nav(`/accounting/bank-deposits/${res.data.id}`);
+        // Replace: Back from the saved deposit should not land on the empty form it came from.
+        nav(`/accounting/bank-deposits/${res.data.id}`, { replace: true });
       } else {
         const body = {
           bank_account_id: bankAccountId,
@@ -566,6 +586,7 @@ export default function BankDepositPage() {
           ...cashBack,
         };
         await api.patch(`/businesses/${bizId}/bank-deposits/${id}`, body);
+        rememberAccount(bizId, 'bank_deposit', bankAccountId);
         invalidateReferenceCache(`/businesses/${bizId}/bank-accounts/${bankAccountId}`);
         await Promise.all([load(), loadBookBalance()]);
       }
@@ -739,6 +760,7 @@ export default function BankDepositPage() {
             Reconciled
           </span>
         )}
+        <CloseFormButton onClose={close} />
       </div>
 
       {deposit?.is_reconciled && canEdit && (
@@ -884,13 +906,15 @@ export default function BankDepositPage() {
                   <tr key={line.id} className="group border-b transition-colors hover:bg-muted/40">
                     <td className="px-2 py-1.5 text-xs text-muted-foreground">{idx + 1}</td>
                     <td className="px-2 py-1.5">
-                      <Input
+                      <ComboInput
                         value={line.received_from}
-                        onChange={e => updateLine(idx, 'received_from', e.target.value)}
+                        onChange={value => updateLine(idx, 'received_from', value)}
+                        options={contactNames}
                         disabled={!canEdit}
-                        list="deposit-contacts"
                         placeholder="Search customer or vendor…"
                         className="w-full"
+                        addNewLabel="Add new customer"
+                        {...(canEdit ? { onAddNew: () => { addCustomerLine.current = idx; addCustomer.open(undefined, contactNames.includes(line.received_from) ? '' : line.received_from.trim()); } } : {})}
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -1043,7 +1067,7 @@ export default function BankDepositPage() {
 
       {/* ── Sticky bottom bar ── */}
       <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
-        <Button type="button" variant="outline" onClick={() => nav('/accounting/bank-transactions')}>
+        <Button type="button" variant="outline" onClick={close}>
           Cancel
         </Button>
 
@@ -1205,9 +1229,7 @@ export default function BankDepositPage() {
         />
       )}
 
-      <datalist id="deposit-contacts">
-        {contactNames.map(name => <option key={name} value={name} />)}
-      </datalist>
+      {addCustomer.dialog}
     </div>
   );
 }

@@ -13,6 +13,10 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { DateInput } from '@/components/ui/date-input';
 import { AccountSelect, type AccountLike } from '@/components/ui/AccountSelect';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { useAddParty } from '@/components/addNew/useAddParty';
+import { CloseFormButton } from '@/components/ui/CloseFormButton';
+import { recallAccount, rememberAccount } from '@/lib/lastUsedAccount';
+import { useCloseForm } from '@/lib/useCloseForm';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
@@ -340,6 +344,9 @@ export default function CheckPage() {
   const [paymentDate, setPaymentDate] = useState(todayLocal());
   const [checkNumber, setCheckNumber] = useState('');
   const [checkNumberEdited, setCheckNumberEdited] = useState(false);
+  // Bumped after "Save and new" so the next number is fetched again for the same bank.
+  const [numberRefresh, setNumberRefresh] = useState(0);
+  const close = useCloseForm('/accounting/checks');
   const [printLater, setPrintLater] = useState(false);
   const [memo, setMemo] = useState('');
   const [lines, setLines] = useState<CheckLine[]>([emptyLine(0), emptyLine(1)]);
@@ -409,6 +416,9 @@ export default function CheckPage() {
         const vendor = (vendData?.vendors ?? []).find(v => v.id === vendorId);
         if (vendor) setMailingAddress(fmtAddress(vendor.billing_address));
       }
+      // Start on the bank the last check was written from (a copied draft keeps its own).
+      const remembered = recallAccount(bizId, 'check', bankData?.bank_accounts ?? []);
+      if (remembered) setBankAccountId(current => current || remembered);
     }
   }, [bizId, id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -434,7 +444,7 @@ export default function CheckPage() {
     api.get<{ check_number: string }>(`/businesses/${bizId}/checks/next-number`, { params: { bank_account_id: bankAccountId } })
       .then(r => setCheckNumber(r.data.check_number))
       .catch(() => {});
-  }, [isNew, bizId, bankAccountId, checkNumberEdited]);
+  }, [isNew, bizId, bankAccountId, checkNumberEdited, numberRefresh]);
 
   async function toggleRecent() {
     if (recentOpen) { setRecentOpen(false); return; }
@@ -473,6 +483,17 @@ export default function CheckPage() {
     setPayeeType('');
     setPayeeText(text);
   }
+
+  // "Add vendor" / "Add customer" under the payee list: the new one becomes the payee.
+  function partyCreated(type: Party['type'], created: { id: string; name: string }) {
+    const party: Party = { id: created.id, type, name: created.name };
+    setParties(prev => [...prev, party]);
+    if (type === 'vendor') setVendors(prev => [...prev, { id: created.id, name: created.name, billing_address: null }]);
+    if (bizId) invalidateReferenceCache(`/businesses/${bizId}/${type === 'vendor' ? 'vendors' : 'customers'}`);
+    pickParty(party);
+  }
+  const addVendor = useAddParty<{ id: string; name: string }>('vendor', created => partyCreated('vendor', created));
+  const addCustomer = useAddParty<{ id: string; name: string }>('customer', created => partyCreated('customer', created));
 
   function updateLine(idx: number, field: keyof CheckLine, value: string) {
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
@@ -536,21 +557,26 @@ export default function CheckPage() {
 
       if (isNew) {
         const res = await api.post<{ id: string }>(`/businesses/${bizId}/checks`, body);
+        rememberAccount(bizId, 'check', bankAccountId);
         const failedAttach = await attachments.attachTo(res.data.id);
         if (after === 'new') {
           attachments.reset();
           setCheck(null);
           setPayeeId(''); setPayeeType(''); setPayeeText(''); setMailingAddress('');
-          setBankAccountId(''); setPaymentDate(todayLocal()); setCheckNumber(''); setCheckNumberEdited(false);
+          // The bank stays: ten checks in a row are written from the same account.
+          setPaymentDate(todayLocal()); setCheckNumber(''); setCheckNumberEdited(false);
+          setNumberRefresh(current => current + 1);
           setPrintLater(false); setMemo(''); setLines([emptyLine(0), emptyLine(1)]);
           if (failedAttach) setErr(failedAttach);
         } else {
-          nav(`/accounting/checks/${res.data.id}`);
+          // Replace: Back from the saved check should not land on the empty form it came from.
+          nav(`/accounting/checks/${res.data.id}`, { replace: true });
         }
       } else {
         await api.patch(`/businesses/${bizId}/checks/${id}`, body);
+        rememberAccount(bizId, 'check', bankAccountId);
         invalidateReferenceCache(`/businesses/${bizId}/bank-accounts/${bankAccountId}`);
-        if (after === 'close') nav('/accounting/checks');
+        if (after === 'close') close();
         else if (after === 'new') nav('/accounting/checks/new');
         else await Promise.all([load(), loadBookBalance()]);
       }
@@ -718,6 +744,7 @@ export default function CheckPage() {
             Reconciled
           </span>
         )}
+        <CloseFormButton onClose={close} />
       </div>
 
       {check?.is_reconciled && canEdit && (
@@ -739,6 +766,7 @@ export default function CheckPage() {
               onTextChange={changePayeeText}
               disabled={!canEdit}
               className="w-56"
+              {...(canEdit ? { onAddNew: (kind: Party['type'], typed: string) => (kind === 'vendor' ? addVendor : addCustomer).open(undefined, typed) } : {})}
             />
             <label className="mb-1 mt-4 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Mailing address</label>
             <textarea
@@ -922,7 +950,7 @@ export default function CheckPage() {
 
       {/* ── Sticky bottom bar ── */}
       <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-3 border-t bg-background px-6 py-3">
-        <Button type="button" variant="outline" onClick={() => nav('/accounting/checks')}>
+        <Button type="button" variant="outline" onClick={close}>
           Cancel
         </Button>
         {canEdit && (
@@ -1043,6 +1071,8 @@ export default function CheckPage() {
       </div>
 
       {addAccount.drawer}
+      {addVendor.dialog}
+      {addCustomer.dialog}
 
       {recurringOpen && bizId && (
         <RecurringDialog

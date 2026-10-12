@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 export interface ComboInputProps {
@@ -28,6 +29,8 @@ export function ComboInput({
   const [open, setOpen] = React.useState(false);
   const [activeIdx, setActiveIdx] = React.useState(-1);
   const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = React.useState({ top: 0, left: 0, width: 0 });
   const listRef = React.useRef<HTMLUListElement>(null);
 
   const filtered = React.useMemo(() => {
@@ -41,7 +44,9 @@ export function ComboInput({
   React.useEffect(() => {
     if (!open) return;
     function onMouseDown(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
@@ -81,6 +86,14 @@ export function ComboInput({
 
   const showMenu = open && !disabled && (filtered.length > 0 || onAddNew !== undefined);
 
+  // The menu is drawn over the page (fixed, in a portal) so a table that scrolls
+  // sideways does not cut it off. Measured as it opens, like PartySelect.
+  React.useLayoutEffect(() => {
+    if (!showMenu) return;
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (rect) setMenuPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, [showMenu, filtered.length]);
+
   return (
     <div ref={wrapperRef} className={cn('relative', className)}>
       <input
@@ -105,8 +118,12 @@ export function ComboInput({
         )}
       />
       <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">▾</span>
-      {showMenu && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-md border bg-background shadow-md">
+      {showMenu && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: menuPosition.width, zIndex: 9999 }}
+          className="overflow-hidden rounded-md border bg-background shadow-md"
+        >
           {filtered.length > 0 && (
             <ul ref={listRef} role="listbox" className="max-h-60 overflow-auto py-1">
               {filtered.map((option, i) => (
@@ -140,7 +157,8 @@ export function ComboInput({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

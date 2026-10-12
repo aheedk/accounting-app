@@ -12,6 +12,8 @@ export interface PartySelectProps {
   text: string;
   onPick: (party: Party) => void;
   onTextChange: (text: string) => void;
+  /** Shows "Add vendor" and "Add customer" pinned under the list. `typed` is the text in the box. */
+  onAddNew?: (kind: Party['type'], typed: string) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -25,7 +27,7 @@ export interface PartySelectProps {
  * be an unregistered name (payee_text) as well as a real vendor or customer.
  */
 export function PartySelect({
-  parties, value, text, onPick, onTextChange, placeholder = 'Search vendor or customer…',
+  parties, value, text, onPick, onTextChange, onAddNew, placeholder = 'Search vendor or customer…',
   disabled, className, id,
 }: PartySelectProps) {
   const [open, setOpen] = React.useState(false);
@@ -124,6 +126,21 @@ export function PartySelect({
               </ul>
             )}
           </div>
+          {onAddNew && (
+            <div className="flex gap-1 border-t p-1">
+              {(['vendor', 'customer'] as const).map(kind => (
+                <button
+                  key={kind}
+                  type="button"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setOpen(false); onAddNew(kind, selected ? '' : text.trim()); }}
+                  className="flex-1 rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                >
+                  Add {kind}
+                </button>
+              ))}
+            </div>
+          )}
         </div>,
         document.body,
       )
