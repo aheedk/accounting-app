@@ -298,3 +298,23 @@ export async function generalLedger(
     totals: { total_debit: reportDebit, total_credit: reportCredit },
   };
 }
+
+/**
+ * One account's full history as a flat, chronological register (a
+ * checkbook-style view), reusing the General Ledger's own line-level data —
+ * type label, payee, memo, debit/credit, running balance, reconciled flag,
+ * voided state and the transaction's own edit page — just widened to every
+ * date ever posted and unwrapped from the per-account report shape.
+ */
+export async function accountRegister(
+  db: Kysely<DB>, q: { business_id: string; account_id: string },
+): Promise<{ account: GeneralLedgerAccount | null; lines: GeneralLedgerLine[] }> {
+  const report = await generalLedger(db, {
+    business_id: q.business_id,
+    period_start: '1900-01-01',
+    period_end: '2999-12-31',
+    account_id: q.account_id,
+  });
+  const account = report.accounts[0] ?? null;
+  return { account, lines: account?.lines ?? [] };
+}

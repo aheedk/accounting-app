@@ -494,7 +494,7 @@ export async function saveProgress(
  * row posts as a plain journal entry instead (see startReconciliation), so
  * that one case is resolved by checking which table actually has the row. */
 async function resolveItemTable(
-  trx: Transaction<DB>, type: ReconciliationItemType, transaction_id: string,
+  trx: Kysely<DB> | Transaction<DB>, type: ReconciliationItemType, transaction_id: string,
 ): Promise<'bank_deposits' | 'expense_transactions' | 'checks' | 'journal_entries'> {
   if (type === 'check') return 'checks';
   if (type === 'journal_entry') return 'journal_entries';
@@ -502,6 +502,11 @@ async function resolveItemTable(
   const dep = await trx.selectFrom('bank_deposits').select('id').where('id', '=', transaction_id).executeTakeFirst();
   return dep ? 'bank_deposits' : 'journal_entries';
 }
+
+const ENTITY_TYPE_FOR_TABLE: Record<'bank_deposits' | 'expense_transactions' | 'checks' | 'journal_entries', string> = {
+  bank_deposits: 'bank_deposit', expense_transactions: 'expense_transaction', checks: 'check', journal_entries: 'journal_entry',
+};
+const UPDATE_ACTIONS = ['expense_transaction.update', 'check.update', 'bank_deposit.update', 'journal_entry.update'];
 
 export async function finishReconciliation(
   trx: Transaction<DB>, ctx: ServiceCtx,
@@ -646,23 +651,76 @@ export async function cancelReconciliation(trx: Transaction<DB>, ctx: ServiceCtx
 }
 
 export async function listHistory(db: Kysely<DB>, ctx: ServiceCtx, q: { account_id?: string }) {
+  const bizId = ctx.business_id!;
   let query = db.selectFrom('reconciliations as r')
     .leftJoin('users as u', 'u.id', 'r.completed_by_user_id')
     .leftJoin('chart_of_accounts as a', 'a.id', 'r.account_id')
-    .select(['r.id', 'r.account_id', 'a.code as account_code', 'a.name as account_name', 'r.statement_ending_date', 'r.statement_ending_balance', 'r.difference', 'r.status', 'r.completed_at', 'u.full_name as completed_by'])
-    .where('r.business_id', '=', ctx.business_id!)
+    .select([
+      'r.id', 'r.account_id', 'a.code as account_code', 'a.name as account_name',
+      'a.account_type', 'a.detail_type', 'r.statement_ending_date', 'r.statement_ending_balance',
+      'r.difference', 'r.adjustment_journal_entry_id', 'r.status', 'r.completed_at', 'u.full_name as completed_by',
+    ])
+    .where('r.business_id', '=', bizId)
     .where('r.status', 'in', ['completed', 'cancelled']);
   if (q.account_id) query = query.where('r.account_id', '=', q.account_id);
   const rows = await query.orderBy('r.statement_ending_date', 'desc').execute();
   if (rows.length === 0) return [];
-  const counts = await db.selectFrom('reconciliation_items')
-    .select(['reconciliation_id', ({ fn }) => fn.countAll<string>().as('count')])
+
+  const bankRows = await db.selectFrom('bank_accounts').select('cash_account_id')
+    .where('business_id', '=', bizId).where('deleted_at', 'is', null).execute();
+  const bankSet = new Set(bankRows.map(b => b.cash_account_id));
+
+  const items = await db.selectFrom('reconciliation_items').selectAll()
     .where('reconciliation_id', 'in', rows.map(r => r.id))
     .where('is_cleared', '=', true)
-    .groupBy('reconciliation_id')
     .execute();
-  const countMap = new Map(counts.map(c => [c.reconciliation_id, Number(c.count)]));
-  return rows.map(r => ({ ...r, items_cleared: countMap.get(r.id) ?? 0 }));
+  const itemsByRecon = new Map<string, typeof items>();
+  for (const item of items) {
+    const list = itemsByRecon.get(item.reconciliation_id) ?? [];
+    list.push(item);
+    itemsByRecon.set(item.reconciliation_id, list);
+  }
+
+  // "Changes": how many of a reconciliation's cleared transactions were
+  // edited afterward — one audit-log sweep for every item across every row,
+  // matched back by (entity_type, entity_id) to whichever reconciliation
+  // actually reconciled it (a row can only be cleared by one at a time).
+  const changesCount = new Map<string, number>();
+  if (items.length > 0) {
+    const resolvedByKey = new Map<string, { entity_type: string; reconciliation_id: string; completed_at_ms: number | null }>();
+    for (const item of items) {
+      const table = await resolveItemTable(db, item.transaction_type, item.transaction_id);
+      const completedAt = rows.find(r => r.id === item.reconciliation_id)?.completed_at;
+      resolvedByKey.set(`${table}:${item.transaction_id}`, {
+        entity_type: ENTITY_TYPE_FOR_TABLE[table],
+        reconciliation_id: item.reconciliation_id,
+        completed_at_ms: completedAt ? new Date(completedAt as unknown as string).getTime() : null,
+      });
+    }
+    const entityIds = [...new Set(items.map(i => i.transaction_id))];
+    const logs = await db.selectFrom('audit_logs')
+      .select(['entity_type', 'entity_id', 'created_at'])
+      .where('business_id', '=', bizId)
+      .where('entity_id', 'in', entityIds)
+      .where('action', 'in', UPDATE_ACTIONS)
+      .execute();
+    for (const log of logs) {
+      if (!log.entity_id) continue;
+      for (const [key, resolved] of resolvedByKey) {
+        if (!key.endsWith(`:${log.entity_id}`) || resolved.entity_type !== log.entity_type) continue;
+        if (resolved.completed_at_ms === null || new Date(log.created_at as unknown as string).getTime() <= resolved.completed_at_ms) continue;
+        changesCount.set(resolved.reconciliation_id, (changesCount.get(resolved.reconciliation_id) ?? 0) + 1);
+      }
+    }
+  }
+
+  return rows.map(r => ({
+    ...r,
+    category: reconcilableCategory({ account_type: r.account_type ?? 'asset', detail_type: r.detail_type }, bankSet.has(r.account_id)),
+    items_cleared: itemsByRecon.get(r.id)?.length ?? 0,
+    changes: changesCount.get(r.id) ?? 0,
+    auto_adjustment: r.adjustment_journal_entry_id ? r.difference : null,
+  }));
 }
 
 export async function getReconciliationDetail(db: Kysely<DB>, ctx: ServiceCtx, id: string) {

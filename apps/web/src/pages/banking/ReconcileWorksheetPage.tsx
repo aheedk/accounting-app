@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { ReconcileNav } from './ReconcileNav';
 
 type ItemType = 'deposit' | 'expense' | 'check' | 'journal_entry' | 'service_charge' | 'interest';
 
@@ -190,7 +191,10 @@ export default function ReconcileWorksheetPage() {
           <h1 className="text-2xl font-semibold">Reconcile — {data.account.name}</h1>
           <p className="text-sm text-muted-foreground">Statement ending {fmtShortDate(data.reconciliation.statement_ending_date)}</p>
         </div>
-        <Link to="/accounting/reconcile" className="text-sm text-primary underline">Back to Reconcile</Link>
+        <div className="flex items-center gap-4">
+          <Link to="/accounting/reconcile" className="text-sm text-primary underline">Back to Reconcile</Link>
+          <ReconcileNav active="setup" accountId={data.account.id} />
+        </div>
       </div>
 
       {err && <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div>}

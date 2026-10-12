@@ -89,4 +89,14 @@ router.get('/businesses/:businessId/reports/general-ledger', async (req: Request
   } catch (e) { next(e); }
 });
 
+router.get('/businesses/:businessId/reports/register/:accountId', async (req: Request, res, next) => {
+  try {
+    const register = await gl.accountRegister(db, {
+      business_id: req.tenancy!.business_id,
+      account_id: req.params['accountId']!,
+    });
+    res.json(register);
+  } catch (e) { next(e); }
+});
+
 export default router;

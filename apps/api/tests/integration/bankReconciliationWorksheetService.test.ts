@@ -239,4 +239,34 @@ describe('bank reconciliation worksheet', () => {
     const paymentRow = await t.db.selectFrom('expense_transactions').selectAll().where('id', '=', payment.id).executeTakeFirstOrThrow();
     expect(paymentRow.reconciliation_status).toBe('unreconciled');
   });
+
+  it('history reports the account category and counts a post-reconciliation edit as a change', async () => {
+    const d = await setup(t);
+    const expense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-05', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '100.00' }],
+    }));
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '-100.00', statement_ending_date: '2026-03-31',
+    }));
+    await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
+      { transaction_type: 'expense', transaction_id: expense.id, is_cleared: true },
+    ]));
+    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+
+    const beforeEdit = await recon.listHistory(t.db, d.ctx, {});
+    const row = beforeEdit.find(r => r.id === started.id)!;
+    expect(row.category).toBe('Bank');
+    expect(row.changes).toBe(0);
+    expect(row.auto_adjustment).toBeNull();
+
+    // Editing the now-reconciled expense (allowed for an accountant) should count as a change.
+    await t.db.transaction().execute(trx => expenseSvc.updateExpense(trx, d.ctx, expense.id, {
+      transaction_date: '2026-03-05', payee_text: 'Staples Inc', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '100.00' }],
+    }));
+
+    const afterEdit = await recon.listHistory(t.db, d.ctx, {});
+    expect(afterEdit.find(r => r.id === started.id)!.changes).toBe(1);
+  });
 });

@@ -1,42 +1,34 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ChevronDown, ChevronLeft } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
+import { AppSelect } from '@/components/ui/select';
+import { pickErr } from '@/lib/apiErrors';
 
-type Account = { id: string; code: string; name: string; account_type: string; is_active: boolean };
+type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
-type RegisterEntry = {
-  id: string;
+type RegisterLine = {
   journal_entry_id: string;
+  line_id: string;
   entry_date: string;
-  reference: string | null;
-  source_type: string;
-  entry_memo: string | null;
-  line_memo: string | null;
+  transaction_label: string;
+  num: string | null;
+  name: string | null;
+  transaction_path: string;
+  memo: string | null;
+  split_account: string | null;
+  status: 'posted' | 'voided';
   debit: string;
   credit: string;
-  counter_account: string;
   running_balance: string;
-  status: string;
+  is_reconciled: boolean;
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  manual: 'Journal Entry',
-  invoice: 'Invoice',
-  payment: 'Payment',
-  bill: 'Bill',
-  bill_payment: 'Bill Payment',
-  expense: 'Expense',
-  vendor_credit: 'Vendor Credit',
-  transfer: 'Transfer',
-  bank_import: 'Bank Import',
-  reversal: 'Reversal',
-  adjustment: 'Adjustment',
-  payroll: 'Payroll',
-  opening_balance: 'Opening Balance',
-};
+type RegisterAccount = { account_id: string; account_code: string; account_name: string; ending_balance: string };
+
+const PAGE_SIZE = 50;
 
 function fmtDate(iso: string) {
   const [y, m, d] = iso.split('-');
@@ -44,68 +36,77 @@ function fmtDate(iso: string) {
 }
 
 export default function AccountRegisterPage() {
-  const { accountId } = useParams<{ accountId: string }>();
+  const params = useParams<{ accountId?: string }>();
+  const [searchParams] = useSearchParams();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const [account, setAccount] = useState<Account | null>(null);
-  const [entries, setEntries] = useState<RegisterEntry[]>([]);
-  const [balance, setBalance] = useState('0');
+
+  const [reconcilableAccounts, setReconcilableAccounts] = useState<ReconcilableAccount[]>([]);
+  const [accountId, setAccountId] = useState<string>('');
+  const [account, setAccount] = useState<RegisterAccount | null>(null);
+  const [lines, setLines] = useState<RegisterLine[]>([]);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+
+  // The URL :accountId param (the old /coa/:id/register links) or ?accountId=
+  // (the new /accounting/register?accountId= links) wins on first load; after
+  // that the page's own dropdown drives it.
+  useEffect(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}/bank-rec/accounts`).then(r => {
+      const list: ReconcilableAccount[] = r.data.accounts;
+      setReconcilableAccounts(list);
+      setAccountId(prev => {
+        if (prev && list.some(a => a.id === prev)) return prev;
+        const requested = params.accountId ?? searchParams.get('accountId');
+        if (requested && list.some(a => a.id === requested)) return requested;
+        return list[0]?.id ?? '';
+      });
+    }).catch((e: unknown) => setErr(pickErr(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when the business changes
+  }, [bizId]);
 
   useEffect(() => {
     if (!bizId || !accountId) return;
     setLoading(true);
-    api.get(`/businesses/${bizId}/coa/${accountId}/register`)
+    setErr(null);
+    setPage(0);
+    api.get(`/businesses/${bizId}/reports/register/${accountId}`)
       .then(r => {
         setAccount(r.data.account);
-        if (Array.isArray(r.data.entries)) {
-          // Deployed shape: newest-first entries + raw-sign running balance.
-          setEntries(r.data.entries);
-          setBalance(r.data.balance);
-        } else if (Array.isArray(r.data.rows)) {
-          // Unified-API shape ({ rows ascending, ending_balance, natural-sign
-          // balances }): adapt so this page renders either deployment.
-          type UnifiedRow = {
-            journal_entry_id: string; line_id: string; entry_date: string;
-            reference: string | null; source_type: string; memo: string | null;
-            counter_account?: string; debit: string; credit: string;
-            balance: string; is_voided: boolean;
-          };
-          const mapped: RegisterEntry[] = (r.data.rows as UnifiedRow[]).map(row => ({
-            id: row.line_id,
-            journal_entry_id: row.journal_entry_id,
-            entry_date: row.entry_date,
-            reference: row.reference,
-            source_type: row.source_type,
-            entry_memo: null,
-            line_memo: row.memo,
-            debit: row.debit,
-            credit: row.credit,
-            counter_account: row.counter_account ?? '—',
-            running_balance: row.balance,
-            status: row.is_voided ? 'voided' : 'posted',
-          })).reverse();
-          setEntries(mapped);
-          setBalance(String(r.data.ending_balance ?? '0'));
-        } else {
-          setEntries([]);
-          setBalance('0');
-        }
+        setLines(r.data.lines ?? []);
       })
-      .catch(() => { setEntries([]); setBalance('0'); })
+      .catch((e: unknown) => { setErr(pickErr(e)); setLines([]); setAccount(null); })
       .finally(() => setLoading(false));
   }, [bizId, accountId]);
 
+  // Newest first, like QBO's register.
+  const ordered = useMemo(() => [...lines].reverse(), [lines]);
+  const totalPages = Math.max(1, Math.ceil(ordered.length / PAGE_SIZE));
+  const pageRows = ordered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const rangeStart = ordered.length === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(ordered.length, page * PAGE_SIZE + PAGE_SIZE);
+
   if (!bizId) return <div>Pick a business.</div>;
 
-  const isBalanceSheet = account && ['asset', 'liability', 'equity'].includes(account.account_type);
-  const registerLabel = account
-    ? (account.account_type === 'asset' ? 'Bank Register' : account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1) + ' Register')
-    : 'Register';
+  function Pagination() {
+    return (
+      <div className="flex items-center justify-end gap-2 px-6 py-2 text-xs text-muted-foreground">
+        <span>Go to:</span>
+        <span className="font-medium text-foreground">{page + 1} of {totalPages}</span>
+        <button type="button" className="underline disabled:opacity-40 disabled:no-underline" disabled={page === 0} onClick={() => setPage(0)}>First</button>
+        <button type="button" className="underline disabled:opacity-40 disabled:no-underline" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Previous</button>
+        <span>{rangeStart}-{rangeEnd} of {ordered.length}</span>
+        <button type="button" className="underline disabled:opacity-40 disabled:no-underline" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}>Next</button>
+        <button type="button" className="underline disabled:opacity-40 disabled:no-underline" disabled={page >= totalPages - 1} onClick={() => setPage(totalPages - 1)}>Last</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-0 -mx-6 -my-6">
-      {/* ── Top breadcrumb bar ── */}
       <div className="border-b px-6 py-3 bg-background">
         <button
           type="button"
@@ -117,34 +118,30 @@ export default function AccountRegisterPage() {
         </button>
       </div>
 
-      {/* ── Header ── */}
       <div className="border-b px-6 py-4 bg-background flex items-start justify-between gap-4">
         <div className="flex items-center gap-4 flex-wrap">
-          <h1 className="text-xl font-semibold">{registerLabel}</h1>
-          {account && (
-            <div className="flex items-center gap-2">
-              <div className="rounded-md border bg-muted/30 px-3 py-1.5 text-sm font-medium">
-                {account.name}
-                {account.code && <span className="text-muted-foreground ml-1.5">· {account.code}</span>}
-              </div>
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Balance</span>
-            {' '}
-            <span className="font-mono font-semibold">{fmtMoney(balance)}</span>
+          <h1 className="text-xl font-semibold">Bank Register</h1>
+          <div className="w-64">
+            <AppSelect
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={accountId}
+              onChange={e => setAccountId(e.target.value)}
+            >
+              {reconcilableAccounts.map(a => (
+                <option key={a.id} value={a.id} data-hint={a.category}>{a.code} {a.name}</option>
+              ))}
+            </AppSelect>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            to="/accounting/bank-transactions"
-            className="inline-flex h-9 items-center rounded-md border bg-background px-4 text-sm font-medium hover:bg-muted/50 transition-colors"
-          >
-            Bank transactions
-          </Link>
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Ending Balance</div>
+            <div className="text-xl font-bold font-mono tabular-nums">{account ? fmtMoney(account.ending_balance) : '0.00'}</div>
+          </div>
           <button
             type="button"
+            onClick={() => nav(`/accounting/reconcile?accountId=${accountId}`)}
             className="inline-flex h-9 items-center rounded-md bg-emerald-600 text-white px-4 text-sm font-semibold hover:bg-emerald-700 transition-colors"
           >
             Reconcile
@@ -152,19 +149,10 @@ export default function AccountRegisterPage() {
         </div>
       </div>
 
-      {/* ── Ending balance banner ── */}
-      <div className="border-b px-6 py-3 bg-muted/10 flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {isBalanceSheet ? 'Balance Sheet' : 'Income Statement'} account
-          {account && <span className="ml-1 capitalize">· {account.account_type}</span>}
-        </span>
-        <div className="text-right">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Ending Balance</div>
-          <div className="text-2xl font-bold font-mono tabular-nums">{fmtMoney(balance)}</div>
-        </div>
-      </div>
+      {err && <div className="mx-6 mt-3 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div>}
 
-      {/* ── Table ── */}
+      <Pagination />
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
@@ -183,7 +171,7 @@ export default function AccountRegisterPage() {
             {loading && (
               <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">Loading…</td></tr>
             )}
-            {!loading && entries.length === 0 && (
+            {!loading && pageRows.length === 0 && (
               <tr>
                 <td colSpan={8} className="py-16 text-center">
                   <p className="text-base font-medium">No transactions yet</p>
@@ -191,23 +179,23 @@ export default function AccountRegisterPage() {
                 </td>
               </tr>
             )}
-            {entries.map(e => {
-              const payment = parseFloat(e.credit) > 0 ? e.credit : null;
-              const deposit = parseFloat(e.debit) > 0 ? e.debit : null;
-              const memo = e.line_memo ?? e.entry_memo;
+            {pageRows.map(l => {
+              const payment = parseFloat(l.credit) > parseFloat(l.debit) ? l.credit : null;
+              const deposit = parseFloat(l.debit) > parseFloat(l.credit) ? l.debit : null;
               return (
-                <tr key={e.id} className="border-b hover:bg-muted/20 group">
-                  <td className="px-4 py-3 whitespace-nowrap font-mono text-sm">{fmtDate(e.entry_date)}</td>
+                <tr key={l.line_id} className="border-b hover:bg-muted/20 cursor-pointer" onClick={() => nav(l.transaction_path)}>
+                  <td className="px-4 py-3 whitespace-nowrap font-mono text-sm">{fmtDate(l.entry_date)}</td>
                   <td className="px-4 py-3">
-                    {e.reference && <div className="text-xs text-muted-foreground font-mono">{e.reference}</div>}
-                    <div className="text-sm">{SOURCE_LABEL[e.source_type] ?? e.source_type}</div>
+                    {l.num && <div className="text-xs text-muted-foreground font-mono">{l.num}</div>}
+                    <div className="text-sm">{l.transaction_label}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-sm">{e.counter_account}</div>
+                    {l.name && <div className="text-sm">{l.name}</div>}
+                    <div className="text-xs text-muted-foreground">{l.split_account ?? '—'}</div>
                   </td>
-                  <td className={`px-4 py-3 text-muted-foreground max-w-[200px] truncate ${e.status === 'voided' ? 'line-through' : ''}`}>
-                    {memo ?? ''}
-                    {e.status === 'voided' && <span className="ml-2 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground no-underline">Voided</span>}
+                  <td className={`px-4 py-3 text-muted-foreground max-w-[200px] truncate ${l.status === 'voided' ? 'line-through' : ''}`}>
+                    {l.memo ?? ''}
+                    {l.status === 'voided' && <span className="ml-2 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground no-underline">Voided</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
                     {payment ? <span className="text-destructive">{fmtMoney(payment)}</span> : <span className="text-muted-foreground/30">—</span>}
@@ -215,11 +203,11 @@ export default function AccountRegisterPage() {
                   <td className="px-4 py-3 text-right font-mono">
                     {deposit ? <span className="text-emerald-600">{fmtMoney(deposit)}</span> : <span className="text-muted-foreground/30">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                    {e.status === 'posted' ? 'C' : ''}
+                  <td className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">
+                    {l.is_reconciled ? 'R' : ''}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-medium whitespace-nowrap">
-                    {fmtMoney(e.running_balance)}
+                    {fmtMoney(l.running_balance)}
                   </td>
                 </tr>
               );
@@ -228,11 +216,24 @@ export default function AccountRegisterPage() {
         </table>
       </div>
 
-      {!loading && entries.length > 0 && (
-        <div className="border-t px-6 py-3 text-right text-sm text-muted-foreground">
-          {entries.length} transaction{entries.length === 1 ? '' : 's'}
-        </div>
-      )}
+      <Pagination />
+
+      <div className="relative border-t px-6 py-3">
+        <button
+          type="button"
+          onClick={() => setAddOpen(o => !o)}
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+        >
+          Add check <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+        {addOpen && (
+          <div className="absolute bottom-full left-6 mb-1 w-40 rounded-md border bg-white dark:bg-zinc-900 shadow-xl">
+            <Link to={`/accounting/checks/new?accountId=${accountId}`} className="block px-3 py-2 text-sm hover:bg-accent" onClick={() => setAddOpen(false)}>Check</Link>
+            <Link to={`/accounting/deposits/new?accountId=${accountId}`} className="block px-3 py-2 text-sm hover:bg-accent" onClick={() => setAddOpen(false)}>Deposit</Link>
+            <Link to={`/accounting/expenses/new?accountId=${accountId}`} className="block px-3 py-2 text-sm hover:bg-accent" onClick={() => setAddOpen(false)}>Expense</Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

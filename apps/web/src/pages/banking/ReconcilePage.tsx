@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { hideUnless, useCan } from '@/lib/roleAccess';
-import { History } from 'lucide-react';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -13,6 +12,7 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { ReconcileNav } from './ReconcileNav';
 
 type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
@@ -22,8 +22,10 @@ export default function ReconcilePage() {
   // Starting a reconciliation is for an accountant — same bar as finishing one.
   const can = useCan();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [bizId] = useActiveBusinessId();
   const today = todayLocal();
+  const preselectedAccountId = searchParams.get('accountId');
 
   const [reconcilableAccounts, setReconcilableAccounts] = useState<ReconcilableAccount[]>([]);
   const [accountId, setAccountId] = useState<string>('');
@@ -51,9 +53,14 @@ export default function ReconcilePage() {
     api.get(`/businesses/${bizId}/bank-rec/accounts`).then(r => {
       const list: ReconcilableAccount[] = r.data.accounts;
       setReconcilableAccounts(list);
-      setAccountId(prev => prev && list.some(a => a.id === prev) ? prev : (list[0]?.id ?? ''));
+      setAccountId(prev => {
+        if (prev && list.some(a => a.id === prev)) return prev;
+        if (preselectedAccountId && list.some(a => a.id === preselectedAccountId)) return preselectedAccountId;
+        return list[0]?.id ?? '';
+      });
     }).catch((e: unknown) => setErr(pickErr(e)));
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only applied once, when the account list first loads
   }, [bizId]);
 
   useEffect(() => {
@@ -103,10 +110,7 @@ export default function ReconcilePage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reconcile</h1>
-        <Button variant="outline" onClick={() => navigate('/accounting/reconcile/history')}>
-          <History className="mr-2 h-4 w-4" />
-          History by account
-        </Button>
+        <ReconcileNav active="setup" accountId={accountId} />
       </div>
 
       {err && (
