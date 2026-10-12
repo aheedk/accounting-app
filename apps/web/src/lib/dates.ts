@@ -73,3 +73,34 @@ export function normalizeDateInput(raw: string, fallback: string): string {
   if (date.getMonth() !== m - 1 || date.getDate() !== d) return fallback;
   return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
+
+/** "2026-10-12" -> "10/12/2026", the way a date box shows it. */
+export function fmtDateText(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${m}/${d}/${y}`;
+}
+
+/**
+ * Read what was typed into a date box and give back YYYY-MM-DD.
+ *
+ * Takes the month first, as it is written here: 10/12/2026, 10/12/26, 10-12-26,
+ * 10.12.2026, 10/12 (this year), and the same without separators (101226,
+ * 10122026). A two-digit year means this century. Anything that is not a real
+ * calendar date falls back to `fallback`, the last good value.
+ */
+export function parseDateText(raw: string, fallback: string): string {
+  const text = raw.trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(text)) return normalizeDateInput(text, fallback);
+
+  let parts = text.split(/[/.\-\s]+/).filter(Boolean);
+  if (parts.length === 1 && /^\d+$/.test(text)) {
+    if (text.length === 4) parts = [text.slice(0, 2), text.slice(2)];
+    else if (text.length === 6 || text.length === 8) parts = [text.slice(0, 2), text.slice(2, 4), text.slice(4)];
+  }
+  if (parts.length < 2 || parts.length > 3 || parts.some(part => !/^\d+$/.test(part))) return fallback;
+  const [m, d, y = String(currentYearLocal())] = parts;
+  if (y.length !== 2 && y.length !== 4) return fallback;
+  return normalizeDateInput(`${y}-${m}-${d}`, fallback);
+}

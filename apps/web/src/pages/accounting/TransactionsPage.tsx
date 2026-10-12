@@ -11,6 +11,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { TableSettingsCustomizeButton } from '@/components/ui/TableSettingsDrawer';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/date-input';
 import { AppSelect } from '@/components/ui/select';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { fmtMoney } from '@/lib/money';
@@ -219,8 +220,7 @@ function DateRangeFilter({
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">From</label>
-                <Input
-                  type="date"
+                <DateInput
                   className="h-9 w-full"
                   value={draftPreset === 'custom' ? draftStart : (displayRange.start ?? '')}
                   disabled={draftPreset !== 'custom'}
@@ -229,8 +229,7 @@ function DateRangeFilter({
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">To</label>
-                <Input
-                  type="date"
+                <DateInput
                   className="h-9 w-full"
                   value={draftPreset === 'custom' ? draftEnd : (displayRange.end ?? '')}
                   disabled={draftPreset !== 'custom'}

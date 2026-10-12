@@ -286,10 +286,10 @@ describe('JournalEntryEditor line keyboard navigation', () => {
     });
     await renderEditor();
 
-    const date = container.querySelector<HTMLInputElement>('input[type="date"]')!;
+    const date = container.querySelector<HTMLInputElement>("input[data-date-input]")!;
     await act(async () => {
       date.focus();
-      setFieldValue(date, '2024-12-31');
+      setFieldValue(date, '12/31/2024');
       date.blur();
     });
 

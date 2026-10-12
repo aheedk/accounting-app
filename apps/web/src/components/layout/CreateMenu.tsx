@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
@@ -55,7 +55,6 @@ const CATEGORIES: CreateCategory[] = [
 export function CreateMenu() {
   const [open, setOpen] = useState(false);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
-  const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   useArrowKeyMenu(open, popupRef);
@@ -87,11 +86,6 @@ export function CreateMenu() {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  function handleItem(to: string) {
-    setOpen(false);
-    navigate(to);
-  }
-
   // Only what this role can actually create.
   const role = useEffectiveRole();
   const canOpen = useCanOpen();
@@ -117,13 +111,14 @@ export function CreateMenu() {
                 <ul className="flex flex-col gap-0.5">
                   {cat.items.map(item => (
                     <li key={item.to}>
-                      <button
-                        type="button"
-                        onClick={() => handleItem(item.to)}
-                        className="w-full rounded px-1 py-1 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      {/* A link, so it can be opened in a new tab (middle click, Ctrl+click, right click). */}
+                      <Link
+                        to={item.to}
+                        onClick={() => setOpen(false)}
+                        className="block w-full rounded px-1 py-1 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                       >
                         {item.label}
-                      </button>
+                      </Link>
                     </li>
                   ))}
                 </ul>

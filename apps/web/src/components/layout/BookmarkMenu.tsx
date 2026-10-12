@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Bookmark, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
-import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
+import { PAGE_NAMES } from '@/lib/pageTitle';
 
 type BookmarkItem = { id: string; label: string; path: string };
 type EditState = { bookmarkId: string | null; label: string; path: string };
@@ -23,64 +23,6 @@ function loadBookmarks(): BookmarkItem[] {
 function persistBookmarks(items: BookmarkItem[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
-
-const PAGE_NAMES: Record<string, string> = {
-  '/': 'Dashboard',
-  '/customers': 'Customers',
-  '/invoices': 'Invoices',
-  '/payments': 'Payments',
-  '/credit-memos': 'Credit Memos',
-  '/reports/aging': 'AR Aging',
-  '/ap/overview': 'AP Overview',
-  '/accounting/expense-transactions': 'Expense Transactions',
-  '/ap/vendors': 'Vendors',
-  '/ap/bills': 'Bills',
-  '/ap/bill-payments': 'Bill Payments',
-  '/ap/vendor-credits': 'Vendor Credits',
-  '/ap/contractors': 'Contractors',
-  '/reports/1099': '1099s',
-  '/accounting/client-overview': 'Client Overview',
-  '/accounting/books-review': 'Books Review',
-  '/accounting/bank-accounts': 'Bank Accounts',
-  '/accounting/bank-transactions': 'Bank Transactions',
-  '/accounting/email-imports': 'Email Import Review',
-  '/accounting/invoice-imports': 'Email Import Review',
-  '/accounting/integrations': 'Integration Transactions',
-  '/accounting/receipts': 'Receipts',
-  '/accounting/reconcile': 'Reconcile',
-  '/accounting/rules': 'Bank Rules',
-  '/settings/coa': 'Chart of Accounts',
-  '/accounting/recurring': 'Recurring Transactions',
-  '/accounting/fixed-assets': 'Fixed Assets',
-  [JOURNAL_NAV_ITEM.path]: JOURNAL_NAV_ITEM.label,
-  '/reports/standard': 'Standard Reports',
-  '/reports/pnl': 'Profit & Loss',
-  '/reports/balance-sheet': 'Balance Sheet',
-  '/reports/cash-flow': 'Cash Flow',
-  '/reports/custom': 'Custom Reports',
-  '/reports/management': 'Management Reports',
-  '/reports/performance': 'Performance Center',
-  '/reports/financial-planning': 'Financial Planning',
-  '/reports/spreadsheet-sync': 'Spreadsheet Sync',
-  '/reports/trial-balance': 'Trial Balance',
-  '/payroll/overview': 'Payroll Overview',
-  '/payroll/employees': 'Employees',
-  '/payroll/contractors': 'Payroll Contractors',
-  '/payroll/taxes': 'Payroll Taxes',
-  '/payroll/compliance': 'Compliance',
-  '/inventory/overview': 'Inventory Overview',
-  '/inventory/items': 'Inventory Items',
-  '/inventory/purchase-orders': 'Purchase Orders',
-  '/inventory/item-receipts': 'Item Receipts',
-  '/inventory/sales-orders': 'Sales Orders',
-  '/inventory/shipping-labels': 'Shipping Labels',
-  '/setup/entity': 'Entity',
-  '/setup/coa': 'Chart of Accounts Setup',
-  '/setup/cost-centers': 'Cost Centers',
-  '/setup/users': 'Users',
-  '/settings/tax-codes': 'Tax Codes',
-  '/settings/periods': 'Fiscal Periods',
-};
 
 function getPageName(pathname: string): string {
   return (

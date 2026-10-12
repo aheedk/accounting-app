@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Check, ChevronsUpDown, Plus, Undo2 } from 'lucide-react';
+import { Building2, Check, ChevronsUpDown, Plus, Search, Undo2 } from 'lucide-react';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ export function BusinessSwitcher() {
   const [active, setActive] = useActiveBusinessId();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   useArrowKeyMenu(open, menuRef);
@@ -44,6 +45,8 @@ export function BusinessSwitcher() {
 
   const activeBiz = businesses.find(b => b.id === active) ?? businesses[0];
   const others = businesses.filter(b => b.id !== activeBiz?.id);
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? others.filter(b => b.name.toLowerCase().includes(needle)) : others;
   const isFirmAdmin = user?.role === 'firm_admin';
 
   function choose(id: string) {
@@ -63,7 +66,7 @@ export function BusinessSwitcher() {
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setQuery(''); setOpen(o => !o); }}
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
@@ -100,8 +103,30 @@ export function BusinessSwitcher() {
               <div className="border-t px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Other companies
               </div>
+              <div className="relative px-3 pb-2">
+                <Search className="pointer-events-none absolute left-5 top-2 h-4 w-4 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={e => {
+                    // Enter opens the first match; Down moves into the list.
+                    if (e.key === 'Enter' && shown[0]) choose(shown[0].id);
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+                    }
+                  }}
+                  placeholder="Search clients"
+                  aria-label="Search clients"
+                  className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
               <div className="max-h-64 overflow-y-auto pb-1">
-                {others.map(b => (
+                {shown.length === 0 && (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">No client matches "{query.trim()}".</p>
+                )}
+                {shown.map(b => (
                   <button
                     key={b.id}
                     type="button"

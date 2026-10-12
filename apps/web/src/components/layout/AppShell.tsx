@@ -7,6 +7,7 @@ import { CompanySwitchedScreen } from './CompanySwitchedScreen';
 import { PdfPreviewHost } from '@/components/PdfPreviewHost';
 import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business';
 import { setExportCompany } from '@/lib/reportExport';
+import { documentTitle } from '@/lib/pageTitle';
 import { useAuth } from '@/auth/useAuth';
 import { useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 
@@ -38,6 +39,9 @@ export function AppShell() {
   const { pathname } = useLocation();
   const canOpen = useCanOpen();
   const allowed = canOpen(pathname);
+
+  // The browser tab is named after the page that is open, then the company.
+  useEffect(() => { document.title = documentTitle(pathname, activeBusinessName); }, [pathname, activeBusinessName]);
 
   const switchedTo = useCompanySwitchedElsewhere();
   if (switchedTo) return <CompanySwitchedScreen businessId={switchedTo} />;
