@@ -31,14 +31,12 @@ mark which meeting an item first came from.
 | # | What | Owner |
 |---|---|---|
 | 34 | Go through Faizan's 19-minute video and the files in the Teams chat, and turn each change into an item here. He is recording a second video. This is the largest unknown on the list | Aheed |
-| 35 | Take Payroll out: the sidebar group, "Run payroll" and "Add employee" in + New, the search results and any dashboard links. See "Payroll" below for what stays | Aheed |
 | 36 | Pay bills: after paying, offer to print the checks, in a check format that fits check stock. See "Pay bills and checks" below | Aheed, Faizan gives the format |
 | 37 | Year end: net income into Retained Earnings. Faizan says it is not happening. See "Retained Earnings" below | Aheed, Faizan |
 | 38 | Phone numbers: ten digits with the area code, shown the same way everywhere (vendors, customers, the company). The test vendors have seven digits; fix them too | Riham |
-| 39 | Statement review: Equipment showed up in the bank account picker. See "Equipment in the bank picker" below | Aheed |
+| 39 | Statement review: Equipment showed up in the bank account picker. Not reproduced; needs the company from the demo. See "Equipment in the bank picker" below | Aheed |
 | 40 | "This year" should follow the client's fiscal year everywhere. Today only the General Ledger does. See "Fiscal year" below | Riham |
 | 41 | Vendors list: the Open balance column is not right (Riham said so in the demo). See "Vendor balance" below | Riham |
-| 42 | Audit history did not open when Aheed clicked it in the demo. Find which page and fix it. It exists on Journal Entry, Bank Deposit, Expense and Check | Aheed |
 | 43 | Backups before real client data arrives on November 1: confirm the database is backed up, how often, and that a restore works. See "Security and data" below | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders, bank statement uploaded before the card statement and after | Faizan |
 | 45 | A check approved from the AI inbox should show its number at the top of the page. See "Check number" below | Riham |
@@ -51,8 +49,9 @@ mark which meeting an item first came from.
 
 ### Notes on the items
 
-**Payroll (35).** Take it out of the menus; leave the code and the tables alone
-until a payroll partner is chosen, so nothing has to be rebuilt or migrated.
+**Payroll (35, done).** It is out of the menus; the code and the tables are
+left alone until a payroll partner is chosen, so nothing has to be rebuilt or
+migrated.
 Contractors and the 1099 report are not payroll and stay under Accounts Payable.
 That also settles the audit question of which of the two Contractors pages to
 keep: the Accounts Payable one. Pay stubs (item 22) are dropped with it.
@@ -82,8 +81,11 @@ type is a bank type, any account set up under Banking, and the account already
 chosen on that statement (`apps/web/src/lib/bankAccountOptions.ts`). So
 Equipment is there for one of two reasons: it was added as a bank account under
 Banking in that company, or it was the account preselected on that statement.
-Check which in the company used for the demo. If it is the second, the
-preselection is the bug.
+Checked on 10-12 against the local test companies: Equipment is not set up
+under Banking in either, a bank statement opens with no account preselected,
+and the picker does not list it. So the rule holds and the cause is in the data
+of the company used in the demo. Open Banking in that company and see whether
+Equipment is listed as a bank account; if it is, remove it there.
 
 **Fiscal year (40).** Faizan explained it in the meeting: for a company whose
 year runs July to June, "This year" must give July 1 to June 30. The General
@@ -121,7 +123,7 @@ is item 28.
 | # | What |
 |---|---|
 | 20 | Bank account connection, so transactions arrive on their own. Brought up again at the start of this meeting. Whether statements should arrive too was left unsure; transactions are the point. Needs an outside service **(10-01)** |
-| 21 | Reconciliation, after 20 **(10-01)** |
+| 21 | Reconciliation against a connected bank, after 20. A manual reconciliation worksheet is built (see Done) **(10-01)** |
 | 23 | Upload a customer's purchase order and turn it into a sales invoice **(10-05)** |
 | 24 | Stripe: (a) clients pay their vendors from the app, (b) we get paid for the software **(10-05)** |
 | 25 | Modules per client, priced separately. Now tied to the two ways of selling (firms and small businesses) and to item 46 **(10-05)** |
@@ -151,6 +153,17 @@ is item 28.
   **(10-05)**. Item 47 waits on it.
 - Next meeting: probably Tuesday. Aheed's start date at his job is not set and
   may change his hours.
+
+## Done
+
+| # | What | Who |
+|---|---|---|
+| 35 | Payroll is out of the sidebar, + New and search. Its pages still open by address. "Add contractor" moved under Vendors in + New. The Payroll tick box on Setup → Users is still there | Aheed, 10-12 |
+| 42 | Audit history: it did nothing on a record not saved yet, which is what happened in the demo. On Journal Entry, Bank Deposit, Expense and Check it is now grayed out until the record is saved, and says why | Aheed, 10-12 |
+| 21 | Manual bank reconciliation: a worksheet and a history page under Banking. Not reviewed or tested by Aheed yet | Riham, `569350c` |
+
+After pulling, run `npm run db:migrate` (migration `0097`, from Riham's
+reconciliation work).
 
 ## Already done — say so next time
 

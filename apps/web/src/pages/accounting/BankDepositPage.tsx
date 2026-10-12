@@ -1141,7 +1141,9 @@ export default function BankDepositPage() {
                       <button
                         type="button"
                         onClick={() => { setMoreOpen(false); setAuditOpen(true); }}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent"
+                        disabled={!id || isNew}
+                        title={!id || isNew ? 'Save it first; history starts when it is saved' : undefined}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Clock className="h-4 w-4" /> Audit history
                       </button>
