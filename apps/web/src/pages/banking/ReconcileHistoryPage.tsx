@@ -102,7 +102,7 @@ export default function ReconcileHistoryPage() {
       <div className="w-64">
         <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={accountId} onChange={e => setAccountId(e.target.value)}>
           <option value="">All accounts</option>
-          {reconcilableAccounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name} — {a.category}</option>)}
+          {reconcilableAccounts.map(a => <option key={a.id} value={a.id} data-hint={a.category}>{a.code} {a.name}</option>)}
         </AppSelect>
       </div>
 

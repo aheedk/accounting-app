@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-type OptionData = { value: string; label: string; disabled?: boolean | undefined };
+type OptionData = { value: string; label: string; disabled?: boolean | undefined; hint?: string | undefined };
 
 function childrenToText(node: React.ReactNode): string {
   if (node === null || node === undefined) return '';
@@ -17,13 +17,17 @@ function parseOptions(children: React.ReactNode): OptionData[] {
   React.Children.forEach(children, child => {
     if (!React.isValidElement(child)) return;
     if (child.type === 'option') {
-      const p = child.props as { value?: string; children?: React.ReactNode; disabled?: boolean };
+      const p = child.props as { value?: string; children?: React.ReactNode; disabled?: boolean; 'data-hint'?: string };
       const label = childrenToText(p.children);
       opts.push({
         // Like a native <select>: an <option> without a value uses its text.
         value: String(p.value ?? label),
         label,
         disabled: p.disabled,
+        // An optional right-aligned, italic category badge (QBO-style "Bank",
+        // "Credit Card"...) — set via a plain data-hint attribute on <option>
+        // so it stays out of the searchable/closed-state label text.
+        hint: p['data-hint'],
       });
     } else if (child.type === 'optgroup') {
       const gp = child.props as { children?: React.ReactNode };
@@ -246,7 +250,11 @@ export function AppSelect({
                   )}
                 >
                   <span className="flex-1 whitespace-nowrap">{opt.label}</span>
-                  {isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />}
+                  {opt.hint ? (
+                    <span className="ml-2 shrink-0 text-xs italic text-muted-foreground">{opt.hint}</span>
+                  ) : (
+                    isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />
+                  )}
                 </li>
               );
             })}

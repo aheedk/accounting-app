@@ -127,8 +127,8 @@ export default function ReconcilePage() {
             >
               <option value="">Select…</option>
               {reconcilableAccounts.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.code} {a.name} — {a.category}
+                <option key={a.id} value={a.id} data-hint={a.category}>
+                  {a.code} {a.name}
                 </option>
               ))}
             </AppSelect>
