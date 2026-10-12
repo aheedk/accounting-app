@@ -60,14 +60,6 @@ const ALL_PAGES: Page[] = [
   { label: 'Financial Planning', group: 'Reports', to: '/reports/financial-planning' },
   { label: 'Spreadsheet Sync', group: 'Reports', to: '/reports/spreadsheet-sync' },
   { label: 'Trial Balance', group: 'Reports', to: '/reports/trial-balance' },
-  // Payroll
-  { label: 'Payroll Overview', group: 'Payroll', to: '/payroll/overview' },
-  { label: 'Pay Runs', group: 'Payroll', to: '/payroll/pay-runs' },
-  { label: 'Run Payroll', group: 'Payroll', to: '/payroll/pay-runs/new' },
-  { label: 'Employees', group: 'Payroll', to: '/payroll/employees' },
-  { label: 'Payroll Contractors', group: 'Payroll', to: '/payroll/contractors' },
-  { label: 'Payroll Taxes', group: 'Payroll', to: '/payroll/taxes' },
-  { label: 'Compliance', group: 'Payroll', to: '/payroll/compliance' },
   // Inventory
   { label: 'Inventory Overview', group: 'Inventory', to: '/inventory/overview' },
   { label: 'Inventory Items', group: 'Inventory', to: '/inventory/items' },
@@ -95,7 +87,6 @@ const QUICK_LINKS: Page[] = [
   { label: JOURNAL_NAV_ITEM.label, group: 'Accounting', to: JOURNAL_NAV_ITEM.path },
   { label: 'Profit & Loss', group: 'Reports', to: '/reports/pnl' },
   { label: 'Trial Balance', group: 'Reports', to: '/reports/trial-balance' },
-  { label: 'Employees', group: 'Payroll', to: '/payroll/employees' },
 ];
 
 function highlight(text: string, query: string): React.ReactNode {

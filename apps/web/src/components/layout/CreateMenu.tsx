@@ -34,13 +34,7 @@ const CATEGORIES: CreateCategory[] = [
       { label: 'Purchase order', to: '/inventory/purchase-orders/new' },
       { label: 'Vendor credit', to: '/ap/vendor-credits/new', minRole: 'accountant' },
       { label: 'Add vendor', to: '/ap/vendors/new' },
-    ],
-  },
-  {
-    heading: 'Team',
-    items: [
-      { label: 'Run payroll', to: '/payroll/pay-runs/new', minRole: 'accountant' },
-      { label: 'Add employee', to: '/payroll/employees/new', minRole: 'firm_admin' },
+      // The Team column went with Payroll; a contractor is paid like a vendor.
       { label: 'Add contractor', to: '/ap/contractors' },
     ],
   },

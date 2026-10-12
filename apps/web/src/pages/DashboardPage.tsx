@@ -202,7 +202,7 @@ export default function DashboardPage() {
               ? 'See your invoices and your financial reports: Profit & Loss, Balance Sheet, Cash Flows, and what is owed to you and by you. Your accountant keeps the books.'
               : <>Full books in one place: AR (customers, invoices, payments, credits),
                 AP (vendors, bills, expenses), banking and reconciliation, journal
-                entries, payroll, inventory, and financial reports — all scoped to the
+                entries, inventory, and financial reports — all scoped to the
                 business selected above.</>}
           </CardContent>
         </Card>

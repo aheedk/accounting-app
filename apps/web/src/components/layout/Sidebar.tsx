@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   BookOpen,
-  Briefcase,
   Sparkles,
   ChevronRight,
   FileBarChart,
@@ -141,19 +140,8 @@ const ALL_GROUPS: NavGroup[] = [
       { to: '/reports/trial-balance', label: 'Trial Balance' },
     ],
   },
-  {
-    id: 'payroll',
-    label: 'Payroll',
-    icon: Briefcase,
-    children: [
-      { to: '/payroll/overview', label: 'Overview' },
-      { to: '/payroll/pay-runs', label: 'Pay Runs' },
-      { to: '/payroll/employees', label: 'Employees' },
-      { to: '/payroll/contractors', label: 'Contractors' },
-      { to: '/payroll/taxes', label: 'Payroll Taxes' },
-      { to: '/payroll/compliance', label: 'Compliance' },
-    ],
-  },
+  // Payroll is out of the menus (10-10 meeting: the firm is not offering payroll).
+  // Its pages and routes are still there; Contractors is under Accounts Payable.
   {
     id: 'inventory',
     label: 'Inventory',
