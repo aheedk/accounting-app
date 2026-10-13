@@ -162,7 +162,7 @@ export default function ApprovalsPage() {
                     <td className="p-3 text-right font-mono">{r.amount !== null ? fmtMoney(r.amount) : '—'}</td>
                     <td className="p-3"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span></td>
                     <td className="p-3 text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => setOpenId(open ? null : r.id)}>
+                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-link hover:text-link" onClick={() => setOpenId(open ? null : r.id)}>
                         {open ? 'Hide' : 'Details'}
                       </Button>
                       {canDecide && r.status === 'pending' && (

@@ -67,6 +67,7 @@ import BankTransactionImportPage from '@/pages/banking/BankTransactionImportPage
 import ReconcilePage from '@/pages/banking/ReconcilePage';
 import ReconcileWorksheetPage from '@/pages/banking/ReconcileWorksheetPage';
 import ReconcileHistoryPage from '@/pages/banking/ReconcileHistoryPage';
+import ReconcileSummaryPage from '@/pages/banking/ReconcileSummaryPage';
 import RulesPage from '@/pages/accounting/RulesPage';
 import FixedAssetListPage from '@/pages/accounting/FixedAssetListPage';
 import FixedAssetNewPage from '@/pages/accounting/FixedAssetNewPage';
@@ -219,7 +220,9 @@ export default function App() {
             <Route path="/accounting/receipts" element={<ReceiptsPage />} />
             <Route path="/accounting/reconcile" element={<ReconcilePage />} />
             <Route path="/accounting/reconcile/history" element={<ReconcileHistoryPage />} />
+            <Route path="/accounting/reconcile/summary" element={<ReconcileSummaryPage />} />
             <Route path="/accounting/reconcile/:id" element={<ReconcileWorksheetPage />} />
+            <Route path="/accounting/register" element={<AccountRegisterPage />} />
             <Route path="/accounting/rules" element={<RulesPage />} />
             <Route path="/accounting/recurring" element={<RecurringTransactionsPage />} />
             <Route path="/accounting/fixed-assets" element={<FixedAssetListPage />} />

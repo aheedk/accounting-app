@@ -245,7 +245,7 @@ export default function EmployeeListPage() {
                 const showRevealed = reveal && reveal.id === r.id;
                 return (
                   <span className="inline-flex items-center gap-2">
-                    <Link className="text-primary underline" to={`/payroll/employees/${r.id}`}>
+                    <Link className="text-link underline" to={`/payroll/employees/${r.id}`}>
                       View
                     </Link>
                     {isFirmAdmin && r.ssn_last_four && (

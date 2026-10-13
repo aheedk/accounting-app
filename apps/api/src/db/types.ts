@@ -28,6 +28,7 @@ export interface BusinessesTable {
   tax_id: string | null;
   fiscal_year_start_month: Generated<number>;
   address: ColumnType<BusinessAddress | null, string | null, string | null>;
+  phone: string | null;
   import_email: string | null;
   /** Firm policy: auto-post high-confidence AI suggestions without review. */
   ai_auto_post_enabled: Generated<boolean>;
@@ -925,7 +926,8 @@ export interface BankReconciliationsTable {
 export interface ReconciliationsTable {
   id: Generated<string>;
   business_id: string;
-  bank_account_id: string;
+  /** Any balance-sheet account (asset/liability/equity) — not necessarily one with a bank_accounts row. */
+  account_id: string;
   statement_beginning_balance: ColumnType<string, string | number, string | number>;
   statement_ending_balance: ColumnType<string, string | number, string | number>;
   statement_ending_date: ColumnType<string, string, string>;

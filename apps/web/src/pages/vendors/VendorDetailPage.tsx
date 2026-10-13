@@ -14,6 +14,7 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { fmtDateTime, todayLocal } from '@/lib/dates';
+import { formatPhone } from '@/lib/phone';
 
 type VendorListItem = { id: string; name: string; is_active: boolean };
 
@@ -325,7 +326,7 @@ export default function VendorDetailPage() {
                     <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
                     <td className="p-3 whitespace-nowrap text-muted-foreground">{fmtDateTime(tx.updated_at)}</td>
                     <td className="p-3 text-right">
-                      <Link className="text-primary hover:underline" to={tx.path}>View/Edit</Link>
+                      <Link className="text-link hover:underline" to={tx.path}>View/Edit</Link>
                     </td>
                   </tr>
                 ))}
@@ -342,10 +343,10 @@ export default function VendorDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <Detail label="Email" value={vendor.email} />
               <Detail label="Cc" value={vendor.email_cc} />
-              <Detail label="Phone" value={vendor.phone} />
-              <Detail label="Mobile" value={vendor.mobile} />
-              <Detail label="Fax" value={vendor.fax} />
-              <Detail label="Other" value={vendor.other_phone} />
+              <Detail label="Phone" value={vendor.phone ? formatPhone(vendor.phone) : vendor.phone} />
+              <Detail label="Mobile" value={vendor.mobile ? formatPhone(vendor.mobile) : vendor.mobile} />
+              <Detail label="Fax" value={vendor.fax ? formatPhone(vendor.fax) : vendor.fax} />
+              <Detail label="Other" value={vendor.other_phone ? formatPhone(vendor.other_phone) : vendor.other_phone} />
               <Detail label="Website" value={vendor.website} />
               <Detail label="Name on checks" value={vendor.name_on_checks} />
             </div>
@@ -372,7 +373,7 @@ export default function VendorDetailPage() {
               <Detail
                 label="1099 tracking"
                 value={vendor.is_1099
-                  ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Tracked for 1099</span>
+                  ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">Tracked for 1099</span>
                   : 'Not tracked'}
               />
               <Detail

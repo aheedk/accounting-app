@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { hasMinRole } from '@accounting/shared';
 import { BookOpen, ChevronDown, Clock, Copy, History, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
+import { Badge } from '@/components/ui/badge';
 import { cachedGet, invalidateReferenceCache } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
@@ -721,7 +722,7 @@ export default function BankDepositPage() {
                         onClick={() => { setRecentOpen(false); nav(`/accounting/bank-deposits/${d.id}`); }}
                         className="grid w-full grid-cols-[1fr_5.5rem_6rem] items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
                       >
-                        <span className="truncate text-primary">Bank Deposit</span>
+                        <span className="truncate text-link">Bank Deposit</span>
                         <span className="whitespace-nowrap text-muted-foreground">{fmtDate(d.deposit_date)}</span>
                         <span className="text-right font-mono tabular-nums">{fmtMoney(d.total_amount)}</span>
                       </button>
@@ -731,7 +732,7 @@ export default function BankDepositPage() {
                 <button
                   type="button"
                   onClick={() => { setRecentOpen(false); nav('/accounting/transactions?type=deposit'); }}
-                  className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
+                  className="block w-full border-t px-4 py-2.5 text-left text-sm text-link hover:bg-accent"
                 >
                   View More
                 </button>
@@ -742,23 +743,13 @@ export default function BankDepositPage() {
         <h1 className="text-xl font-semibold">
           Bank Deposit{deposit ? ` — ${deposit.deposit_number}` : ''}
         </h1>
-        {deposit && deposit.voided_at && (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Voided</span>
-        )}
-        {deposit && !deposit.voided_at && (
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
-            Posted
-          </span>
-        )}
-        {deposit?.imported && (
-          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
-            Imported
-          </span>
-        )}
+        {deposit && deposit.voided_at && <Badge status="red">Voided</Badge>}
+        {deposit && !deposit.voided_at && <Badge status="green">Posted</Badge>}
+        {deposit?.imported && <Badge status="blue">Imported</Badge>}
         {deposit?.is_reconciled && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="This deposit's payment has been reconciled">
-            Reconciled
-          </span>
+          <Badge status="gray">
+            <span title="This deposit's payment has been reconciled">Reconciled</span>
+          </Badge>
         )}
         <CloseFormButton onClose={close} />
       </div>
@@ -1073,7 +1064,7 @@ export default function BankDepositPage() {
 
         <div className="mx-auto flex items-center gap-3 text-sm">
           <div className="relative">
-            <button type="button" onClick={() => setPrintOpen(prev => !prev)} className="text-primary hover:underline">
+            <button type="button" onClick={() => setPrintOpen(prev => !prev)} className="text-link hover:underline">
               Print
             </button>
             {printOpen && (
@@ -1110,7 +1101,7 @@ export default function BankDepositPage() {
               <span className="text-muted-foreground">·</span>
               <button
                 type="button"
-                className="text-primary hover:underline"
+                className="text-link hover:underline"
                 onClick={() => setRecurringOpen(true)}
               >
                 Make recurring
@@ -1122,7 +1113,7 @@ export default function BankDepositPage() {
             <>
               <span className="text-muted-foreground">·</span>
               <div className="relative">
-                <button type="button" onClick={() => setMoreOpen(prev => !prev)} className="text-primary hover:underline">
+                <button type="button" onClick={() => setMoreOpen(prev => !prev)} className="text-link hover:underline">
                   More
                 </button>
                 {moreOpen && (

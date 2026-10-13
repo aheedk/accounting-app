@@ -112,7 +112,7 @@ export function MyMenu() {
                     onClick={() => go(bm.path)}
                     className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
                   >
-                    <Bookmark className="h-3.5 w-3.5 shrink-0 fill-current text-primary" />
+                    <Bookmark className="h-3.5 w-3.5 shrink-0 fill-current text-link" />
                     <span className="truncate">{bm.label}</span>
                   </button>
                 ))

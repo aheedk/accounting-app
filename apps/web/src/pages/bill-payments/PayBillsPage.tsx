@@ -145,7 +145,7 @@ export default function PayBillsPage() {
           <h1 className="text-2xl font-semibold">Pay Bills</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Tick the bills to pay. One payment is recorded for each vendor.{' '}
-            <Link className="text-primary hover:underline" to="/ap/bill-payments">Past payments</Link>
+            <Link className="text-link hover:underline" to="/ap/bill-payments">Past payments</Link>
           </p>
         </div>
         <div className="text-right">
@@ -234,8 +234,8 @@ export default function PayBillsPage() {
                       <td className="p-3">
                         <input type="checkbox" checked={on} onChange={() => toggle(bill)} aria-label={`Pay bill ${bill.bill_number}`} />
                       </td>
-                      <td className="p-3"><Link className="text-primary hover:underline" to={`/ap/vendors/${bill.vendor_id}`}>{bill.vendor_name}</Link></td>
-                      <td className="p-3 font-mono"><Link className="text-primary hover:underline" to={`/ap/bills/${bill.bill_id}`}>{bill.bill_number}</Link></td>
+                      <td className="p-3"><Link className="text-link hover:underline" to={`/ap/vendors/${bill.vendor_id}`}>{bill.vendor_name}</Link></td>
+                      <td className="p-3 font-mono"><Link className="text-link hover:underline" to={`/ap/bills/${bill.bill_id}`}>{bill.bill_number}</Link></td>
                       <td className="p-3 whitespace-nowrap">
                         {fmtShortDate(bill.due_date)}
                         {bill.due_date < today && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">Overdue</span>}

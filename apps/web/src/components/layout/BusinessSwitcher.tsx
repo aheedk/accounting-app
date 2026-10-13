@@ -95,7 +95,7 @@ export function BusinessSwitcher() {
               </div>
               <span className="truncate text-sm font-medium">{activeBiz?.name}</span>
             </div>
-            <Check className="h-4 w-4 shrink-0 text-primary" />
+            <Check className="h-4 w-4 shrink-0 text-link" />
           </div>
 
           {others.length > 0 && (
@@ -157,7 +157,7 @@ export function BusinessSwitcher() {
                 onClick={() => go(ADD_CLIENT_PATH)}
                 className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60"
               >
-                <Plus className="h-4 w-4 text-primary" />
+                <Plus className="h-4 w-4 text-link" />
                 <span className="font-medium">Add client</span>
               </button>
               <button

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppSelect } from '../../components/ui/select';
+import { cleanPhoneInput, settlePhoneInput } from '@/lib/phone';
 
 type BusinessAddress = {
   line1?: string;
@@ -25,6 +26,7 @@ type Business = {
   tax_id: string | null;
   fiscal_year_start_month: number;
   address: BusinessAddress | null;
+  phone: string | null;
   import_email: string | null;
   created_at: string;
   updated_at: string;
@@ -41,6 +43,7 @@ type FormState = {
   address_state: string;
   address_postal_code: string;
   address_country: string;
+  phone: string;
   import_email: string;
 };
 
@@ -61,6 +64,7 @@ function toFormState(b: Business): FormState {
     address_state: b.address?.state ?? '',
     address_postal_code: b.address?.postal_code ?? '',
     address_country: b.address?.country ?? '',
+    phone: b.phone ?? '',
     import_email: b.import_email ?? '',
   };
 }
@@ -128,6 +132,7 @@ export default function EntityPage() {
         tax_id: form.tax_id || null,
         fiscal_year_start_month: form.fiscal_year_start_month,
         address,
+        phone: form.phone || null,
         import_email: form.import_email || null,
       };
       const r = await api.patch<Business>(`/businesses/${bizId}`, payload);
@@ -197,6 +202,13 @@ export default function EntityPage() {
                 <Input id="tax_id" value={form.tax_id}
                   onChange={e => updateField('tax_id', e.target.value)}
                   disabled={!canEdit} placeholder="12-3456789" />
+              </div>
+              <div>
+                <Label htmlFor="phone">Phone</Label>
+                <Input id="phone" value={form.phone}
+                  onChange={e => updateField('phone', cleanPhoneInput(e.target.value))}
+                  onBlur={e => updateField('phone', settlePhoneInput(e.target.value))}
+                  disabled={!canEdit} placeholder="(555) 123-4567" />
               </div>
               <div>
                 <Label htmlFor="fy_month">Fiscal year starts</Label>

@@ -128,7 +128,7 @@ export default function InventoryListPage() {
               defaultSortKey="name"
               defaultSortDir="asc"
               actions={r => (
-                <Link className="text-primary hover:underline" to={`/inventory/items/${r.id}`}>
+                <Link className="text-link hover:underline" to={`/inventory/items/${r.id}`}>
                   View/Edit
                 </Link>
               )}

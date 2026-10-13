@@ -650,16 +650,16 @@ export default function RecurringTransactionsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary"
+                        className="mr-3 h-auto p-0 font-normal text-link hover:text-link"
                         disabled={runNowBusyId === t.id}
                         {...hideUnless(can.accountant)} onClick={() => void runNow(t.id)}
                       >
                         {runNowBusyId === t.id ? 'Running…' : 'Run now'}
                       </Button>
-                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-primary hover:text-primary" {...hideUnless(can.accountant)} onClick={() => startEdit(t)}>
+                      <Button size="sm" variant="ghost" className="mr-3 h-auto p-0 font-normal text-link hover:text-link" {...hideUnless(can.accountant)} onClick={() => startEdit(t)}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-auto p-0 font-normal" {...hideUnless(can.accountant)} onClick={() => deleteTemplate(t.id)}>
+                      <Button size="sm" variant="ghost" className="text-link hover:text-link h-auto p-0 font-normal" {...hideUnless(can.accountant)} onClick={() => deleteTemplate(t.id)}>
                         Delete
                       </Button>
                     </td>

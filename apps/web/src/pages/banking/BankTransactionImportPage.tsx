@@ -325,7 +325,7 @@ export default function BankTransactionImportPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Import Bank Transactions</h1>
         <Card><CardContent className="p-6 text-sm text-muted-foreground">
-          No bank accounts — create one in <Link to="/accounting/bank-accounts" className="text-primary underline">Bank Accounts</Link> first.
+          No bank accounts — create one in <Link to="/accounting/bank-accounts" className="text-link underline">Bank Accounts</Link> first.
         </CardContent></Card>
       </div>
     );
@@ -489,7 +489,7 @@ export default function BankTransactionImportPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-auto p-0 font-normal text-primary hover:text-primary"
+                            className="h-auto p-0 font-normal text-link hover:text-link"
                             disabled={undoBusy === b.id}
                             onClick={() => undoBatch(b)}
                           >

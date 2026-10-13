@@ -22,7 +22,7 @@ export default function SendDocumentsPage() {
           <p className="text-sm text-muted-foreground">
             Each one is read as it arrives, which can take a minute for a long statement. Your accountant
             reviews it before anything is recorded in your books. Have a question about one?{' '}
-            <Link className="text-primary hover:underline" to="/messages">Send a message.</Link>
+            <Link className="text-link hover:underline" to="/messages">Send a message.</Link>
           </p>
         </CardContent>
       </Card>

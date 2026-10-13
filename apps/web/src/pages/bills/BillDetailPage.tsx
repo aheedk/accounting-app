@@ -108,7 +108,7 @@ export default function BillDetailPage() {
       <DetailPageHeader
         eyebrow="Bill"
         title={bill.bill_number}
-        subtitle={!vendor ? 'Vendor' : linksOut ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : vendor.name}
+        subtitle={!vendor ? 'Vendor' : linksOut ? <Link className="text-link hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : vendor.name}
         status={bill.status}
         totalLabel="Amount due"
         total={fmtMoney(data.amount_due)}
@@ -132,7 +132,7 @@ export default function BillDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Bill details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <DetailField label="Vendor" value={!vendor ? null : linksOut ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : vendor.name} />
+            <DetailField label="Vendor" value={!vendor ? null : linksOut ? <Link className="text-link hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : vendor.name} />
             <DetailField label="Vendor email" value={vendor?.email} />
             <DetailField label="Bill date" value={fmtLongDate(bill.bill_date)} />
             <DetailField label="Due date" value={fmtLongDate(bill.due_date)} />
@@ -156,7 +156,7 @@ export default function BillDetailPage() {
                   label: 'Journal entry',
                   // The journal is not part of a client login.
                   value: bill.posted_journal_entry_id && canOpen('/journal')
-                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${bill.posted_journal_entry_id}`}>View journal entry</Link>
+                    ? <Link className="font-mono text-link hover:underline" to={`/journal/${bill.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
               ]}

@@ -151,7 +151,7 @@ export function ComboInput({
                 type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { setOpen(false); onAddNew(); }}
-                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-link hover:bg-accent"
               >
                 {addNewLabel}
               </button>

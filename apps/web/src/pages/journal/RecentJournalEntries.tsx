@@ -119,7 +119,7 @@ export default function RecentJournalEntries({ businessId }: { businessId: strin
                 key={entry.id}
                 to={`/journal/${entry.id}`}
                 onClick={() => setOpen(false)}
-                className="grid grid-cols-[1fr_auto] gap-8 px-2 py-2 text-sm text-primary hover:bg-muted/50 hover:underline"
+                className="grid grid-cols-[1fr_auto] gap-8 px-2 py-2 text-sm text-link hover:bg-muted/50 hover:underline"
               >
                 <span>{recentJournalEntryLabel(entry)}</span>
                 <span>{recentJournalEntryDate(entry.entry_date)}</span>
@@ -131,7 +131,7 @@ export default function RecentJournalEntries({ businessId }: { businessId: strin
               type="button"
               onClick={() => { void loadMore(); }}
               disabled={loadingMore}
-              className="mt-3 text-sm font-medium text-primary hover:underline disabled:opacity-50"
+              className="mt-3 text-sm font-medium text-link hover:underline disabled:opacity-50"
             >
               {loadingMore ? 'Loading...' : 'View more'}
             </button>

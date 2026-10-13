@@ -12,11 +12,11 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/auth/useAuth';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
-import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { ReportCard } from '@/components/ui/ReportCard';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -211,6 +211,15 @@ function fmtAmount(value: string): string {
   const amount = new Decimal(value);
   const formatted = fmtMoney(amount.abs().toFixed(4));
   return amount.isNegative() ? `-${formatted}` : formatted;
+}
+
+/** Negative red, positive green — the General Ledger and the reconciliation
+ * worksheet are the only places amounts get this sign coloring; elsewhere a
+ * figure just reads as dark text regardless of sign. */
+function signColor(value: string): string {
+  const amount = new Decimal(value);
+  if (amount.isZero()) return '';
+  return amount.isNegative() ? 'text-destructive' : 'text-status-green-fg';
 }
 
 // "10/1/26 3:57 PM" for the created / modified columns.
@@ -659,7 +668,7 @@ export default function GeneralLedgerPage() {
     <div className="space-y-4">
       {/* Back link */}
       <div>
-        <Link to="/reports" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <Link to="/reports" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
           <ChevronLeft className="h-4 w-4" />Back to custom reports
         </Link>
       </div>
@@ -776,11 +785,11 @@ export default function GeneralLedgerPage() {
             <span className="flex items-center gap-3">
               {displayAccounts.length > 0 && (
                 <>
-                  <button type="button" className="text-primary hover:underline" onClick={() => setCollapsedAccounts(new Set())}>Expand all</button>
+                  <button type="button" className="text-link hover:underline" onClick={() => setCollapsedAccounts(new Set())}>Expand all</button>
                   <span aria-hidden="true">·</span>
                   <button
                     type="button"
-                    className="text-primary hover:underline"
+                    className="text-link hover:underline"
                     onClick={() => setCollapsedAccounts(new Set(displayAccounts.map(account => account.account_id)))}
                   >
                     Collapse all
@@ -1159,7 +1168,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
   // Date, name and memo open the transaction too, like the type, number and
   // amount do. They keep the look of plain text until hovered.
   const textLink = (text: string) => (
-    <Link className="block truncate hover:text-primary hover:underline" to={line.transaction_path} title={text}>{text}</Link>
+    <Link className="block truncate hover:text-link hover:underline" to={line.transaction_path} title={text}>{text}</Link>
   );
   switch (column) {
     case 'date':
@@ -1169,8 +1178,8 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
     case 'transaction':
       content = (
         <>
-          <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{line.transaction_label}</Link>
-          {line.status === 'voided' && <span className="ml-2 text-xs uppercase">Voided</span>}
+          <Link className="font-medium text-link hover:underline" to={line.transaction_path}>{line.transaction_label}</Link>
+          {line.status === 'voided' && <Badge status="red" className="ml-2">Voided</Badge>}
           {line.is_reconciled && (
             <span
               className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700"
@@ -1185,7 +1194,7 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
     case 'reference': {
       const num = fmtNum(line);
       content = num
-        ? <Link className="font-medium text-primary hover:underline" to={line.transaction_path}>{num}</Link>
+        ? <Link className="font-medium text-link hover:underline" to={line.transaction_path}>{num}</Link>
         : null;
       className += ' font-mono text-xs whitespace-nowrap';
       break;
@@ -1209,23 +1218,25 @@ function LedgerLineCell({ column, line, padding }: { column: GeneralLedgerColumn
       className += ' max-w-[16rem] truncate text-xs text-muted-foreground';
       break;
     case 'amount':
-      content = new Decimal(line.amount).isZero()
-        ? ''
-        : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(line.amount)}</ReportAmountLink>;
-      className += ' text-right font-mono';
+      content = new Decimal(line.amount).isZero() ? '' : (
+        <span className={signColor(line.amount)}>{fmtAmount(line.amount)}</span>
+      );
+      className += ' text-right font-mono tabular-nums';
       break;
     case 'debit':
     case 'credit': {
+      // Debit/credit are always positive magnitudes whose direction depends on
+      // the account's own type (a credit increases revenue, decreases cash) —
+      // unlike the signed `amount`/`balance` columns, sign coloring doesn't
+      // apply here; QBO parity decision kept for this pass.
       const value = column === 'debit' ? line.debit : line.credit;
-      content = new Decimal(value).isZero()
-        ? ''
-        : <ReportAmountLink to={line.transaction_path} title="Open this transaction">{fmtAmount(value)}</ReportAmountLink>;
-      className += ' text-right font-mono';
+      content = new Decimal(value).isZero() ? '' : fmtAmount(value);
+      className += ' text-right font-mono tabular-nums';
       break;
     }
     case 'balance':
-      content = fmtAmount(line.running_balance);
-      className += ' text-right font-mono';
+      content = <span className={signColor(line.running_balance)}>{fmtAmount(line.running_balance)}</span>;
+      className += ' text-right font-mono tabular-nums';
       break;
     case 'class':
       content = line.class_name ?? '';

@@ -118,7 +118,7 @@ export default function PurchaseOrderDetailPage() {
       <DetailPageHeader
         eyebrow="Purchase order"
         title={data.po_number}
-        subtitle={vendor ? <Link className="text-primary hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : 'Vendor'}
+        subtitle={vendor ? <Link className="text-link hover:underline" to={`/ap/vendors/${vendor.id}`}>{vendor.name}</Link> : 'Vendor'}
         status={data.status}
         totalLabel="Order total"
         total={fmtMoney(total)}

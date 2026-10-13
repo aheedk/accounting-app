@@ -26,7 +26,7 @@ export function CodingSuggestionHint({
       </span>{' '}
       ({suggestion.confidence}%)
       {selectedId !== suggestion.account_id && (
-        <>{' '}<button type="button" className="font-medium text-primary underline" onClick={() => onUse(suggestion.account_id)}>Use</button></>
+        <>{' '}<button type="button" className="font-medium text-link underline" onClick={() => onUse(suggestion.account_id)}>Use</button></>
       )}
     </p>
   );

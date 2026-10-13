@@ -407,7 +407,7 @@ export default function BankTransactionsInboxPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Bank Transactions</h1>
         <Card><CardContent className="p-6 text-sm text-muted-foreground">
-          No bank accounts — create one in <Link to="/accounting/bank-accounts" className="text-primary underline">Bank Accounts</Link> first.
+          No bank accounts — create one in <Link to="/accounting/bank-accounts" className="text-link underline">Bank Accounts</Link> first.
         </CardContent></Card>
       </div>
     );
@@ -688,7 +688,7 @@ export default function BankTransactionsInboxPage() {
                     <p className="text-base font-semibold">All set with this account</p>
                     <p className="text-sm text-muted-foreground max-w-xs">
                       Go to the next account to review more transactions. You can also view your updated{' '}
-                      <Link to="/reports/profit-loss" className="text-primary underline">profit and loss</Link>.
+                      <Link to="/reports/profit-loss" className="text-link underline">profit and loss</Link>.
                     </p>
                   </div>
                 </td>
@@ -740,7 +740,7 @@ export default function BankTransactionsInboxPage() {
                           {t.matched_journal_entry_id ? (
                             <span className="text-muted-foreground">
                               Added to:{' '}
-                              <Link to={`/journal/${t.matched_journal_entry_id}`} className="text-primary underline">
+                              <Link to={`/journal/${t.matched_journal_entry_id}`} className="text-link underline">
                                 Journal Entry {fmtShortDate(t.transaction_date)}
                               </Link>
                             </span>
@@ -753,7 +753,7 @@ export default function BankTransactionsInboxPage() {
                         <td className="p-3">
                           {canUnreview && !t.is_reconciled && (
                             <button type="button" onClick={() => unreview(t)} disabled={busy}
-                              className="text-sm font-medium text-primary hover:underline disabled:opacity-50">
+                              className="text-sm font-medium text-link hover:underline disabled:opacity-50">
                               Undo
                             </button>
                           )}
@@ -768,7 +768,7 @@ export default function BankTransactionsInboxPage() {
                         <td className="p-3">
                           {canUnreview && !t.is_reconciled && (
                             <button type="button" onClick={() => unreview(t)} disabled={busy}
-                              className="text-sm font-medium text-primary hover:underline disabled:opacity-50">
+                              className="text-sm font-medium text-link hover:underline disabled:opacity-50">
                               Undo
                             </button>
                           )}

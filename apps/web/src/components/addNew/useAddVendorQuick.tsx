@@ -227,7 +227,7 @@ export function useAddVendorQuick(onCreated: (vendor: QuickVendor) => void) {
               href="/ap/vendors/new"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
+              className="text-sm text-link hover:underline"
             >
               Full details
             </a>

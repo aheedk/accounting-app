@@ -176,14 +176,14 @@ export default function CheckStubsPanel({ accounts }: { accounts: Account[] }) {
                     </span>
                     {stub.source_file_id && (
                       <button type="button" onClick={() => { void openSource(stub.source_file_id!); }}
-                        className="ml-2 inline-flex items-center gap-0.5 text-[11px] text-primary hover:underline">
+                        className="ml-2 inline-flex items-center gap-0.5 text-[11px] text-link hover:underline">
                         <ExternalLink className="h-3 w-3" />Stub
                       </button>
                     )}
                   </td>
                   <td className="px-3 py-2">
                     {stub.status === 'matched' && stub.matched_journal_entry_id && (
-                      <Link to={`/journal/${stub.matched_journal_entry_id}`} className="text-xs text-primary hover:underline">Open the check</Link>
+                      <Link to={`/journal/${stub.matched_journal_entry_id}`} className="text-xs text-link hover:underline">Open the check</Link>
                     )}
                     {stub.status === 'unmatched' && !stub.posted_check && (
                       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -197,7 +197,7 @@ export default function CheckStubsPanel({ accounts }: { accounts: Account[] }) {
                         <p>
                           Already posted on {fmtDate(stub.posted_check.date)}
                           {stub.posted_check.payee ? ` as “${stub.posted_check.payee}”` : ''}.{' '}
-                          <Link to={stub.posted_check.path} className="text-primary hover:underline">Open</Link>
+                          <Link to={stub.posted_check.path} className="text-link hover:underline">Open</Link>
                         </p>
                         <AppSelect
                           value={categories[stub.id] ?? stub.suggested_account_id ?? ''}

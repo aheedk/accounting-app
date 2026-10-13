@@ -167,7 +167,7 @@ export default function FixedAssetDetailPage() {
                   <tr key={h.id} className="border-b last:border-b-0">
                     <td className="p-3">{fmtLongDate(h.period_end)}</td>
                     <td className="p-3 text-right font-mono">{fmtMoney(h.amount)}</td>
-                    <td className="p-3"><Link className="text-primary hover:underline" to={`/journal/${h.journal_entry_id}`}>Open entry</Link></td>
+                    <td className="p-3"><Link className="text-link hover:underline" to={`/journal/${h.journal_entry_id}`}>Open entry</Link></td>
                   </tr>
                 ))}
               </tbody>

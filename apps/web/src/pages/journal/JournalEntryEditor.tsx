@@ -408,12 +408,12 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
             </Button>
           )}
           {existing?.entry.corrected_from_entry_id && (
-            <Link className="text-primary hover:underline" to={`/journal/${existing.entry.corrected_from_entry_id}`}>
+            <Link className="text-link hover:underline" to={`/journal/${existing.entry.corrected_from_entry_id}`}>
               Correction of Journal Entry #{existing.corrected_from_entry_journal_number}
             </Link>
           )}
           {existing?.entry.reversed_entry_id && (
-            <Link className="text-primary hover:underline" to={`/journal/${existing.entry.reversed_entry_id}`}>
+            <Link className="text-link hover:underline" to={`/journal/${existing.entry.reversed_entry_id}`}>
               Reversal of Journal Entry #{existing.reversed_entry_journal_number}
             </Link>
           )}
@@ -441,7 +441,7 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
             ? existing.correction_block_reason
             : 'Saving updates this entry in place. The change is recorded in the audit history.'}
           {readOnly && existing.source_path && (
-            <>{' '}<Link className="font-medium text-primary underline" to={existing.source_path}>Open the source transaction</Link></>
+            <>{' '}<Link className="font-medium text-link underline" to={existing.source_path}>Open the source transaction</Link></>
           )}
         </div>
       )}
@@ -735,7 +735,7 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
               <button
                 type="button"
                 onClick={() => setMoreOpen(current => !current)}
-                className="text-sm font-medium text-primary hover:underline"
+                className="text-sm font-medium text-link hover:underline"
               >
                 More
               </button>

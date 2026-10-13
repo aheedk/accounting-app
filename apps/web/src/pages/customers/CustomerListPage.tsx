@@ -14,6 +14,7 @@ import { printReport } from '@/lib/reportExport';
 import { pickErr } from '@/lib/apiErrors';
 import { flashMessage } from '@/lib/flash';
 import { mailtoLink } from '@/lib/mailto';
+import { formatPhone } from '@/lib/phone';
 import { useCan } from '@/lib/roleAccess';
 
 const IMPORT_COLS = [
@@ -90,7 +91,7 @@ export default function CustomerListPage() {
   const columns: Column<Customer>[] = [
     { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <span><Link className="font-medium hover:underline" to={`/customers/${r.id}`}>{r.name}</Link>{!r.is_active && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Inactive</span>}</span> },
     { key: 'company_name', header: 'Company name', sortable: true, sortValue: r => r.company_name ?? '', render: r => r.company_name || <span className="text-muted-foreground">—</span> },
-    { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</span> },
+    { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone ? formatPhone(r.phone) : <span className="text-muted-foreground">—</span>}</span> },
     { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => Number(r.open_balance ?? 0), render: r => <span className="font-mono">{fmtMoney((r.open_balance ?? '0').toString())}</span> },
   ];
 
@@ -187,8 +188,8 @@ export default function CustomerListPage() {
             return (
               <span className="relative inline-flex items-center gap-2">
                 {hasBalance
-                  ? <Link className="text-primary hover:underline" to={`/payments/new?customer_id=${r.id}`}>Receive payment</Link>
-                  : <Link className="text-primary hover:underline" to={`/invoices/new?customer_id=${r.id}`}>Create invoice</Link>}
+                  ? <Link className="text-link hover:underline" to={`/payments/new?customer_id=${r.id}`}>Receive payment</Link>
+                  : <Link className="text-link hover:underline" to={`/invoices/new?customer_id=${r.id}`}>Create invoice</Link>}
                 <button type="button" onClick={() => setOpenActionRow(current => (current === r.id ? null : r.id))} aria-label={`More actions for ${r.name}`}>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </button>

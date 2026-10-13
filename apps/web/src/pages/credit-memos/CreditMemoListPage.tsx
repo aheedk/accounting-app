@@ -177,7 +177,7 @@ export default function CreditMemoListPage() {
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="inline-flex items-center gap-2">
-              <Link className="text-primary hover:underline" to={`/credit-memos/${r.id}`}>View/Edit</Link>
+              <Link className="text-link hover:underline" to={`/credit-memos/${r.id}`}>View/Edit</Link>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </span>
           )}

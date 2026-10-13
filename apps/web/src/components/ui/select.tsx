@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-type OptionData = { value: string; label: string; disabled?: boolean | undefined };
+type OptionData = { value: string; label: string; disabled?: boolean | undefined; hint?: string | undefined };
 
 function childrenToText(node: React.ReactNode): string {
   if (node === null || node === undefined) return '';
@@ -17,13 +17,17 @@ function parseOptions(children: React.ReactNode): OptionData[] {
   React.Children.forEach(children, child => {
     if (!React.isValidElement(child)) return;
     if (child.type === 'option') {
-      const p = child.props as { value?: string; children?: React.ReactNode; disabled?: boolean };
+      const p = child.props as { value?: string; children?: React.ReactNode; disabled?: boolean; 'data-hint'?: string };
       const label = childrenToText(p.children);
       opts.push({
         // Like a native <select>: an <option> without a value uses its text.
         value: String(p.value ?? label),
         label,
         disabled: p.disabled,
+        // An optional right-aligned, italic category badge (QBO-style "Bank",
+        // "Credit Card"...) — set via a plain data-hint attribute on <option>
+        // so it stays out of the searchable/closed-state label text.
+        hint: p['data-hint'],
       });
     } else if (child.type === 'optgroup') {
       const gp = child.props as { children?: React.ReactNode };
@@ -169,10 +173,10 @@ export function AppSelect({
       ref={containerRef}
       className={cn(
         'relative flex h-9 w-full items-center rounded-md border border-input bg-background text-sm',
-        'ring-offset-background transition-colors',
-        'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
-        open && 'ring-2 ring-ring ring-offset-2',
-        disabled && 'cursor-not-allowed opacity-50',
+        'transition-shadow',
+        'focus-within:border-ring focus-within:shadow-[0_0_0_2px_rgba(0,119,197,0.15)]',
+        open && 'border-ring shadow-[0_0_0_2px_rgba(0,119,197,0.15)]',
+        disabled && 'cursor-not-allowed border-border bg-muted opacity-100 text-muted-foreground',
         className,
       )}
       {...(rest as React.HTMLAttributes<HTMLDivElement>)}
@@ -246,7 +250,11 @@ export function AppSelect({
                   )}
                 >
                   <span className="flex-1 whitespace-nowrap">{opt.label}</span>
-                  {isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />}
+                  {opt.hint ? (
+                    <span className="ml-2 shrink-0 text-xs italic text-muted-foreground">{opt.hint}</span>
+                  ) : (
+                    isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-link" />
+                  )}
                 </li>
               );
             })}
@@ -259,7 +267,7 @@ export function AppSelect({
               <button
                 type="button"
                 onClick={() => { setOpen(false); onAddNew(); }}
-                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-link hover:bg-accent"
               >
                 {addNewLabel}
               </button>

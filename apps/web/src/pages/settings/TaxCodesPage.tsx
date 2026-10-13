@@ -186,7 +186,7 @@ export default function TaxCodesPage() {
             <td className="p-3">{c.name}</td>
             <td className="p-3 text-right font-mono">{c.current_rate ? `${ratePercent(c.current_rate)}%` : '—'}</td>
             <td className="p-3">{statusBadge(c.is_active)}</td>
-            <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => startEdit(c)} disabled={!isFirmAdmin} title={isFirmAdmin ? undefined : 'Only a firm admin can change a tax code'}>Edit</Button></td>
+            <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-link hover:text-link" onClick={() => startEdit(c)} disabled={!isFirmAdmin} title={isFirmAdmin ? undefined : 'Only a firm admin can change a tax code'}>Edit</Button></td>
           </tr>))}</tbody>
         </table>
       </CardContent></Card>

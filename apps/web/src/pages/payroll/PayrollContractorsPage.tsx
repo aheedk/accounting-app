@@ -105,7 +105,7 @@ export default function PayrollContractorsPage() {
         <p className="text-sm text-muted-foreground">
           1099 contractors paid through payroll. To manage W-9 details (tax ID, type, 1099
           flag), use the{' '}
-          <Link to="/ap/contractors" className="text-primary underline">
+          <Link to="/ap/contractors" className="text-link underline">
             AP Contractors page
           </Link>
           .
@@ -132,7 +132,7 @@ export default function PayrollContractorsPage() {
                 <tr>
                   <td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">
                     No 1099 contractors yet. Mark a vendor as 1099 from the{' '}
-                    <Link to="/ap/vendors" className="text-primary underline">
+                    <Link to="/ap/vendors" className="text-link underline">
                       Vendors page
                     </Link>
                     .
@@ -152,7 +152,7 @@ export default function PayrollContractorsPage() {
                   <td className="p-3">{c.email ?? ''}</td>
                   <td className="p-3">
                     {c.tax_id_type ? (
-                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">
                         {c.tax_id_type}
                       </span>
                     ) : (

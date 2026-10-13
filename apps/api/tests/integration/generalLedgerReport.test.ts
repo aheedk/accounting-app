@@ -220,4 +220,22 @@ describe('general ledger report', () => {
     expect(report.accounts[0]!.lines.map(line => line.status)).toContain('voided');
     expect(report.accounts[0]!.ending_balance).toBe('0.0000');
   });
+
+  it('accountRegister returns one account\'s whole history as a flat register, regardless of fiscal period', async () => {
+    const { biz, ctx, cash, revenue } = await setup();
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id,
+      entry_date: '2026-01-15',
+      source_type: 'manual',
+      memo: 'Opening activity',
+      lines: [
+        { account_id: cash.id, debit: '100.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '100.0000', memo: null },
+      ],
+    }));
+    const register = await reportService.accountRegister(t.db, { business_id: biz.id, account_id: cash.id });
+    expect(register.account?.account_code).toBe('1010');
+    expect(register.lines).toHaveLength(1);
+    expect(register.lines[0]).toMatchObject({ debit: '100.0000', running_balance: '100.0000' });
+  });
 });

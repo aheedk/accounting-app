@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
+import { ReconcileNav } from './ReconcileNav';
 
 type ItemType = 'deposit' | 'expense' | 'check' | 'journal_entry' | 'service_charge' | 'interest';
 
@@ -35,8 +36,9 @@ type Summary = {
 };
 
 type Worksheet = {
-  reconciliation: { id: string; bank_account_id: string; status: string; statement_ending_date: string };
-  bank_account: { id: string; name: string };
+  reconciliation: { id: string; account_id: string; status: string; statement_ending_date: string };
+  account: { id: string; name: string };
+  category: string;
   items: WorksheetItem[];
   summary: Summary;
 };
@@ -186,10 +188,13 @@ export default function ReconcileWorksheetPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Reconcile — {data.bank_account.name}</h1>
+          <h1 className="text-2xl font-semibold">Reconcile — {data.account.name}</h1>
           <p className="text-sm text-muted-foreground">Statement ending {fmtShortDate(data.reconciliation.statement_ending_date)}</p>
         </div>
-        <Link to="/accounting/reconcile" className="text-sm text-primary underline">Back to Reconcile</Link>
+        <div className="flex items-center gap-4">
+          <Link to="/accounting/reconcile" className="text-sm text-link underline">Back to Reconcile</Link>
+          <ReconcileNav active="setup" accountId={data.account.id} />
+        </div>
       </div>
 
       {err && <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div>}
@@ -252,7 +257,7 @@ export default function ReconcileWorksheetPage() {
                     <td className="p-2 whitespace-nowrap">{fmtShortDate(item.transaction_date)}</td>
                     <td className="p-2 whitespace-nowrap">{item.type_label}</td>
                     <td className="p-2">
-                      <Link to={item.transaction_path} className="text-primary underline">{item.ref_no ?? '—'}</Link>
+                      <Link to={item.transaction_path} className="text-link underline">{item.ref_no ?? '—'}</Link>
                     </td>
                     <td className="p-2">{item.name ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-2 text-muted-foreground">{item.description ?? ''}</td>

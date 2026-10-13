@@ -534,7 +534,7 @@ export default function SalesOrderNewPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold">Modernized Template</span>
-                    <button type="button" className="text-xs text-primary hover:underline">Make default</button>
+                    <button type="button" className="text-xs text-link hover:underline">Make default</button>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="so_template" defaultChecked readOnly className="accent-green-500" />
@@ -545,7 +545,7 @@ export default function SalesOrderNewPage() {
                 <div className="border-t pt-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold">Other Templates</span>
-                    <button type="button" className="text-xs text-primary hover:underline">Add/Edit</button>
+                    <button type="button" className="text-xs text-link hover:underline">Add/Edit</button>
                   </div>
                 </div>
 

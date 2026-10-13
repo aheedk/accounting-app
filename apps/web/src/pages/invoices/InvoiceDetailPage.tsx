@@ -145,7 +145,7 @@ export default function InvoiceDetailPage() {
       <DetailPageHeader
         eyebrow="Invoice"
         title={inv.invoice_number}
-        subtitle={!customer ? 'Customer' : linksOut ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : customer.name}
+        subtitle={!customer ? 'Customer' : linksOut ? <Link className="text-link hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : customer.name}
         status={inv.status}
         totalLabel="Balance due"
         total={fmtMoney(data.amount_due)}
@@ -171,7 +171,7 @@ export default function InvoiceDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Invoice details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <DetailField label="Customer" value={!customer ? null : linksOut ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : customer.name} />
+            <DetailField label="Customer" value={!customer ? null : linksOut ? <Link className="text-link hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : customer.name} />
             <DetailField label="Customer email" value={customer?.email} />
             <DetailField label="Invoice date" value={fmtLongDate(inv.issue_date)} />
             <DetailField label="Due date" value={fmtLongDate(inv.due_date)} />
@@ -195,7 +195,7 @@ export default function InvoiceDetailPage() {
                   label: 'Journal entry',
                   // The journal is not part of a client login.
                   value: inv.posted_journal_entry_id && canOpen('/journal')
-                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${inv.posted_journal_entry_id}`}>View journal entry</Link>
+                    ? <Link className="font-mono text-link hover:underline" to={`/journal/${inv.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
               ]}

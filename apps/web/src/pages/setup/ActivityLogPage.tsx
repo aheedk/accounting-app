@@ -125,7 +125,7 @@ export default function ActivityLogPage() {
                     </td>
                     <td className="p-3 text-right">
                       {(row.before !== null || row.after !== null) && (
-                        <Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => setOpenId(open ? null : row.id)}>
+                        <Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-link hover:text-link" onClick={() => setOpenId(open ? null : row.id)}>
                           {open ? 'Hide' : 'Show'}
                         </Button>
                       )}

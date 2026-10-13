@@ -642,13 +642,13 @@ export default function EmailImportReviewPage() {
             if (selectedInvoice) { setSelectedInvoice(null); return; }
             nav(-1);
           }}
-          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-sm text-link hover:underline"
         >
           <ChevronLeft className="h-4 w-4" />Back
         </button>
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Sparkles className="h-5 w-5 text-link" />
             Document Inbox
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -705,7 +705,7 @@ export default function EmailImportReviewPage() {
             </button>
           </div>
           <button type="button" onClick={handleRefresh} disabled={refreshing}
-            className="inline-flex items-center gap-2 h-9 rounded-md border px-4 text-sm font-medium transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+            className="inline-flex items-center gap-2 h-9 rounded-md border px-4 text-sm font-medium transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed">
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Checking Gmail…' : 'Refresh'}
           </button>
@@ -741,13 +741,13 @@ export default function EmailImportReviewPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-4">
                       <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-link' : 'hover:bg-muted/50'}`}
                         title="View details">
                         <Info className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => openPdf('bank', imp.id)}
                         disabled={pdfLoading === imp.id}
-                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed"
                         title="View original PDF">
                         {pdfLoading === imp.id
                           ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -789,7 +789,7 @@ export default function EmailImportReviewPage() {
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => openPdf('bank', selectedBank.id)}
                     disabled={pdfLoading === selectedBank.id}
-                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed">
                     {pdfLoading === selectedBank.id
                       ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                       : <ExternalLink className="h-3.5 w-3.5" />}
@@ -904,7 +904,7 @@ export default function EmailImportReviewPage() {
                                           setPayeeDropdownRow(null);
                                           addVendor.open(vendor => setPayees(prev => ({ ...prev, [i]: vendor.name })));
                                         }}
-                                        className="w-full rounded-sm px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-accent"
+                                        className="w-full rounded-sm px-3 py-1.5 text-left text-xs font-medium text-link hover:bg-accent"
                                       >
                                         + Add new vendor
                                       </button>
@@ -1075,13 +1075,13 @@ export default function EmailImportReviewPage() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
                             <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
-                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-link' : 'hover:bg-muted/50'}`}
                               title="View details">
                               <Info className="h-3 w-3" />
                             </button>
                             <button type="button" onClick={() => openPdf('bank', imp.id)}
                               disabled={pdfLoading === imp.id}
-                              className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                              className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed">
                               {pdfLoading === imp.id
                                 ? <RefreshCw className="h-3 w-3 animate-spin" />
                                 : <ExternalLink className="h-3 w-3" />}
@@ -1138,13 +1138,13 @@ export default function EmailImportReviewPage() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
                             <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
-                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-link' : 'hover:bg-muted/50'}`}
                               title="View details">
                               <Info className="h-3 w-3" />
                             </button>
                             <button type="button" onClick={() => openPdf('invoice', imp.id)}
                               disabled={pdfLoading === imp.id}
-                              className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                              className="inline-flex h-7 items-center rounded-md border px-2.5 text-xs gap-1 transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed">
                               {pdfLoading === imp.id
                                 ? <RefreshCw className="h-3 w-3 animate-spin" />
                                 : <ExternalLink className="h-3 w-3" />}
@@ -1233,13 +1233,13 @@ export default function EmailImportReviewPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-4">
                       <button type="button" onClick={() => setInfoOpen(infoOpen === imp.id ? null : imp.id)}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted/50'}`}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${infoOpen === imp.id ? 'bg-primary/10 border-primary text-link' : 'hover:bg-muted/50'}`}
                         title="View details">
                         <Info className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => openPdf('invoice', imp.id)}
                         disabled={pdfLoading === imp.id}
-                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed"
                         title="View original PDF">
                         {pdfLoading === imp.id
                           ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1290,7 +1290,7 @@ export default function EmailImportReviewPage() {
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => openPdf('invoice', selectedInvoice.id)}
                     disabled={pdfLoading === selectedInvoice.id}
-                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm gap-1.5 transition-colors hover:bg-primary/5 hover:border-primary hover:text-link disabled:opacity-50 disabled:cursor-not-allowed">
                     {pdfLoading === selectedInvoice.id
                       ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                       : <ExternalLink className="h-3.5 w-3.5" />}
