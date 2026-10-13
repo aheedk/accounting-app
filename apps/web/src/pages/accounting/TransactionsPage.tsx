@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { AppSelect } from '@/components/ui/select';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { fmtMoney } from '@/lib/money';
-import { fmtDateTime } from '@/lib/dates';
+import { fiscalYearBoundsLocal, fmtDateTime } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 
 type TransactionType = 'deposit' | 'expense' | 'check' | 'journal' | 'bill' | 'payment' | 'credit_memo' | 'invoice' | 'bill_payment' | 'vendor_credit';
@@ -123,7 +123,7 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
   ...Object.fromEntries(DATE_PRESETS.map(p => [p.value, p.label])),
 } as Record<DatePreset, string>;
 
-function presetRange(preset: DatePreset, customStart: string, customEnd: string): { start: string | null; end: string | null } {
+function presetRange(preset: DatePreset, customStart: string, customEnd: string, fiscalYearStartMonth = 1): { start: string | null; end: string | null } {
   const now = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const startOfMonth = (y: number, m: number) => new Date(y, m, 1);
@@ -144,17 +144,18 @@ function presetRange(preset: DatePreset, customStart: string, customEnd: string)
     case 'previous_month': return { start: iso(startOfMonth(now.getFullYear(), now.getMonth() - 1)), end: iso(endOfMonth(now.getFullYear(), now.getMonth() - 1)) };
     case 'previous_quarter': { const q = Math.floor(now.getMonth() / 3) - 1; const y = now.getFullYear() + (q < 0 ? -1 : 0); const qq = (q + 4) % 4; return { start: iso(startOfMonth(y, qq * 3)), end: iso(endOfMonth(y, qq * 3 + 2)) }; }
     case 'this_week': { const s = startOfWeek(now); return { start: iso(s), end: iso(addDays(s, 6)) }; }
-    case 'this_year': return { start: iso(new Date(now.getFullYear(), 0, 1)), end: iso(new Date(now.getFullYear(), 11, 31)) };
+    case 'this_year': { const fy = fiscalYearBoundsLocal(fiscalYearStartMonth, now); return { start: fy.start, end: fy.end }; }
     case 'last_year': return { start: iso(new Date(now.getFullYear() - 1, 0, 1)), end: iso(new Date(now.getFullYear() - 1, 11, 31)) };
     case 'last_7_years': return { start: iso(addYears(now, -7)), end: iso(now) };
   }
 }
 
 function DateRangeFilter({
-  preset, start, end, onApply,
+  preset, start, end, onApply, fiscalYearStartMonth,
 }: {
   preset: DatePreset; start: string; end: string;
   onApply: (next: { preset: DatePreset; start: string; end: string }) => void;
+  fiscalYearStartMonth: number;
 }) {
   const [open, setOpen] = useState(false);
   const [draftPreset, setDraftPreset] = useState<DatePreset>(preset === 'unset' ? 'custom' : preset);
@@ -169,7 +170,7 @@ function DateRangeFilter({
   }
 
   function draftRange() {
-    return draftPreset === 'custom' ? { start: draftStart, end: draftEnd } : presetRange(draftPreset, '', '');
+    return draftPreset === 'custom' ? { start: draftStart, end: draftEnd } : presetRange(draftPreset, '', '', fiscalYearStartMonth);
   }
 
   function handleApply() {
@@ -405,25 +406,28 @@ export default function TransactionsPage() {
   const [contactText, setContactText] = useState('');
   const [amountFilter, setAmountFilter] = useState<AmountFilterState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
 
   useEffect(() => {
     if (!bizId) return;
     (async () => {
-      const [custData, vendData] = await Promise.all([
+      const [custData, vendData, bizData] = await Promise.all([
         cachedGet<{ customers: Array<{ id: string; name: string }> }>(`/businesses/${bizId}/customers`),
         cachedGet<{ vendors: Array<{ id: string; name: string }> }>(`/businesses/${bizId}/vendors`),
+        cachedGet<{ fiscal_year_start_month: number }>(`/businesses/${bizId}`),
       ]);
       setParties([
         ...(vendData?.vendors ?? []).map((v: { id: string; name: string }) => ({ id: v.id, type: 'vendor' as const, name: v.name })),
         ...(custData?.customers ?? []).map((c: { id: string; name: string }) => ({ id: c.id, type: 'customer' as const, name: c.name })),
       ]);
+      setFiscalYearStartMonth(bizData?.fiscal_year_start_month ?? 1);
     })();
   }, [bizId]);
 
   const reload = useCallback(async () => {
     if (!bizId) { setRows([]); setTotal(0); return; }
     setErr(null);
-    const range = presetRange(datePreset, customStart, customEnd);
+    const range = presetRange(datePreset, customStart, customEnd, fiscalYearStartMonth);
     const query: Record<string, string> = {
       page: String(page),
       page_size: String(PAGE_SIZE),
@@ -448,7 +452,7 @@ export default function TransactionsPage() {
     } catch (e: unknown) {
       setErr(pickErr(e));
     }
-  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page, sort.key, sort.dir]);
+  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page, sort.key, sort.dir, fiscalYearStartMonth]);
 
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => { setPage(1); }, [typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter]);
@@ -531,6 +535,7 @@ export default function TransactionsPage() {
             start={customStart}
             end={customEnd}
             onApply={next => { setDatePreset(next.preset); setCustomStart(next.start); setCustomEnd(next.end); }}
+            fiscalYearStartMonth={fiscalYearStartMonth}
           />
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">Transaction type</label>

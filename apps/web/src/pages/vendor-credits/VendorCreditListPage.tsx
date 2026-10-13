@@ -10,7 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
+import { daysAgoLocal, fiscalYearBoundsLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
 
@@ -30,7 +30,7 @@ const STATUSES = ['draft', 'posted', 'applied', 'voided'];
 const DATE_RANGES = [
   { value: '30d', label: 'Last 30 days', days: 30 },
   { value: '3m', label: 'Last 3 months', days: 92 },
-  // days -1: from January 1, to match the 'this year' figures in the bar above the table.
+  // days -1: from the fiscal year's own start, to match the 'this year' figures in the bar above the table.
   { value: 'ytd', label: 'This year', days: -1 },
   { value: '12m', label: 'Last 12 months', days: 365 },
   { value: 'all', label: 'All dates', days: 0 },
@@ -49,9 +49,11 @@ export default function VendorCreditListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('ytd');
   const [vendorQuery, setVendorQuery] = useState('');
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
 
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/vendor-credits`).then(r => setItems(r.data.vendor_credits)); }, [bizId]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/vendors`).then(r => setVendors(r.data.vendors)); }, [bizId]);
+  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}`).then(r => setFiscalYearStartMonth(r.data.fiscal_year_start_month ?? 1)).catch(() => {}); }, [bizId]);
 
   const vendorMap = useMemo(() => new Map(vendors.map(v => [v.id, v.name])), [vendors]);
 
@@ -63,18 +65,18 @@ export default function VendorCreditListPage() {
 
   const rows = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : `${currentYearLocal()}-01-01`;
+    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : fiscalYearBoundsLocal(fiscalYearStartMonth).start;
     const q = vendorQuery.trim().toLowerCase();
     return allRows.filter(r =>
       (!statusFilter || r.status === statusFilter) &&
       (!cutoff || r.credit_date >= cutoff) &&
       (!q || r.vendor_name.toLowerCase().includes(q)),
     );
-  }, [allRows, statusFilter, dateFilter, vendorQuery]);
+  }, [allRows, statusFilter, dateFilter, vendorQuery, fiscalYearStartMonth]);
 
   // Money bar totals are computed across all vendor credits, unfiltered (QBO behavior).
   const stats = useMemo(() => {
-    const yearStart = `${currentYearLocal()}-01-01`;
+    const yearStart = fiscalYearBoundsLocal(fiscalYearStartMonth).start;
     const recentCutoff = daysAgoLocal(30);
     let issued = 0, remaining = 0, drafts = 0, draftCount = 0, recent = 0, recentCount = 0;
     for (const c of items) {
@@ -87,7 +89,7 @@ export default function VendorCreditListPage() {
       }
     }
     return { issued, remaining, drafts, draftCount, recent, recentCount };
-  }, [items]);
+  }, [items, fiscalYearStartMonth]);
 
   const columns: Column<Row>[] = [
     { key: 'number', header: 'No.', sortable: true, sortValue: r => r.vendor_credit_number ?? '', render: r => <span className="whitespace-nowrap font-mono text-xs">{r.vendor_credit_number ?? '—'}</span> },

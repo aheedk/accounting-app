@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
-import { daysAgoLocal, todayLocal } from '@/lib/dates';
+import { daysAgoLocal, fiscalYearBoundsLocal, todayLocal } from '@/lib/dates';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
@@ -43,9 +43,9 @@ function daysBetween(fromIso: string, toIso: string) {
   return Math.floor((b - a) / 86_400_000);
 }
 
-function dateRangeBounds(value: string): { from: string; to: string } | null {
+function dateRangeBounds(value: string, fiscalYearStartMonth = 1): { from: string; to: string } | null {
   const today = todayLocal();
-  if (value === 'year') return { from: `${today.slice(0, 4)}-01-01`, to: `${today.slice(0, 4)}-12-31` };
+  if (value === 'year') { const fy = fiscalYearBoundsLocal(fiscalYearStartMonth); return { from: fy.start, to: fy.end }; }
   if (value === '3m') return { from: daysAgoLocal(92), to: today };
   if (value === '12m') return { from: daysAgoLocal(365), to: today };
   return null;
@@ -61,6 +61,7 @@ export default function BillListPage() {
   const [tab, setTab] = useState<string>('posted');
   const [vendorFilter, setVendorFilter] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('year');
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
 
   useEffect(() => {
     if (!bizId) return;
@@ -70,13 +71,17 @@ export default function BillListPage() {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/vendors`).then(r => setVendors(r.data.vendors));
   }, [bizId]);
+  useEffect(() => {
+    if (!bizId) return;
+    api.get(`/businesses/${bizId}`).then(r => setFiscalYearStartMonth(r.data.fiscal_year_start_month ?? 1)).catch(() => {});
+  }, [bizId]);
 
   const vendorMap = useMemo(() => new Map(vendors.map(v => [v.id, v.name])), [vendors]);
   const today = todayLocal();
 
   type Row = BillSummary & { vendor_name: string; overdue_days: number };
   const rows: Row[] = useMemo(() => {
-    const bounds = dateRangeBounds(dateFilter);
+    const bounds = dateRangeBounds(dateFilter, fiscalYearStartMonth);
     return items
       .filter(b => (!vendorFilter || b.vendor_id === vendorFilter) && (!bounds || (b.bill_date >= bounds.from && b.bill_date <= bounds.to)))
       .map(b => ({
@@ -84,7 +89,7 @@ export default function BillListPage() {
         vendor_name: vendorMap.get(b.vendor_id) ?? '',
         overdue_days: b.status === 'posted' && b.due_date < today ? daysBetween(b.due_date, today) : 0,
       }));
-  }, [items, vendorMap, vendorFilter, dateFilter, today]);
+  }, [items, vendorMap, vendorFilter, dateFilter, today, fiscalYearStartMonth]);
 
   const columns: Column<Row>[] = [
     { key: 'vendor', header: 'Vendor', sortable: true, sortValue: r => r.vendor_name, render: r => r.vendor_name || <span className="text-muted-foreground">—</span> },
@@ -97,7 +102,7 @@ export default function BillListPage() {
       : <span className="capitalize">{r.status === 'posted' ? 'Open' : r.status}</span> },
   ];
 
-  const bounds = dateRangeBounds(dateFilter);
+  const bounds = dateRangeBounds(dateFilter, fiscalYearStartMonth);
 
   if (!bizId) return <div>Pick a business.</div>;
 

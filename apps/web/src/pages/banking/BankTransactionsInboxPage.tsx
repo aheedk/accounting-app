@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { downloadAsExcel } from '@/lib/download';
 import { api } from '@/lib/apiClient';
 import { cachedGet } from '@/lib/referenceDataCache';
+import { fiscalYearBoundsLocal } from '@/lib/dates';
 import { useActiveBusinessId } from '@/lib/business';
 import { roleAtLeast, useEffectiveRole } from '@/lib/roleAccess';
 import { Button } from '@/components/ui/button';
@@ -123,7 +124,7 @@ function isoToDisplay(iso: string): string {
   return y && m && d ? `${m}/${d}/${y}` : iso;
 }
 
-function getPresetRange(preset: string): { from: string; to: string } | null {
+function getPresetRange(preset: string, fiscalYearStartMonth = 1): { from: string; to: string } | null {
   const now = new Date();
   const y = now.getFullYear();
   const mo = now.getMonth();
@@ -144,7 +145,7 @@ function getPresetRange(preset: string): { from: string; to: string } | null {
     }
     case 'this_month': return { from: ymd(y, mo, 1), to: ymd(y, mo + 1, 0) };
     case 'this_quarter': { const q = Math.floor(mo / 3); return { from: ymd(y, q * 3, 1), to: ymd(y, q * 3 + 3, 0) }; }
-    case 'this_year': return { from: ymd(y, 0, 1), to: ymd(y, 11, 31) };
+    case 'this_year': { const fy = fiscalYearBoundsLocal(fiscalYearStartMonth, now); return { from: fy.start, to: fy.end }; }
     case 'last_week': {
       const dow = now.getDay();
       const mon = new Date(now); mon.setDate(d - (dow === 0 ? 6 : dow - 1) - 7);
@@ -189,6 +190,14 @@ export default function BankTransactionsInboxPage() {
   const [showDatePanel, setShowDatePanel] = useState(false);
   const [txnTypeFilter, setTxnTypeFilter] = useState('all');
   const datePanelRef = useRef<HTMLDivElement>(null);
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
+
+  useEffect(() => {
+    if (!bizId) return;
+    cachedGet<{ fiscal_year_start_month: number }>(`/businesses/${bizId}`)
+      .then(r => setFiscalYearStartMonth(r?.fiscal_year_start_month ?? 1))
+      .catch(() => {});
+  }, [bizId]);
 
   useEffect(() => {
     if (!bizId) return;
@@ -520,7 +529,7 @@ export default function BankTransactionsInboxPage() {
                     const val = e.target.value;
                     setDatePreset(val);
                     if (val !== 'custom') {
-                      const range = getPresetRange(val);
+                      const range = getPresetRange(val, fiscalYearStartMonth);
                       setDateFrom(range?.from ?? '');
                       setDateTo(range?.to ?? '');
                     }

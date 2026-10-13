@@ -10,7 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
+import { daysAgoLocal, fiscalYearBoundsLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
 import { humanizeCode } from '@/lib/labels';
@@ -33,7 +33,7 @@ const STATUSES = ['draft', 'posted', 'voided'];
 const DATE_RANGES = [
   { value: '30d', label: 'Last 30 days', days: 30 },
   { value: '3m', label: 'Last 3 months', days: 92 },
-  // days -1: from January 1, to match the 'this year' figures in the bar above the table.
+  // days -1: from the fiscal year's own start, to match the 'this year' figures in the bar above the table.
   { value: 'ytd', label: 'This year', days: -1 },
   { value: '12m', label: 'Last 12 months', days: 365 },
   { value: 'all', label: 'All dates', days: 0 },
@@ -53,9 +53,11 @@ export default function PaymentListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('ytd');
   const [customerQuery, setCustomerQuery] = useState('');
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
 
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/payments`).then(r => setItems(r.data.payments)); }, [bizId]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/customers?include_inactive=true`).then(r => setCustomers(r.data.customers)); }, [bizId]);
+  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}`).then(r => setFiscalYearStartMonth(r.data.fiscal_year_start_month ?? 1)).catch(() => {}); }, [bizId]);
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
 
@@ -67,7 +69,7 @@ export default function PaymentListPage() {
 
   const rows = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : `${currentYearLocal()}-01-01`;
+    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : fiscalYearBoundsLocal(fiscalYearStartMonth).start;
     const q = customerQuery.trim().toLowerCase();
     return allRows.filter(r =>
       (!methodFilter || r.payment_method === methodFilter) &&
@@ -75,11 +77,11 @@ export default function PaymentListPage() {
       (!cutoff || r.payment_date >= cutoff) &&
       (!q || r.customer_name.toLowerCase().includes(q)),
     );
-  }, [allRows, methodFilter, statusFilter, dateFilter, customerQuery]);
+  }, [allRows, methodFilter, statusFilter, dateFilter, customerQuery, fiscalYearStartMonth]);
 
   // Money bar totals are computed across all payments, unfiltered (QBO behavior).
   const stats = useMemo(() => {
-    const yearStart = `${currentYearLocal()}-01-01`;
+    const yearStart = fiscalYearBoundsLocal(fiscalYearStartMonth).start;
     const recentCutoff = daysAgoLocal(30);
     let received = 0, unapplied = 0, drafts = 0, draftCount = 0, recent = 0, recentCount = 0;
     for (const p of items) {
@@ -92,7 +94,7 @@ export default function PaymentListPage() {
       }
     }
     return { received, unapplied, drafts, draftCount, recent, recentCount };
-  }, [items]);
+  }, [items, fiscalYearStartMonth]);
 
   const columns: Column<Row>[] = [
     { key: 'payment_date', header: 'Date', sortable: true, sortValue: r => r.payment_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.payment_date)}</span> },
