@@ -116,6 +116,12 @@ export async function getImportedTransaction(
 export async function updateImportedTransaction(
   trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateImportedTransactionInput,
 ): Promise<ImportedTransaction> {
+  // The ledger leaves the role to whoever passes a source_guard (see
+  // updateJournalEntry), so the rule shown as `can_edit` is enforced here too,
+  // not only by the route.
+  if (!hasMinRole(ctx.effective_role, 'accountant')) {
+    throw new BusinessRuleError(ERR.FORBIDDEN, 'Accountant access is required to edit transactions.');
+  }
   const { entry, bankLine, businessId } = await load(trx, ctx, input.journal_entry_id);
   if (!entry.source_id) throw new PreconditionError('This transaction is not linked to an import');
 
