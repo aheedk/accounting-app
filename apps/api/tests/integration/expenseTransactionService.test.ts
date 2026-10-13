@@ -422,4 +422,46 @@ describe('expenseTransactionService', () => {
       .where('id', '=', wrapped.id).executeTakeFirst();
     expect(row).toBeUndefined();
   });
+
+  it('recategorizeExpense swaps a single line\'s account and updates the posted JE in place, same journal number', async () => {
+    const { ctx, supplies, rent, cash } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: supplies.id, amount: '30.00' }],
+    }));
+    const originalJeId = expense.journal_entry_id;
+
+    const recategorized = await t.db.transaction().execute(trx =>
+      et.recategorizeExpense(trx, ctx, { id: expense.id, category_account_id: rent.id }),
+    );
+    expect(recategorized.journal_entry_id).toBe(originalJeId);
+    expect(recategorized.total_amount).toBe('30.0000');
+
+    const lines = await t.db.selectFrom('expense_transaction_lines').selectAll()
+      .where('expense_transaction_id', '=', expense.id).execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.category_account_id).toBe(rent.id);
+
+    const jeLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', originalJeId!).execute();
+    expect(jeLines.find(l => l.account_id === rent.id)?.debit).toBe('30.0000');
+    expect(jeLines.find(l => l.account_id === supplies.id)).toBeUndefined();
+  });
+
+  it('recategorizeExpense refuses a split (more than one line)', async () => {
+    const { ctx, supplies, rent, cash } = await bootstrap();
+    const expense = await t.db.transaction().execute(trx => et.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', payee_text: 'Staples',
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [
+        { category_account_id: supplies.id, amount: '20.00' },
+        { category_account_id: rent.id, amount: '10.00' },
+      ],
+    }));
+
+    await expect(
+      t.db.transaction().execute(trx => et.recategorizeExpense(trx, ctx, { id: expense.id, category_account_id: rent.id })),
+    ).rejects.toThrow();
+  });
 });

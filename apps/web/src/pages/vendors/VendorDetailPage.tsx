@@ -49,7 +49,7 @@ type Vendor = {
 type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string };
 // For the sidebar's "Sort by open balance" — business-wide, not just this vendor's.
 type VendorBillSummary = { vendor_id: string; status: string; total: string };
-type Account = { id: string; name: string };
+type Account = { id: string; name: string; account_type: string };
 // Every transaction type this vendor can appear on (bills, checks, expenses,
 // journal entries, ...) — the unified transactions endpoint's contact_id
 // filter, not just the AP-specific bills list, so Checks/Expenses actually
@@ -205,6 +205,24 @@ export default function VendorDetailPage() {
   const [noteDraft, setNoteDraft] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
   const [txTypeFilter, setTxTypeFilter] = useState('all');
+  const [recategorizingId, setRecategorizingId] = useState<string | null>(null);
+
+  async function recategorize(tx: VendorTransaction, accountId: string) {
+    if (!bizId) return;
+    setRecategorizingId(tx.id);
+    try {
+      // A unified 'check' row can be a real checks-table row or a legacy
+      // check-by-expense row (expenseTransactionService) — its own path tells
+      // us which, same test the page already relies on for the View/Edit link.
+      const isExpenseBacked = tx.type === 'expense' || tx.path.startsWith('/accounting/expenses/');
+      const path = isExpenseBacked
+        ? `/businesses/${bizId}/expense-transactions/${tx.id}/category`
+        : `/businesses/${bizId}/checks/${tx.id}/category`;
+      await api.patch(path, { account_id: accountId });
+      loadTransactions();
+    } catch (e: unknown) { showToast(pickErr(e)); }
+    finally { setRecategorizingId(null); }
+  }
 
   function loadNotes() {
     if (!bizId || !id) return;
@@ -238,13 +256,18 @@ export default function VendorDetailPage() {
     } catch (e: unknown) { setDeleteErr(pickErr(e)); }
   }
 
+  function loadTransactions() {
+    if (!bizId || !id) return;
+    api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
+      .then(r => setTransactions(r.data.transactions));
+  }
+
   useEffect(() => {
     if (!bizId || !id) return;
     api.get(`/businesses/${bizId}/vendors/${id}`).then(r => setVendor(r.data));
     api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: id, limit: 1000 } }).then(r => setBills(r.data.bills));
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts));
-    api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
-      .then(r => setTransactions(r.data.transactions));
+    loadTransactions();
   }, [bizId, id]);
 
   useEffect(() => { if (tab === 'notes') loadNotes(); }, [bizId, id, tab]);
@@ -305,6 +328,8 @@ export default function VendorDetailPage() {
   const expenseCategory = vendor?.default_expense_account_id
     ? accounts.find(a => a.id === vendor.default_expense_account_id)?.name ?? null
     : null;
+  // Same ordering as the expense/check line's own category picker (ExpensePage/CheckPage): expense accounts first.
+  const categoryAccounts = [...accounts.filter(a => a.account_type === 'expense'), ...accounts.filter(a => a.account_type !== 'expense')];
 
   if (!vendor) return <div>Loading…</div>;
   return (
@@ -480,13 +505,24 @@ export default function VendorDetailPage() {
                       <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>
                       <td className="p-3">{tx.contact_name ?? <span className="text-muted-foreground">—</span>}</td>
                       <td className="p-3">
-                        <div
-                          title="Editing the category here is coming soon"
-                          className="flex h-8 max-w-[12rem] cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
-                        >
-                          <span className="truncate">{tx.category ?? '—'}</span>
-                          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                        </div>
+                        {(tx.type === 'expense' || tx.type === 'check') && tx.category && tx.category !== 'Split' ? (
+                          <AppSelect
+                            className="h-8 w-full max-w-[12rem] rounded-md border bg-background px-2 text-sm disabled:opacity-60"
+                            value={categoryAccounts.find(a => a.name === tx.category)?.id ?? ''}
+                            disabled={recategorizingId === tx.id}
+                            onChange={e => { if (e.target.value) { void recategorize(tx, e.target.value); } }}
+                          >
+                            {categoryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </AppSelect>
+                        ) : (
+                          <div
+                            title={tx.category === 'Split' ? 'This transaction has more than one category — open it to edit.' : 'Editing the category here isn’t supported for this transaction type.'}
+                            className="flex h-8 max-w-[12rem] cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
+                          >
+                            <span className="truncate">{tx.category ?? '—'}</span>
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
                       <td className="p-3 text-right">

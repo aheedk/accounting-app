@@ -363,6 +363,40 @@ export async function updateCheck(
   return updated;
 }
 
+/**
+ * Re-point a single-line check at a different category account — see the
+ * matching recategorizeExpense in expenseTransactionService for why this
+ * delegates to the full updateCheck rather than writing the line/JE update
+ * itself. Refuses a split (more than one line), same as QBO.
+ */
+export async function recategorizeCheck(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { id: string; account_id: string },
+) {
+  const bizId = ctx.business_id!;
+  const check = await trx.selectFrom('checks').selectAll()
+    .where('id', '=', input.id).where('business_id', '=', bizId).executeTakeFirst();
+  if (!check) throw new NotFoundError('check', input.id);
+
+  const lines = await trx.selectFrom('check_lines').selectAll()
+    .where('check_id', '=', input.id).orderBy('line_number', 'asc').execute();
+  if (lines.length !== 1) {
+    throw new PreconditionError('This transaction has more than one category line — open it to edit a split.');
+  }
+
+  return updateCheck(trx, ctx, input.id, {
+    payment_date: check.payment_date,
+    check_number: check.check_number,
+    payee_id: check.payee_id,
+    payee_type: check.payee_type,
+    payee_text: check.payee_text,
+    bank_account_id: check.bank_account_id,
+    mailing_address: check.mailing_address,
+    memo: check.memo,
+    print_later: check.print_later,
+    lines: [{ account_id: input.account_id, description: lines[0]!.description, amount: lines[0]!.amount }],
+  });
+}
+
 export async function voidCheck(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { check_id: string; void_reason?: string | null },
 ) {

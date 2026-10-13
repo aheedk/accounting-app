@@ -251,4 +251,46 @@ describe('checkService', () => {
     expect(list[1]?.path).toBe(`/accounting/expenses/${legacy.id}`);
     expect(list[1]?.bank_account_name).toBe('Operating Checking');
   });
+
+  it('recategorizeCheck swaps a single line\'s account and updates the posted JE in place, same journal number', async () => {
+    const { ctx, repairs, supplies, bankAccount } = await bootstrap();
+    const check = await t.db.transaction().execute(trx => checkSvc.createCheck(trx, ctx, {
+      payment_date: '2026-04-15',
+      payee_text: 'Action Lawn Maintenance',
+      bank_account_id: bankAccount.id,
+      lines: [{ account_id: repairs.id, amount: '80.00' }],
+    }));
+    const originalJeId = check.journal_entry_id;
+
+    const recategorized = await t.db.transaction().execute(trx =>
+      checkSvc.recategorizeCheck(trx, ctx, { id: check.id, account_id: supplies.id }),
+    );
+    expect(recategorized.journal_entry_id).toBe(originalJeId);
+
+    const lines = await t.db.selectFrom('check_lines').selectAll().where('check_id', '=', check.id).execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.account_id).toBe(supplies.id);
+
+    const jeLines = await t.db.selectFrom('journal_entry_lines').selectAll()
+      .where('journal_entry_id', '=', originalJeId!).execute();
+    expect(jeLines.find(l => l.account_id === supplies.id)?.debit).toBe('80.0000');
+    expect(jeLines.find(l => l.account_id === repairs.id)).toBeUndefined();
+  });
+
+  it('recategorizeCheck refuses a split (more than one line)', async () => {
+    const { ctx, repairs, supplies, bankAccount } = await bootstrap();
+    const check = await t.db.transaction().execute(trx => checkSvc.createCheck(trx, ctx, {
+      payment_date: '2026-04-15',
+      payee_text: 'Action Lawn Maintenance',
+      bank_account_id: bankAccount.id,
+      lines: [
+        { account_id: repairs.id, amount: '50.00' },
+        { account_id: supplies.id, amount: '30.00' },
+      ],
+    }));
+
+    await expect(
+      t.db.transaction().execute(trx => checkSvc.recategorizeCheck(trx, ctx, { id: check.id, account_id: supplies.id })),
+    ).rejects.toThrow();
+  });
 });

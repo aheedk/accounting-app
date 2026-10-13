@@ -59,6 +59,16 @@ router.patch('/businesses/:businessId/expense-transactions/:id', requireMinRole(
   } catch (e) { next(e); }
 });
 
+router.patch('/businesses/:businessId/expense-transactions/:id/category', requireMinRole('staff'), async (req, res, next) => {
+  try {
+    const body = schemas.recategorizeSchema.parse(req.body);
+    const updated = await db.transaction().execute(trx =>
+      et.recategorizeExpense(trx, ctxFromReq(req), { id: req.params['id']!, category_account_id: body.account_id }),
+    );
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
 router.post('/businesses/:businessId/expense-transactions/:id/void', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const updated = await db.transaction().execute(trx =>

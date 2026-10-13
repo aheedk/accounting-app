@@ -76,6 +76,16 @@ router.patch('/businesses/:businessId/checks/:id', requireMinRole('staff'), asyn
   } catch (e) { next(e); }
 });
 
+router.patch('/businesses/:businessId/checks/:id/category', requireMinRole('staff'), async (req, res, next) => {
+  try {
+    const body = schemas.recategorizeSchema.parse(req.body);
+    const updated = await db.transaction().execute(trx =>
+      checkSvc.recategorizeCheck(trx, ctxFromReq(req), { id: req.params['id']!, account_id: body.account_id }),
+    );
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
 router.post('/businesses/:businessId/checks/:id/void', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const body = schemas.checkVoidSchema.parse(req.body ?? {});
