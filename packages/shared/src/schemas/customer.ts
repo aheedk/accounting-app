@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { phoneSchema } from '../phone.js';
 
 const addressSchema = z.object({
   line1: z.string().max(200).optional(),
@@ -22,10 +23,10 @@ export const customerCreateSchema = z.object({
   email: z.string().email().nullable().optional(),
   email_cc: z.string().max(200).nullable().optional(),
   email_bcc: z.string().max(200).nullable().optional(),
-  phone: z.string().max(50).nullable().optional(),
-  mobile: z.string().max(50).nullable().optional(),
-  fax: z.string().max(50).nullable().optional(),
-  other_phone: z.string().max(50).nullable().optional(),
+  phone: phoneSchema,
+  mobile: phoneSchema,
+  fax: phoneSchema,
+  other_phone: phoneSchema,
   website: z.string().max(200).nullable().optional(),
   name_on_checks: z.string().max(200).nullable().optional(),
   billing_address: addressSchema,

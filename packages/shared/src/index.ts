@@ -1,4 +1,5 @@
 export * from './decimal.js';
+export * from './phone.js';
 export * from './autoCoding.js';
 export * from './auditActions.js';
 export * from './errorCodes.js';

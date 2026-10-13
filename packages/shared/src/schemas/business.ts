@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { phoneSchema } from '../phone.js';
 
 export const businessAddressSchema = z.object({
   line1: z.string().max(200).optional(),
@@ -16,7 +17,7 @@ export const businessUpdateSchema = z.object({
   tax_id: z.string().min(1).max(50).nullable().optional(),
   fiscal_year_start_month: z.number().int().min(1).max(12).optional(),
   address: businessAddressSchema.nullable().optional(),
-  phone: z.string().max(30).nullable().optional(),
+  phone: phoneSchema,
   import_email: z.string().email().max(254).nullable().optional(),
   /** Opt in to posting high-confidence AI suggestions without review. */
   ai_auto_post_enabled: z.boolean().optional(),

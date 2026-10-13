@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { phoneSchema } from '../phone.js';
 
 const moneyString = z.union([z.string(), z.number()]).transform(v => String(v)).pipe(z.string().regex(/^-?\d+(\.\d+)?$/));
 
@@ -12,9 +13,9 @@ const vendorExpandedFields = {
   suffix: z.string().max(20).nullable().optional(),
   email_cc: z.string().max(200).nullable().optional(),
   email_bcc: z.string().max(200).nullable().optional(),
-  mobile: z.string().max(50).nullable().optional(),
-  fax: z.string().max(50).nullable().optional(),
-  other_phone: z.string().max(50).nullable().optional(),
+  mobile: phoneSchema,
+  fax: phoneSchema,
+  other_phone: phoneSchema,
   website: z.string().max(200).nullable().optional(),
   name_on_checks: z.string().max(200).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
@@ -27,7 +28,7 @@ const vendorExpandedFields = {
 export const vendorCreateSchema = z.object({
   name: z.string().min(1).max(200),
   email: z.string().email().nullable().optional(),
-  phone: z.string().max(50).nullable().optional(),
+  phone: phoneSchema,
   billing_address: z.record(z.string().max(200)).nullable().optional(),
   tax_id: z.string().min(1).max(50).nullable().optional(),
   tax_id_type: z.enum(['SSN', 'EIN']).nullable().optional(),
@@ -44,7 +45,7 @@ export type VendorCreate = z.infer<typeof vendorCreateSchema>;
 export const vendorUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.string().email().nullable().optional(),
-  phone: z.string().max(50).nullable().optional(),
+  phone: phoneSchema,
   billing_address: z.record(z.string().max(200)).nullable().optional(),
   tax_id: z.string().min(1).max(50).nullable().optional(),
   tax_id_type: z.enum(['SSN', 'EIN']).nullable().optional(),
