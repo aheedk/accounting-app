@@ -26,7 +26,7 @@ describe('vendorService', () => {
     const biz = await makeBusiness(t.db, firm.id);
     const user = await makeUser(t.db, firm.id, { role: 'accountant' });
     const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
-    return { firm, biz, ctx };
+    return { firm, biz, user, ctx };
   }
 
   async function setupWithCoa() {
@@ -187,5 +187,29 @@ describe('vendorService', () => {
     // 500 - 200 applied = 300 outstanding; less the $75 unused credit and the $50 unapplied payment = 175.
     const [row] = await vend.listVendors(t.db, biz.id);
     expect(row!.open_balance).toBe('175.0000');
+  });
+
+  it('addVendorNote records a timestamped note with its author, newest first', async () => {
+    const { biz, ctx, user } = await setup();
+    const vendor = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme' }));
+
+    await t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendor.id, note_text: 'Called about a late bill' }));
+    await t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendor.id, note_text: 'Confirmed new remit-to address' }));
+
+    const notes = await vend.listVendorNotes(t.db, biz.id, vendor.id);
+    expect(notes).toHaveLength(2);
+    expect(notes[0]!.note_text).toBe('Confirmed new remit-to address');
+    expect(notes[1]!.note_text).toBe('Called about a late bill');
+    expect(notes[0]!.author_name).toBe(user.full_name);
+  });
+
+  it('addVendorNote refuses a vendor from another business', async () => {
+    const { ctx } = await setup();
+    const other = await setup();
+    const vendor = await t.db.transaction().execute(trx => vend.createVendor(trx, other.ctx, { business_id: other.biz.id, name: 'Acme' }));
+
+    await expect(
+      t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendor.id, note_text: 'x' })),
+    ).rejects.toMatchObject({ code: ERR.NOT_FOUND });
   });
 });

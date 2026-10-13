@@ -312,3 +312,39 @@ export async function listContractors(db: Kysely<DB>, business_id: string) {
     .where('is_1099', '=', true)
     .orderBy('name').execute();
 }
+
+export async function listVendorNotes(db: Kysely<DB>, business_id: string, vendor_id: string) {
+  const rows = await db.selectFrom('vendor_notes as n')
+    .innerJoin('users as u', 'u.id', 'n.user_id')
+    .select(['n.id', 'n.note_text', 'n.created_at', 'n.user_id', 'u.full_name as author_name'])
+    .where('n.business_id', '=', business_id)
+    .where('n.vendor_id', '=', vendor_id)
+    .orderBy('n.created_at', 'desc')
+    .execute();
+  return rows;
+}
+
+export async function addVendorNote(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { vendor_id: string; note_text: string },
+) {
+  const vendor = await trx.selectFrom('vendors').select('id')
+    .where('id', '=', input.vendor_id).where('business_id', '=', ctx.business_id ?? '').where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  if (!vendor) throw new NotFoundError('vendor', input.vendor_id);
+
+  const row = await trx.insertInto('vendor_notes').values({
+    business_id: ctx.business_id ?? '',
+    vendor_id: input.vendor_id,
+    user_id: ctx.user_id,
+    note_text: input.note_text,
+  }).returningAll().executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.VENDOR_NOTE_CREATE,
+    entity_type: 'vendor',
+    entity_id: input.vendor_id,
+    before: null,
+    after: row,
+  });
+  return row;
+}

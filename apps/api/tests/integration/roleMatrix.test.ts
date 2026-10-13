@@ -98,6 +98,7 @@ const STAFF_MAY_WRITE = [
   'POST ~/sales-orders',
   'POST ~/shipping-labels',
   'POST ~/vendors',
+  'POST ~/vendors/:id/notes',
 ];
 
 // What only a firm admin may do: the firm's users and clients (adding one,

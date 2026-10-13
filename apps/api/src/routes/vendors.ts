@@ -106,6 +106,23 @@ router.delete('/businesses/:businessId/vendors/:id', requireMinRole('firm_admin'
   } catch (e) { next(e); }
 });
 
+router.get('/businesses/:businessId/vendors/:id/notes', async (req, res, next) => {
+  try {
+    const notes = await vend.listVendorNotes(db, req.tenancy!.business_id, req.params['id']!);
+    res.json({ notes });
+  } catch (e) { next(e); }
+});
+
+router.post('/businesses/:businessId/vendors/:id/notes', requireMinRole('staff'), async (req, res, next) => {
+  try {
+    const body = schemas.vendorNoteCreateSchema.parse(req.body);
+    const note = await db.transaction().execute(trx =>
+      vend.addVendorNote(trx, ctxFromReq(req), { vendor_id: req.params['id']!, note_text: body.note_text }),
+    );
+    res.status(201).json(note);
+  } catch (e) { next(e); }
+});
+
 router.get('/businesses/:businessId/contractors', async (req, res, next) => {
   try { res.json({ vendors: await vend.listContractors(db, req.tenancy!.business_id) }); }
   catch (e) { next(e); }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, FolderOpen, Plus, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, Star } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -69,7 +69,10 @@ const TX_TYPE_LABELS: Record<string, string> = {
 const TABS = [
   { value: 'transactions', label: 'Transaction list' },
   { value: 'details', label: 'Vendor details' },
+  { value: 'notes', label: 'Notes' },
 ] as const;
+
+type VendorNote = { id: string; note_text: string; created_at: string; author_name: string };
 
 function fmtAddress(a: Address | null | undefined): string {
   if (!a) return '';
@@ -190,6 +193,30 @@ export default function VendorDetailPage() {
   const [allBills, setAllBills] = useState<VendorBillSummary[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [notes, setNotes] = useState<VendorNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteBusy, setNoteBusy] = useState(false);
+
+  function loadNotes() {
+    if (!bizId || !id) return;
+    setNotesLoading(true);
+    api.get(`/businesses/${bizId}/vendors/${id}/notes`)
+      .then(r => setNotes(r.data.notes))
+      .finally(() => setNotesLoading(false));
+  }
+
+  async function saveNote() {
+    if (!bizId || !id || !noteDraft.trim()) return;
+    setNoteBusy(true);
+    try {
+      await api.post(`/businesses/${bizId}/vendors/${id}/notes`, { note_text: noteDraft.trim() });
+      setNoteDraft('');
+      setAddingNote(false);
+      loadNotes();
+    } finally { setNoteBusy(false); }
+  }
 
   function showToast(msg: string) {
     setToastMsg(msg);
@@ -212,6 +239,8 @@ export default function VendorDetailPage() {
     api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
       .then(r => setTransactions(r.data.transactions));
   }, [bizId, id]);
+
+  useEffect(() => { if (tab === 'notes') loadNotes(); }, [bizId, id, tab]);
 
   // Loaded once per business (not per vendor) so switching vendors via the
   // sidebar doesn't re-fetch the whole list each click.
@@ -460,6 +489,57 @@ export default function VendorDetailPage() {
             </div>
           </CardContent></Card>
         </div>
+      )}
+
+      {tab === 'notes' && (
+        <Card><CardContent className="p-0">
+          <div className="flex items-center justify-between border-b p-3">
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <button type="button" aria-label="Favorite this vendor" onClick={() => showToast('Coming soon')} className="hover:text-foreground">
+                <Star className="h-4 w-4" />
+              </button>
+              <button type="button" aria-label="Refresh notes" onClick={loadNotes} className="hover:text-foreground">
+                <RefreshCw className={`h-4 w-4 ${notesLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            <Button type="button" size="sm" onClick={() => setAddingNote(a => !a)}>+ Add note</Button>
+          </div>
+
+          {addingNote && (
+            <div className="space-y-2 border-b p-4">
+              <textarea
+                autoFocus
+                value={noteDraft}
+                onChange={e => setNoteDraft(e.target.value)}
+                rows={3}
+                placeholder="Write a note about this vendor…"
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+              <div className="flex gap-2">
+                <Button type="button" size="sm" disabled={noteBusy || !noteDraft.trim()} onClick={() => { void saveNote(); }}>
+                  {noteBusy ? 'Saving…' : 'Save'}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setAddingNote(false); setNoteDraft(''); }}>Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          {notes.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
+              <FolderOpen className="h-10 w-10" />
+              <div className="text-sm">No notes yet</div>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notes.map(n => (
+                <div key={n.id} className="p-4">
+                  <div className="text-xs text-muted-foreground">{fmtDateTime(n.created_at)} · {n.author_name}</div>
+                  <div className="mt-1 whitespace-pre-line text-sm">{n.note_text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent></Card>
       )}
       </div>
     </div>
