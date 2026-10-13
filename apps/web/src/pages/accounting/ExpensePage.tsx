@@ -623,7 +623,9 @@ export default function ExpensePage() {
             'cash' default) before committing to either word — otherwise a
             check flashes "Expense" for the ~1-2s the GET takes, then flips. */}
         <h1 className="text-xl font-semibold">
-          {isNew || expense ? (expense?.payment_method === 'check' ? 'Check' : 'Expense') : ' '}
+          {isNew || expense
+            ? (expense?.payment_method === 'check' ? `Check${reference ? ` #${reference}` : ''}` : 'Expense')
+            : ' '}
         </h1>
         {expense && expense.status === 'void' && (
           <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Voided</span>
