@@ -30,6 +30,10 @@ const IMPORT_COLS = [
 type Vendor = {
   id: string; name: string; email: string | null; phone: string | null;
   default_terms_days: number; is_1099: boolean; is_active: boolean; has_transactions: boolean;
+  // Outstanding posted bills net of payments applied to them, less this
+  // vendor's own unused credit (unapplied vendor credits and bill-payment
+  // leftover) — computed server-side (vendorService.listVendors).
+  open_balance: string;
 };
 type Bill = { id: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
 
@@ -76,20 +80,8 @@ export default function VendorListPage() {
     return { overdue, overdueCount, open, openCount, paid, paidCount };
   }, [bills, today, yearAgo]);
 
-  const openBalanceByVendor = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const b of bills) {
-      if (b.status !== 'posted') continue;
-      m.set(b.vendor_id, (m.get(b.vendor_id) ?? 0) + Number(b.total));
-    }
-    return m;
-  }, [bills]);
-
-  type Row = Vendor & { open_balance: number };
-  const rows: Row[] = useMemo(
-    () => items.map(v => ({ ...v, open_balance: openBalanceByVendor.get(v.id) ?? 0 })),
-    [items, openBalanceByVendor],
-  );
+  type Row = Vendor;
+  const rows: Row[] = items;
 
   const columns: Column<Row>[] = [
     {
@@ -115,7 +107,7 @@ export default function VendorListPage() {
         ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">Yes</span>
         : <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">No</span>,
     },
-    { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => r.open_balance, render: r => <span className="font-mono">{fmtMoney(String(r.open_balance))}</span> },
+    { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => Number(r.open_balance), render: r => <span className="font-mono">{fmtMoney(r.open_balance)}</span> },
   ];
 
   async function importRow(row: Record<string, string>) {

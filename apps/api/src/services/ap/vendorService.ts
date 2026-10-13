@@ -1,4 +1,4 @@
-import { Kysely, type Transaction } from 'kysely';
+import { Kysely, sql, type Transaction } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
@@ -234,13 +234,51 @@ export async function deleteVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
   await auditRecord(trx, ctx, { action: AUDIT.VENDOR_DELETE, entity_type: 'vendor', entity_id: input.vendor_id, before, after: null });
 }
 
+/**
+ * Open balance = outstanding posted bills (net of what's already applied to
+ * them) minus this vendor's own unused credit: vendor credits not yet
+ * applied, and bill payments with money left over unapplied. Same shape as
+ * apOverviewService's business-wide net_payable_total, just grouped per
+ * vendor instead of summed across all of them — a vendor with more credit
+ * than it owes reads as a negative balance, same as QuickBooks.
+ */
 export async function listVendors(
   db: Kysely<DB>, business_id: string, opts: { includeInactive?: boolean } = {},
 ) {
-  let q = db.selectFrom('vendors').selectAll()
-    .where('business_id', '=', business_id).where('deleted_at', 'is', null);
-  if (!opts.includeInactive) q = q.where('is_active', '=', true);
-  return q.orderBy('name').execute();
+  let q = db.selectFrom('vendors as v')
+    .selectAll('v')
+    .select(eb => [
+      eb.selectFrom('bills as b')
+        .leftJoin(
+          eb2 => eb2.selectFrom('bill_payment_applications')
+            .select(['bill_id', ({ fn }) => fn.sum<string>('applied_amount').as('applied')])
+            .groupBy('bill_id')
+            .as('p'),
+          join => join.onRef('p.bill_id', '=', 'b.id'),
+        )
+        .select(({ fn }) => fn.coalesce(fn.sum<string>(sql<string>`b.total - COALESCE(p.applied, 0)`), sql.lit('0')).as('v'))
+        .whereRef('b.vendor_id', '=', 'v.id')
+        .where('b.status', '=', 'posted')
+        .where('b.deleted_at', 'is', null)
+        .as('outstanding_bills'),
+      eb.selectFrom('vendor_credits')
+        .select(({ fn }) => fn.coalesce(fn.sum<string>('remaining_amount'), sql.lit('0')).as('v'))
+        .whereRef('vendor_id', '=', 'v.id')
+        .where('status', 'in', ['posted', 'applied'])
+        .as('unused_credits'),
+      eb.selectFrom('bill_payments')
+        .select(({ fn }) => fn.coalesce(fn.sum<string>('unapplied_amount'), sql.lit('0')).as('v'))
+        .whereRef('vendor_id', '=', 'v.id')
+        .where('status', '=', 'posted')
+        .as('unapplied_payments'),
+    ])
+    .where('v.business_id', '=', business_id).where('v.deleted_at', 'is', null);
+  if (!opts.includeInactive) q = q.where('v.is_active', '=', true);
+  const rows = await q.orderBy('v.name').execute();
+  return rows.map(({ outstanding_bills, unused_credits, unapplied_payments, ...v }) => ({
+    ...v,
+    open_balance: (Number(outstanding_bills) - Number(unused_credits) - Number(unapplied_payments)).toFixed(4),
+  }));
 }
 
 export async function getVendor(db: Kysely<DB>, business_id: string, vendor_id: string) {

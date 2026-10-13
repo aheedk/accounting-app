@@ -4,6 +4,8 @@ import { makeFirm, makeBusiness, makeUser, makeVendor, seedCoa, seedYearPeriods 
 import * as vend from '../../src/services/ap/vendorService.js';
 import * as expenses from '../../src/services/ap/expenseTransactionService.js';
 import * as billSvc from '../../src/services/ap/billService.js';
+import * as paymentSvc from '../../src/services/ap/billPaymentService.js';
+import * as vendorCreditSvc from '../../src/services/ap/vendorCreditService.js';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -148,5 +150,42 @@ describe('vendorService', () => {
     expect(await vend.listVendors(t.db, biz.id)).toHaveLength(1);
     await t.db.selectFrom('audit_logs').selectAll()
       .where('entity_id', '=', v.id).where('action', '=', AUDIT.VENDOR_REACTIVATE).executeTakeFirstOrThrow();
+  });
+
+  it('open_balance nets outstanding bills against this vendor\'s own unused credit, not just the bill total', async () => {
+    const { biz, ctx, cash, expense } = await setupWithCoa();
+    const vendor = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Supply' }));
+
+    // A $500 posted bill, partially paid $200 (still outstanding $300).
+    const billDraft = await t.db.transaction().execute(trx =>
+      billSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id,
+        bill_number: 'BILL-500', bill_date: '2026-04-15', due_date: '2026-05-15',
+        memo: null, terms: null,
+        lines: [{ description: 'Item', quantity: '1', unit_price: '500.0000', expense_account_id: expense.id }],
+      }));
+    const bill = await t.db.transaction().execute(trx => billSvc.postBill(trx, ctx, { bill_id: billDraft.bill.id }));
+
+    // A $250 payment, $200 of it applied to the bill above — $50 left unapplied.
+    const paymentDraft = await t.db.transaction().execute(trx =>
+      paymentSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id, payment_date: '2026-04-20',
+        payment_method: 'check', reference: 'check-1', amount: '250.0000',
+        cash_account_id: cash.id, memo: null,
+        initial_applications: [{ bill_id: bill.id, applied_amount: '200.0000' }],
+      }));
+    await t.db.transaction().execute(trx => paymentSvc.postBillPayment(trx, ctx, { bill_payment_id: paymentDraft.bill_payment.id }));
+
+    // A $75 vendor credit, not applied to anything.
+    const creditDraft = await t.db.transaction().execute(trx =>
+      vendorCreditSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id, credit_date: '2026-04-22',
+        amount: '75.0000', offset_account_id: expense.id, memo: null,
+      }));
+    await t.db.transaction().execute(trx => vendorCreditSvc.postVendorCredit(trx, ctx, { vendor_credit_id: creditDraft.id }));
+
+    // 500 - 200 applied = 300 outstanding; less the $75 unused credit and the $50 unapplied payment = 175.
+    const [row] = await vend.listVendors(t.db, biz.id);
+    expect(row!.open_balance).toBe('175.0000');
   });
 });
