@@ -3,6 +3,7 @@ import { ERR, addMoney, isZero, subMoney, toMoneyString } from '@accounting/shar
 import type { AccountType, DB, JournalEntrySourceType, JournalEntryStatus } from '../../db/types.js';
 import { BusinessRuleError } from '../../lib/errors.js';
 import { describeTransactions } from '../core/transactionDescriptorService.js';
+import { businessFiscalYearStart, pickRetainedEarnings } from '../../lib/yearEnd.js';
 
 export type GeneralLedgerLine = {
   journal_entry_id: string;
@@ -86,7 +87,7 @@ export async function generalLedger(
   q: { business_id: string; period_start: string; period_end: string; account_id?: string },
 ): Promise<GeneralLedgerReport> {
   let accountQuery = db.selectFrom('chart_of_accounts')
-    .select(['id', 'code', 'name', 'account_type'])
+    .select(['id', 'code', 'name', 'account_type', 'system_key'])
     .where('business_id', '=', q.business_id);
   if (q.account_id !== undefined) accountQuery = accountQuery.where('id', '=', q.account_id);
 
@@ -106,12 +107,19 @@ export async function generalLedger(
   }
 
   const accountIds = accountRows.map(account => account.id);
+  // Year end is not posted (see lib/yearEnd.ts), so the beginning balances make
+  // it: an income or expense account starts from the first day of the fiscal
+  // year the report opens in, and Retained Earnings starts with the profit of
+  // the years before that.
+  const yearStart = await businessFiscalYearStart(db, q.business_id, q.period_start);
   const openingRows = await db.selectFrom('journal_entry_lines as jel')
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select(({ fn }) => [
       'jel.account_id',
       fn.coalesce(fn.sum<string>('jel.debit'), sql.lit('0')).as('total_debit'),
       fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('total_credit'),
+      sql<string>`coalesce(sum(jel.debit) filter (where je.entry_date < ${yearStart}), 0)`.as('prior_debit'),
+      sql<string>`coalesce(sum(jel.credit) filter (where je.entry_date < ${yearStart}), 0)`.as('prior_credit'),
     ])
     .where('je.business_id', '=', q.business_id)
     .where('jel.account_id', 'in', accountIds)
@@ -120,9 +128,32 @@ export async function generalLedger(
     .groupBy('jel.account_id')
     .execute();
 
-  const openingByAccount = new Map(
-    openingRows.map(row => [row.account_id, { debit: row.total_debit, credit: row.total_credit }]),
+  const closesAtYearEnd = new Set(
+    accountRows.filter(a => a.account_type === 'revenue' || a.account_type === 'expense').map(a => a.id),
   );
+  const openingByAccount = new Map(openingRows.map(row => [row.account_id, closesAtYearEnd.has(row.account_id)
+    ? { debit: toMoneyString(subMoney(row.total_debit, row.prior_debit)), credit: toMoneyString(subMoney(row.total_credit, row.prior_credit)) }
+    : { debit: row.total_debit, credit: row.total_credit }]));
+
+  // Asked for only when Retained Earnings is in the report: it needs every
+  // income and expense account's earlier years, not just the ones listed.
+  const retainedAccount = pickRetainedEarnings(accountRows);
+  let priorEarnings = '0.0000';
+  if (retainedAccount) {
+    const prior = await db.selectFrom('journal_entry_lines as jel')
+      .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
+      .innerJoin('chart_of_accounts as a', 'a.id', 'jel.account_id')
+      .select(({ fn }) => [
+        fn.coalesce(fn.sum<string>('jel.debit'), sql.lit('0')).as('total_debit'),
+        fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('total_credit'),
+      ])
+      .where('je.business_id', '=', q.business_id)
+      .where('a.account_type', 'in', ['revenue', 'expense'])
+      .where('je.status', 'in', ['posted', 'voided'])
+      .where('je.entry_date', '<', yearStart)
+      .executeTakeFirst();
+    priorEarnings = toMoneyString(subMoney(prior?.total_credit ?? '0', prior?.total_debit ?? '0'));
+  }
 
   const activity = await db.selectFrom('journal_entry_lines as jel')
     .innerJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
@@ -221,7 +252,8 @@ export async function generalLedger(
 
   for (const account of accountRows) {
     const openingTotals = openingByAccount.get(account.id) ?? { debit: '0', credit: '0' };
-    const beginning = naturalChange(account.account_type, openingTotals.debit, openingTotals.credit);
+    const posted = naturalChange(account.account_type, openingTotals.debit, openingTotals.credit);
+    const beginning = account.id === retainedAccount?.id ? toMoneyString(addMoney(posted, priorEarnings)) : posted;
     const rawLines = activityByAccount.get(account.id) ?? [];
 
     if (q.account_id === undefined && rawLines.length === 0 && isZero(beginning)) continue;

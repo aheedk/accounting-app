@@ -1,6 +1,9 @@
 import { type Kysely, sql } from 'kysely';
 import { accountGroup, addMoney, subMoney, toMoneyString, type AccountGroup } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
+import { dayBefore, fiscalYearStart, pickRetainedEarnings } from '../../lib/yearEnd.js';
+
+export { fiscalYearStart };
 
 export type BsLine = {
   account_id: string;
@@ -31,14 +34,6 @@ export type BalanceSheetReport = {
   liabilities_equity_total: string;
   in_balance: boolean;
 };
-
-/** First day of the fiscal year that `asOf` falls in. */
-export function fiscalYearStart(asOf: string, startMonth: number): string {
-  const year = Number(asOf.slice(0, 4));
-  const month = Number(asOf.slice(5, 7));
-  const startYear = month >= startMonth ? year : year - 1;
-  return `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
-}
 
 /** Revenue less expenses over a date range; `from` null means from the beginning. */
 async function netIncomeBetween(
@@ -100,10 +95,8 @@ export async function balanceSheet(db: Kysely<DB>, q: { business_id: string; as_
   // Profit of earlier fiscal years belongs to Retained Earnings. Nothing posts it
   // there at year end, so it is added here, the way QuickBooks does; without it
   // the sheet goes out of balance the day a new fiscal year starts.
-  const dayBeforeYtd = new Date(new Date(`${ytdStart}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10);
-  const priorEarnings = await netIncomeBetween(db, q.business_id, null, dayBeforeYtd);
-  const retainedAccount = rows.find(r => r.system_key === 'retained_earnings')
-    ?? rows.find(r => r.account_type === 'equity' && /retained earnings/i.test(r.name));
+  const priorEarnings = await netIncomeBetween(db, q.business_id, null, dayBefore(ytdStart));
+  const retainedAccount = pickRetainedEarnings(rows);
 
   const assetLines: BsLine[] = [];
   const liabilityLines: BsLine[] = [];

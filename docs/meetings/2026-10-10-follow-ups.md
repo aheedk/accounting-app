@@ -32,7 +32,7 @@ mark which meeting an item first came from.
 |---|---|---|
 | 34 | Go through Faizan's 19-minute video and the files in the Teams chat, and turn each change into an item here. He is recording a second video. The first video is written up in [`2026-10-12-faizan-video-1.md`](./2026-10-12-faizan-video-1.md) (items 50 to 70); the PDF and the check stubs are still to go through | Aheed |
 | 36 | Pay bills prints checks: **built 10-13**, on the usual voucher check stock. Left: Faizan confirms the stock the firm prints on and a test print is lined up against it. See "Pay bills and checks" below | Aheed, Faizan confirms the format |
-| 37 | Year end: net income into Retained Earnings. Faizan says it is not happening. See "Retained Earnings" below | Aheed, Faizan |
+| 37 | Year end: net income into Retained Earnings. **Built 10-13** for the Trial Balance and General Ledger (the Balance Sheet already did it). Left: show Faizan, and ask whether he wants a posted closing entry as well. See "Retained Earnings" below | Aheed, Faizan |
 | 39 | Statement review: Equipment showed up in the bank account picker. Not reproduced; needs the company from the demo. See "Equipment in the bank picker" below | Aheed |
 | 40 | "This year" should follow the client's fiscal year everywhere. Today only the General Ledger does. See "Fiscal year" below | Riham |
 | 41 | Vendors list: the Open balance column is not right (Riham said so in the demo). See "Vendor balance" below | Riham |
@@ -67,16 +67,18 @@ QuickBooks voucher check (the check on top, two stubs under it) and has not
 been lined up against real stock; three checks to a page is not built. Paying
 online from the app is item 24 and stays later.
 
-**Retained Earnings (37).** What the code does today: the Balance Sheet shows
-this year's profit as a Net Income line, and adds the profit of earlier years
-into the Retained Earnings line itself. Nothing is posted to the ledger at year
-end, so the Retained Earnings account in the General Ledger and Trial Balance
-does not change. The test companies only have 2026 activity, so no year has
-rolled over yet and there is nothing on screen to show it working. To do: put
-prior-year activity into a test company and show Faizan the Balance Sheet on
-January 1. Then decide whether closing a year should post a real closing entry
-(net income to Retained Earnings), which is what he described and what an
-accountant will look for in the ledger.
+**Retained Earnings (37).** Spec:
+[`../specs/2026-10-13-year-end-retained-earnings-design.md`](../specs/2026-10-13-year-end-retained-earnings-design.md).
+The Balance Sheet already carried earlier years' profit into Retained Earnings.
+The Trial Balance and the General Ledger did not, so after a year end they
+showed Retained Earnings empty and every year's income piled together, which is
+most likely what Faizan saw. Since 10-13 all three agree: on the first day of a
+fiscal year (the client's own, so July 1 for a July to June company) income and
+expense accounts start at zero and the earlier years are in Retained Earnings.
+Nothing is posted for it, which is how QuickBooks does it. The test companies
+only have 2026 activity, so to show it: put some 2025 entries into one, or run
+the Trial Balance as of a date in 2027. Still to ask Faizan: is that enough, or
+does he want a real closing entry in the journal when a year is closed.
 
 **Equipment in the bank picker (39).** The picker lists accounts whose detail
 type is a bank type, any account set up under Banking, and the account already

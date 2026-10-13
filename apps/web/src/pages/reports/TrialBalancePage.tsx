@@ -64,6 +64,9 @@ export default function TrialBalancePage() {
   const [asOf, setAsOf] = useState(todayLocal());
   const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState({ total_debit: '0', total_credit: '0' });
+  // Year end is not posted: the report starts income and expense accounts at
+  // the fiscal year and carries the earlier years in Retained Earnings.
+  const [yearEnd, setYearEnd] = useState({ fiscal_year_start: '', retained_earnings_prior_years: '0' });
   const [excelBusy, setExcelBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [dlErr, setDlErr] = useState<string | null>(null);
@@ -91,8 +94,25 @@ export default function TrialBalancePage() {
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/reports/trial-balance`, { params: { as_of: asOf } })
-      .then(r => { setRows(r.data.rows); setTotals(r.data.totals); });
+      .then(r => {
+        setRows(r.data.rows); setTotals(r.data.totals);
+        setYearEnd({
+          fiscal_year_start: r.data.fiscal_year_start ?? '',
+          retained_earnings_prior_years: r.data.retained_earnings_prior_years ?? '0',
+        });
+      });
   }, [bizId, asOf]);
+
+  // An income or expense figure is this fiscal year's, so its ledger opens there too.
+  function ledgerUrl(r: Row): string {
+    const thisYearOnly = (r.account_type === 'revenue' || r.account_type === 'expense') && yearEnd.fiscal_year_start !== '';
+    return generalLedgerDrilldownUrl({
+      accountId: r.account_id,
+      periodStart: thisYearOnly ? yearEnd.fiscal_year_start : LEDGER_HISTORY_START,
+      periodEnd: asOf,
+    });
+  }
+  const carried = Number(yearEnd.retained_earnings_prior_years) || 0;
 
   if (!bizId) return <div>Pick a business.</div>;
   return (
@@ -134,13 +154,13 @@ export default function TrialBalancePage() {
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.account_id} className="border-b hover:bg-muted/30">
+              <tr key={r.account_id || r.name} className="border-b hover:bg-muted/30">
                 <td className="p-3 font-mono">{r.code}</td>
                 <td className="p-3">{r.name}</td>
                 <td className="p-3 capitalize">{r.account_type}</td>
                 <td className="p-3 text-right font-mono">
                   <ReportAmountLink
-                    to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: asOf })}
+                    to={ledgerUrl(r)}
                     title={`View ${r.name} debit transactions in the General Ledger`}
                   >
                     {fmtMoney(r.total_debit)}
@@ -148,7 +168,7 @@ export default function TrialBalancePage() {
                 </td>
                 <td className="p-3 text-right font-mono">
                   <ReportAmountLink
-                    to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: asOf })}
+                    to={ledgerUrl(r)}
                     title={`View ${r.name} credit transactions in the General Ledger`}
                   >
                     {fmtMoney(r.total_credit)}
@@ -156,7 +176,7 @@ export default function TrialBalancePage() {
                 </td>
                 <td className="p-3 text-right font-mono">
                   <ReportAmountLink
-                    to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: asOf })}
+                    to={ledgerUrl(r)}
                     title={`View ${r.name} transactions in the General Ledger`}
                   >
                     {fmtSigned(r.net)}
@@ -173,6 +193,13 @@ export default function TrialBalancePage() {
           </tbody>
         </table>
         </div>
+        {carried !== 0 && (
+          <p className="px-3 pt-3 text-xs text-muted-foreground">
+            Income and expense accounts show the fiscal year that began {fmtLongDate(yearEnd.fiscal_year_start)}.
+            The net {carried > 0 ? 'income' : 'loss'} of earlier years, {fmtMoney(String(Math.abs(carried)))}, is in
+            Retained Earnings, as on the Balance Sheet.
+          </p>
+        )}
       </ReportCard>
     </div>
   );

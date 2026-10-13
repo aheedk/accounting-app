@@ -12,6 +12,7 @@ import { record as auditRecord } from '../audit/auditService.js';
 import { findPeriodForDate } from './fiscalPeriodService.js';
 import { nextCounter, reserveCounterAtLeast } from './numberingService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { businessFiscalYearStart, pickRetainedEarnings } from '../../lib/yearEnd.js';
 
 export type LineInput = {
   account_id: string;
@@ -840,16 +841,33 @@ export type TrialBalanceRow = {
   net: string;
 };
 
+/**
+ * The trial balance as of a date, with the year end already made the way
+ * QuickBooks makes it: income and expense accounts show the fiscal year that
+ * `as_of` falls in, and the profit of the years before it is in Retained
+ * Earnings. Nothing is posted for that, so it is worked out here; the totals
+ * still balance, and Retained Earnings matches the Balance Sheet.
+ */
 export async function computeTrialBalance(
   db: Kysely<DB>, q: { business_id: string; as_of: string },
-): Promise<{ rows: TrialBalanceRow[]; totals: { total_debit: string; total_credit: string } }> {
+): Promise<{
+  rows: TrialBalanceRow[];
+  totals: { total_debit: string; total_credit: string };
+  fiscal_year_start: string;
+  /** Profit of earlier years, included in the Retained Earnings row. */
+  retained_earnings_prior_years: string;
+}> {
+  const yearStart = await businessFiscalYearStart(db, q.business_id, q.as_of);
   const rows = await db.selectFrom('chart_of_accounts as a')
     .leftJoin('journal_entry_lines as jel', 'jel.account_id', 'a.id')
     .leftJoin('journal_entries as je', 'je.id', 'jel.journal_entry_id')
     .select(({ fn }) => [
-      'a.id as account_id', 'a.code', 'a.name', 'a.account_type',
+      'a.id as account_id', 'a.code', 'a.name', 'a.account_type', 'a.system_key',
       fn.coalesce(fn.sum<string>('jel.debit'), sql.lit('0')).as('total_debit'),
       fn.coalesce(fn.sum<string>('jel.credit'), sql.lit('0')).as('total_credit'),
+      // The part of each total that belongs to fiscal years already finished.
+      sql<string>`coalesce(sum(jel.debit) filter (where je.entry_date < ${yearStart}), 0)`.as('prior_debit'),
+      sql<string>`coalesce(sum(jel.credit) filter (where je.entry_date < ${yearStart}), 0)`.as('prior_credit'),
     ])
     .where('a.business_id', '=', q.business_id)
     .where(eb => eb.or([
@@ -858,26 +876,63 @@ export async function computeTrialBalance(
       // posted reversal cancels the voided original, keeping as-of math right.
       eb.and([eb('je.status', 'in', ['posted', 'voided']), eb('je.entry_date', '<=', q.as_of)]),
     ]))
-    .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type'])
+    .groupBy(['a.id', 'a.code', 'a.name', 'a.account_type', 'a.system_key'])
     .orderBy('a.code')
     .execute();
 
+  // Earlier years' income and expense come off their own accounts...
+  let priorEarnings = '0.0000';
+  const figures = rows.map(r => {
+    const closes = r.account_type === 'revenue' || r.account_type === 'expense';
+    if (closes) {
+      priorEarnings = toMoneyString(addMoney(priorEarnings, subMoney(r.prior_credit ?? '0', r.prior_debit ?? '0')));
+    }
+    return {
+      ...r,
+      debit: toMoneyString(closes ? subMoney(r.total_debit ?? '0', r.prior_debit ?? '0') : (r.total_debit ?? '0')),
+      credit: toMoneyString(closes ? subMoney(r.total_credit ?? '0', r.prior_credit ?? '0') : (r.total_credit ?? '0')),
+    };
+  });
+  // ...and go to Retained Earnings: a profit as a credit, a loss as a debit.
+  const profit = parseFloat(priorEarnings) >= 0;
+  const carried = profit ? priorEarnings : toMoneyString(subMoney('0', priorEarnings));
+  const retained = pickRetainedEarnings(figures);
+  if (retained && !isZero(priorEarnings)) {
+    if (profit) retained.credit = toMoneyString(addMoney(retained.credit, carried));
+    else retained.debit = toMoneyString(addMoney(retained.debit, carried));
+  }
+
   let totalD = '0.0000', totalC = '0.0000';
-  const out: TrialBalanceRow[] = rows.map(r => {
-    const net = toMoneyString(subMoney(r.total_debit ?? '0', r.total_credit ?? '0'));
-    totalD = toMoneyString(addMoney(totalD, r.total_debit ?? '0'));
-    totalC = toMoneyString(addMoney(totalC, r.total_credit ?? '0'));
+  const out: TrialBalanceRow[] = figures.map(r => {
+    totalD = toMoneyString(addMoney(totalD, r.debit));
+    totalC = toMoneyString(addMoney(totalC, r.credit));
     return {
       account_id: r.account_id,
       code: r.code,
       name: r.name,
       account_type: r.account_type as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
-      total_debit: toMoneyString(r.total_debit ?? '0'),
-      total_credit: toMoneyString(r.total_credit ?? '0'),
-      net,
+      total_debit: r.debit,
+      total_credit: r.credit,
+      net: toMoneyString(subMoney(r.debit, r.credit)),
     };
   });
-  return { rows: out, totals: { total_debit: totalD, total_credit: totalC } };
+  // A chart with no Retained Earnings account still has to carry the earlier years.
+  if (!retained && !isZero(priorEarnings)) {
+    const debit = profit ? '0.0000' : carried;
+    const credit = profit ? carried : '0.0000';
+    out.push({
+      account_id: '', code: '', name: 'Retained Earnings', account_type: 'equity',
+      total_debit: debit, total_credit: credit, net: toMoneyString(subMoney(debit, credit)),
+    });
+    totalD = toMoneyString(addMoney(totalD, debit));
+    totalC = toMoneyString(addMoney(totalC, credit));
+  }
+  return {
+    rows: out,
+    totals: { total_debit: totalD, total_credit: totalC },
+    fiscal_year_start: yearStart,
+    retained_earnings_prior_years: priorEarnings,
+  };
 }
 
 // Batch variant of postJournalEntry — validates accounts and resolves periods once
