@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmtMoney } from '@/lib/money';
 import { fmtDateTime, todayLocal } from '@/lib/dates';
 import { formatPhone } from '@/lib/phone';
@@ -85,6 +86,15 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function SummaryStat({ label, amount, borderClass }: { label: string; amount: number; borderClass: string }) {
+  return (
+    <div className={`border-l-4 ${borderClass} pl-2.5`}>
+      <div className="font-mono text-lg font-semibold">{fmtMoney(String(amount))}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
 type VendorSortKey = 'name' | 'balance';
 
 function VendorSidebar({
@@ -137,7 +147,7 @@ function VendorSidebar({
       </div>
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input className="h-9 pl-8 text-sm" placeholder="Search" value={query} onChange={e => setQuery(e.target.value)} />
+        <Input className="h-9 pl-8 text-sm" placeholder="Filter by name or details" value={query} onChange={e => setQuery(e.target.value)} />
       </div>
       <AppSelect className="mb-2 h-9 rounded-md border bg-background px-3 text-sm font-medium" value={sortKey} onChange={e => setSortKey(e.target.value as VendorSortKey)}>
         <option value="name">Sort by name</option>
@@ -179,6 +189,20 @@ export default function VendorDetailPage() {
   const [vendorList, setVendorList] = useState<VendorListItem[]>([]);
   const [allBills, setAllBills] = useState<VendorBillSummary[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2500);
+  }
+
+  async function makeInactive() {
+    if (!bizId || !vendor) return;
+    try {
+      await api.patch(`/businesses/${bizId}/vendors/${vendor.id}`, { is_active: false });
+      setVendor(v => v && { ...v, is_active: false });
+    } catch (e: unknown) { setDeleteErr(pickErr(e)); }
+  }
 
   useEffect(() => {
     if (!bizId || !id) return;
@@ -241,39 +265,90 @@ export default function VendorDetailPage() {
         <ChevronLeft className="h-4 w-4" /> Back to vendors
       </Link>
 
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            {vendor.name}
-            {!vendor.is_active && <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Inactive</span>}
-          </h1>
-          {vendor.company_name && <div className="text-sm text-muted-foreground">{vendor.company_name}</div>}
-        </div>
-        <div className="flex items-start gap-2">
-          <div className="mr-4 text-right">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open balance</div>
-            <div className="text-2xl font-semibold font-mono">{fmtMoney(String(stats.open + stats.overdue))}</div>
+      <div>
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</div>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          {vendor.name}
+          {!vendor.is_active && <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Inactive</span>}
+        </h1>
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-6 border-b pb-4">
+        <div className="grid grid-cols-2 gap-x-10 gap-y-3 text-sm sm:grid-cols-4">
+          <Detail label="Company" value={vendor.company_name} />
+          <Detail label="Billing address" value={fmtAddress(vendor.billing_address) || null} />
+          <div>
+            <div className="text-xs text-muted-foreground">Bill Pay ACH info</div>
+            <button type="button" className="mt-0.5 text-sm text-link hover:underline" onClick={() => showToast('Coming soon')}>
+              Ask vendor for payment info
+            </button>
           </div>
-          <Button asChild variant="outline"><Link to={`/ap/bill-payments/new?vendor_id=${vendor.id}`}>Pay bills</Link></Button>
-          <Button asChild><Link to={`/ap/bills/new?vendor_id=${vendor.id}`}>Create bill</Link></Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="text-destructive hover:text-destructive"
-            disabled={!canDelete || vendor.has_transactions || deleteBusy}
-            onClick={() => { void deleteVendor(); }}
-            title={
-              vendor.has_transactions
-                ? 'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.'
-                : !canDelete ? 'Firm admin access is required' : undefined
-            }
-          >
-            {deleteBusy ? 'Deleting…' : 'Delete'}
-          </Button>
+          <div>
+            <div className="text-xs text-muted-foreground">Notes</div>
+            <button type="button" className="mt-0.5 text-sm text-link hover:underline" onClick={() => showToast('Coming soon')}>
+              Add notes
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-4">
+          <div className="flex gap-4">
+            <SummaryStat label="Open balance" amount={stats.open + stats.overdue} borderClass="border-amber-400" />
+            <SummaryStat label="Overdue payment" amount={stats.overdue} borderClass="border-red-500" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex">
+              <Button asChild variant="outline" className="rounded-r-none border-r-0">
+                <Link to={`/ap/vendors/${vendor.id}/edit`}>Edit</Link>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="rounded-l-none px-2" aria-label="More vendor actions">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem disabled={!vendor.is_active} onSelect={() => { void makeInactive(); }}>
+                    Make inactive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => showToast('Coming soon')}>Merge vendor</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    disabled={!canDelete || vendor.has_transactions || deleteBusy}
+                    onSelect={() => { void deleteVendor(); }}
+                    title={
+                      vendor.has_transactions
+                        ? 'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.'
+                        : !canDelete ? 'Firm admin access is required' : undefined
+                    }
+                  >
+                    {deleteBusy ? 'Deleting…' : 'Delete'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button">
+                  New transaction <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild><Link to={`/ap/bills/new?vendor_id=${vendor.id}`}>Create bill</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={`/accounting/expenses/new?vendor_id=${vendor.id}`}>Create expense</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to={`/accounting/checks/new?vendor_id=${vendor.id}`}>Write check</Link></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
       {deleteErr && <p className="text-sm text-destructive">{deleteErr}</p>}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-[60] rounded-md bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-lg">
+          {toastMsg}
+        </div>
+      )}
 
       <MoneyBar segments={[
         { amount: stats.overdue, caption: `${stats.overdueCount} overdue`, colorClass: 'bg-orange-400' },

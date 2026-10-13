@@ -35,6 +35,7 @@ import CreditMemoNewPage from '@/pages/credit-memos/CreditMemoNewPage';
 import CreditMemoDetailPage from '@/pages/credit-memos/CreditMemoDetailPage';
 import VendorListPage from '@/pages/vendors/VendorListPage';
 import VendorNewPage from '@/pages/vendors/VendorNewPage';
+import VendorEditPage from '@/pages/vendors/VendorEditPage';
 import VendorDetailPage from '@/pages/vendors/VendorDetailPage';
 import BillListPage from '@/pages/bills/BillListPage';
 import BillNewPage from '@/pages/bills/BillNewPage';
@@ -179,6 +180,7 @@ export default function App() {
             <Route path="/ap/overview" element={<ApOverviewPage />} />
             <Route path="/ap/vendors" element={<VendorListPage />} />
             <Route path="/ap/vendors/new" element={<VendorNewPage />} />
+            <Route path="/ap/vendors/:id/edit" element={<VendorEditPage />} />
             <Route path="/ap/vendors/:id" element={<VendorDetailPage />} />
             <Route path="/ap/bills" element={<BillListPage />} />
             <Route path="/ap/bills/new" element={<BillNewPage />} />
