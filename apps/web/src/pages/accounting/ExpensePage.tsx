@@ -594,7 +594,7 @@ export default function ExpensePage() {
                         onClick={() => { setRecentOpen(false); nav(`/accounting/expenses/${e.id}`); }}
                         className="grid w-full grid-cols-[1fr_5.5rem_6rem] items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
                       >
-                        <span className="truncate text-primary">{e.payee_name ?? 'Expense'}</span>
+                        <span className="truncate text-link">{e.payee_name ?? 'Expense'}</span>
                         <span className="whitespace-nowrap text-muted-foreground">{fmtDate(e.transaction_date)}</span>
                         <span className="text-right font-mono tabular-nums">{fmtMoney(e.total_amount)}</span>
                       </button>
@@ -604,7 +604,7 @@ export default function ExpensePage() {
                 <button
                   type="button"
                   onClick={() => { setRecentOpen(false); nav('/accounting/transactions?type=expense'); }}
-                  className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
+                  className="block w-full border-t px-4 py-2.5 text-left text-sm text-link hover:bg-accent"
                 >
                   View More
                 </button>
@@ -812,7 +812,7 @@ export default function ExpensePage() {
 
         <div className="mx-auto flex items-center gap-3 text-sm">
           {canEdit && (
-            <button type="button" className="text-primary hover:underline" onClick={() => setRecurringOpen(true)}>
+            <button type="button" className="text-link hover:underline" onClick={() => setRecurringOpen(true)}>
               Make recurring
             </button>
           )}
@@ -821,7 +821,7 @@ export default function ExpensePage() {
             <>
               {canEdit && <span className="text-muted-foreground">·</span>}
               <div className="relative">
-                <button type="button" onClick={() => setMoreOpen(prev => !prev)} className="text-primary hover:underline">
+                <button type="button" onClick={() => setMoreOpen(prev => !prev)} className="text-link hover:underline">
                   More
                 </button>
                 {moreOpen && (

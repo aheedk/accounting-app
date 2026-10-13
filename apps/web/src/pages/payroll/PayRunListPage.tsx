@@ -112,10 +112,10 @@ export default function PayRunListPage() {
                     </td>
                     <td className="p-3 text-right whitespace-nowrap">
                       {run.journal_entry_id && (
-                        <Link className="mr-3 text-primary hover:underline" to={`/journal/${run.journal_entry_id}`}>Journal entry</Link>
+                        <Link className="mr-3 text-link hover:underline" to={`/journal/${run.journal_entry_id}`}>Journal entry</Link>
                       )}
                       {run.status === 'draft' && (
-                        <button type="button" className="text-primary hover:underline disabled:opacity-50" disabled={busyId === run.id} onClick={() => void act(run, 'finalize')}>
+                        <button type="button" className="text-link hover:underline disabled:opacity-50" disabled={busyId === run.id} onClick={() => void act(run, 'finalize')}>
                           Finalize
                         </button>
                       )}

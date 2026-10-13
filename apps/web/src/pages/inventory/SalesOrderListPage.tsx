@@ -161,7 +161,7 @@ export default function SalesOrderListPage() {
       key: 'invoice',
       header: 'Invoice',
       render: r => r.invoice_id
-        ? <Link className="text-primary underline" to={`/invoices/${r.invoice_id}`}>view invoice</Link>
+        ? <Link className="text-link underline" to={`/invoices/${r.invoice_id}`}>view invoice</Link>
         : <span className="text-muted-foreground">—</span>,
     },
   ];
@@ -223,7 +223,7 @@ export default function SalesOrderListPage() {
                   'See what\'s selling and track popular products with sales reports',
                 ].map(item => (
                   <li key={item} className="flex items-start gap-2">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-link" />
                     {item}
                   </li>
                 ))}
@@ -273,7 +273,7 @@ export default function SalesOrderListPage() {
                     const busy = busyId === r.id;
                     return (
                       <span className="inline-flex items-center gap-2">
-                        <Link className="text-primary underline" to={`/inventory/sales-orders/${r.id}`}>view</Link>
+                        <Link className="text-link underline" to={`/inventory/sales-orders/${r.id}`}>view</Link>
                         {canFulfill && (
                           <Button size="sm" disabled={busy} {...hideUnless(can.accountant)} onClick={() => fulfill(r.id)}>
                             {busy ? 'Working…' : 'Fulfill'}

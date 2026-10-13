@@ -429,11 +429,11 @@ export default function UsersPage() {
                         </Button>
                       )}
                       <div className="mt-2 flex flex-col items-end gap-1 text-xs">
-                        <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'reset-password', `Give ${u.email} a new password? They will be signed out everywhere.`)}>Reset password</button>
-                        {!isSelf && <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'sign-out')}>Sign out everywhere</button>}
-                        {u.two_step_enabled && <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'reset-two-step', `Turn off the second step for ${u.email}? Do this when they have lost the phone it is on.`)}>Turn off two-step</button>}
+                        <button type="button" className="text-link hover:underline" onClick={() => void userAction(u, 'reset-password', `Give ${u.email} a new password? They will be signed out everywhere.`)}>Reset password</button>
+                        {!isSelf && <button type="button" className="text-link hover:underline" onClick={() => void userAction(u, 'sign-out')}>Sign out everywhere</button>}
+                        {u.two_step_enabled && <button type="button" className="text-link hover:underline" onClick={() => void userAction(u, 'reset-two-step', `Turn off the second step for ${u.email}? Do this when they have lost the phone it is on.`)}>Turn off two-step</button>}
                         {!isSelf && (u.deactivated_at
-                          ? <button type="button" className="text-primary hover:underline" onClick={() => void userAction(u, 'reactivate')}>Switch back on</button>
+                          ? <button type="button" className="text-link hover:underline" onClick={() => void userAction(u, 'reactivate')}>Switch back on</button>
                           : <button type="button" className="text-destructive hover:underline" onClick={() => void userAction(u, 'deactivate', `Switch off ${u.email}? They are signed out now and cannot sign in until it is switched back on.`)}>Switch off</button>)}
                       </div>
                     </td>

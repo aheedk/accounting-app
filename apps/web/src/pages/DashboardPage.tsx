@@ -115,7 +115,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Hero */}
       <section className="overflow-hidden rounded-xl border border-primary/10 bg-gradient-to-br from-secondary via-background to-background p-6 md:p-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-primary">Dashboard</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-link">Dashboard</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
           {firmPrefix ? `Welcome back, ${firmPrefix}.` : 'Welcome back.'}
         </h1>
@@ -168,7 +168,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">{action.description}</p>
-                    <div className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                    <div className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-link">
                       Go
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </div>

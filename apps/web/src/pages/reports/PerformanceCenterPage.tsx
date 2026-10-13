@@ -95,7 +95,7 @@ function TrendCard({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-base">
           <span>{title}</span>
-          <Link to="/reports/pnl" className="text-xs font-normal text-primary hover:underline">
+          <Link to="/reports/pnl" className="text-xs font-normal text-link hover:underline">
             View P&amp;L →
           </Link>
         </CardTitle>

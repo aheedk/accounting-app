@@ -508,7 +508,7 @@ export default function IntegrationInboxPage() {
                       {t.status !== 'pending' && (
                         <div className="flex items-center gap-2">
                           {t.matched_journal_entry_id && (
-                            <Link to={`/journal/${t.matched_journal_entry_id}`} className="text-primary underline font-mono text-xs">
+                            <Link to={`/journal/${t.matched_journal_entry_id}`} className="text-link underline font-mono text-xs">
                               Journal entry
                             </Link>
                           )}

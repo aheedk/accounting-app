@@ -172,7 +172,7 @@ export default function ContractorsPage() {
                 <tr>
                   <td colSpan={5} className="p-6 text-center text-sm text-muted-foreground">
                     No 1099 contractors yet. Mark a vendor as 1099 from the{' '}
-                    <Link to="/ap/vendors" className="text-primary underline">Vendors page</Link>.
+                    <Link to="/ap/vendors" className="text-link underline">Vendors page</Link>.
                   </td>
                 </tr>
               )}
@@ -187,7 +187,7 @@ export default function ContractorsPage() {
                     <td className="p-3">{c.email ?? ''}</td>
                     <td className="p-3">
                       {c.tax_id_type ? (
-                        <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">
                           {c.tax_id_type}
                         </span>
                       ) : (

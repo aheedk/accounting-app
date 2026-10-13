@@ -4,42 +4,67 @@
 
 @layer base {
   :root {
-    /* "Ink & ledger" palette: warm paper workspace, ink text, deep ledger blue. */
-    --background: 40 23% 97%;
-    --foreground: 225 30% 16%;
+    /* QBO-inspired palette: clean white/light-gray surfaces, QuickBooks green
+       for primary actions, QuickBooks blue for links, dark navy sidebar kept. */
+    --background: 0 0% 100%;
+    --foreground: 215 28% 17%;
     --card: 0 0% 100%;
-    --card-foreground: 225 30% 16%;
-    --primary: 221 65% 44%;
+    --card-foreground: 215 28% 17%;
+    /* The page canvas behind cards/sections — applied to the main content
+       wrapper only, so every component that uses --background (inputs,
+       dropdowns, dialogs, the Card surface itself) stays white. */
+    --page: 220 16% 96%;
+    --primary: 113 70% 37%;
+    --primary-hover: 114 71% 32%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 218 60% 95%;
-    --secondary-foreground: 221 60% 32%;
-    --muted: 220 20% 94%;
-    --muted-foreground: 222 14% 46%;
-    --accent: 220 25% 93%;
-    --accent-foreground: 222 30% 22%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 16% 88%;
-    --input: 220 16% 85%;
-    --ring: 221 65% 44%;
-    /* Ink sidebar */
+    --secondary: 0 0% 100%;
+    --secondary-foreground: 217 19% 27%;
+    --muted: 220 16% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 16% 96%;
+    --accent-foreground: 217 19% 27%;
+    --destructive: 0 62% 53%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 7% 89%;
+    --input: 216 12% 84%;
+    --ring: 204 100% 39%;
+    /* Links and clickable text (ref numbers, entity names, GL transaction links). */
+    --link: 204 100% 39%;
+    /* Status badges. */
+    --status-green-bg: 137 39% 93%;
+    --status-green-fg: 134 62% 31%;
+    --status-red-bg: 6 83% 95%;
+    --status-red-fg: 0 62% 53%;
+    --status-blue-bg: 218 92% 95%;
+    --status-blue-fg: 214 82% 51%;
+    --status-gray-bg: 200 12% 95%;
+    --status-gray-fg: 213 5% 39%;
+    /* Ink sidebar — kept dark; only the accent (now green, was gold) changed. */
     --sidebar: 224 42% 14%;
     --sidebar-foreground: 220 30% 92%;
     --sidebar-muted: 221 18% 66%;
-    --sidebar-hover: 222 30% 22%;
-    --sidebar-active: 223 32% 20%;
-    --gold: 42 62% 58%;
+    --sidebar-hover: 0 0% 100%;
+    --sidebar-active: 0 0% 100%;
+    --gold: 113 65% 50%;
   }
   * { @apply border-border; }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-feature-settings: 'tnum' on, 'lnum' on;
   }
-  /* Page titles get the editorial serif across the whole app. */
   h1 {
-    font-family: 'Fraunces', Georgia, serif;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 18px;
     font-weight: 600;
-    letter-spacing: -0.015em;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
   }
   ::selection {
     background: hsl(var(--primary) / 0.15);
@@ -72,5 +97,18 @@
   input[type='number'] {
     -moz-appearance: textfield;
     appearance: textfield;
+  }
+}
+
+@layer utilities {
+  /* Skeleton loading blocks — replaces blank loading screens. */
+  .skeleton {
+    background-color: #E5E7EB;
+    border-radius: 0.375rem;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
 }

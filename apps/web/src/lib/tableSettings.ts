@@ -112,7 +112,7 @@ export function moveTableColumn(order: string[], key: string, direction: -1 | 1)
 
 export const ROW_HEIGHT_CLASS: Record<TableRowHeight, string> = {
   roomy: 'py-5',
-  comfortable: 'py-3',
+  comfortable: 'py-2.5',
   cozy: 'py-2',
   compact: 'py-1',
 };

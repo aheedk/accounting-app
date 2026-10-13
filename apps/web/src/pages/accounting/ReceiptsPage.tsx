@@ -333,7 +333,7 @@ export default function ReceiptsPage() {
                     <td className="p-3">
                       <button
                         type="button"
-                        className="text-primary underline"
+                        className="text-link underline"
                         onClick={() => downloadFile(r.file_id, name)}
                       >
                         {name}

@@ -225,7 +225,7 @@ export function AttachmentsPanel({
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <button
                 type="button"
-                className="min-w-0 flex-1 truncate text-left text-primary hover:underline"
+                className="min-w-0 flex-1 truncate text-left text-link hover:underline"
                 onClick={() => { void attachments.download(item); }}
                 title={item.name}
               >

@@ -325,7 +325,7 @@ export default function VendorDetailPage() {
                     <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
                     <td className="p-3 whitespace-nowrap text-muted-foreground">{fmtDateTime(tx.updated_at)}</td>
                     <td className="p-3 text-right">
-                      <Link className="text-primary hover:underline" to={tx.path}>View/Edit</Link>
+                      <Link className="text-link hover:underline" to={tx.path}>View/Edit</Link>
                     </td>
                   </tr>
                 ))}
@@ -372,7 +372,7 @@ export default function VendorDetailPage() {
               <Detail
                 label="1099 tracking"
                 value={vendor.is_1099
-                  ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Tracked for 1099</span>
+                  ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">Tracked for 1099</span>
                   : 'Not tracked'}
               />
               <Detail

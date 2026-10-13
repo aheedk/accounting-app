@@ -203,7 +203,7 @@ export function ProductServiceSelect({
                 e.preventDefault();
                 handleAddNew();
               }}
-              className="flex w-full items-center gap-2 border-t bg-background px-3 py-2 text-sm text-primary hover:bg-accent"
+              className="flex w-full items-center gap-2 border-t bg-background px-3 py-2 text-sm text-link hover:bg-accent"
             >
               <Plus className="h-4 w-4" /> Add new product/service
             </button>

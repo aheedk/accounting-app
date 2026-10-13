@@ -156,7 +156,7 @@ export default function ImportedTransactionPage() {
     return (
       <div className="space-y-3">
         <p className="text-sm text-destructive">{loadError}</p>
-        {id && <Link className="text-sm text-primary hover:underline" to={`/journal/${id}?view=entry`}>View the journal entry</Link>}
+        {id && <Link className="text-sm text-link hover:underline" to={`/journal/${id}?view=entry`}>View the journal entry</Link>}
       </div>
     );
   }
@@ -234,7 +234,7 @@ export default function ImportedTransactionPage() {
                           onClick={() => { setRecentOpen(false); nav(item.path); }}
                           className="grid w-full grid-cols-[1fr_5.5rem_6rem] items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
                         >
-                          <span className="truncate text-primary">{item.label}</span>
+                          <span className="truncate text-link">{item.label}</span>
                           <span className="whitespace-nowrap text-muted-foreground">{fmtShortDate(item.date)}</span>
                           <span className="text-right font-mono tabular-nums">{fmtMoney(item.amount)}</span>
                         </button>
@@ -244,7 +244,7 @@ export default function ImportedTransactionPage() {
                   <button
                     type="button"
                     onClick={() => { setRecentOpen(false); nav(form.transaction_type === 'deposit' ? '/accounting/bank-deposits' : '/accounting/expense-transactions'); }}
-                    className="block w-full border-t px-4 py-2.5 text-left text-sm text-primary hover:bg-accent"
+                    className="block w-full border-t px-4 py-2.5 text-left text-sm text-link hover:bg-accent"
                   >
                     View More
                   </button>
@@ -400,7 +400,7 @@ export default function ImportedTransactionPage() {
       {notice && <p className="text-sm text-emerald-700">{notice}</p>}
       <div className="sticky -bottom-4 z-10 lg:-bottom-6 flex items-center gap-2 border-t bg-background py-3">
         <Button type="button" variant="outline" onClick={() => nav(-1)}>{readOnly ? 'Back' : 'Cancel'}</Button>
-        <Link className="text-sm text-primary hover:underline" to={`/journal/${txn.id}?view=entry`}>View journal entry</Link>
+        <Link className="text-sm text-link hover:underline" to={`/journal/${txn.id}?view=entry`}>View journal entry</Link>
         <div className="flex-1" />
         {!readOnly && can.accountant && <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>}
       </div>

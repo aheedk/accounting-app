@@ -198,7 +198,7 @@ export default function ReconcileSummaryPage() {
         </CardContent>
       </Card>
 
-      <Link to="/accounting/reconcile" className="text-sm text-primary underline">Back to Reconcile</Link>
+      <Link to="/accounting/reconcile" className="text-sm text-link underline">Back to Reconcile</Link>
     </div>
   );
 }

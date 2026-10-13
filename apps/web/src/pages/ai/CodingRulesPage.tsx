@@ -112,7 +112,7 @@ export default function CodingRulesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Sparkles className="h-5 w-5 text-link" />
             Coding Rules
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

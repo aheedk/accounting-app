@@ -114,9 +114,9 @@ export default function ShippingLabelListPage() {
       render: r => (
         <span>
           {r.invoice_id
-            ? <Link className="text-primary hover:underline" to={`/invoices/${r.invoice_id}`}>Invoice {r.invoice_number ?? ''}</Link>
+            ? <Link className="text-link hover:underline" to={`/invoices/${r.invoice_id}`}>Invoice {r.invoice_number ?? ''}</Link>
             : r.sales_order_id
-              ? <Link className="text-primary hover:underline" to={`/inventory/sales-orders/${r.sales_order_id}`}>Sales order {r.so_number ?? ''}</Link>
+              ? <Link className="text-link hover:underline" to={`/inventory/sales-orders/${r.sales_order_id}`}>Sales order {r.so_number ?? ''}</Link>
               : <span className="text-muted-foreground">—</span>}
         </span>
       ),
@@ -152,7 +152,7 @@ export default function ShippingLabelListPage() {
         <div className="flex flex-col md:flex-row gap-8 p-8">
           {/* Left: copy + CTA */}
           <div className="flex-1 space-y-4">
-            <div className="flex items-center gap-2 text-primary">
+            <div className="flex items-center gap-2 text-link">
               <Package className="h-6 w-6" />
               <span className="text-sm font-semibold uppercase tracking-wide">Shipping</span>
             </div>
@@ -167,7 +167,7 @@ export default function ShippingLabelListPage() {
                 'Download and print your label log any time',
               ].map(item => (
                 <li key={item} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-link" />
                   {item}
                 </li>
               ))}
@@ -192,7 +192,7 @@ export default function ShippingLabelListPage() {
                     <tr key={c.name} className={i < CARRIERS.length - 1 ? 'border-b' : ''}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          {c.best && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                          {c.best && <CheckCircle2 className="h-4 w-4 text-link" />}
                           <span className={c.best ? 'font-medium text-foreground' : 'text-muted-foreground'}>{c.name}</span>
                         </div>
                       </td>

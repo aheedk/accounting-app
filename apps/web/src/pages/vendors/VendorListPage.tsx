@@ -111,7 +111,7 @@ export default function VendorListPage() {
       sortable: true,
       sortValue: r => (r.is_1099 ? 1 : 0),
       render: r => r.is_1099
-        ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Yes</span>
+        ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">Yes</span>
         : <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">No</span>,
     },
     { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => r.open_balance, render: r => <span className="font-mono">{fmtMoney(String(r.open_balance))}</span> },
@@ -266,7 +266,7 @@ export default function VendorListPage() {
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="relative inline-flex items-center gap-2">
-              <Link className="text-primary hover:underline" to={`/ap/bills/new?vendor_id=${r.id}`}>Create bill</Link>
+              <Link className="text-link hover:underline" to={`/ap/bills/new?vendor_id=${r.id}`}>Create bill</Link>
               <button
                 type="button"
                 onClick={() => setOpenActionRow(current => (current === r.id ? null : r.id))}

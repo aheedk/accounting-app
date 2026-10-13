@@ -192,7 +192,7 @@ export default function ReconcileWorksheetPage() {
           <p className="text-sm text-muted-foreground">Statement ending {fmtShortDate(data.reconciliation.statement_ending_date)}</p>
         </div>
         <div className="flex items-center gap-4">
-          <Link to="/accounting/reconcile" className="text-sm text-primary underline">Back to Reconcile</Link>
+          <Link to="/accounting/reconcile" className="text-sm text-link underline">Back to Reconcile</Link>
           <ReconcileNav active="setup" accountId={data.account.id} />
         </div>
       </div>
@@ -257,7 +257,7 @@ export default function ReconcileWorksheetPage() {
                     <td className="p-2 whitespace-nowrap">{fmtShortDate(item.transaction_date)}</td>
                     <td className="p-2 whitespace-nowrap">{item.type_label}</td>
                     <td className="p-2">
-                      <Link to={item.transaction_path} className="text-primary underline">{item.ref_no ?? '—'}</Link>
+                      <Link to={item.transaction_path} className="text-link underline">{item.ref_no ?? '—'}</Link>
                     </td>
                     <td className="p-2">{item.name ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-2 text-muted-foreground">{item.description ?? ''}</td>

@@ -163,7 +163,7 @@ export default function AccountPage() {
                 <li>
                   Type this key (the account name can be anything, such as your email):
                   <div className="mt-1 select-all break-all rounded-md bg-muted p-3 font-mono text-sm tracking-wider">{setup.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
-                  <a className="mt-1 inline-block text-xs text-primary hover:underline" href={setup.otpauth_uri}>On this phone? Open it in the app.</a>
+                  <a className="mt-1 inline-block text-xs text-link hover:underline" href={setup.otpauth_uri}>On this phone? Open it in the app.</a>
                 </li>
                 <li>
                   <Label htmlFor="setup-code">Enter the 6-digit code the app shows</Label>
@@ -208,7 +208,7 @@ export default function AccountPage() {
                   <td className="p-3 whitespace-nowrap">{fmtDateTime(s.started_at)}</td>
                   <td className="p-3 whitespace-nowrap">{fmtDateTime(s.last_active_at)}</td>
                   <td className="p-3 text-right">
-                    {!s.current && <Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-primary hover:text-primary" onClick={() => void endSession(s.id)}>Sign out</Button>}
+                    {!s.current && <Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-link hover:text-link" onClick={() => void endSession(s.id)}>Sign out</Button>}
                   </td>
                 </tr>
               ))}

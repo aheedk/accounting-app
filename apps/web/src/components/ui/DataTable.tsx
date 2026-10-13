@@ -270,12 +270,12 @@ export function DataTable<T>({
       <thead className="border-b">
         <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {selectable && (
-            <th className="p-3 w-10">
+            <th className="px-4 py-3 w-10">
               <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
             </th>
           )}
           {effectiveColumns.map(c => (
-            <th key={c.key} className={`p-3 ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
+            <th key={c.key} className={`px-4 py-3 ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
               {c.sortable ? (
                 <button
                   type="button"
@@ -293,7 +293,7 @@ export function DataTable<T>({
               )}
             </th>
           ))}
-          {actions && <th className="p-3 text-right">{actionsHeader ?? 'Action'}</th>}
+          {actions && <th className="px-4 py-3 text-right">{actionsHeader ?? 'Action'}</th>}
         </tr>
       </thead>
       <tbody>
@@ -304,10 +304,10 @@ export function DataTable<T>({
             <tr
               key={id}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-b last:border-b-0 hover:bg-muted/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${alt ? 'bg-muted/30' : ''}`}
+              className={`border-b border-border/60 last:border-b-0 hover:bg-muted/60 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${alt ? 'bg-muted/30' : ''}`}
             >
               {selectable && (
-                <td className={`px-3 ${rowPadding}`}>
+                <td className={`px-4 ${rowPadding}`}>
                   <input
                     type="checkbox"
                     checked={selected.has(id)}
@@ -317,12 +317,12 @@ export function DataTable<T>({
                 </td>
               )}
               {effectiveColumns.map(c => (
-                <td key={c.key} className={`px-3 ${rowPadding} ${c.align === 'right' ? 'text-right' : ''}`}>
+                <td key={c.key} className={`px-4 ${rowPadding} ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>
                   {c.render(row)}
                 </td>
               ))}
               {actions && (
-                <td className="p-3 text-right whitespace-nowrap">{actions(row)}</td>
+                <td className="px-4 py-3 text-right whitespace-nowrap">{actions(row)}</td>
               )}
             </tr>
           );

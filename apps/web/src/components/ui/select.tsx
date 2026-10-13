@@ -173,10 +173,10 @@ export function AppSelect({
       ref={containerRef}
       className={cn(
         'relative flex h-9 w-full items-center rounded-md border border-input bg-background text-sm',
-        'ring-offset-background transition-colors',
-        'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
-        open && 'ring-2 ring-ring ring-offset-2',
-        disabled && 'cursor-not-allowed opacity-50',
+        'transition-shadow',
+        'focus-within:border-ring focus-within:shadow-[0_0_0_2px_rgba(0,119,197,0.15)]',
+        open && 'border-ring shadow-[0_0_0_2px_rgba(0,119,197,0.15)]',
+        disabled && 'cursor-not-allowed border-border bg-muted opacity-100 text-muted-foreground',
         className,
       )}
       {...(rest as React.HTMLAttributes<HTMLDivElement>)}
@@ -253,7 +253,7 @@ export function AppSelect({
                   {opt.hint ? (
                     <span className="ml-2 shrink-0 text-xs italic text-muted-foreground">{opt.hint}</span>
                   ) : (
-                    isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />
+                    isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-link" />
                   )}
                 </li>
               );
@@ -267,7 +267,7 @@ export function AppSelect({
               <button
                 type="button"
                 onClick={() => { setOpen(false); onAddNew(); }}
-                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-link hover:bg-accent"
               >
                 {addNewLabel}
               </button>

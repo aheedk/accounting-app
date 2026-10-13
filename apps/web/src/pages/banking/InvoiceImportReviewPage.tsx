@@ -148,7 +148,7 @@ export default function InvoiceImportReviewPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => nav(-1)} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <button type="button" onClick={() => nav(-1)} className="inline-flex items-center gap-1 text-sm text-link hover:underline">
           <ChevronLeft className="h-4 w-4" />Back
         </button>
         <div>

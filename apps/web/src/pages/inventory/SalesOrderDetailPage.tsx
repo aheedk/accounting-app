@@ -204,7 +204,7 @@ export default function SalesOrderDetailPage() {
             {data.invoice_id && (
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-36">Invoice</span>
-                <Link className="text-primary underline" to={`/invoices/${data.invoice_id}`}>
+                <Link className="text-link underline" to={`/invoices/${data.invoice_id}`}>
                   view invoice
                 </Link>
               </div>

@@ -978,7 +978,7 @@ export default function CoaListPage() {
                   <div className="flex items-center justify-end gap-1" data-row-menu={acct.id}>
                     <Link
                       to={`/coa/${acct.id}/register`}
-                      className="text-sm font-medium text-primary px-2 py-1 rounded hover:bg-muted/40 transition-colors"
+                      className="text-sm font-medium text-link px-2 py-1 rounded hover:bg-muted/40 transition-colors"
                     >
                       View register
                     </Link>
@@ -1299,7 +1299,7 @@ export default function CoaListPage() {
                 <svg className="mb-3 h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p className="text-sm">Drag and drop or <span className="font-medium text-primary underline">select files</span></p>
+                <p className="text-sm">Drag and drop or <span className="font-medium text-link underline">select files</span></p>
                 <p className="mt-1 text-xs text-muted-foreground">Use file type .csv, .xls, or .xlsx</p>
                 {importParseErr && <p className="mt-3 text-sm text-destructive">{importParseErr}</p>}
               </div>
@@ -1331,7 +1331,7 @@ export default function CoaListPage() {
           </div>
 
           <DialogFooter className="justify-between gap-3">
-            <button type="button" className="text-sm text-primary underline hover:no-underline" onClick={downloadSampleTemplate}>
+            <button type="button" className="text-sm text-link underline hover:no-underline" onClick={downloadSampleTemplate}>
               Download sample template
             </button>
             <div className="flex gap-2">

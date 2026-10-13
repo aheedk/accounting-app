@@ -582,7 +582,7 @@ export default function RulesPage() {
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            className="text-primary hover:underline text-sm font-medium"
+                            className="text-link hover:underline text-sm font-medium"
                             onClick={() => openEdit(r)}
                             disabled={isRowBusy}
                           >

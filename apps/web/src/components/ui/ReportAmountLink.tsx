@@ -24,7 +24,7 @@ export function ReportAmountLink({
       to={to}
       title={title}
       className={cn(
-        'text-primary underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none',
+        'text-link underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none',
         className,
       )}
     >

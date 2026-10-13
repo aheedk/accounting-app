@@ -210,7 +210,7 @@ export function BookmarkMenu() {
                     editing?.bookmarkId === bm.id && 'bg-accent text-accent-foreground',
                   )}
                 >
-                  <Bookmark className="h-3.5 w-3.5 shrink-0 fill-current text-primary" />
+                  <Bookmark className="h-3.5 w-3.5 shrink-0 fill-current text-link" />
                   <span className="truncate">{bm.label}</span>
                 </button>
               ))
@@ -222,7 +222,7 @@ export function BookmarkMenu() {
             <button
               type="button"
               onClick={handleBookmarkCurrentPage}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-primary transition-colors hover:bg-muted/60"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-link transition-colors hover:bg-muted/60"
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>{currentBookmark ? 'Edit bookmark for this page' : 'Bookmark current page'}</span>

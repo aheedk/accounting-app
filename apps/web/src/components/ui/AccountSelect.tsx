@@ -236,7 +236,7 @@ export function AccountSelect({
               <button
                 type="button"
                 onClick={createAccount}
-                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium text-link hover:bg-accent"
               >
                 Add new account
               </button>

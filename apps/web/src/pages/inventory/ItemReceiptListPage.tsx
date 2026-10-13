@@ -87,7 +87,7 @@ export default function ItemReceiptListPage() {
     { key: 'receipt_date', header: 'Receipt Date', sortable: true, sortValue: r => Date.parse(r.receipt_date), render: r => <span className="whitespace-nowrap">{fmtShortDate(r.receipt_date)}</span> },
     { key: 'po_number', header: 'PO #', sortable: true, sortValue: r => r.po_number, render: r => <span className="font-mono">{r.po_number || <span className="text-muted-foreground">—</span>}</span> },
     { key: 'bill_number', header: 'Bill #', sortable: true, sortValue: r => r.bill_number ?? '', render: r => r.bill_id ? (
-      <Link className="font-mono text-primary hover:underline" to={`/ap/bills/${r.bill_id}`}>
+      <Link className="font-mono text-link hover:underline" to={`/ap/bills/${r.bill_id}`}>
         {r.bill_number ?? r.bill_id.slice(0, 8)}
       </Link>
     ) : <span className="text-muted-foreground">—</span> },
@@ -128,7 +128,7 @@ export default function ItemReceiptListPage() {
                 'Track discrepancies for faster resolutions',
               ].map(item => (
                 <li key={item} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-link" />
                   {item}
                 </li>
               ))}

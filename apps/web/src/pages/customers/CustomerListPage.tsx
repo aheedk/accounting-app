@@ -187,8 +187,8 @@ export default function CustomerListPage() {
             return (
               <span className="relative inline-flex items-center gap-2">
                 {hasBalance
-                  ? <Link className="text-primary hover:underline" to={`/payments/new?customer_id=${r.id}`}>Receive payment</Link>
-                  : <Link className="text-primary hover:underline" to={`/invoices/new?customer_id=${r.id}`}>Create invoice</Link>}
+                  ? <Link className="text-link hover:underline" to={`/payments/new?customer_id=${r.id}`}>Receive payment</Link>
+                  : <Link className="text-link hover:underline" to={`/invoices/new?customer_id=${r.id}`}>Create invoice</Link>}
                 <button type="button" onClick={() => setOpenActionRow(current => (current === r.id ? null : r.id))} aria-label={`More actions for ${r.name}`}>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </button>

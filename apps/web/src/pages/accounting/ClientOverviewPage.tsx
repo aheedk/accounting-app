@@ -67,7 +67,7 @@ export default function ClientOverviewPage() {
     {
       key: 'business_name', header: 'Business', sortable: true, sortValue: r => r.business_name,
       render: r => (
-        <button type="button" onClick={() => pickBusiness(r.business_id)} className="font-medium text-primary hover:underline">
+        <button type="button" onClick={() => pickBusiness(r.business_id)} className="font-medium text-link hover:underline">
           {r.business_name}
         </button>
       ),

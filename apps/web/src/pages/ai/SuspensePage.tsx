@@ -106,7 +106,7 @@ export default function SuspensePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <HelpCircle className="h-5 w-5 text-primary" />
+            <HelpCircle className="h-5 w-5 text-link" />
             Suspense
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
@@ -165,7 +165,7 @@ export default function SuspensePage() {
                     {item.age_days > 30 && <div className="text-[11px] text-amber-700">{item.age_days} days</div>}
                   </td>
                   <td className="px-3 py-2">
-                    <Link to={item.path} className="text-primary hover:underline">{item.label}{item.num ? ` ${item.num}` : ''}</Link>
+                    <Link to={item.path} className="text-link hover:underline">{item.label}{item.num ? ` ${item.num}` : ''}</Link>
                   </td>
                   <td className="max-w-[320px] px-3 py-2">
                     {item.payee && <div className="font-medium">{item.payee}</div>}

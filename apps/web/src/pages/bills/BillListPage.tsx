@@ -181,11 +181,11 @@ export default function BillListPage() {
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="inline-flex items-center gap-2">
-              <Link className="text-primary hover:underline" to={`/ap/bills/${r.id}`}>{canEnter ? 'View/Edit' : 'View'}</Link>
+              <Link className="text-link hover:underline" to={`/ap/bills/${r.id}`}>{canEnter ? 'View/Edit' : 'View'}</Link>
               {canEnter && r.status === 'posted' && (
                 <>
                   <span className="text-muted-foreground/50">|</span>
-                  <Link className="text-primary hover:underline" to={`/ap/bill-payments/new?vendor_id=${r.vendor_id}&bill_id=${r.id}`}>Pay bill</Link>
+                  <Link className="text-link hover:underline" to={`/ap/bill-payments/new?vendor_id=${r.vendor_id}&bill_id=${r.id}`}>Pay bill</Link>
                 </>
               )}
               {canEnter && <ChevronDown className="h-4 w-4 text-muted-foreground" />}

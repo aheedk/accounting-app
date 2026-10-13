@@ -9,13 +9,13 @@ export function ReconcileNav({ active, accountId }: { active: Active; accountId?
     <div className="flex items-center gap-4 text-sm">
       <Link
         to="/settings/coa"
-        className="text-primary hover:underline"
+        className="text-link hover:underline"
       >
         Chart of accounts
       </Link>
       <Link
         to={registerHref}
-        className={active === 'register' ? 'font-semibold text-foreground underline' : 'text-primary hover:underline'}
+        className={active === 'register' ? 'font-semibold text-foreground underline' : 'text-link hover:underline'}
       >
         Register
       </Link>

@@ -192,7 +192,7 @@ export function SidebarBrand() {
   return (
     <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
       <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
-        <BookOpen className="h-4 w-4" />
+        <BookOpen className="h-[18px] w-[18px]" />
       </div>
       <span className="font-display text-lg tracking-tight text-white">Accounting</span>
     </div>
@@ -278,8 +278,8 @@ function DesktopSidebarNav() {
       {groups.map(item => {
         const Icon = item.icon;
         const active = item.children?.some(child => pathMatchesChild(pathname, child)) ?? pathname === item.to;
-        const rowClass = cn('flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-hover hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', active || openId === item.id ? 'bg-sidebar-active text-white' : 'text-sidebar-muted');
-        if (!item.children) return <NavLink key={item.id} to={item.to ?? '/'} end className={rowClass} onClick={closeGroup} onMouseEnter={() => { if (!pinnedRef.current) closeGroup(); }}><Icon className="h-4 w-4 shrink-0" />{item.label}{item.to === MESSAGES_PATH && <UnreadPill count={unreadMessages} />}</NavLink>;
+        const rowClass = cn('flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-hover/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', active || openId === item.id ? 'bg-sidebar-active/[0.12] text-white' : 'text-sidebar-muted');
+        if (!item.children) return <NavLink key={item.id} to={item.to ?? '/'} end className={rowClass} onClick={closeGroup} onMouseEnter={() => { if (!pinnedRef.current) closeGroup(); }}><Icon className="h-[18px] w-[18px] shrink-0" />{item.label}{item.to === MESSAGES_PATH && <UnreadPill count={unreadMessages} />}</NavLink>;
         return (
           <button key={item.id} type="button" className={rowClass} aria-expanded={openId === item.id} aria-controls={openId === item.id ? 'sidebar-flyout' : undefined}
             onMouseEnter={event => { if (!pinnedRef.current) openGroup(item.id, event.currentTarget); }} onMouseLeave={scheduleClose}
@@ -292,7 +292,7 @@ function DesktopSidebarNav() {
                 requestAnimationFrame(() => panelRef.current?.querySelector<HTMLAnchorElement>('a')?.focus());
               }
             }}>
-            <Icon className="h-4 w-4 shrink-0" /><span className="flex-1 text-left">{item.label}</span><ChevronRight className="h-4 w-4 shrink-0" />
+            <Icon className="h-[18px] w-[18px] shrink-0" /><span className="flex-1 text-left">{item.label}</span><ChevronRight className="h-[18px] w-[18px] shrink-0" />
           </button>
         );
       })}
@@ -304,7 +304,7 @@ function DesktopSidebarNav() {
           <div className="shrink-0 border-b border-white/10 px-3 pb-3 text-sm font-semibold text-white">{group.label}</div>
           <div className="mt-2 flex min-h-0 flex-col gap-0.5 overflow-y-auto">
             {group.children.map(child => (
-              <NavLink key={child.to} to={child.to} onClick={closeGroup} className={cn('shrink-0 flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', pathMatchesChild(pathname, child) ? 'border-gold bg-sidebar-active font-medium text-white' : 'border-transparent text-sidebar-muted hover:bg-sidebar-hover hover:text-white')}>
+              <NavLink key={child.to} to={child.to} onClick={closeGroup} className={cn('shrink-0 flex items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold', pathMatchesChild(pathname, child) ? 'border-gold bg-sidebar-active/[0.12] font-medium text-white' : 'border-transparent text-sidebar-muted hover:bg-sidebar-hover/[0.08] hover:text-white')}>
                 <span className="flex-1">{child.label}</span>
                 {child.to === AI_INBOX_PATH && pendingImports > 0 && (
                   <span className="flex h-2 w-2 shrink-0 rounded-full bg-blue-400" title={`${pendingImports} pending`} />
@@ -370,14 +370,14 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
               className={({ isActive }) =>
                 cn(
                   'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  'hover:bg-sidebar-hover hover:text-white',
+                  'hover:bg-sidebar-hover/[0.08] hover:text-white',
                   isActive
-                    ? 'border-l-2 border-gold bg-sidebar-active text-white'
+                    ? 'border-l-2 border-gold bg-sidebar-active/[0.12] text-white'
                     : 'text-sidebar-muted',
                 )
               }
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className="h-[18px] w-[18px] shrink-0" />
               <span>{group.label}</span>
               {to === MESSAGES_PATH && <UnreadPill count={unreadMessages} />}
             </NavLink>
@@ -402,17 +402,17 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                 aria-expanded={isOpen}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  'hover:bg-sidebar-hover hover:text-white',
+                  'hover:bg-sidebar-hover/[0.08] hover:text-white',
                   isActiveGroup
-                    ? 'bg-sidebar-active text-white'
+                    ? 'bg-sidebar-active/[0.12] text-white'
                     : 'text-sidebar-muted',
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-[18px] w-[18px] shrink-0" />
                 <span className="flex-1 text-left">{group.label}</span>
                 <ChevronRight
                   className={cn(
-                    'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
+                    'h-[18px] w-[18px] text-sidebar-muted/70 transition-transform duration-200 ease-out',
                     isOpen && 'rotate-90',
                   )}
                 />
@@ -424,17 +424,17 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                 aria-expanded={isOpen}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  'hover:bg-sidebar-hover hover:text-white',
+                  'hover:bg-sidebar-hover/[0.08] hover:text-white',
                   isActiveGroup
-                    ? 'bg-sidebar-active text-white'
+                    ? 'bg-sidebar-active/[0.12] text-white'
                     : 'text-sidebar-muted',
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-[18px] w-[18px] shrink-0" />
                 <span className="flex-1 text-left">{group.label}</span>
                 <ChevronRight
                   className={cn(
-                    'h-4 w-4 text-sidebar-muted/70 transition-transform duration-200 ease-out',
+                    'h-[18px] w-[18px] text-sidebar-muted/70 transition-transform duration-200 ease-out',
                     isOpen && 'rotate-90',
                   )}
                 />
@@ -467,8 +467,8 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                           'flex items-center gap-2 rounded-md border-l-2 px-3 py-1.5 text-left text-sm transition-all duration-150 ease-out',
                           isOpen ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
                           childActive
-                            ? 'border-gold bg-sidebar-active font-medium text-white'
-                            : 'border-white/10 text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
+                            ? 'border-gold bg-sidebar-active/[0.12] font-medium text-white'
+                            : 'border-white/10 text-sidebar-muted hover:bg-sidebar-hover/[0.08] hover:text-white',
                         )}
                       >
                         <span className="flex-1">{child.label}</span>

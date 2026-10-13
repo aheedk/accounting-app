@@ -111,7 +111,7 @@ export default function AccountRegisterPage() {
         <button
           type="button"
           onClick={() => nav('/settings/coa')}
-          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-sm text-link hover:underline"
         >
           <ChevronLeft className="h-4 w-4" />
           Back to Chart of Accounts
@@ -222,7 +222,7 @@ export default function AccountRegisterPage() {
         <button
           type="button"
           onClick={() => setAddOpen(o => !o)}
-          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-sm font-medium text-link hover:underline"
         >
           Add check <ChevronDown className="h-3.5 w-3.5" />
         </button>

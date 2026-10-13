@@ -54,7 +54,7 @@ export function AppShell() {
           <TopBar onMenuClick={() => setMobileNavOpen(true)} />
         </div>
         <PdfPreviewHost />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 print:overflow-visible print:p-0">
+        <main className="flex-1 overflow-y-auto bg-page p-4 lg:p-8 print:overflow-visible print:bg-background print:p-0">
           {allowed ? <Outlet /> : (
             <div className="mx-auto mt-16 max-w-md rounded-lg border bg-card p-8 text-center">
               <h1 className="text-lg font-semibold">This page is not part of your access</h1>
@@ -67,7 +67,7 @@ export function AppShell() {
                       ? 'Payroll is not open to your login. A firm admin can turn it on.'
                       : 'It needs a login with more access than yours.'}
               </p>
-              <Link className="mt-4 inline-block text-sm font-medium text-primary hover:underline" to="/">Back to the dashboard</Link>
+              <Link className="mt-4 inline-block text-sm font-medium text-link hover:underline" to="/">Back to the dashboard</Link>
             </div>
           )}
         </main>

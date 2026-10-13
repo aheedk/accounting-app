@@ -63,7 +63,7 @@ export default function StandardReportsPage() {
                 className="group flex items-center justify-between gap-4 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-muted/40"
               >
                 <div>
-                  <div className="font-medium text-primary">{r.name}</div>
+                  <div className="font-medium text-link">{r.name}</div>
                   <div className="text-sm text-muted-foreground">{r.description}</div>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

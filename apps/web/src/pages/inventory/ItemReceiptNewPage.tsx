@@ -246,7 +246,7 @@ export default function ItemReceiptNewPage() {
         <div>
           <Label>Attachments</Label>
           <div className="mt-1 flex flex-col items-center justify-center gap-2 rounded-md border border-dashed bg-muted/20 p-8 text-center">
-            <p className="text-sm font-medium text-primary">Add attachment</p>
+            <p className="text-sm font-medium text-link">Add attachment</p>
             <p className="text-xs text-muted-foreground">Max file size: 20 MB</p>
           </div>
         </div>

@@ -133,7 +133,7 @@ export default function PaymentDetailPage() {
       <DetailPageHeader
         eyebrow="Payment"
         title={p.reference ? `Payment ${p.reference}` : fmtLongDate(p.payment_date)}
-        subtitle={customer ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : 'Customer payment'}
+        subtitle={customer ? <Link className="text-link hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : 'Customer payment'}
         status={p.status}
         totalLabel="Payment amount"
         total={fmtMoney(p.amount)}
@@ -154,7 +154,7 @@ export default function PaymentDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Payment details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <DetailField label="Customer" value={customer ? <Link className="text-primary hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : p.customer_id} />
+            <DetailField label="Customer" value={customer ? <Link className="text-link hover:underline" to={`/customers/${customer.id}`}>{customer.name}</Link> : p.customer_id} />
             <DetailField label="Customer email" value={customer?.email} />
             <DetailField label="Method" value={humanizeCode(p.payment_method)} />
             <DetailField label="Deposit account" value={accountMap.get(p.cash_account_id) ?? p.cash_account_id} />
@@ -175,7 +175,7 @@ export default function PaymentDetailPage() {
                 {
                   label: 'Journal entry',
                   value: p.posted_journal_entry_id
-                    ? <Link className="font-mono text-primary hover:underline" to={`/journal/${p.posted_journal_entry_id}`}>View journal entry</Link>
+                    ? <Link className="font-mono text-link hover:underline" to={`/journal/${p.posted_journal_entry_id}`}>View journal entry</Link>
                     : null,
                 },
               ]}
@@ -203,7 +203,7 @@ export default function PaymentDetailPage() {
                 ) : data.applications.map(a => (
                   <tr key={a.id} className="border-b last:border-b-0">
                     <td className="p-3 font-mono">
-                      <Link className="text-primary hover:underline" to={`/invoices/${a.invoice_id}`}>{a.invoice_number}</Link>
+                      <Link className="text-link hover:underline" to={`/invoices/${a.invoice_id}`}>{a.invoice_number}</Link>
                     </td>
                     <td className="p-3 text-right font-mono">{fmtMoney(a.applied_amount)}</td>
                     <td className="p-3">{fmtDateTime(a.applied_at)}</td>

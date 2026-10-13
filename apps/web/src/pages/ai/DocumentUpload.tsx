@@ -99,7 +99,7 @@ export default function DocumentUpload({ onUploaded }: Props) {
       >
         {state.busy ? (
           <>
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <Loader2 className="h-6 w-6 animate-spin text-link" />
             <p className="text-sm font-medium">Reading the document…</p>
             <p className="text-xs text-muted-foreground">
               Extracting transactions and suggesting accounts.
@@ -112,7 +112,7 @@ export default function DocumentUpload({ onUploaded }: Props) {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="text-sm font-medium text-primary hover:underline"
+              className="text-sm font-medium text-link hover:underline"
             >
               choose a file
             </button>

@@ -119,11 +119,11 @@ export default function InvoiceListPage() {
           actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
           actions={r => (
             <span className="inline-flex items-center gap-2">
-              <Link className="text-primary hover:underline" to={`/invoices/${r.id}`}>{canCreate ? 'View/Edit' : 'View'}</Link>
+              <Link className="text-link hover:underline" to={`/invoices/${r.id}`}>{canCreate ? 'View/Edit' : 'View'}</Link>
               {canCreate && r.status === 'posted' && (
                 <>
                   <span className="text-muted-foreground/50">|</span>
-                  <Link className="text-primary hover:underline" to={`/payments/new?customer_id=${r.customer_id}&invoice_id=${r.id}`}>Receive payment</Link>
+                  <Link className="text-link hover:underline" to={`/payments/new?customer_id=${r.customer_id}&invoice_id=${r.id}`}>Receive payment</Link>
                 </>
               )}
               {canCreate && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
