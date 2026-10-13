@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, FolderOpen, Plus, PanelLeftClose, PanelLeftOpen, Printer, RefreshCw, Search, Settings, SlidersHorizontal, Star } from 'lucide-react';
+import { ChevronDown, ChevronLeft, FolderOpen, ListFilter, Plus, PanelLeftClose, PanelLeftOpen, Printer, RefreshCw, Search, Settings, SlidersHorizontal, Star } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -104,10 +104,10 @@ function SummaryStat({ label, amount, borderClass }: { label: string; amount: nu
 type VendorSortKey = 'name' | 'balance';
 
 function VendorSidebar({
-  vendors, bills, activeId, collapsed, onToggleCollapsed,
+  vendors, bills, activeId, collapsed, onToggleCollapsed, onStub,
 }: {
   vendors: VendorListItem[]; bills: VendorBillSummary[]; activeId: string | undefined;
-  collapsed: boolean; onToggleCollapsed: () => void;
+  collapsed: boolean; onToggleCollapsed: () => void; onStub: (msg: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<VendorSortKey>('name');
@@ -147,6 +147,9 @@ function VendorSidebar({
         <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
           <Link to="/ap/vendors/new" aria-label="New vendor"><Plus className="h-4 w-4" /></Link>
         </Button>
+        <button type="button" onClick={() => onStub('Coming soon')} aria-label="List view options" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+          <ListFilter className="h-4 w-4" />
+        </button>
         <button type="button" onClick={onToggleCollapsed} aria-label="Hide vendor list" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
           <PanelLeftClose className="h-4 w-4" />
         </button>
@@ -312,6 +315,7 @@ export default function VendorDetailPage() {
         activeId={vendor.id}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(c => !c)}
+        onStub={showToast}
       />
       <div className="min-w-0 flex-1 space-y-6">
       <Link to="/ap/vendors" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
