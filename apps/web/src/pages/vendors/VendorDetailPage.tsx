@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fmtMoney } from '@/lib/money';
 import { fmtDateTime, daysAgoLocal, todayLocal } from '@/lib/dates';
 import { formatPhone } from '@/lib/phone';
@@ -256,6 +257,29 @@ export default function VendorDetailPage() {
     } catch (e: unknown) { setDeleteErr(pickErr(e)); }
   }
 
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeConfirming, setMergeConfirming] = useState(false);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeErr, setMergeErr] = useState<string | null>(null);
+
+  function openMerge() {
+    setMergeTargetId('');
+    setMergeConfirming(false);
+    setMergeErr(null);
+    setMergeOpen(true);
+  }
+
+  async function confirmMerge() {
+    if (!bizId || !vendor || !mergeTargetId) return;
+    setMergeBusy(true);
+    setMergeErr(null);
+    try {
+      await api.post(`/businesses/${bizId}/vendors/${vendor.id}/merge`, { into_vendor_id: mergeTargetId });
+      nav(`/ap/vendors/${mergeTargetId}`);
+    } catch (e: unknown) { setMergeErr(pickErr(e)); setMergeBusy(false); }
+  }
+
   function loadTransactions() {
     if (!bizId || !id) return;
     api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
@@ -393,7 +417,10 @@ export default function VendorDetailPage() {
                   <DropdownMenuItem disabled={!vendor.is_active} onSelect={() => { void makeInactive(); }}>
                     Make inactive
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => showToast('Coming soon')}>Merge vendor</DropdownMenuItem>
+                  <DropdownMenuItem disabled={!canDelete} title={!canDelete ? 'Firm admin access is required' : undefined} onSelect={openMerge}>
+                    Merge contacts
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => showToast('Coming soon')}>Ask vendor for info</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
@@ -431,6 +458,48 @@ export default function VendorDetailPage() {
           {toastMsg}
         </div>
       )}
+
+      <Dialog open={mergeOpen} onOpenChange={o => { if (!mergeBusy) setMergeOpen(o); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Merge {vendor.name} with another vendor</DialogTitle></DialogHeader>
+          <div className="space-y-4 p-6">
+            {!mergeConfirming ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Pick the vendor to merge <span className="font-medium text-foreground">{vendor.name}</span> into. That vendor survives; its own details stay as they are.
+                </p>
+                <AppSelect
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={mergeTargetId}
+                  onChange={e => setMergeTargetId(e.target.value)}
+                >
+                  <option value="">Choose a vendor</option>
+                  {vendorList.filter(v => v.id !== vendor.id).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                </AppSelect>
+              </>
+            ) : (
+              <p className="text-sm">
+                This will merge <span className="font-medium">{vendor.name}</span> into{' '}
+                <span className="font-medium">{vendorList.find(v => v.id === mergeTargetId)?.name}</span>. All transactions currently
+                linked to <span className="font-medium">{vendor.name}</span> will be moved to{' '}
+                <span className="font-medium">{vendorList.find(v => v.id === mergeTargetId)?.name}</span>, and{' '}
+                <span className="font-medium">{vendor.name}</span> will be permanently deleted. This cannot be undone.
+              </p>
+            )}
+            {mergeErr && <p className="text-sm text-destructive">{mergeErr}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setMergeOpen(false)} disabled={mergeBusy}>Cancel</Button>
+            {!mergeConfirming ? (
+              <Button type="button" disabled={!mergeTargetId} onClick={() => setMergeConfirming(true)}>Continue</Button>
+            ) : (
+              <Button type="button" variant="destructive" disabled={mergeBusy} onClick={() => { void confirmMerge(); }}>
+                {mergeBusy ? 'Merging…' : 'Merge'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MoneyBar segments={[
         { amount: stats.overdue, caption: `${stats.overdueCount} overdue`, colorClass: 'bg-orange-400' },

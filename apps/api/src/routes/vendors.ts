@@ -99,6 +99,16 @@ router.patch('/businesses/:businessId/vendors/:id', requireMinRole('accountant')
   } catch (e) { next(e); }
 });
 
+router.post('/businesses/:businessId/vendors/:id/merge', requireMinRole('firm_admin'), async (req, res, next) => {
+  try {
+    const body = schemas.vendorMergeSchema.parse(req.body);
+    const survivor = await db.transaction().execute(trx =>
+      vend.mergeVendors(trx, ctxFromReq(req), { from_vendor_id: req.params['id']!, into_vendor_id: body.into_vendor_id }),
+    );
+    res.json(survivor);
+  } catch (e) { next(e); }
+});
+
 router.delete('/businesses/:businessId/vendors/:id', requireMinRole('firm_admin'), async (req, res, next) => {
   try {
     await db.transaction().execute(trx => vend.deleteVendor(trx, ctxFromReq(req), { vendor_id: req.params['id']! }));

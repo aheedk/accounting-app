@@ -77,6 +77,7 @@ export const AUDIT = {
   VENDOR_REACTIVATE: 'vendor.reactivate',
   VENDOR_DELETE: 'vendor.delete',
   VENDOR_NOTE_CREATE: 'vendor.note_create',
+  VENDOR_MERGE: 'vendor.merge',
 
   // Bills
   BILL_CREATE: 'bill.create',

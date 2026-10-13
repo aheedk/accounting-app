@@ -203,6 +203,76 @@ describe('vendorService', () => {
     expect(notes[0]!.author_name).toBe(user.full_name);
   });
 
+  it('mergeVendors moves every reassignable record onto the survivor and deletes the merged-away vendor', async () => {
+    const { biz, ctx, cash, expense } = await setupWithCoa();
+    const vendorA = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Co' }));
+    const vendorB = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Company' }));
+
+    await t.db.transaction().execute(trx => expenses.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', vendor_id: vendorA.id,
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: expense.id, amount: '40.00' }],
+    }));
+    const billDraft = await t.db.transaction().execute(trx => billSvc.createDraft(trx, ctx, {
+      business_id: biz.id, vendor_id: vendorA.id,
+      bill_number: 'BILL-900', bill_date: '2026-04-15', due_date: '2026-05-15',
+      memo: null, terms: null,
+      lines: [{ description: 'Item', quantity: '1', unit_price: '100.0000', expense_account_id: expense.id }],
+    }));
+    await t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendorA.id, note_text: 'Called them Tuesday' }));
+
+    const survivor = await t.db.transaction().execute(trx =>
+      vend.mergeVendors(trx, ctx, { from_vendor_id: vendorA.id, into_vendor_id: vendorB.id }),
+    );
+    expect(survivor.id).toBe(vendorB.id);
+
+    // vendorA is gone entirely.
+    const gone = await t.db.selectFrom('vendors').select('id').where('id', '=', vendorA.id).executeTakeFirst();
+    expect(gone).toBeUndefined();
+
+    // Everything that pointed at vendorA now points at vendorB.
+    const expenseRows = await t.db.selectFrom('expense_transactions').select('vendor_id').where('business_id', '=', biz.id).execute();
+    expect(expenseRows.every(r => r.vendor_id === vendorB.id)).toBe(true);
+    const billRow = await t.db.selectFrom('bills').select('vendor_id').where('id', '=', billDraft.bill.id).executeTakeFirstOrThrow();
+    expect(billRow.vendor_id).toBe(vendorB.id);
+    const notes = await vend.listVendorNotes(t.db, biz.id, vendorB.id);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.note_text).toBe('Called them Tuesday');
+
+    const auditLog = await t.db.selectFrom('audit_logs').selectAll()
+      .where('action', '=', AUDIT.VENDOR_MERGE).where('entity_id', '=', vendorB.id).executeTakeFirstOrThrow();
+    const before = (typeof auditLog.before_state === 'string' ? JSON.parse(auditLog.before_state) : auditLog.before_state) as { id: string; name: string };
+    expect(before.id).toBe(vendorA.id);
+    expect(before.name).toBe('Acme Co');
+  });
+
+  it('mergeVendors refuses when both vendors have a different tax id on file', async () => {
+    const { biz, ctx } = await setup();
+    const vendorA = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, {
+      business_id: biz.id, name: 'Acme Co', tax_id: '12-3456789', tax_id_type: 'EIN',
+    }));
+    const vendorB = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, {
+      business_id: biz.id, name: 'Acme Company', tax_id: '98-7654321', tax_id_type: 'EIN',
+    }));
+
+    await expect(
+      t.db.transaction().execute(trx => vend.mergeVendors(trx, ctx, { from_vendor_id: vendorA.id, into_vendor_id: vendorB.id })),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+  });
+
+  it('mergeVendors allows a matching tax id, and allows one side having none at all', async () => {
+    const { biz, ctx } = await setup();
+    const vendorA = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, {
+      business_id: biz.id, name: 'Acme Co', tax_id: '12-3456789', tax_id_type: 'EIN',
+    }));
+    const vendorB = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Company' }));
+
+    const survivor = await t.db.transaction().execute(trx =>
+      vend.mergeVendors(trx, ctx, { from_vendor_id: vendorA.id, into_vendor_id: vendorB.id }),
+    );
+    expect(survivor.id).toBe(vendorB.id);
+  });
+
   it('addVendorNote refuses a vendor from another business', async () => {
     const { ctx } = await setup();
     const other = await setup();

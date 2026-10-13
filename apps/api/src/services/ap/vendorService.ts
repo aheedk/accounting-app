@@ -235,6 +235,88 @@ export async function deleteVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
 }
 
 /**
+ * Merge `from_vendor_id` into `into_vendor_id`: every record that points at
+ * the "from" vendor is repointed at the "into" vendor, then the "from"
+ * vendor is permanently deleted. The surviving vendor keeps its own id, name
+ * and settings untouched — only the other side's history moves over.
+ *
+ * Every table with a real FK to vendors gets reassigned: expense_transactions,
+ * checks (payee_id, vendor payees only), bills, bill_payments, vendor_credits,
+ * purchase_orders, vendor_notes. journal_entry_lines carries no vendor
+ * reference of its own (a JE's "contact" is read off its source document, via
+ * the unified transactions query) and bank_deposit_lines.received_from is
+ * free text, not a vendor_id — so neither needs a reassignment pass; moving
+ * the source documents already carries the JE's and the deposit line's vendor
+ * association along with them.
+ *
+ * Conflict rule: QBO refuses a merge across a currency or tax id mismatch.
+ * This app has no per-vendor currency at all (single-currency books), so
+ * that half never applies here; a tax id set on both sides that doesn't
+ * match is the one real conflict, checked by decrypting both.
+ */
+export async function mergeVendors(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { from_vendor_id: string; into_vendor_id: string },
+) {
+  const bizId = ctx.business_id!;
+  if (input.from_vendor_id === input.into_vendor_id) {
+    throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'Pick a different vendor to merge into');
+  }
+
+  const [from, into] = await Promise.all([
+    trx.selectFrom('vendors').selectAll().where('id', '=', input.from_vendor_id).where('business_id', '=', bizId).executeTakeFirst(),
+    trx.selectFrom('vendors').selectAll().where('id', '=', input.into_vendor_id).where('business_id', '=', bizId).executeTakeFirst(),
+  ]);
+  if (!from) throw new NotFoundError('vendor', input.from_vendor_id);
+  if (!into) throw new NotFoundError('vendor', input.into_vendor_id);
+
+  if (from.tax_id_encrypted && into.tax_id_encrypted) {
+    const fromTaxId = decryptField(Buffer.from(from.tax_id_encrypted));
+    const intoTaxId = decryptField(Buffer.from(into.tax_id_encrypted));
+    if (fromTaxId !== intoTaxId) {
+      throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'These vendors have different tax IDs on file and cannot be merged.');
+    }
+  }
+
+  await trx.updateTable('expense_transactions').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('checks').set({ payee_id: input.into_vendor_id })
+    .where('payee_id', '=', input.from_vendor_id).where('payee_type', '=', 'vendor').where('business_id', '=', bizId).execute();
+  await trx.updateTable('bills').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('bill_payments').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('vendor_credits').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('purchase_orders').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('vendor_notes').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+
+  await trx.deleteFrom('vendors').where('id', '=', input.from_vendor_id).execute();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.VENDOR_MERGE,
+    entity_type: 'vendor',
+    entity_id: input.into_vendor_id,
+    // Full snapshot of the deleted vendor, as required: it no longer exists
+    // anywhere else once this commits.
+    before: from,
+    // The audit row itself already carries who and when (user_id, created_at)
+    // — this just names both vendors in the one place a reader can't get that
+    // from the id alone, since "from" is gone after this commits.
+    after: {
+      summary: `Vendor "${from.name}" merged into Vendor "${into.name}"`,
+      merged_from_vendor_id: input.from_vendor_id,
+      merged_from_name: from.name,
+      merged_into_vendor_id: input.into_vendor_id,
+      merged_into_name: into.name,
+    },
+  });
+
+  return trx.selectFrom('vendors').selectAll().where('id', '=', input.into_vendor_id).executeTakeFirstOrThrow();
+}
+
+/**
  * Open balance = outstanding posted bills (net of what's already applied to
  * them) minus this vendor's own unused credit: vendor credits not yet
  * applied, and bill payments with money left over unapplied. Same shape as

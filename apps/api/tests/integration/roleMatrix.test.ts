@@ -123,6 +123,7 @@ const FIRM_ADMIN_ONLY = [
   'GET /me/firm/users',
   'GET ~/employees/:id/ssn-reveal',
   'GET ~/vendors/:id/tax-id-reveal',
+  'POST ~/vendors/:id/merge',
   'PATCH /me/firm/users/:id',
   'PATCH ~',
   'PATCH ~/bank-accounts/:id',

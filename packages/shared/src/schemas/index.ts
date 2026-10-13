@@ -12,6 +12,7 @@ export * from './creditMemo.js';
 export * from './aging.js';
 export * from './vendor.js';
 export * from './vendorNote.js';
+export * from './vendorMerge.js';
 export * from './recategorize.js';
 export * from './bill.js';
 export * from './billPayment.js';
