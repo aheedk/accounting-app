@@ -7,7 +7,6 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
@@ -107,60 +106,58 @@ export default function ReconcilePage() {
   const canSubmit = !busy && !!accountId && !!form.statement_ending_date && !needsServiceChargeAccount && !needsInterestAccount;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reconcile</h1>
         <ReconcileNav active="setup" accountId={accountId} />
       </div>
 
       {err && (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="max-w-xl rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {err}
         </div>
       )}
 
-      <Card>
-        <CardHeader><CardTitle>Which account do you want to reconcile?</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Account</Label>
-            <AppSelect
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={accountId}
-              onChange={e => setAccountId(e.target.value)}
-            >
-              <option value="">Select…</option>
-              {reconcilableAccounts.map(a => (
-                <option key={a.id} value={a.id} data-hint={a.category}>
-                  {a.code} {a.name}
-                </option>
-              ))}
-            </AppSelect>
-          </div>
+      <div className="space-y-2">
+        <h2 className="text-base font-medium">Which account do you want to reconcile?</h2>
+        <div className="w-64">
+          <Label>Account</Label>
+          <AppSelect
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            value={accountId}
+            onChange={e => setAccountId(e.target.value)}
+          >
+            <option value="">Select…</option>
+            {reconcilableAccounts.map(a => (
+              <option key={a.id} value={a.id} data-hint={a.category}>
+                {a.code} {a.name}
+              </option>
+            ))}
+          </AppSelect>
+        </div>
 
-          {inProgressId && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              A reconciliation is already in progress for this account.{' '}
-              <button type="button" className="font-medium underline" onClick={() => navigate(`/accounting/reconcile/${inProgressId}`)}>
-                Resume it
-              </button>
-              {' '}or finish/cancel it before starting a new one.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {inProgressId && (
+          <div className="max-w-xl rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            A reconciliation is already in progress for this account.{' '}
+            <button type="button" className="font-medium underline" onClick={() => navigate(`/accounting/reconcile/${inProgressId}`)}>
+              Resume it
+            </button>
+            {' '}or finish/cancel it before starting a new one.
+          </div>
+        )}
+      </div>
 
       <form onSubmit={submit} className="space-y-6">
-        <Card>
-          <CardHeader><CardTitle>Add the following information</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <h2 className="text-base font-medium">Add the following information*</h2>
+          <div className="flex flex-wrap items-start gap-6">
             <div>
               <Label>Beginning balance</Label>
-              <div className="flex h-10 items-center text-sm font-mono">
+              <div className="flex h-10 w-32 items-center text-sm font-mono">
                 {fmtMoney(beginningBalance)}
               </div>
             </div>
-            <div>
+            <div className="w-40">
               <Label>Statement ending balance</Label>
               <MoneyInput
                 allowNegative value={form.statement_ending_balance}
@@ -169,7 +166,7 @@ export default function ReconcilePage() {
                 required
               />
             </div>
-            <div>
+            <div className="w-44">
               <Label>Statement ending date</Label>
               <DateInput
                 value={form.statement_ending_date}
@@ -177,28 +174,28 @@ export default function ReconcilePage() {
                 required
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader><CardTitle>Service charge, if any</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
-            <div>
+        <div className="space-y-2">
+          <h2 className="text-base font-medium">Enter the service charge or interest earned, if necessary</h2>
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="w-36">
               <Label>Date</Label>
               <DateInput
                 value={form.service_charge_date}
                 onChange={e => setForm(f => ({ ...f, service_charge_date: e.target.value }))}
               />
             </div>
-            <div>
-              <Label>Amount</Label>
+            <div className="w-32">
+              <Label>Service charge</Label>
               <MoneyInput
                 value={form.service_charge_amount}
                 onChange={e => setForm(f => ({ ...f, service_charge_amount: e.target.value }))}
                 placeholder="0.00"
               />
             </div>
-            <div>
+            <div className="w-48">
               <Label>Expense account</Label>
               <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -209,28 +206,24 @@ export default function ReconcilePage() {
                 {expenseAccounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
               </AppSelect>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Interest earned, if any</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
-            <div>
+          </div>
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="w-36">
               <Label>Date</Label>
               <DateInput
                 value={form.interest_earned_date}
                 onChange={e => setForm(f => ({ ...f, interest_earned_date: e.target.value }))}
               />
             </div>
-            <div>
-              <Label>Amount</Label>
+            <div className="w-32">
+              <Label>Interest earned</Label>
               <MoneyInput
                 value={form.interest_earned_amount}
                 onChange={e => setForm(f => ({ ...f, interest_earned_amount: e.target.value }))}
                 placeholder="0.00"
               />
             </div>
-            <div>
+            <div className="w-48">
               <Label>Income account</Label>
               <AppSelect
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -241,8 +234,8 @@ export default function ReconcilePage() {
                 {incomeAccounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
               </AppSelect>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <div>
           <Button type="submit" {...hideUnless(can.accountant)} disabled={!canSubmit}>
