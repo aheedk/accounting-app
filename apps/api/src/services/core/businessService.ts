@@ -12,6 +12,7 @@ export type BusinessPatch = {
   tax_id?: string | null;
   fiscal_year_start_month?: number;
   address?: BusinessAddress | null;
+  phone?: string | null;
   import_email?: string | null;
   ai_auto_post_enabled?: boolean;
   /** Staff entries that would post at once wait for an accountant. */
@@ -30,7 +31,7 @@ export type BusinessCreateInput = {
 
 const BUSINESS_COLUMNS = [
   'id', 'firm_id', 'name', 'legal_name', 'tax_id',
-  'fiscal_year_start_month', 'address', 'import_email',
+  'fiscal_year_start_month', 'address', 'phone', 'import_email',
   'ai_auto_post_enabled', 'staff_entries_need_approval', 'capitalization_threshold', 'created_at', 'updated_at',
 ] as const;
 
@@ -123,6 +124,7 @@ export async function updateBusiness(
     tax_id?: string | null;
     fiscal_year_start_month?: number;
     address?: string | null;
+    phone?: string | null;
     import_email?: string | null;
     ai_auto_post_enabled?: boolean;
     staff_entries_need_approval?: boolean;
@@ -137,6 +139,7 @@ export async function updateBusiness(
   if (input.patch.address !== undefined) {
     updateSet.address = input.patch.address === null ? null : JSON.stringify(input.patch.address);
   }
+  if (input.patch.phone !== undefined) updateSet.phone = input.patch.phone;
   if (input.patch.import_email !== undefined) updateSet.import_email = input.patch.import_email;
   // These two were accepted by the route and then dropped here, so the auto-post
   // switch never saved (and an update of nothing else failed outright).

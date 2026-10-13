@@ -14,6 +14,7 @@ import { printReport } from '@/lib/reportExport';
 import { pickErr } from '@/lib/apiErrors';
 import { flashMessage } from '@/lib/flash';
 import { mailtoLink } from '@/lib/mailto';
+import { formatPhone } from '@/lib/phone';
 import { useCan } from '@/lib/roleAccess';
 
 const IMPORT_COLS = [
@@ -90,7 +91,7 @@ export default function CustomerListPage() {
   const columns: Column<Customer>[] = [
     { key: 'name', header: 'Name', sortable: true, sortValue: r => r.name, render: r => <span><Link className="font-medium hover:underline" to={`/customers/${r.id}`}>{r.name}</Link>{!r.is_active && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Inactive</span>}</span> },
     { key: 'company_name', header: 'Company name', sortable: true, sortValue: r => r.company_name ?? '', render: r => r.company_name || <span className="text-muted-foreground">—</span> },
-    { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</span> },
+    { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone ? formatPhone(r.phone) : <span className="text-muted-foreground">—</span>}</span> },
     { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => Number(r.open_balance ?? 0), render: r => <span className="font-mono">{fmtMoney((r.open_balance ?? '0').toString())}</span> },
   ];
 

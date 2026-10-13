@@ -28,6 +28,7 @@ export interface BusinessesTable {
   tax_id: string | null;
   fiscal_year_start_month: Generated<number>;
   address: ColumnType<BusinessAddress | null, string | null, string | null>;
+  phone: string | null;
   import_email: string | null;
   /** Firm policy: auto-post high-confidence AI suggestions without review. */
   ai_auto_post_enabled: Generated<boolean>;

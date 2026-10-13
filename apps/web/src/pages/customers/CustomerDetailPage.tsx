@@ -8,6 +8,7 @@ import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, DetailStat
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
+import { formatPhone } from '@/lib/phone';
 
 type Address = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
 type Customer = {
@@ -99,7 +100,7 @@ export default function CustomerDetailPage() {
             <DetailField label="Company" value={customer.company_name} />
             <DetailField label="Terms" value={termsLabel(customer.default_terms_days)} />
             <DetailField label="Email" value={customer.email ? <a className="text-link hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a> : null} />
-            <DetailField label="Phone" value={customer.phone} />
+            <DetailField label="Phone" value={customer.phone ? formatPhone(customer.phone) : customer.phone} />
             <DetailField label="Website" value={customer.website ? <a className="text-link hover:underline" href={customer.website}>{customer.website}</a> : null} />
             <DetailField label="Opening balance" value={customer.opening_balance ? `${fmtMoney(customer.opening_balance)}${customer.opening_balance_as_of ? ` as of ${fmtLongDate(customer.opening_balance_as_of)}` : ''}` : null} />
             <DetailField label="Billing address" value={fmtAddress(customer.billing_address)} />

@@ -11,6 +11,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { cleanPhoneInput, settlePhoneInput } from '@/lib/phone';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 
@@ -147,18 +148,42 @@ export default function VendorNewPage() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></Field>
-          <Field label="Phone number"><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></Field>
+          <Field label="Phone number">
+            <Input
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: cleanPhoneInput(e.target.value) }))}
+              onBlur={e => setForm(f => ({ ...f, phone: settlePhoneInput(e.target.value) }))}
+            />
+          </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Cc"><Input value={form.email_cc} onChange={e => setForm(f => ({ ...f, email_cc: e.target.value }))} /></Field>
           <Field label="Bcc"><Input value={form.email_bcc} onChange={e => setForm(f => ({ ...f, email_bcc: e.target.value }))} /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Mobile number"><Input value={form.mobile} onChange={e => setForm(f => ({ ...f, mobile: e.target.value }))} /></Field>
-          <Field label="Fax"><Input value={form.fax} onChange={e => setForm(f => ({ ...f, fax: e.target.value }))} /></Field>
+          <Field label="Mobile number">
+            <Input
+              value={form.mobile}
+              onChange={e => setForm(f => ({ ...f, mobile: cleanPhoneInput(e.target.value) }))}
+              onBlur={e => setForm(f => ({ ...f, mobile: settlePhoneInput(e.target.value) }))}
+            />
+          </Field>
+          <Field label="Fax">
+            <Input
+              value={form.fax}
+              onChange={e => setForm(f => ({ ...f, fax: cleanPhoneInput(e.target.value) }))}
+              onBlur={e => setForm(f => ({ ...f, fax: settlePhoneInput(e.target.value) }))}
+            />
+          </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Other"><Input value={form.other_phone} onChange={e => setForm(f => ({ ...f, other_phone: e.target.value }))} /></Field>
+          <Field label="Other">
+            <Input
+              value={form.other_phone}
+              onChange={e => setForm(f => ({ ...f, other_phone: cleanPhoneInput(e.target.value) }))}
+              onBlur={e => setForm(f => ({ ...f, other_phone: settlePhoneInput(e.target.value) }))}
+            />
+          </Field>
           <Field label="Website"><Input value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">

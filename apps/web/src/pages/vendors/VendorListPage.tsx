@@ -18,6 +18,7 @@ import { printReport } from '@/lib/reportExport';
 import { pickErr } from '@/lib/apiErrors';
 import { flashMessage } from '@/lib/flash';
 import { mailtoLink, vendorInfoRequest } from '@/lib/mailto';
+import { formatPhone } from '@/lib/phone';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -103,7 +104,7 @@ export default function VendorListPage() {
         </span>
       ),
     },
-    { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</span> },
+    { key: 'phone', header: 'Phone', render: r => <span className="whitespace-nowrap">{r.phone ? formatPhone(r.phone) : <span className="text-muted-foreground">—</span>}</span> },
     { key: 'email', header: 'Email', sortable: true, sortValue: r => r.email ?? '', render: r => r.email || <span className="text-muted-foreground">—</span> },
     {
       key: 'is_1099',
