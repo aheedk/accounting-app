@@ -441,7 +441,11 @@ export default function VendorDetailPage() {
       )}
 
       {tab === 'details' && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button asChild variant="outline" size="sm"><Link to={`/ap/vendors/${vendor.id}/edit`}>Edit</Link></Button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card><CardContent className="space-y-4 pt-6">
             <div className="text-sm font-semibold">Contact</div>
             <div className="grid grid-cols-2 gap-4">
@@ -465,8 +469,14 @@ export default function VendorDetailPage() {
           </CardContent></Card>
 
           <Card><CardContent className="space-y-4 pt-6">
-            <div className="text-sm font-semibold">Payments &amp; tax</div>
+            <div className="text-sm font-semibold">Additional info</div>
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Bill Pay ACH info</div>
+                <button type="button" className="mt-0.5 text-sm text-link hover:underline" onClick={() => showToast('Coming soon')}>
+                  Ask vendor for payment info
+                </button>
+              </div>
               <Detail label="Terms" value={vendor.default_terms_days === 0 ? 'Due on receipt' : `Net ${vendor.default_terms_days}`} />
               <Detail label="Account no." value={vendor.account_number} />
               <Detail label="Default expense category" value={expenseCategory} />
@@ -488,6 +498,7 @@ export default function VendorDetailPage() {
               />
             </div>
           </CardContent></Card>
+          </div>
         </div>
       )}
 
