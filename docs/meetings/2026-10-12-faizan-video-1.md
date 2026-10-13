@@ -11,7 +11,9 @@ built (68), 4 were fixed or in place already (50, 51, 52, 70), and 1 is waiting
 on Faizan (56). Everything built passed the
 typecheck and the web tests. **None of it has been clicked through in the
 browser yet**, and the API tests added today for the Balance Sheet were not run
-(Docker was off). Do that before showing it to him.
+(Docker was off). Do that before showing it to him. The click-through, one
+step per item with what to look for, is
+[`../qa/2026-10-12-faizan-video-1-demo.md`](../qa/2026-10-12-faizan-video-1-demo.md).
 
 ## Bugs — something is broken
 
