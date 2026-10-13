@@ -29,6 +29,10 @@ export type TransactionRow = {
   status: string;
   updated_at: string;
   path: string;
+  // The expense/offset account's name, when every line of the transaction
+  // shares one -- 'Split' when they don't, NULL for types with no such
+  // concept (deposits, journal entries, AR documents, cash receipts).
+  category: string | null;
 };
 
 export type TransactionSortKey = 'date' | 'type' | 'ref_no' | 'due_date' | 'balance' | 'total_amount' | 'updated_at';
@@ -78,7 +82,8 @@ function unionSql(business_id: string) {
       NULL::date AS due_date, '0.00' AS balance,
       ba.name AS payment_account_name, d.total_amount::text AS total_amount, d.memo,
       (CASE WHEN d.voided_at IS NOT NULL THEN 'voided' ELSE 'posted' END) AS status,
-      d.updated_at, ('/accounting/bank-deposits/' || d.id) AS path
+      d.updated_at, ('/accounting/bank-deposits/' || d.id) AS path,
+      NULL::text AS category
     FROM bank_deposits d
     JOIN bank_accounts ba ON ba.id = d.bank_account_id
     WHERE d.business_id = ${business_id}
@@ -89,7 +94,11 @@ function unionSql(business_id: string) {
       COALESCE(e.vendor_id, e.customer_id), COALESCE(v.name, c.name, e.payee_text),
       NULL::date, '0.00',
       pa.name, e.total_amount::text, e.memo, e.status::text,
-      e.updated_at, ('/accounting/expenses/' || e.id)
+      e.updated_at, ('/accounting/expenses/' || e.id),
+      (SELECT CASE WHEN COUNT(DISTINCT l.category_account_id) = 1 THEN MAX(coa5.name)
+                   WHEN COUNT(DISTINCT l.category_account_id) > 1 THEN 'Split' ELSE NULL END
+       FROM expense_transaction_lines l JOIN chart_of_accounts coa5 ON coa5.id = l.category_account_id
+       WHERE l.expense_transaction_id = e.id)
     FROM expense_transactions e
     LEFT JOIN vendors v ON v.id = e.vendor_id
     LEFT JOIN customers c ON c.id = e.customer_id
@@ -102,7 +111,11 @@ function unionSql(business_id: string) {
       ch.payee_id, COALESCE(v2.name, cu2.name, ch.payee_text),
       NULL::date, '0.00',
       ba2.name, ch.total_amount::text, ch.memo, ch.status::text,
-      ch.updated_at, ('/accounting/checks/' || ch.id)
+      ch.updated_at, ('/accounting/checks/' || ch.id),
+      (SELECT CASE WHEN COUNT(DISTINCT l2.account_id) = 1 THEN MAX(coa6.name)
+                   WHEN COUNT(DISTINCT l2.account_id) > 1 THEN 'Split' ELSE NULL END
+       FROM check_lines l2 JOIN chart_of_accounts coa6 ON coa6.id = l2.account_id
+       WHERE l2.check_id = ch.id)
     FROM checks ch
     LEFT JOIN vendors v2 ON v2.id = ch.payee_id
     LEFT JOIN customers cu2 ON cu2.id = ch.payee_id
@@ -118,7 +131,11 @@ function unionSql(business_id: string) {
       e2.vendor_id, COALESCE(v3.name, e2.payee_text),
       NULL::date, '0.00',
       COALESCE(ba3.name, pa2.name), e2.total_amount::text, e2.memo, e2.status::text,
-      e2.updated_at, ('/accounting/expenses/' || e2.id)
+      e2.updated_at, ('/accounting/expenses/' || e2.id),
+      (SELECT CASE WHEN COUNT(DISTINCT l3.category_account_id) = 1 THEN MAX(coa7.name)
+                   WHEN COUNT(DISTINCT l3.category_account_id) > 1 THEN 'Split' ELSE NULL END
+       FROM expense_transaction_lines l3 JOIN chart_of_accounts coa7 ON coa7.id = l3.category_account_id
+       WHERE l3.expense_transaction_id = e2.id)
     FROM expense_transactions e2
     LEFT JOIN vendors v3 ON v3.id = e2.vendor_id
     JOIN chart_of_accounts pa2 ON pa2.id = e2.payment_account_id
@@ -131,7 +148,8 @@ function unionSql(business_id: string) {
       NULL::uuid, NULL::text,
       NULL::date, '0.00',
       NULL::text, COALESCE((SELECT SUM(jel.debit) FROM journal_entry_lines jel WHERE jel.journal_entry_id = je.id), 0)::text,
-      je.memo, je.status::text, je.updated_at, ('/journal/' || je.id)
+      je.memo, je.status::text, je.updated_at, ('/journal/' || je.id),
+      NULL::text
     FROM journal_entries je
     WHERE je.business_id = ${business_id} AND je.source_type IN ('manual', 'adjustment') AND je.source_id IS NULL
 
@@ -141,7 +159,11 @@ function unionSql(business_id: string) {
       b.vendor_id, v4.name,
       b.due_date, (CASE WHEN b.status = 'paid' THEN '0.00' ELSE b.total::text END),
       NULL::text, b.total::text, b.memo, b.status::text,
-      b.updated_at, ('/ap/bills/' || b.id)
+      b.updated_at, ('/ap/bills/' || b.id),
+      (SELECT CASE WHEN COUNT(DISTINCT l4.expense_account_id) = 1 THEN MAX(coa8.name)
+                   WHEN COUNT(DISTINCT l4.expense_account_id) > 1 THEN 'Split' ELSE NULL END
+       FROM bill_lines l4 JOIN chart_of_accounts coa8 ON coa8.id = l4.expense_account_id
+       WHERE l4.bill_id = b.id)
     FROM bills b
     JOIN vendors v4 ON v4.id = b.vendor_id
     WHERE b.business_id = ${business_id}
@@ -152,7 +174,8 @@ function unionSql(business_id: string) {
       p.customer_id, c2.name,
       NULL::date, p.unapplied_amount::text,
       coa.name, p.amount::text, p.memo, p.status::text,
-      p.updated_at, ('/payments/' || p.id)
+      p.updated_at, ('/payments/' || p.id),
+      NULL::text
     FROM payments p
     JOIN customers c2 ON c2.id = p.customer_id
     JOIN chart_of_accounts coa ON coa.id = p.cash_account_id
@@ -164,7 +187,8 @@ function unionSql(business_id: string) {
       cm.customer_id, c3.name,
       NULL::date, cm.remaining_amount::text,
       NULL::text, cm.amount::text, cm.memo, cm.status::text,
-      cm.updated_at, ('/credit-memos/' || cm.id)
+      cm.updated_at, ('/credit-memos/' || cm.id),
+      NULL::text
     FROM credit_memos cm
     JOIN customers c3 ON c3.id = cm.customer_id
     WHERE cm.business_id = ${business_id}
@@ -177,7 +201,8 @@ function unionSql(business_id: string) {
       i.due_date,
       (CASE WHEN i.status = 'posted' THEN (i.total - COALESCE((SELECT SUM(pa.applied_amount) FROM payment_applications pa WHERE pa.invoice_id = i.id), 0))::text ELSE '0.00' END),
       NULL::text, i.total::text, i.memo, i.status::text,
-      i.updated_at, ('/invoices/' || i.id)
+      i.updated_at, ('/invoices/' || i.id),
+      NULL::text
     FROM invoices i
     JOIN customers c4 ON c4.id = i.customer_id
     WHERE i.business_id = ${business_id} AND i.deleted_at IS NULL
@@ -188,7 +213,8 @@ function unionSql(business_id: string) {
       bp.vendor_id, v5.name,
       NULL::date, bp.unapplied_amount::text,
       coa2.name, bp.amount::text, bp.memo, bp.status::text,
-      bp.updated_at, ('/ap/bill-payments/' || bp.id)
+      bp.updated_at, ('/ap/bill-payments/' || bp.id),
+      NULL::text
     FROM bill_payments bp
     JOIN vendors v5 ON v5.id = bp.vendor_id
     JOIN chart_of_accounts coa2 ON coa2.id = bp.cash_account_id
@@ -200,7 +226,8 @@ function unionSql(business_id: string) {
       vc.vendor_id, v6.name,
       NULL::date, vc.remaining_amount::text,
       NULL::text, vc.amount::text, vc.memo, vc.status::text,
-      vc.updated_at, ('/ap/vendor-credits/' || vc.id)
+      vc.updated_at, ('/ap/vendor-credits/' || vc.id),
+      NULL::text
     FROM vendor_credits vc
     JOIN vendors v6 ON v6.id = vc.vendor_id
     WHERE vc.business_id = ${business_id}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, FolderOpen, Plus, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, Star } from 'lucide-react';
+import { ChevronDown, ChevronLeft, FolderOpen, Plus, PanelLeftClose, PanelLeftOpen, Printer, RefreshCw, Search, Settings, SlidersHorizontal, Star } from 'lucide-react';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
@@ -14,8 +14,9 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmtMoney } from '@/lib/money';
-import { fmtDateTime, todayLocal } from '@/lib/dates';
+import { fmtDateTime, daysAgoLocal, todayLocal } from '@/lib/dates';
 import { formatPhone } from '@/lib/phone';
+import { printReport } from '@/lib/reportExport';
 
 type VendorListItem = { id: string; name: string; is_active: boolean };
 
@@ -58,6 +59,8 @@ type VendorTransaction = {
   total_amount: string; status: string; updated_at: string; path: string;
   // Only a bill has one. A posted bill past it reads Overdue, as on the Bills page.
   due_date?: string | null;
+  contact_name: string | null;
+  category: string | null;
 };
 
 const TX_TYPE_LABELS: Record<string, string> = {
@@ -198,6 +201,7 @@ export default function VendorDetailPage() {
   const [addingNote, setAddingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
+  const [txTypeFilter, setTxTypeFilter] = useState('all');
 
   function loadNotes() {
     if (!bizId || !id) return;
@@ -274,6 +278,26 @@ export default function VendorDetailPage() {
     }
     return { open, openCount, overdue, overdueCount, paid, paidCount };
   }, [bills, today]);
+
+  const last12mCutoff = daysAgoLocal(365);
+  const filteredTransactions = useMemo(
+    () => transactions.filter(tx => (txTypeFilter === 'all' || tx.type === txTypeFilter) && tx.date >= last12mCutoff),
+    [transactions, txTypeFilter, last12mCutoff],
+  );
+  const txTotal = useMemo(
+    () => filteredTransactions.reduce((sum, tx) => sum + Number(tx.total_amount), 0),
+    [filteredTransactions],
+  );
+
+  function printTransactions() {
+    printReport({
+      title: `${vendor?.name ?? 'Vendor'} — Transactions`,
+      headers: ['Date', 'Type', 'No.', 'Payee', 'Category', 'Total'],
+      rows: filteredTransactions.map(tx => [
+        tx.date, TX_TYPE_LABELS[tx.type] ?? tx.type, tx.ref_no ?? '', tx.contact_name ?? '', tx.category ?? '', fmtMoney(tx.total_amount),
+      ]),
+    });
+  }
 
   const expenseCategory = vendor?.default_expense_account_id
     ? accounts.find(a => a.id === vendor.default_expense_account_id)?.name ?? null
@@ -399,45 +423,85 @@ export default function VendorDetailPage() {
       </div>
 
       {tab === 'transactions' && (
-        <Card><CardContent className="p-0">
-          {transactions.length === 0 ? (
-            <EmptyState
-              title="No transactions yet"
-              hint="Bills, checks, expenses and payments for this vendor will show up here."
-              actionLabel="Create bill"
-              actionTo={`/ap/bills/new?vendor_id=${vendor.id}`}
-            />
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b">
-                <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-left">Type</th>
-                  <th className="p-3 text-left">No.</th>
-                  <th className="p-3 text-left">Status</th>
-                  <th className="p-3 text-right">Total</th>
-                  <th className="p-3 text-left">Last modified</th>
-                  <th className="p-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map(tx => (
-                  <tr key={`${tx.type}:${tx.id}`} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="p-3 whitespace-nowrap">{tx.date}</td>
-                    <td className="p-3">{TX_TYPE_LABELS[tx.type] ?? tx.type}</td>
-                    <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="p-3 capitalize">{tx.type === 'bill' && tx.status === 'posted' ? (tx.due_date && tx.due_date.slice(0, 10) < today ? 'Overdue' : 'Open') : tx.status}</td>
-                    <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
-                    <td className="p-3 whitespace-nowrap text-muted-foreground">{fmtDateTime(tx.updated_at)}</td>
-                    <td className="p-3 text-right">
-                      <Link className="text-link hover:underline" to={tx.path}>View/Edit</Link>
-                    </td>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <AppSelect className="h-9 rounded-md border bg-background px-3 text-sm" value={txTypeFilter} onChange={e => setTxTypeFilter(e.target.value)}>
+                <option value="all">All transactions</option>
+                {Object.entries(TX_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </AppSelect>
+              <Button type="button" variant="outline" size="sm" onClick={() => showToast('Coming soon')}>
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> Filter
+              </Button>
+              <span className="inline-flex h-9 items-center rounded-full border bg-muted/50 px-3 text-sm text-muted-foreground">
+                Dates: Last 12 months
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button type="button" aria-label="Print" onClick={printTransactions} className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+                <Printer className="h-4 w-4" />
+              </button>
+              <button type="button" aria-label="Table settings" onClick={() => showToast('Coming soon')} className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+                <Settings className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <Card><CardContent className="p-0">
+            {filteredTransactions.length === 0 ? (
+              <EmptyState
+                title="No transactions yet"
+                hint="Bills, checks, expenses and payments for this vendor will show up here."
+                actionLabel="Create bill"
+                actionTo={`/ap/bills/new?vendor_id=${vendor.id}`}
+              />
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="border-b">
+                  <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Type</th>
+                    <th className="p-3 text-left">No.</th>
+                    <th className="p-3 text-left">Payee</th>
+                    <th className="p-3 text-left">Category</th>
+                    <th className="p-3 text-right">Total</th>
+                    <th className="p-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent></Card>
+                </thead>
+                <tbody>
+                  {filteredTransactions.map(tx => (
+                    <tr key={`${tx.type}:${tx.id}`} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="p-3 whitespace-nowrap">{tx.date}</td>
+                      <td className="p-3">{TX_TYPE_LABELS[tx.type] ?? tx.type}</td>
+                      <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td className="p-3">{tx.contact_name ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td className="p-3">
+                        <div
+                          title="Editing the category here is coming soon"
+                          className="flex h-8 max-w-[12rem] cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
+                        >
+                          <span className="truncate">{tx.category ?? '—'}</span>
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                        </div>
+                      </td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
+                      <td className="p-3 text-right">
+                        <Link className="text-link hover:underline" to={tx.path}>View/Edit</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t font-medium">
+                    <td className="p-3" colSpan={5}>Total</td>
+                    <td className="p-3 text-right font-mono">{fmtMoney(String(txTotal))}</td>
+                    <td className="p-3"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </CardContent></Card>
+        </div>
       )}
 
       {tab === 'details' && (
