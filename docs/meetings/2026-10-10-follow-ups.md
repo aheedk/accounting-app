@@ -34,7 +34,7 @@ mark which meeting an item first came from.
 | 36 | Pay bills prints checks: **built 10-13**, on the usual voucher check stock. Left: Faizan confirms the stock the firm prints on and a test print is lined up against it. See "Pay bills and checks" below | Aheed, Faizan confirms the format |
 | 37 | Year end: net income into Retained Earnings. **Built 10-13** for the Trial Balance and General Ledger (the Balance Sheet already did it). Left: show Faizan, and ask whether he wants a posted closing entry as well. See "Retained Earnings" below | Aheed, Faizan |
 | 39 | Statement review: Equipment showed up in the bank account picker. Not reproduced; needs the company from the demo. See "Equipment in the bank picker" below | Aheed |
-| 43 | Backups before real client data arrives on November 1: confirm the database is backed up, how often, and that a restore works. See "Security and data" below | Aheed, Riham |
+| 43 | Backups before real client data arrives on November 1. **The tool is built (10-13):** `npm run db:backup` takes a copy and `npm run db:backup:verify` restores it into a throwaway database and counts the rows; guide in [`../guides/backups.md`](../guides/backups.md). Left: run both against production once, check what Railway keeps by itself, decide how often and where our own copy is kept. See "Security and data" below | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders, bank statement uploaded before the card statement and after | Faizan |
 | 17 | QA audit: done apart from emailing an invoice (now item 47), Estimate, and two decisions for the firm; see "Still needs an answer" **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm **(10-05)** | Aheed, firm |

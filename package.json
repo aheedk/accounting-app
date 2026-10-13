@@ -16,7 +16,9 @@
     "db:migrate": "tsx bin/migrate.ts",
     "db:seed": "tsx bin/seed.ts",
     "db:role-users": "tsx bin/role-users.ts",
-    "db:reset": "tsx bin/migrate.ts --reset && tsx bin/seed.ts"
+    "db:reset": "tsx bin/migrate.ts --reset && tsx bin/seed.ts",
+    "db:backup": "tsx bin/backup.ts dump",
+    "db:backup:verify": "tsx bin/backup.ts verify"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
