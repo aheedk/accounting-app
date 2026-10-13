@@ -40,7 +40,7 @@ export default function InvoiceListPage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/invoices`, { params: statusFilter ? { status: statusFilter } : {} }).then(r => setItems(r.data.invoices));
+    api.get(`/businesses/${bizId}/invoices`, { params: statusFilter ? { status: statusFilter, limit: 1000 } : { limit: 1000 } }).then(r => setItems(r.data.invoices));
   }, [bizId, statusFilter]);
   useEffect(() => {
     if (!bizId) return;

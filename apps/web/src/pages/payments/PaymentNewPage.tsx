@@ -63,7 +63,7 @@ function PaymentNewPage() {
     if (!bizId || !form.customer_id) { setOutstanding([]); setPayments({}); return; }
     let cancelled = false;
     (async () => {
-      const r = await api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: form.customer_id, status: 'posted' } });
+      const r = await api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: form.customer_id, status: 'posted', limit: 1000 } });
       const invoices: InvoiceSummary[] = r.data.invoices;
       const details = await Promise.all(invoices.map(i => api.get(`/businesses/${bizId}/invoices/${i.id}`)));
       if (cancelled) return;

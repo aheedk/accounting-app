@@ -40,7 +40,7 @@ export default function CreditMemoDetailPage() {
     const cm = r.data.credit_memos.find((c: CreditMemo) => c.id === id);
     setData(cm);
     if (cm) {
-      const inv = await api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: cm.customer_id, status: 'posted' } });
+      const inv = await api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: cm.customer_id, status: 'posted', limit: 1000 } });
       setOpenInvoices(inv.data.invoices);
     }
   }

@@ -40,7 +40,7 @@ export default function VendorCreditDetailPage() {
     const vc = r.data.vendor_credits.find((c: VendorCredit) => c.id === id);
     setData(vc);
     if (vc) {
-      const bills = await api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: vc.vendor_id, status: 'posted' } });
+      const bills = await api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: vc.vendor_id, status: 'posted', limit: 1000 } });
       setOpenBills(bills.data.bills);
     }
   }

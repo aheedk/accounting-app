@@ -59,7 +59,7 @@ export default function BillPaymentDetailPage() {
     if (!bizId || !id) return;
     const r = await api.get(`/businesses/${bizId}/bill-payments/${id}`);
     setData(r.data);
-    const bills = await api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: r.data.bill_payment.vendor_id, status: 'posted' } });
+    const bills = await api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: r.data.bill_payment.vendor_id, status: 'posted', limit: 1000 } });
     setOpenBills(bills.data.bills);
   }
   useEffect(() => { reload(); }, [bizId, id]);

@@ -21,13 +21,18 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/invoices', async (req, res, next) => {
   try {
-    const q: { business_id: string; status?: string; customer_id?: string } = {
+    const q: { business_id: string; status?: string; customer_id?: string; limit?: number; offset?: number } = {
       business_id: req.tenancy!.business_id,
     };
     const status = req.query['status'];
     if (typeof status === 'string') q.status = status;
     const customer_id = req.query['customer_id'];
     if (typeof customer_id === 'string') q.customer_id = customer_id;
+    // Without this every list stopped at the newest 50 invoices, whatever was asked for.
+    const limit = Number(req.query['limit']);
+    if (Number.isInteger(limit) && limit > 0) q.limit = Math.min(limit, 1000);
+    const offset = Number(req.query['offset']);
+    if (Number.isInteger(offset) && offset > 0) q.offset = offset;
     const list = await inv.listInvoices(db, q);
     res.json({ invoices: list });
   } catch (e) { next(e); }

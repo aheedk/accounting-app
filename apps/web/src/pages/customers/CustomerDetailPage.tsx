@@ -48,7 +48,7 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     if (!bizId || !id) return;
     api.get(`/businesses/${bizId}/customers/${id}`).then(r => setCustomer(r.data));
-    api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: id } }).then(r => setInvoices(r.data.invoices));
+    api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: id, limit: 1000 } }).then(r => setInvoices(r.data.invoices));
   }, [bizId, id]);
 
   const stats = useMemo(() => {

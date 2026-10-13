@@ -157,7 +157,7 @@ export default function ReceiptsPage() {
     if (!bizId) return;
     try {
       if (type === 'bill' && bills.length === 0) {
-        const r = await api.get<{ bills: Bill[] }>(`/businesses/${bizId}/bills`);
+        const r = await api.get<{ bills: Bill[] }>(`/businesses/${bizId}/bills`, { params: { limit: 1000 } });
         setBills(r.data.bills);
       } else if (type === 'bank_transaction' && bankTxns.length === 0) {
         const r = await api.get<{ bank_transactions: BankTxn[] }>(`/businesses/${bizId}/bank-transactions`);

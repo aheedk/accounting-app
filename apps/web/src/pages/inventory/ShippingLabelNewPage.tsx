@@ -70,7 +70,7 @@ export default function ShippingLabelNewPage() {
   useEffect(() => {
     if (!bizId) return;
     api
-      .get<{ invoices: InvoiceRow[] }>(`/businesses/${bizId}/invoices`, { params: { status: 'posted' } })
+      .get<{ invoices: InvoiceRow[] }>(`/businesses/${bizId}/invoices`, { params: { status: 'posted', limit: 1000 } })
       .then((r) => setInvoices(r.data.invoices))
       .catch(() => { /* non-fatal — user can still pick SO */ });
     api

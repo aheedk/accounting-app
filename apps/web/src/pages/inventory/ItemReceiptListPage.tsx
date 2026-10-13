@@ -62,7 +62,7 @@ export default function ItemReceiptListPage() {
     Promise.all([
       api.get<ListResponse>(`/businesses/${bizId}/item-receipts`),
       api.get<POListResponse>(`/businesses/${bizId}/purchase-orders`),
-      api.get<BillsListResponse>(`/businesses/${bizId}/bills`),
+      api.get<BillsListResponse>(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }),
     ])
       .then(([rRec, rPo, rBill]) => {
         setReceipts(rRec.data.item_receipts);

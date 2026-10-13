@@ -75,7 +75,7 @@ export default function PaymentDetailPage() {
     } catch {
       setCustomer(null);
     }
-    const inv = await api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: r.data.payment.customer_id, status: 'posted' } });
+    const inv = await api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: r.data.payment.customer_id, status: 'posted', limit: 1000 } });
     setOpenInvoices(inv.data.invoices);
   }
 
