@@ -29,7 +29,12 @@ Uploads still land in ephemeral container storage until one of:
 
 ### Delete the prod test vendor
 "QBO Style Test Co" was created accidentally in production while testing the
-vendor form (no bills attached). Needs a deliberate delete against prod.
+vendor form, under the "Green Gadgets Inc." test business. Checked on 10-13:
+it's no longer bill-free — it now has 2 bills, 1 expense, and 1 bill payment
+attached, so `deleteVendor`'s existing transactions guard correctly refuses a
+delete. Either accept the transactions as disposable test data and remove
+them first, or just mark the vendor inactive (hides it without touching
+anything) — a deliberate choice either way, not a one-line delete.
 
 ---
 
