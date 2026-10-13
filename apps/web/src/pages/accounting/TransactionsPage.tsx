@@ -16,6 +16,7 @@ import { AppSelect } from '@/components/ui/select';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { fmtMoney } from '@/lib/money';
 import { fmtDateTime } from '@/lib/dates';
+import { fiscalYearRange, useFiscalYearStartMonth } from '@/lib/fiscalYear';
 import { pickErr } from '@/lib/apiErrors';
 
 type TransactionType = 'deposit' | 'expense' | 'check' | 'journal' | 'bill' | 'payment' | 'credit_memo' | 'invoice' | 'bill_payment' | 'vendor_credit';
@@ -124,7 +125,10 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
   ...Object.fromEntries(DATE_PRESETS.map(p => [p.value, p.label])),
 } as Record<DatePreset, string>;
 
-function presetRange(preset: DatePreset, customStart: string, customEnd: string): { start: string | null; end: string | null } {
+// This year and Last year are the client's fiscal years, so they need the month that year starts in.
+function presetRange(
+  preset: DatePreset, customStart: string, customEnd: string, fiscalStartMonth = 1,
+): { start: string | null; end: string | null } {
   const now = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const startOfMonth = (y: number, m: number) => new Date(y, m, 1);
@@ -145,8 +149,8 @@ function presetRange(preset: DatePreset, customStart: string, customEnd: string)
     case 'previous_month': return { start: iso(startOfMonth(now.getFullYear(), now.getMonth() - 1)), end: iso(endOfMonth(now.getFullYear(), now.getMonth() - 1)) };
     case 'previous_quarter': { const q = Math.floor(now.getMonth() / 3) - 1; const y = now.getFullYear() + (q < 0 ? -1 : 0); const qq = (q + 4) % 4; return { start: iso(startOfMonth(y, qq * 3)), end: iso(endOfMonth(y, qq * 3 + 2)) }; }
     case 'this_week': { const s = startOfWeek(now); return { start: iso(s), end: iso(addDays(s, 6)) }; }
-    case 'this_year': return { start: iso(new Date(now.getFullYear(), 0, 1)), end: iso(new Date(now.getFullYear(), 11, 31)) };
-    case 'last_year': return { start: iso(new Date(now.getFullYear() - 1, 0, 1)), end: iso(new Date(now.getFullYear() - 1, 11, 31)) };
+    case 'this_year': return fiscalYearRange(iso(now), fiscalStartMonth);
+    case 'last_year': return fiscalYearRange(iso(now), fiscalStartMonth, -1);
     case 'last_7_years': return { start: iso(addYears(now, -7)), end: iso(now) };
   }
 }
@@ -161,6 +165,7 @@ function DateRangeFilter({
   const [draftPreset, setDraftPreset] = useState<DatePreset>(preset === 'unset' ? 'custom' : preset);
   const [draftStart, setDraftStart] = useState(start);
   const [draftEnd, setDraftEnd] = useState(end);
+  const fiscalStartMonth = useFiscalYearStartMonth();
 
   function openPopup() {
     setDraftPreset(preset === 'unset' ? 'custom' : preset);
@@ -170,7 +175,7 @@ function DateRangeFilter({
   }
 
   function draftRange() {
-    return draftPreset === 'custom' ? { start: draftStart, end: draftEnd } : presetRange(draftPreset, '', '');
+    return draftPreset === 'custom' ? { start: draftStart, end: draftEnd } : presetRange(draftPreset, '', '', fiscalStartMonth);
   }
 
   function handleApply() {
@@ -381,6 +386,7 @@ const PAGE_SIZE = 25;
 
 export default function TransactionsPage() {
   const [bizId] = useActiveBusinessId();
+  const fiscalStartMonth = useFiscalYearStartMonth();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
 
@@ -422,7 +428,7 @@ export default function TransactionsPage() {
   const reload = useCallback(async () => {
     if (!bizId) { setRows([]); setTotal(0); return; }
     setErr(null);
-    const range = presetRange(datePreset, customStart, customEnd);
+    const range = presetRange(datePreset, customStart, customEnd, fiscalStartMonth);
     const query: Record<string, string> = {
       page: String(page),
       page_size: String(PAGE_SIZE),
@@ -447,7 +453,7 @@ export default function TransactionsPage() {
     } catch (e: unknown) {
       setErr(pickErr(e));
     }
-  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page, sort.key, sort.dir]);
+  }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page, sort.key, sort.dir, fiscalStartMonth]);
 
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => { setPage(1); }, [typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter]);

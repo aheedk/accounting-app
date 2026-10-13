@@ -10,6 +10,7 @@ import { fmtMoney } from '@/lib/money';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { addDaysLocal, fmtLongDate } from '@/lib/dates';
+import { useFiscalYear } from '@/lib/fiscalYear';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 import { AppSelect } from '../../components/ui/select';
@@ -48,10 +49,6 @@ type BankAccount = {
   cash_account_name: string;
 };
 
-function defaultPeriodStart(): string {
-  return `${new Date().getFullYear()}-01-01`;
-}
-
 function defaultPeriodEnd(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -68,7 +65,9 @@ export default function CashFlowPage() {
   const [bizId] = useActiveBusinessId();
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
-  const [periodStart, setPeriodStart] = useState<string>(defaultPeriodStart());
+  // Opens on the client's fiscal year to date.
+  const fiscalYear = useFiscalYear();
+  const [periodStart, setPeriodStart] = useState<string>(fiscalYear.start);
   const [periodEnd, setPeriodEnd] = useState<string>(defaultPeriodEnd());
   const [cashAccountId, setCashAccountId] = useState<string>('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);

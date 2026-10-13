@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtSigned } from '@/lib/money';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
+import { useFiscalYear } from '@/lib/fiscalYear';
 import { downloadAsExcel } from '@/lib/download';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl } from '@/lib/reportDrilldown';
@@ -39,7 +40,9 @@ export default function StatementOfCashFlowsPage() {
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const today = todayLocal();
-  const [periodStart, setPeriodStart] = useState(`${today.slice(0, 4)}-01-01`);
+  // Opens on the client's fiscal year to date.
+  const fiscalYear = useFiscalYear();
+  const [periodStart, setPeriodStart] = useState(fiscalYear.start);
   const [periodEnd, setPeriodEnd] = useState(today);
   const [report, setReport] = useState<Statement | null>(null);
   const [loading, setLoading] = useState(false);

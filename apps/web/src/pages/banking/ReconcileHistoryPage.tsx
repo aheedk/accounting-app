@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { fiscalYearRange, useFiscalYearStartMonth } from '@/lib/fiscalYear';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { ReconcileNav } from './ReconcileNav';
@@ -40,13 +41,15 @@ function fmtShortDate(iso: string) {
   return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
 }
 
-function withinPeriod(dateIso: string, period: Period): boolean {
+// This year and Last year are the client's fiscal years.
+function withinPeriod(dateIso: string, period: Period, fiscalStartMonth: number): boolean {
   if (period === 'all_time') return true;
   const today = todayLocal();
-  const thisYear = Number(today.slice(0, 4));
-  const year = Number(dateIso.slice(0, 4));
-  if (period === 'this_year') return year === thisYear;
-  if (period === 'last_year') return year === thisYear - 1;
+  if (period === 'this_year' || period === 'last_year') {
+    const year = fiscalYearRange(today, fiscalStartMonth, period === 'last_year' ? -1 : 0);
+    const day = dateIso.slice(0, 10);
+    return day >= year.start && day <= year.end;
+  }
   // since_365: within the last 365 days of today.
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - 365);
@@ -56,6 +59,7 @@ function withinPeriod(dateIso: string, period: Period): boolean {
 export default function ReconcileHistoryPage() {
   const can = useCan();
   const [bizId] = useActiveBusinessId();
+  const fiscalStartMonth = useFiscalYearStartMonth();
   const [reconcilableAccounts, setReconcilableAccounts] = useState<ReconcilableAccount[]>([]);
   const [accountId, setAccountId] = useState<string>('');
   const [period, setPeriod] = useState<Period>('all_time');
@@ -81,7 +85,7 @@ export default function ReconcileHistoryPage() {
 
   useEffect(reload, [bizId, accountId]);
 
-  const visible = useMemo(() => rows.filter(r => withinPeriod(r.statement_ending_date, period)), [rows, period]);
+  const visible = useMemo(() => rows.filter(r => withinPeriod(r.statement_ending_date, period, fiscalStartMonth)), [rows, period, fiscalStartMonth]);
 
   async function toggleExpand(id: string) {
     if (expanded === id) { setExpanded(null); setDetail(null); return; }

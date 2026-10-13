@@ -15,6 +15,7 @@ import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
+import { fiscalYearRange, useFiscalYearStartMonth } from '@/lib/fiscalYear';
 import { CodingSuggestionHint, PREFILL_CONFIDENCE, type CodingSuggestion } from '@/components/CodingSuggestion';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
@@ -123,7 +124,8 @@ function isoToDisplay(iso: string): string {
   return y && m && d ? `${m}/${d}/${y}` : iso;
 }
 
-function getPresetRange(preset: string): { from: string; to: string } | null {
+// This year and Last year are the client's fiscal years, so they need the month that year starts in.
+function getPresetRange(preset: string, fiscalStartMonth = 1): { from: string; to: string } | null {
   const now = new Date();
   const y = now.getFullYear();
   const mo = now.getMonth();
@@ -144,7 +146,7 @@ function getPresetRange(preset: string): { from: string; to: string } | null {
     }
     case 'this_month': return { from: ymd(y, mo, 1), to: ymd(y, mo + 1, 0) };
     case 'this_quarter': { const q = Math.floor(mo / 3); return { from: ymd(y, q * 3, 1), to: ymd(y, q * 3 + 3, 0) }; }
-    case 'this_year': return { from: ymd(y, 0, 1), to: ymd(y, 11, 31) };
+    case 'this_year': { const fy = fiscalYearRange(ymd(y, mo, d), fiscalStartMonth); return { from: fy.start, to: fy.end }; }
     case 'last_week': {
       const dow = now.getDay();
       const mon = new Date(now); mon.setDate(d - (dow === 0 ? 6 : dow - 1) - 7);
@@ -158,13 +160,14 @@ function getPresetRange(preset: string): { from: string; to: string } | null {
       const lqy = q === 0 ? y - 1 : y;
       return { from: ymd(lqy, lq * 3, 1), to: ymd(lqy, lq * 3 + 3, 0) };
     }
-    case 'last_year': return { from: ymd(y - 1, 0, 1), to: ymd(y - 1, 11, 31) };
+    case 'last_year': { const fy = fiscalYearRange(ymd(y, mo, d), fiscalStartMonth, -1); return { from: fy.start, to: fy.end }; }
     default: return null;
   }
 }
 
 export default function BankTransactionsInboxPage() {
   const [bizId] = useActiveBusinessId();
+  const fiscalStartMonth = useFiscalYearStartMonth();
   // The role on the open company, which is the one the API checks.
   const canUnreview = roleAtLeast(useEffectiveRole(), 'accountant');
 
@@ -520,7 +523,7 @@ export default function BankTransactionsInboxPage() {
                     const val = e.target.value;
                     setDatePreset(val);
                     if (val !== 'custom') {
-                      const range = getPresetRange(val);
+                      const range = getPresetRange(val, fiscalStartMonth);
                       setDateFrom(range?.from ?? '');
                       setDateTo(range?.to ?? '');
                     }

@@ -10,7 +10,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
+import { daysAgoLocal } from '@/lib/dates';
+import { useFiscalYear } from '@/lib/fiscalYear';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
 import { humanizeCode } from '@/lib/labels';
@@ -46,6 +47,8 @@ function fmtShortDate(iso: string) {
 }
 export default function BillPaymentListPage() {
   const [bizId] = useActiveBusinessId();
+  // "This year" is the client's fiscal year, not January to December.
+  const fiscalYear = useFiscalYear();
   const [items, setItems] = useState<BillPaymentSummary[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -67,7 +70,7 @@ export default function BillPaymentListPage() {
 
   const rows = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : `${currentYearLocal()}-01-01`;
+    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : fiscalYear.start;
     const q = vendorQuery.trim().toLowerCase();
     return allRows.filter(r =>
       (!methodFilter || r.payment_method === methodFilter) &&
@@ -75,11 +78,11 @@ export default function BillPaymentListPage() {
       (!cutoff || r.payment_date >= cutoff) &&
       (!q || r.vendor_name.toLowerCase().includes(q)),
     );
-  }, [allRows, methodFilter, statusFilter, dateFilter, vendorQuery]);
+  }, [allRows, methodFilter, statusFilter, dateFilter, vendorQuery, fiscalYear.start]);
 
   // Money bar totals are computed across all bill payments, unfiltered (QBO behavior).
   const stats = useMemo(() => {
-    const yearStart = `${currentYearLocal()}-01-01`;
+    const yearStart = fiscalYear.start;
     const recentCutoff = daysAgoLocal(30);
     let paidOut = 0, unapplied = 0, drafts = 0, draftCount = 0, recent = 0, recentCount = 0;
     for (const p of items) {
@@ -92,7 +95,7 @@ export default function BillPaymentListPage() {
       }
     }
     return { paidOut, unapplied, drafts, draftCount, recent, recentCount };
-  }, [items]);
+  }, [items, fiscalYear.start]);
 
   const columns: Column<Row>[] = [
     { key: 'payment_date', header: 'Date', sortable: true, sortValue: r => r.payment_date, render: r => <span className="whitespace-nowrap">{fmtShortDate(r.payment_date)}</span> },

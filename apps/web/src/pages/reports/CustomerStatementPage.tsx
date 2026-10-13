@@ -7,7 +7,8 @@ import { AppSelect } from '../../components/ui/select';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { pickErr } from '@/lib/apiErrors';
-import { currentYearLocal, fmtLongDate, todayLocal } from '@/lib/dates';
+import { fmtLongDate, todayLocal } from '@/lib/dates';
+import { useFiscalYear } from '@/lib/fiscalYear';
 import { downloadAsExcel } from '@/lib/download';
 import { fmtMoney } from '@/lib/money';
 import { printReport } from '@/lib/reportExport';
@@ -33,7 +34,9 @@ export default function CustomerStatementPage() {
   const [bizId] = useActiveBusinessId();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState('');
-  const [from, setFrom] = useState(`${currentYearLocal()}-01-01`);
+  // Opens on the client's fiscal year to date.
+  const fiscalYear = useFiscalYear();
+  const [from, setFrom] = useState(fiscalYear.start);
   const [to, setTo] = useState(todayLocal());
   const [statement, setStatement] = useState<Statement | null>(null);
   const [err, setErr] = useState<string | null>(null);

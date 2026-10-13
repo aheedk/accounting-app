@@ -24,7 +24,8 @@ export type LoginResult = {
   access_token: string;
   refresh_token: string; // raw; API caller is responsible for cookie-setting
   user: { id: string; email: string; full_name: string; role: UserRole; firm_id: string; payroll_access: boolean };
-  businesses: Array<{ id: string; name: string; role_override: UserRole | null }>;
+  /** `fiscal_year_start_month` (1 to 12) is what "This year" means for that company. */
+  businesses: Array<{ id: string; name: string; role_override: UserRole | null; fiscal_year_start_month: number }>;
 };
 
 /** Whether this login may open payroll: a firm admin always, anyone else unless it was switched off. */
@@ -44,7 +45,7 @@ export async function businessesForUser(
       .leftJoin('user_business_access as uba', (join) =>
         join.onRef('uba.business_id', '=', 'b.id').on('uba.user_id', '=', user.id),
       )
-      .select(['b.id', 'b.name', 'uba.role_override'])
+      .select(['b.id', 'b.name', 'uba.role_override', 'b.fiscal_year_start_month'])
       .where('b.firm_id', '=', user.firm_id)
       .where('b.deleted_at', 'is', null)
       .orderBy('b.name')
@@ -53,7 +54,7 @@ export async function businessesForUser(
   return trx
     .selectFrom('user_business_access as uba')
     .innerJoin('businesses as b', 'b.id', 'uba.business_id')
-    .select(['b.id', 'b.name', 'uba.role_override'])
+    .select(['b.id', 'b.name', 'uba.role_override', 'b.fiscal_year_start_month'])
     .where('uba.user_id', '=', user.id)
     .where('b.deleted_at', 'is', null)
     .orderBy('b.name')

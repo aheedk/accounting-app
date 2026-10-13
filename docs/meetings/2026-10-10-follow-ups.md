@@ -34,7 +34,6 @@ mark which meeting an item first came from.
 | 36 | Pay bills prints checks: **built 10-13**, on the usual voucher check stock. Left: Faizan confirms the stock the firm prints on and a test print is lined up against it. See "Pay bills and checks" below | Aheed, Faizan confirms the format |
 | 37 | Year end: net income into Retained Earnings. **Built 10-13** for the Trial Balance and General Ledger (the Balance Sheet already did it). Left: show Faizan, and ask whether he wants a posted closing entry as well. See "Retained Earnings" below | Aheed, Faizan |
 | 39 | Statement review: Equipment showed up in the bank account picker. Not reproduced; needs the company from the demo. See "Equipment in the bank picker" below | Aheed |
-| 40 | "This year" should follow the client's fiscal year everywhere. Today only the General Ledger does. See "Fiscal year" below | Riham |
 | 43 | Backups before real client data arrives on November 1: confirm the database is backed up, how often, and that a restore works. See "Security and data" below | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders, bank statement uploaded before the card statement and after | Faizan |
 | 17 | QA audit: done apart from emailing an invoice (now item 47), Estimate, and two decisions for the firm; see "Still needs an answer" **(10-01)** | Aheed, firm |
@@ -89,12 +88,6 @@ under Banking in either, a bank statement opens with no account preselected,
 and the picker does not list it. So the rule holds and the cause is in the data
 of the company used in the demo. Open Banking in that company and see whether
 Equipment is listed as a bank account; if it is, remove it there.
-
-**Fiscal year (40).** Faizan explained it in the meeting: for a company whose
-year runs July to June, "This year" must give July 1 to June 30. The General
-Ledger presets do this. These lists still use the calendar year: Transactions,
-the bank transactions inbox, Bills, Bill Payments, Payments, Credit Memos and
-Vendor Credits. Check the other reports as well.
 
 **Security and data (43).** Said in the meeting: once small businesses use the
 app we are responsible for their data and its backup; a second environment that
@@ -153,6 +146,7 @@ is item 28.
 | 35 | Payroll is out of the sidebar, + New and search. Its pages still open by address. "Add contractor" moved under Vendors in + New. The Payroll tick box on Setup → Users is still there | Aheed, 10-12 |
 | 42 | Audit history: it did nothing on a record not saved yet, which is what happened in the demo. On Journal Entry, Bank Deposit, Expense and Check it is now grayed out until the record is saved, and says why | Aheed, 10-12 |
 | 21 | Manual bank reconciliation: a worksheet and a history page under Banking. Since widened to any balance sheet account, with a Bank Register and a Summary report. Not reviewed or tested by Aheed yet | Riham, `569350c`, `9439e46`, `e06e0ed` |
+| 40 | "This year" is the client's fiscal year (July 1 to June 30 for a July company). On the filters of Transactions, the bank transactions inbox, Bills, Bill Payments, Payments, Credit Memos, Vendor Credits and Reconcile history ("Last year" too, where there is one); on the year-to-date totals of those lists; and as the opening dates of Profit & Loss, Statement of Cash Flows, Cash Activity and Customer Statement. One helper, `apps/web/src/lib/fiscalYear.ts`. The General Ledger keeps both "This Year" (calendar) and "This Fiscal Year", as QuickBooks does. Not changed: Custom Reports' default range and the 1099 report, which is a calendar year by law. Was Riham's; picked up by Aheed | Aheed, 10-13 |
 | 41 | Vendors list Open balance. Two causes: it added up the full amount of every unpaid bill (so a part-paid bill counted in full and credits were ignored), and the bills list only ever returned the newest 50 bills. It now shows the A/P aging figure, on the Vendors list, the vendor page and its side list; the Bills list returns up to 1000 and each bill carries what is left on it. Was Riham's; picked up by Aheed | Aheed, 10-13 |
 | 38 | Phone numbers are formatted the same way everywhere, and the company has a phone field | Riham, `4457f91` |
 | 45 | A check's own number shows in its page title | Riham, `20d58db` |

@@ -12,7 +12,11 @@ export type AuthUser = {
   /** False when a firm admin has switched payroll off for this login. */
   payroll_access?: boolean;
 };
-export type AuthBusiness = { id: string; name: string; role_override: Role | null };
+export type AuthBusiness = {
+  id: string; name: string; role_override: Role | null;
+  /** First month of the company's fiscal year, 1 to 12. See lib/fiscalYear.ts. */
+  fiscal_year_start_month?: number;
+};
 
 type AuthState = {
   status: 'loading' | 'authenticated' | 'anonymous';

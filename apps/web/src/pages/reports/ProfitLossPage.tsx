@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ReportCard } from '@/components/ui/ReportCard';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { fmtLongDate } from '@/lib/dates';
+import { useFiscalYear } from '@/lib/fiscalYear';
 import { downloadAsExcel } from '@/lib/download';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl } from '@/lib/reportDrilldown';
@@ -56,7 +57,9 @@ export default function ProfitLossPage() {
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   const defaults = ytdRange(new Date());
-  const [periodStart, setPeriodStart] = useState<string>(defaults.start);
+  // Year to date starts at the client's fiscal year, not always January 1.
+  const fiscalYear = useFiscalYear();
+  const [periodStart, setPeriodStart] = useState<string>(fiscalYear.start);
   const [periodEnd, setPeriodEnd] = useState<string>(defaults.end);
   const [report, setReport] = useState<PnlReport | null>(null);
   const [loading, setLoading] = useState<boolean>(false);

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { fmtMoney } from '@/lib/money';
 import { daysAgoLocal, todayLocal } from '@/lib/dates';
+import { fiscalYearRange, useFiscalYearStartMonth } from '@/lib/fiscalYear';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
@@ -43,9 +44,10 @@ function daysBetween(fromIso: string, toIso: string) {
   return Math.floor((b - a) / 86_400_000);
 }
 
-function dateRangeBounds(value: string): { from: string; to: string } | null {
+// "This year" is the client's fiscal year, so it needs the month that year starts in.
+function dateRangeBounds(value: string, fiscalStartMonth: number): { from: string; to: string } | null {
   const today = todayLocal();
-  if (value === 'year') return { from: `${today.slice(0, 4)}-01-01`, to: `${today.slice(0, 4)}-12-31` };
+  if (value === 'year') { const fy = fiscalYearRange(today, fiscalStartMonth); return { from: fy.start, to: fy.end }; }
   if (value === '3m') return { from: daysAgoLocal(92), to: today };
   if (value === '12m') return { from: daysAgoLocal(365), to: today };
   return null;
@@ -53,6 +55,7 @@ function dateRangeBounds(value: string): { from: string; to: string } | null {
 
 export default function BillListPage() {
   const [bizId] = useActiveBusinessId();
+  const fiscalStartMonth = useFiscalYearStartMonth();
   // A client or view-only login reads bills; entering and paying them is for staff and up.
   const canEnter = roleAtLeast(useEffectiveRole(), 'staff');
   const [items, setItems] = useState<BillSummary[]>([]);
@@ -76,7 +79,7 @@ export default function BillListPage() {
 
   type Row = BillSummary & { vendor_name: string; overdue_days: number };
   const rows: Row[] = useMemo(() => {
-    const bounds = dateRangeBounds(dateFilter);
+    const bounds = dateRangeBounds(dateFilter, fiscalStartMonth);
     return items
       .filter(b => (!vendorFilter || b.vendor_id === vendorFilter) && (!bounds || (b.bill_date >= bounds.from && b.bill_date <= bounds.to)))
       .map(b => ({
@@ -84,7 +87,7 @@ export default function BillListPage() {
         vendor_name: vendorMap.get(b.vendor_id) ?? '',
         overdue_days: b.status === 'posted' && b.due_date < today ? daysBetween(b.due_date, today) : 0,
       }));
-  }, [items, vendorMap, vendorFilter, dateFilter, today]);
+  }, [items, vendorMap, vendorFilter, dateFilter, today, fiscalStartMonth]);
 
   const columns: Column<Row>[] = [
     { key: 'vendor', header: 'Vendor', sortable: true, sortValue: r => r.vendor_name, render: r => r.vendor_name || <span className="text-muted-foreground">—</span> },
@@ -97,7 +100,7 @@ export default function BillListPage() {
       : <span className="capitalize">{r.status === 'posted' ? 'Open' : r.status}</span> },
   ];
 
-  const bounds = dateRangeBounds(dateFilter);
+  const bounds = dateRangeBounds(dateFilter, fiscalStartMonth);
 
   if (!bizId) return <div>Pick a business.</div>;
 

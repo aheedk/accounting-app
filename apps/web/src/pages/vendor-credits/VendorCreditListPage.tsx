@@ -10,7 +10,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { currentYearLocal, daysAgoLocal } from '@/lib/dates';
+import { daysAgoLocal } from '@/lib/dates';
+import { useFiscalYear } from '@/lib/fiscalYear';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
 
@@ -43,6 +44,8 @@ function fmtShortDate(iso: string) {
 }
 export default function VendorCreditListPage() {
   const [bizId] = useActiveBusinessId();
+  // "This year" is the client's fiscal year, not January to December.
+  const fiscalYear = useFiscalYear();
   const [items, setItems] = useState<VendorCreditSummary[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -63,18 +66,18 @@ export default function VendorCreditListPage() {
 
   const rows = useMemo(() => {
     const range = DATE_RANGES.find(r => r.value === dateFilter);
-    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : `${currentYearLocal()}-01-01`;
+    const cutoff = !range || range.days === 0 ? '' : range.days > 0 ? daysAgoLocal(range.days) : fiscalYear.start;
     const q = vendorQuery.trim().toLowerCase();
     return allRows.filter(r =>
       (!statusFilter || r.status === statusFilter) &&
       (!cutoff || r.credit_date >= cutoff) &&
       (!q || r.vendor_name.toLowerCase().includes(q)),
     );
-  }, [allRows, statusFilter, dateFilter, vendorQuery]);
+  }, [allRows, statusFilter, dateFilter, vendorQuery, fiscalYear.start]);
 
   // Money bar totals are computed across all vendor credits, unfiltered (QBO behavior).
   const stats = useMemo(() => {
-    const yearStart = `${currentYearLocal()}-01-01`;
+    const yearStart = fiscalYear.start;
     const recentCutoff = daysAgoLocal(30);
     let issued = 0, remaining = 0, drafts = 0, draftCount = 0, recent = 0, recentCount = 0;
     for (const c of items) {
@@ -87,7 +90,7 @@ export default function VendorCreditListPage() {
       }
     }
     return { issued, remaining, drafts, draftCount, recent, recentCount };
-  }, [items]);
+  }, [items, fiscalYear.start]);
 
   const columns: Column<Row>[] = [
     { key: 'number', header: 'No.', sortable: true, sortValue: r => r.vendor_credit_number ?? '', render: r => <span className="whitespace-nowrap font-mono text-xs">{r.vendor_credit_number ?? '—'}</span> },
