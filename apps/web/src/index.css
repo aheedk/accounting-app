@@ -4,8 +4,10 @@
 
 @layer base {
   :root {
-    /* QBO-inspired palette: clean white/light-gray surfaces, QuickBooks green
-       for primary actions, QuickBooks blue for links, dark navy sidebar kept. */
+    /* QBO-inspired palette: clean white/light-gray surfaces, QuickBooks blue
+       for primary actions and links, dark navy sidebar kept. Primary briefly
+       went to QuickBooks green during this pass; reverted back to blue per
+       feedback — blue is the one accent color now, used for both. */
     --background: 0 0% 100%;
     --foreground: 215 28% 17%;
     --card: 0 0% 100%;
@@ -14,8 +16,8 @@
        wrapper only, so every component that uses --background (inputs,
        dropdowns, dialogs, the Card surface itself) stays white. */
     --page: 220 16% 96%;
-    --primary: 113 70% 37%;
-    --primary-hover: 114 71% 32%;
+    --primary: 221 65% 44%;
+    --primary-hover: 221 65% 36%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 100%;
     --secondary-foreground: 217 19% 27%;
