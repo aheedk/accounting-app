@@ -18,6 +18,7 @@ import { fmtMoney } from '@/lib/money';
 import { fmtDateTime, daysAgoLocal, todayLocal } from '@/lib/dates';
 import { formatPhone } from '@/lib/phone';
 import { printReport } from '@/lib/reportExport';
+import { humanizeCode } from '@/lib/labels';
 
 type VendorListItem = { id: string; name: string; is_active: boolean };
 
@@ -50,7 +51,7 @@ type Vendor = {
 type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string };
 // For the sidebar's "Sort by open balance" — business-wide, not just this vendor's.
 type VendorBillSummary = { vendor_id: string; status: string; total: string };
-type Account = { id: string; name: string; account_type: string };
+type Account = { id: string; code: string; name: string; account_type: string };
 // Every transaction type this vendor can appear on (bills, checks, expenses,
 // journal entries, ...) — the unified transactions endpoint's contact_id
 // filter, not just the AP-specific bills list, so Checks/Expenses actually
@@ -581,7 +582,11 @@ export default function VendorDetailPage() {
                             disabled={recategorizingId === tx.id}
                             onChange={e => { if (e.target.value) { void recategorize(tx, e.target.value); } }}
                           >
-                            {categoryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            {categoryAccounts.map(a => (
+                              <option key={a.id} value={a.id} data-hint={humanizeCode(a.account_type)}>
+                                {a.code} {a.name}
+                              </option>
+                            ))}
                           </AppSelect>
                         ) : (
                           <div
