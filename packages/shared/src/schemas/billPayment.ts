@@ -28,6 +28,8 @@ export const billPaymentBatchSchema = z.object({
   payment_method: z.enum(['cash','check','ach','wire','card','other']),
   cash_account_id: z.string().uuid(),
   reference: z.string().max(200).nullable().optional(),
+  // Paying by check: the first check's number. Each vendor's payment takes the next one.
+  starting_check_number: z.string().regex(/^\d{1,9}$/).nullable().optional(),
   items: z.array(z.object({ bill_id: z.string().uuid(), amount: moneyStr })).min(1).max(500),
 });
 export type BillPaymentBatch = z.infer<typeof billPaymentBatchSchema>;

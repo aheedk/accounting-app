@@ -31,15 +31,13 @@ mark which meeting an item first came from.
 | # | What | Owner |
 |---|---|---|
 | 34 | Go through Faizan's 19-minute video and the files in the Teams chat, and turn each change into an item here. He is recording a second video. The first video is written up in [`2026-10-12-faizan-video-1.md`](./2026-10-12-faizan-video-1.md) (items 50 to 70); the PDF and the check stubs are still to go through | Aheed |
-| 36 | Pay bills: after paying, offer to print the checks, in a check format that fits check stock. See "Pay bills and checks" below | Aheed, Faizan gives the format |
+| 36 | Pay bills prints checks: **built 10-13**, on the usual voucher check stock. Left: Faizan confirms the stock the firm prints on and a test print is lined up against it. See "Pay bills and checks" below | Aheed, Faizan confirms the format |
 | 37 | Year end: net income into Retained Earnings. Faizan says it is not happening. See "Retained Earnings" below | Aheed, Faizan |
-| 38 | Phone numbers: ten digits with the area code, shown the same way everywhere (vendors, customers, the company). The test vendors have seven digits; fix them too | Riham |
 | 39 | Statement review: Equipment showed up in the bank account picker. Not reproduced; needs the company from the demo. See "Equipment in the bank picker" below | Aheed |
 | 40 | "This year" should follow the client's fiscal year everywhere. Today only the General Ledger does. See "Fiscal year" below | Riham |
 | 41 | Vendors list: the Open balance column is not right (Riham said so in the demo). See "Vendor balance" below | Riham |
 | 43 | Backups before real client data arrives on November 1: confirm the database is backed up, how often, and that a restore works. See "Security and data" below | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders, bank statement uploaded before the card statement and after | Faizan |
-| 45 | A check approved from the AI inbox should show its number at the top of the page. See "Check number" below | Riham |
 | 17 | QA audit: done apart from emailing an invoice (now item 47), Estimate, and two decisions for the firm; see "Still needs an answer" **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm **(10-05)** | Aheed, firm |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it **(10-05)** | Riham, Faizan |
@@ -57,13 +55,17 @@ That also settles the audit question of which of the two Contractors pages to
 keep: the Accounts Payable one. Pay stubs (item 22) are dropped with it.
 
 **Pay bills and checks (36).** In the demo, paying two bills only marked them
-paid. What was asked for: paying bills by check brings up the checks to print on
-check stock, as QuickBooks does. The app can already print one check from Write
-Check (`previewCheck` in `apps/web/src/lib/download.ts`), but it is a plain
-single-check page, not a layout made for pre-printed stock. Two things are
-needed from Faizan: what QuickBooks does after Pay bills, and which check stock
-the firm prints on (voucher, three to a page). Paying online from the app is
-item 24 and stays later.
+paid. Built on 10-13; spec:
+[`../specs/2026-10-13-pay-bills-print-checks-design.md`](../specs/2026-10-13-pay-bills-print-checks-design.md).
+Paying by check now asks for a starting check number (filled with the next one
+for that account), writes one numbered check per vendor, and offers them for
+printing on check stock or on plain paper. A check can be printed again from the
+bill payment, and Write Check has the check stock option too. Check numbers from
+Pay Bills and from Write Check share one sequence per account. Still needed
+from Faizan: which check stock the firm prints on. The layout follows the usual
+QuickBooks voucher check (the check on top, two stubs under it) and has not
+been lined up against real stock; three checks to a page is not built. Paying
+online from the app is item 24 and stays later.
 
 **Retained Earnings (37).** What the code does today: the Balance Sheet shows
 this year's profit as a Net Income line, and adds the profit of earlier years
@@ -97,12 +99,6 @@ Vendor Credits. Check the other reports as well.
 browser. Not checked yet, but the likely cause is that it counts open bills and
 leaves out vendor credits and payments not yet applied, which is what the
 Accounts Payable overview had wrong before 10-08.
-
-**Check number (45).** In the demo a check approved from the AI inbox opened
-without "5519" at the top. The Write Check page does title itself "Check #5519",
-so the record shown was probably one of the older ones saved as an expense.
-Riham's later commits (`2dd9ce5`, `aafc9fb`) label an edited check as a check.
-Open one approved after those and confirm.
 
 **Security and data (43).** Said in the meeting: once small businesses use the
 app we are responsible for their data and its backup; a second environment that
@@ -160,10 +156,12 @@ is item 28.
 |---|---|---|
 | 35 | Payroll is out of the sidebar, + New and search. Its pages still open by address. "Add contractor" moved under Vendors in + New. The Payroll tick box on Setup → Users is still there | Aheed, 10-12 |
 | 42 | Audit history: it did nothing on a record not saved yet, which is what happened in the demo. On Journal Entry, Bank Deposit, Expense and Check it is now grayed out until the record is saved, and says why | Aheed, 10-12 |
-| 21 | Manual bank reconciliation: a worksheet and a history page under Banking. Not reviewed or tested by Aheed yet | Riham, `569350c` |
+| 21 | Manual bank reconciliation: a worksheet and a history page under Banking. Since widened to any balance sheet account, with a Bank Register and a Summary report. Not reviewed or tested by Aheed yet | Riham, `569350c`, `9439e46`, `e06e0ed` |
+| 38 | Phone numbers are formatted the same way everywhere, and the company has a phone field | Riham, `4457f91` |
+| 45 | A check's own number shows in its page title | Riham, `20d58db` |
 
-After pulling, run `npm run db:migrate` (migration `0097`, from Riham's
-reconciliation work).
+After pulling, run `npm run db:migrate` (migrations `0097` to `0099`, from
+Riham's reconciliation and phone work).
 
 ## Already done — say so next time
 
@@ -228,5 +226,6 @@ email from the app (47), what each role may do (46, in part).
   recording.
 - **Which page** the audit history failed to open on (item 42).
 - **The check format** (item 36). "We need to figure out check format" was said
-  and left there.
+  and left there. Built for the usual voucher stock in the meantime; see the
+  note on item 36.
 - **The product name** is still not settled **(10-05)**.

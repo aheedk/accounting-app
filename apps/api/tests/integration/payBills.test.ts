@@ -3,6 +3,7 @@ import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/te
 import { makeFirm, makeBusiness, makeUser, makeVendor, seedYearPeriods, seedCoa } from '../helpers/factories.js';
 import * as billSvc from '../../src/services/ap/billService.js';
 import * as pay from '../../src/services/ap/billPaymentService.js';
+import { nextCheckNumberForCashAccount } from '../../src/services/ap/checkService.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
 const meta = { request_id: '00000000-0000-0000-0000-000000004012', ip_address: '127.0.0.1', user_agent: 'vitest' };
@@ -90,5 +91,42 @@ describe('pay bills', () => {
     await expect(t.db.transaction().execute(trx => pay.payBills(trx, ctx, {
       payment_date: '2026-05-02', payment_method: 'check', cash_account_id: cash.id, items: [],
     }))).rejects.toThrow(/at least one bill/);
+  });
+
+  // 10-10 meeting, item 36: paying bills by check writes checks that can be printed.
+  it('numbers one check per vendor from the starting number, in vendor name order', async () => {
+    const { biz, ctx, cash, paper, landlord, p1, p2, rent } = await setup();
+    expect(await nextCheckNumberForCashAccount(t.db, biz.id, cash.id)).toBe('1');
+
+    const result = await t.db.transaction().execute(trx => pay.payBills(trx, ctx, {
+      payment_date: '2026-05-02', payment_method: 'check', cash_account_id: cash.id,
+      starting_check_number: '5519',
+      items: [
+        { bill_id: p1.id, amount: '100.00' },
+        { bill_id: p2.id, amount: '250.00' },
+        { bill_id: rent.id, amount: '1000.00' },
+      ],
+    }));
+    expect(result.bill_payments.map(p => [p.vendor_name, p.reference, p.amount])).toEqual([
+      ['Oak Street Properties', '5519', '1000.0000'],
+      ['Paper Supply Co', '5520', '350.0000'],
+    ]);
+    const saved = await t.db.selectFrom('bill_payments').select(['vendor_id', 'reference'])
+      .where('business_id', '=', biz.id).orderBy('reference').execute();
+    expect(saved).toEqual([
+      { vendor_id: landlord.id, reference: '5519' },
+      { vendor_id: paper.id, reference: '5520' },
+    ]);
+    // The next check, from here or from Write Check, carries on after them.
+    expect(await nextCheckNumberForCashAccount(t.db, biz.id, cash.id)).toBe('5521');
+  });
+
+  it('refuses a starting check number on a payment that is not by check', async () => {
+    const { ctx, cash, p1 } = await setup();
+    await expect(t.db.transaction().execute(trx => pay.payBills(trx, ctx, {
+      payment_date: '2026-05-02', payment_method: 'ach', cash_account_id: cash.id,
+      starting_check_number: '5519',
+      items: [{ bill_id: p1.id, amount: '100.00' }],
+    }))).rejects.toThrow(/only for payment by check/);
   });
 });

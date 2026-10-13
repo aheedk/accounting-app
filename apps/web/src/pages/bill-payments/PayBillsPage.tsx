@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Printer } from 'lucide-react';
 import { api } from '@/lib/apiClient';
+import { useAuth } from '@/auth/useAuth';
 import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -15,12 +17,16 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { flashMessage } from '@/lib/flash';
 import { statementBankAccounts } from '@/lib/bankAccountOptions';
+import { billPaymentCheck, type CheckVendor } from '@/lib/billPaymentCheck';
+import { previewChecks, type CheckDocInput } from '@/lib/download';
 
 type UnpaidBill = {
   bill_id: string; bill_number: string; vendor_id: string; vendor_name: string;
   bill_date: string; due_date: string; total: string; open_balance: string;
 };
 type Account = { id: string; code: string; name: string; account_type: string; detail_type?: string | null; is_active: boolean };
+type BankAccount = { cash_account_id: string; name: string; account_last_four: string | null };
+type PaidPayment = { id: string; vendor_id: string; vendor_name: string; amount: string; reference: string | null };
 
 const METHODS = [
   { value: 'check', label: 'Check' },
@@ -37,9 +43,11 @@ function fmtShortDate(iso: string) {
 }
 
 // Pay Bills, as in QuickBooks: every unpaid bill of every vendor on one screen.
-// Tick the ones to pay; one payment per vendor is recorded and posted.
+// Tick the ones to pay; one payment per vendor is recorded and posted. Paid by
+// check, each payment is a check with its own number, offered for printing.
 export default function PayBillsPage() {
   const [bizId] = useActiveBusinessId();
+  const { businesses } = useAuth();
   const [bills, setBills] = useState<UnpaidBill[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [bankingIds, setBankingIds] = useState<ReadonlySet<string>>(new Set());
@@ -50,21 +58,33 @@ export default function PayBillsPage() {
   const [payments, setPayments] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ cash_account_id: '', payment_date: todayLocal(), payment_method: 'check', reference: '' });
   const [vendorFilter, setVendorFilter] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [vendors, setVendors] = useState<ReadonlyMap<string, CheckVendor>>(new Map());
+  // The first check's number; typed over, it stops following the account's sequence.
+  const [startingCheck, setStartingCheck] = useState('');
+  const [startingEdited, setStartingEdited] = useState(false);
+  // The checks just written, kept on the page until they are printed or dismissed.
+  const [written, setWritten] = useState<CheckDocInput[]>([]);
   const today = todayLocal();
 
   const load = useCallback(async () => {
     if (!bizId) return;
     setLoading(true);
     try {
-      const [billsRes, coaRes, bankRes] = await Promise.all([
+      const [billsRes, coaRes, bankRes, vendorRes] = await Promise.all([
         api.get<{ bills: UnpaidBill[] }>(`/businesses/${bizId}/unpaid-bills`),
         api.get<{ accounts: Account[] }>(`/businesses/${bizId}/coa`),
-        api.get<{ bank_accounts: Array<{ cash_account_id: string }> }>(`/businesses/${bizId}/bank-accounts`)
+        api.get<{ bank_accounts: BankAccount[] }>(`/businesses/${bizId}/bank-accounts`)
           .then(r => r.data.bank_accounts ?? []).catch(() => []),
+        // Only for the name and address on a printed check.
+        api.get<{ vendors: Array<CheckVendor & { id: string }> }>(`/businesses/${bizId}/vendors`, { params: { include_inactive: 'true' } })
+          .then(r => r.data.vendors ?? []).catch(() => []),
       ]);
       setBills(billsRes.data.bills);
       setAccounts(coaRes.data.accounts.filter(a => a.is_active));
       setBankingIds(new Set(bankRes.map(b => b.cash_account_id)));
+      setBankAccounts(bankRes);
+      setVendors(new Map(vendorRes.map(v => [v.id, v])));
       setPayments({});
     } catch (e: unknown) {
       setErr(pickErr(e));
@@ -83,6 +103,17 @@ export default function PayBillsPage() {
   useEffect(() => {
     if (form.cash_account_id === '' && payFrom.length === 1) setForm(f => ({ ...f, cash_account_id: payFrom[0]!.id }));
   }, [payFrom, form.cash_account_id]);
+
+  // Paying by check: start from the next number on that account, unless one was typed.
+  useEffect(() => {
+    if (!bizId || form.payment_method !== 'check' || form.cash_account_id === '' || startingEdited) return;
+    let cancelled = false;
+    api.get<{ check_number: string | null }>(`/businesses/${bizId}/checks/next-number`, { params: { cash_account_id: form.cash_account_id } })
+      .then(r => { if (!cancelled) setStartingCheck(r.data.check_number ?? ''); })
+      .catch(() => { /* the number can still be typed */ });
+    return () => { cancelled = true; };
+    // `bills` changes after each run of payments, which is when the next number moves on.
+  }, [bizId, form.payment_method, form.cash_account_id, startingEdited, bills]);
 
   const shown = useMemo(() => {
     const q = vendorFilter.trim().toLowerCase();
@@ -120,15 +151,38 @@ export default function PayBillsPage() {
     if (!bizId || !ready) return;
     setErr(null); setBusy(true);
     try {
-      const r = await api.post<{ bill_payments: Array<{ id: string }> }>(`/businesses/${bizId}/bill-payments/batch`, {
+      const byCheck = form.payment_method === 'check';
+      const r = await api.post<{ bill_payments: PaidPayment[] }>(`/businesses/${bizId}/bill-payments/batch`, {
         payment_date: form.payment_date,
         payment_method: form.payment_method,
         cash_account_id: form.cash_account_id,
-        reference: form.reference.trim() || null,
+        reference: byCheck ? null : form.reference.trim() || null,
+        starting_check_number: byCheck && startingCheck !== '' ? startingCheck : null,
         items: selected.map(b => ({ bill_id: b.bill_id, amount: parseMoneyInput(payments[b.bill_id] ?? '0') })),
       });
       const made = r.data.bill_payments.length;
-      flashMessage(`Paid ${selected.length} bill${selected.length === 1 ? '' : 's'} with ${made} payment${made === 1 ? '' : 's'}`);
+      if (byCheck) {
+        const bank = bankAccounts.find(b => b.cash_account_id === form.cash_account_id);
+        const account = accounts.find(a => a.id === form.cash_account_id);
+        setWritten(r.data.bill_payments.map(p => billPaymentCheck({
+          checkNumber: p.reference,
+          paymentDate: form.payment_date,
+          vendor: vendors.get(p.vendor_id) ?? { name: p.vendor_name },
+          amount: p.amount,
+          bills: selected.filter(b => b.vendor_id === p.vendor_id).map(b => ({
+            bill_number: b.bill_number, due_date: b.due_date, amount: parseMoneyInput(payments[b.bill_id] ?? '0'),
+          })),
+          bankAccountName: bank?.name ?? account?.name ?? '',
+          bankAccountLastFour: bank?.account_last_four ?? null,
+          businessName: businesses.find(b => b.id === bizId)?.name ?? '',
+        })));
+        setStartingEdited(false);
+      } else {
+        setWritten([]);
+      }
+      flashMessage(byCheck
+        ? `Wrote ${made} check${made === 1 ? '' : 's'} for ${selected.length} bill${selected.length === 1 ? '' : 's'}`
+        : `Paid ${selected.length} bill${selected.length === 1 ? '' : 's'} with ${made} payment${made === 1 ? '' : 's'}`);
       await load();
     } catch (e: unknown) {
       setErr(pickErr(e));
@@ -144,7 +198,7 @@ export default function PayBillsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Pay Bills</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tick the bills to pay. One payment is recorded for each vendor.{' '}
+            Tick the bills to pay. One payment is recorded for each vendor; paid by check, that is one check each.{' '}
             <Link className="text-link hover:underline" to="/ap/bill-payments">Past payments</Link>
           </p>
         </div>
@@ -153,6 +207,45 @@ export default function PayBillsPage() {
           <div className="text-3xl font-semibold font-mono">{fmtMoney(String(total))}</div>
         </div>
       </div>
+
+      {written.length > 0 && (
+        <Card><CardContent className="space-y-3 pt-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-medium">{written.length} check{written.length === 1 ? '' : 's'} to print</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The bills are paid. Put the check stock in the printer first; a check can be printed again from{' '}
+                <Link className="text-link hover:underline" to="/ap/bill-payments">Past payments</Link>.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={() => previewChecks(written, 'stock')}>
+                <Printer className="mr-1.5 h-4 w-4" /> Print on check stock
+              </Button>
+              <Button type="button" variant="outline" onClick={() => previewChecks(written, 'plain')}>Print on plain paper</Button>
+              <Button type="button" variant="ghost" onClick={() => setWritten([])}>Done</Button>
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="border-b">
+              <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <th className="p-2 text-left">Check no.</th>
+                <th className="p-2 text-left">Pay to</th>
+                <th className="p-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {written.map((check, i) => (
+                <tr key={`${check.checkNumber}-${i}`} className="border-b last:border-b-0">
+                  <td className="p-2 font-mono">{check.checkNumber}</td>
+                  <td className="p-2">{check.payeeName}</td>
+                  <td className="p-2 text-right font-mono">{check.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent></Card>
+      )}
 
       <Card><CardContent className="grid grid-cols-1 gap-3 pt-6 md:grid-cols-4">
         <div>
@@ -181,10 +274,23 @@ export default function PayBillsPage() {
             {METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </AppSelect>
         </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Reference (optional)</Label>
-          <Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="Check no., batch…" />
-        </div>
+        {form.payment_method === 'check' ? (
+          <div>
+            <Label className="text-xs text-muted-foreground">Starting check no.</Label>
+            <Input
+              inputMode="numeric"
+              value={startingCheck}
+              onChange={e => { setStartingCheck(e.target.value.replace(/\D/g, '').slice(0, 9)); setStartingEdited(true); }}
+              placeholder="Next check number"
+              aria-label="Starting check number"
+            />
+          </div>
+        ) : (
+          <div>
+            <Label className="text-xs text-muted-foreground">Reference (optional)</Label>
+            <Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="Confirmation no., batch…" />
+          </div>
+        )}
       </CardContent></Card>
 
       {!loading && bills.length === 0 ? (

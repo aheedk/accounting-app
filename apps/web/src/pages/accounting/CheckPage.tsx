@@ -21,7 +21,7 @@ import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
-import { previewCheck } from '@/lib/download';
+import { previewCheck, type CheckLayout } from '@/lib/download';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -649,7 +649,7 @@ export default function CheckPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew]);
 
-  function handlePrintCheck() {
+  function handlePrintCheck(layout: CheckLayout = 'plain') {
     const lineRows = validLines.map(l => {
       const account = accounts.find(a => a.id === l.account_id);
       return {
@@ -669,7 +669,7 @@ export default function CheckPage() {
       memo: memo || null,
       lines: lineRows,
       businessName: businesses.find(b => b.id === bizId)?.name ?? '',
-    });
+    }, null, layout);
   }
 
   if (!bizId) return <div className="p-6">Pick a business.</div>;
@@ -969,8 +969,12 @@ export default function CheckPage() {
         )}
 
         <div className="mx-auto flex items-center gap-3 text-sm">
-          <button type="button" className="inline-flex items-center gap-1.5 text-link hover:underline" onClick={handlePrintCheck}>
+          <button type="button" className="inline-flex items-center gap-1.5 text-link hover:underline" onClick={() => handlePrintCheck('plain')}>
             <Printer className="h-3.5 w-3.5" /> Print check
+          </button>
+          <span className="text-muted-foreground">·</span>
+          <button type="button" className="text-link hover:underline" onClick={() => handlePrintCheck('stock')}>
+            Print on check stock
           </button>
           {canEdit && (
             <>

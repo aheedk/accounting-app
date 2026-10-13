@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useParams } from 'react-router-dom';
+import { Printer } from 'lucide-react';
 import { api } from '@/lib/apiClient';
+import { useAuth } from '@/auth/useAuth';
+import { billPaymentCheck, type CheckVendor } from '@/lib/billPaymentCheck';
+import { previewCheck, type CheckLayout } from '@/lib/download';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +18,7 @@ import { humanizeCode } from '@/lib/labels';
 type BillPayment = {
   id: string;
   vendor_id: string;
+  cash_account_id: string;
   payment_date: string;
   payment_method: string;
   status: string;
@@ -43,6 +48,7 @@ export default function BillPaymentDetailPage() {
   const can = useCan();
   const { id } = useParams<{ id: string }>();
   const [bizId] = useActiveBusinessId();
+  const { businesses } = useAuth();
   const [data, setData] = useState<BillPaymentDetail | null>(null);
   const [openBills, setOpenBills] = useState<OpenBill[]>([]);
   const [applyForm, setApplyForm] = useState({ bill_id: '', applied_amount: '0.00' });
@@ -99,6 +105,35 @@ export default function BillPaymentDetailPage() {
     finally { setBusy(false); }
   }
 
+  // Prints this payment's check again: the vendor and the bank account are
+  // only needed for the paper, so they are fetched when it is asked for.
+  async function printCheck(layout: CheckLayout) {
+    if (!bizId || !data) return;
+    const payment = data.bill_payment;
+    setErr(null);
+    try {
+      const [vendor, banks] = await Promise.all([
+        api.get<CheckVendor>(`/businesses/${bizId}/vendors/${payment.vendor_id}`).then(r => r.data),
+        api.get<{ bank_accounts: Array<{ cash_account_id: string; name: string; account_last_four: string | null }> }>(`/businesses/${bizId}/bank-accounts`)
+          .then(r => r.data.bank_accounts ?? []).catch(() => []),
+      ]);
+      const bank = banks.find(b => b.cash_account_id === payment.cash_account_id);
+      previewCheck(billPaymentCheck({
+        checkNumber: payment.reference,
+        paymentDate: String(payment.payment_date),
+        vendor,
+        amount: payment.amount,
+        bills: data.applications.map(a => ({ bill_number: a.bill_number, amount: a.applied_amount })),
+        bankAccountName: bank?.name ?? '',
+        bankAccountLastFour: bank?.account_last_four ?? null,
+        memo: payment.memo,
+        businessName: businesses.find(b => b.id === bizId)?.name ?? '',
+      }), null, layout);
+    } catch {
+      setErr('The check could not be prepared for printing');
+    }
+  }
+
   if (!data) return <div>Loading…</div>;
   const p = data.bill_payment;
   return (
@@ -106,6 +141,14 @@ export default function BillPaymentDetailPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Bill Payment {p.payment_date}</h1>
         <div className="flex gap-2">
+          {p.status === 'posted' && p.payment_method === 'check' && (
+            <>
+              <Button variant="outline" onClick={() => void printCheck('stock')}>
+                <Printer className="mr-1.5 h-4 w-4" /> Print on check stock
+              </Button>
+              <Button variant="outline" onClick={() => void printCheck('plain')}>Print on plain paper</Button>
+            </>
+          )}
           {p.status === 'draft' && <Button disabled={busy} {...hideUnless(can.accountant)} onClick={post}>Post</Button>}
           {p.status === 'posted' && <Button variant="destructive" disabled={busy} {...hideUnless(can.accountant)} onClick={voidIt}>Void</Button>}
         </div>
@@ -114,7 +157,7 @@ export default function BillPaymentDetailPage() {
         <CardContent className="grid grid-cols-2 gap-2 text-sm">
           <div>Status: {humanizeCode(p.status)}</div><div>Method: {humanizeCode(p.payment_method)}</div>
           <div>Amount: {fmtMoney(p.amount)}</div><div>Unapplied: {fmtMoney(p.unapplied_amount)}</div>
-          <div>Reference: {p.reference ?? '—'}</div><div>Memo: {p.memo ?? '—'}</div>
+          <div>{p.payment_method === 'check' ? 'Check no.' : 'Reference'}: {p.reference ?? '—'}</div><div>Memo: {p.memo ?? '—'}</div>
         </CardContent>
       </Card>
       <Card><CardHeader><CardTitle>Applications</CardTitle></CardHeader>

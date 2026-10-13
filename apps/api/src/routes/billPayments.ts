@@ -48,6 +48,7 @@ router.post('/businesses/:businessId/bill-payments/batch', requireMinRole('accou
       payment_method: body.payment_method,
       cash_account_id: body.cash_account_id,
       reference: body.reference ?? null,
+      starting_check_number: body.starting_check_number ?? null,
       items: body.items,
     }));
     res.status(201).json(result);

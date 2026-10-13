@@ -527,8 +527,17 @@ export type CheckDocInput = {
   bankAccountLastFour: string | null;
   memo: string | null;
   lines: Array<{ accountLabel: string; description: string; amount: string }>;
+  /** Headings for the three columns of `lines` on the stub. Default: Category, Description, Amount. */
+  lineHeaders?: [string, string, string];
   businessName: string;
 };
+
+/**
+ * `plain` is a whole check drawn on blank paper. `stock` prints only what goes
+ * in the blanks of pre-printed voucher check stock: the check on the top third
+ * of a letter page and a stub on each of the other two.
+ */
+export type CheckLayout = 'plain' | 'stock';
 
 // Caller pre-formats money (fmtMoney) — this stays a pure layout concern,
 // same convention as the deposit slip/summary above. A plain single-check
@@ -602,7 +611,7 @@ function drawCheckPage(doc: jsPDF, input: CheckDocInput): void {
   y += 6;
 
   autoTable(doc, {
-    head: [['Category', 'Description', 'Amount']],
+    head: [input.lineHeaders ?? ['Category', 'Description', 'Amount']],
     body: input.lines.map(l => [l.accountLabel, l.description, l.amount]),
     startY: y,
     margin: { left: marginX, right: marginX },
@@ -618,10 +627,101 @@ function drawCheckPage(doc: jsPDF, input: CheckDocInput): void {
   doc.setFont('helvetica', 'normal');
 }
 
-/** "Print check" — opened for preview, same pattern as the deposit slip/summary. */
-export function previewCheck(input: CheckDocInput, target?: Window | null): void {
+// Where each blank sits on voucher check stock, in millimetres from the top
+// left of a letter page. These follow the usual QuickBooks-compatible voucher
+// check (check on top, two stubs of 3.5 inches below). They have not been
+// tried on the firm's own stock yet: print one on plain paper, hold it against
+// a real check, and move the numbers here if a field is off.
+const CHECK_STOCK = {
+  date: { x: 178, y: 24 },
+  payee: { x: 25, y: 37 },
+  amount: { x: 178, y: 37 },
+  words: { x: 9, y: 46 },
+  address: { x: 25, y: 53, lineHeight: 4.2 },
+  memo: { x: 19, y: 76 },
+  stubTops: [89, 178],
+  stubLines: 9,
+} as const;
+
+function drawCheckStockPage(doc: jsPDF, input: CheckDocInput): void {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const right = pageWidth - 14;
+  doc.setTextColor(0);
+  doc.setFont('helvetica', 'normal');
+
+  // ── The check: the stock already carries the company, the bank and the number ──
+  doc.setFontSize(10);
+  doc.text(input.paymentDate, CHECK_STOCK.date.x, CHECK_STOCK.date.y);
+  doc.text(input.payeeName, CHECK_STOCK.payee.x, CHECK_STOCK.payee.y);
+  doc.text(`**${input.amount}`, CHECK_STOCK.amount.x, CHECK_STOCK.amount.y);
+  // Asterisks fill the rest of the line so nothing can be written in after it.
+  const words = amountInWords(input.amount.replace(/,/g, ''));
+  doc.text(`${words} ${'*'.repeat(Math.max(4, 70 - words.length))}`, CHECK_STOCK.words.x, CHECK_STOCK.words.y);
+  doc.setFontSize(9);
+  input.mailingAddress.slice(0, 5).forEach((line, i) => {
+    doc.text(line, CHECK_STOCK.address.x, CHECK_STOCK.address.y + i * CHECK_STOCK.address.lineHeight);
+  });
+  if (input.memo) doc.text(input.memo, CHECK_STOCK.memo.x, CHECK_STOCK.memo.y);
+
+  // ── The two stubs: one goes with the check, one stays in the company's records ──
+  const headers = input.lineHeaders ?? ['Category', 'Description', 'Amount'];
+  const shown = input.lines.slice(0, CHECK_STOCK.stubLines);
+  const more = input.lines.length - shown.length;
+  for (const top of CHECK_STOCK.stubTops) {
+    let y = top + 9;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(input.payeeName, 14, y);
+    doc.text(input.paymentDate, pageWidth / 2, y, { align: 'center' });
+    doc.text(`Check ${input.checkNumber}`, right, y, { align: 'right' });
+    y += 7;
+    doc.setFontSize(8);
+    doc.text(headers[0], 14, y);
+    doc.text(headers[1], 70, y);
+    doc.text(headers[2], right, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += 5;
+    for (const line of shown) {
+      doc.text(line.accountLabel, 14, y, { maxWidth: 52 });
+      doc.text(line.description, 70, y, { maxWidth: 90 });
+      doc.text(line.amount, right, y, { align: 'right' });
+      y += 4.5;
+    }
+    if (more > 0) { doc.text(`and ${more} more`, 14, y); y += 4.5; }
+    y += 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total', right - 40, y);
+    doc.text(input.amount, right, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    if (input.businessName) {
+      doc.setTextColor(110);
+      doc.text(input.businessName, 14, top + 82);
+      doc.setTextColor(0);
+    }
+  }
+}
+
+/** One letter page for each check, on blank paper or on pre-printed check stock. */
+export function buildChecksPdf(inputs: CheckDocInput[], layout: CheckLayout = 'plain'): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', format: 'letter' });
-  doc.setProperties({ title: `Check-${input.checkNumber}.pdf` });
-  drawCheckPage(doc, input);
-  openPdfPreview(doc, target);
+  const first = inputs[0]?.checkNumber ?? '';
+  const last = inputs[inputs.length - 1]?.checkNumber ?? '';
+  doc.setProperties({ title: inputs.length === 1 ? `Check-${first}.pdf` : `Checks-${first}-to-${last}.pdf` });
+  inputs.forEach((input, i) => {
+    if (i > 0) doc.addPage();
+    if (layout === 'stock') drawCheckStockPage(doc, input);
+    else drawCheckPage(doc, input);
+  });
+  return doc;
+}
+
+/** The checks as one PDF, a page each, opened for preview. */
+export function previewChecks(inputs: CheckDocInput[], layout: CheckLayout = 'plain', target?: Window | null): void {
+  if (inputs.length === 0) return;
+  openPdfPreview(buildChecksPdf(inputs, layout), target);
+}
+
+/** "Print check" — opened for preview, same pattern as the deposit slip/summary. */
+export function previewCheck(input: CheckDocInput, target?: Window | null, layout: CheckLayout = 'plain'): void {
+  previewChecks([input], layout, target);
 }

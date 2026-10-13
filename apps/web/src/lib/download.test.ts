@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amountInWords } from './download';
+import { amountInWords, buildChecksPdf, type CheckDocInput } from './download';
 
 describe('amountInWords', () => {
   it('matches the check-writing convention from the spec', () => {
@@ -18,5 +18,31 @@ describe('amountInWords', () => {
 
   it('rounds sub-cent floating point noise before formatting', () => {
     expect(amountInWords(19.99)).toBe('Nineteen and 99/100');
+  });
+});
+
+describe('buildChecksPdf', () => {
+  const check = (checkNumber: string, lines: number): CheckDocInput => ({
+    checkNumber,
+    paymentDate: '10/13/2026',
+    payeeName: 'Paper Supply Co',
+    mailingAddress: ['Paper Supply Co', '12 Mill Rd', 'Dayton, OH, 45402'],
+    amount: '1,350.00',
+    bankAccountName: 'Operating',
+    bankAccountLastFour: '4411',
+    memo: 'October',
+    lineHeaders: ['Bill no.', 'Due date', 'Amount paid'],
+    lines: Array.from({ length: lines }, (_, i) => ({ accountLabel: `P-${i + 1}`, description: '10/01/2026', amount: '100.00' })),
+    businessName: 'Acme LLC',
+  });
+
+  it('puts each check on a page of its own, on check stock or plain paper', () => {
+    expect(buildChecksPdf([check('5519', 2), check('5520', 1)], 'stock').getNumberOfPages()).toBe(2);
+    expect(buildChecksPdf([check('5519', 2), check('5520', 1)], 'plain').getNumberOfPages()).toBe(2);
+  });
+
+  it('keeps a check with many bills on one page of check stock', () => {
+    // The stub is 3.5 inches; the bills that do not fit are counted, not run over the next stub.
+    expect(buildChecksPdf([check('5519', 30)], 'stock').getNumberOfPages()).toBe(1);
   });
 });

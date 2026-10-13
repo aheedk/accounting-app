@@ -298,6 +298,8 @@ export type PayBillsInput = {
   payment_method: PaymentMethod;
   cash_account_id: string;
   reference?: string | null;
+  /** Paying by check: the first check's number; each vendor's payment takes the next. */
+  starting_check_number?: string | null;
   items: Array<{ bill_id: string; amount: string }>;
 };
 
@@ -306,6 +308,10 @@ export type PayBillsInput = {
  * posted bill payment per vendor, each applied to that vendor's chosen bills.
  * All of it happens in the caller's transaction, so either every payment posts
  * or none does.
+ *
+ * Paid by check with a starting number, each payment is one check: vendors are
+ * taken in name order and numbered from there, and the number is kept as the
+ * payment's reference so the checks can be printed and found again.
  */
 export async function payBills(trx: Transaction<DB>, ctx: ServiceCtx, input: PayBillsInput) {
   const business_id = ctx.business_id;
@@ -316,11 +322,18 @@ export async function payBills(trx: Transaction<DB>, ctx: ServiceCtx, input: Pay
     throw new PreconditionError('A bill is listed twice');
   }
 
-  const bills = await trx.selectFrom('bills').select(['id', 'vendor_id'])
-    .where('business_id', '=', business_id)
-    .where('id', 'in', items.map(item => item.bill_id))
+  const startingCheck = input.starting_check_number?.trim() || null;
+  if (startingCheck && input.payment_method !== 'check') {
+    throw new PreconditionError('A starting check number is only for payment by check');
+  }
+
+  const bills = await trx.selectFrom('bills as b').innerJoin('vendors as v', 'v.id', 'b.vendor_id')
+    .select(['b.id', 'b.vendor_id', 'v.name as vendor_name'])
+    .where('b.business_id', '=', business_id)
+    .where('b.id', 'in', items.map(item => item.bill_id))
     .execute();
   const vendorOf = new Map(bills.map(b => [b.id, b.vendor_id]));
+  const vendorName = new Map(bills.map(b => [b.vendor_id, b.vendor_name]));
 
   const byVendor = new Map<string, Array<{ bill_id: string; applied_amount: string }>>();
   for (const item of items) {
@@ -331,21 +344,29 @@ export async function payBills(trx: Transaction<DB>, ctx: ServiceCtx, input: Pay
     byVendor.set(vendorId, list);
   }
 
-  const paid: Array<{ id: string; vendor_id: string; amount: string; bill_count: number }> = [];
-  for (const [vendor_id, applications] of byVendor) {
+  const paid: Array<{
+    id: string; vendor_id: string; vendor_name: string; amount: string; bill_count: number; reference: string | null;
+  }> = [];
+  const vendors = [...byVendor.entries()]
+    .sort(([a], [b]) => (vendorName.get(a) ?? '').localeCompare(vendorName.get(b) ?? ''));
+  for (const [index, [vendor_id, applications]] of vendors.entries()) {
     const amount = applications.reduce<string>((sum, a) => toMoneyString(addMoney(sum, a.applied_amount)), '0');
+    const reference = startingCheck ? String(Number(startingCheck) + index) : (input.reference ?? null);
     const draft = await createDraft(trx, ctx, {
       business_id, vendor_id,
       payment_date: input.payment_date,
       payment_method: input.payment_method,
-      reference: input.reference ?? null,
+      reference,
       amount,
       cash_account_id: input.cash_account_id,
       memo: null,
       initial_applications: applications,
     });
     await postBillPayment(trx, ctx, { bill_payment_id: draft.bill_payment.id });
-    paid.push({ id: draft.bill_payment.id, vendor_id, amount, bill_count: applications.length });
+    paid.push({
+      id: draft.bill_payment.id, vendor_id, vendor_name: vendorName.get(vendor_id) ?? '',
+      amount, bill_count: applications.length, reference,
+    });
   }
   return { bill_payments: paid };
 }

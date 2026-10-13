@@ -25,6 +25,7 @@ to run the app.
 | [Card statements and check stubs](./specs/2026-10-04-card-statements-and-check-stubs-design.md) | Credit card statements in the AI inbox, card payments on bank statements, check stubs, long multi-account PDFs. |
 | [Suspense](./specs/2026-10-04-suspense-account-design.md) | Where the AI parks what it cannot categorize, and clearing it. |
 | [Account types](./specs/2026-10-12-account-types-design.md) | QuickBooks' account types and detail types: one shared list, worked out from the detail type, and how the Chart of Accounts and the Balance Sheet group by it. |
+| [Printing checks from Pay Bills](./specs/2026-10-13-pay-bills-print-checks-design.md) | Paying bills by check: one numbered check per vendor, printed on check stock or plain paper, and how check numbers are kept in one sequence. |
 | [Accounts and roles](./specs/2026-10-08-accounts-and-roles-design.md) | Signing in (switching a login off, passwords, two-step, sessions), the five roles, payroll access, the approval step, the activity log, and what a client login can do. |
 | [Report set](./specs/2026-10-07-report-set-design.md) | A/R and A/P aging that tie to the ledger, and the Statement of Cash Flows. |
 | [Inventory in the ledger](./specs/2026-10-07-inventory-ledger-design.md) | How stock reaches the books: cost of goods sold on a sale, opening stock, adjustments. Built; three choices in it are marked "to confirm" for the firm. |

@@ -28,6 +28,12 @@ router.get('/businesses/:businessId/checks', async (req, res, next) => {
 
 router.get('/businesses/:businessId/checks/next-number', async (req, res, next) => {
   try {
+    // Pay Bills asks by the ledger account it pays from; Write Check by the bank account.
+    const cashAccountId = String(req.query['cash_account_id'] ?? '');
+    if (cashAccountId) {
+      res.json({ check_number: await checkSvc.nextCheckNumberForCashAccount(db, req.tenancy!.business_id, cashAccountId) });
+      return;
+    }
     const bankAccountId = String(req.query['bank_account_id'] ?? '');
     if (!bankAccountId) { res.json({ check_number: null }); return; }
     const check_number = await checkSvc.nextCheckNumber(db, req.tenancy!.business_id, bankAccountId);

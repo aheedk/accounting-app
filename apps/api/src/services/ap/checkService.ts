@@ -132,6 +132,20 @@ async function isReconciled(db: Kysely<DB>, journal_entry_id: string | null): Pr
 export async function nextCheckNumber(
   db: Kysely<DB>, business_id: string, bank_account_id: string,
 ): Promise<string> {
+  const bank = await db.selectFrom('bank_accounts').select('cash_account_id')
+    .where('business_id', '=', business_id).where('id', '=', bank_account_id).executeTakeFirst();
+  if (!bank) return '1';
+  return nextCheckNumberForCashAccount(db, business_id, bank.cash_account_id);
+}
+
+/**
+ * The same sequence, found from the ledger account the checks are drawn on.
+ * Pay Bills knows that account and not the Banking record, and an account can
+ * be a bank account without having one.
+ */
+export async function nextCheckNumberForCashAccount(
+  db: Kysely<DB>, business_id: string, cash_account_id: string,
+): Promise<string> {
   // Also considers checks written the old way, as an Expense with payment
   // method Check (expense_transactions.reference) against this same bank
   // account's cash account -- otherwise a new check would restart at 1 and
@@ -140,16 +154,22 @@ export async function nextCheckNumber(
   const row = await sql<{ next: string }>`
     SELECT COALESCE(MAX(num), 0) + 1 AS next
     FROM (
-      SELECT CAST(check_number AS INTEGER) AS num
-      FROM checks
-      WHERE business_id = ${business_id} AND bank_account_id = ${bank_account_id}
-      AND check_number ~ '^[0-9]+$'
+      SELECT CAST(c.check_number AS INTEGER) AS num
+      FROM checks c
+      JOIN bank_accounts ba ON ba.id = c.bank_account_id
+      WHERE c.business_id = ${business_id} AND ba.cash_account_id = ${cash_account_id}
+      AND c.check_number ~ '^[0-9]{1,9}$'
       UNION ALL
       SELECT CAST(e.reference AS INTEGER) AS num
       FROM expense_transactions e
-      JOIN bank_accounts ba ON ba.cash_account_id = e.payment_account_id
-      WHERE e.business_id = ${business_id} AND ba.id = ${bank_account_id}
-      AND e.payment_method = 'check' AND e.reference ~ '^[0-9]+$'
+      WHERE e.business_id = ${business_id} AND e.payment_account_id = ${cash_account_id}
+      AND e.payment_method = 'check' AND e.reference ~ '^[0-9]{1,9}$'
+      UNION ALL
+      -- Checks written from Pay Bills: the bill payment's reference is its check number.
+      SELECT CAST(bp.reference AS INTEGER) AS num
+      FROM bill_payments bp
+      WHERE bp.business_id = ${business_id} AND bp.cash_account_id = ${cash_account_id}
+      AND bp.payment_method = 'check' AND bp.reference ~ '^[0-9]{1,9}$'
     ) sub
   `.execute(db);
   return String(row.rows[0]?.next ?? 1);
