@@ -21,13 +21,18 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 
 router.get('/businesses/:businessId/bills', async (req, res, next) => {
   try {
-    const q: { business_id: string; status?: string; vendor_id?: string } = {
+    const q: { business_id: string; status?: string; vendor_id?: string; limit?: number; offset?: number } = {
       business_id: req.tenancy!.business_id,
     };
     const status = req.query['status'];
     if (typeof status === 'string') q.status = status;
     const vendor_id = req.query['vendor_id'];
     if (typeof vendor_id === 'string') q.vendor_id = vendor_id;
+    // The pages ask for up to 1000; this was dropped, so every list stopped at the newest 50.
+    const limit = Number(req.query['limit']);
+    if (Number.isInteger(limit) && limit > 0) q.limit = Math.min(limit, 1000);
+    const offset = Number(req.query['offset']);
+    if (Number.isInteger(offset) && offset > 0) q.offset = offset;
     const list = await bill.listBills(db, q);
     res.json({ bills: list });
   } catch (e) { next(e); }

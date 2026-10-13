@@ -203,7 +203,7 @@ describe('VendorDetailPage', () => {
     expect(Array.from(container.querySelectorAll('a')).find(a => a.textContent?.includes('Other Vendor'))).toBeUndefined();
   });
 
-  it('sorts the sidebar by open balance, computed from posted bills', async () => {
+  it('sorts the sidebar by open balance, taken from A/P aging', async () => {
     apiGet.mockImplementation((url: string) => {
       if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: vendor() });
       if (url.endsWith('/vendors')) {
@@ -211,16 +211,9 @@ describe('VendorDetailPage', () => {
           data: { vendors: [{ id: 'v2', name: 'Clean Vendor', is_active: true }, { id: 'v3', name: 'Other Vendor', is_active: true }] },
         });
       }
-      if (url.endsWith('/bills')) {
-        return Promise.resolve({
-          data: {
-            bills: [
-              { id: 'b1', vendor_id: 'v2', status: 'posted', total: '50.00' },
-              { id: 'b2', vendor_id: 'v3', status: 'posted', total: '500.00' },
-              { id: 'b3', vendor_id: 'v3', status: 'paid', total: '9999.00' },
-            ],
-          },
-        });
+      if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
+      if (url.endsWith('/reports/ap-aging')) {
+        return Promise.resolve({ data: { rows: [{ id: 'v2', total: '50.0000' }, { id: 'v3', total: '500.0000' }] } });
       }
       if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
       if (url.endsWith('/transactions')) return Promise.resolve({ data: { transactions: [], total: 0 } });
@@ -242,7 +235,8 @@ describe('VendorDetailPage', () => {
     const names = Array.from(container.querySelectorAll('a')).map(a => a.textContent).filter((t): t is string => !!t && (t.includes('Vendor')));
     const otherIdx = names.findIndex(t => t.includes('Other Vendor'));
     const cleanIdx = names.findIndex(t => t.includes('Clean Vendor'));
-    // Other Vendor has $500 open (the $9999 bill is paid, excluded); Clean Vendor has $50 — Other sorts first.
+    // Other Vendor is owed 500, Clean Vendor 50, so Other sorts first.
+    expect(apiGet.mock.calls.some(([url]) => String(url).endsWith('/reports/ap-aging'))).toBe(true);
     expect(otherIdx).toBeGreaterThanOrEqual(0);
     expect(otherIdx).toBeLessThan(cleanIdx);
   });

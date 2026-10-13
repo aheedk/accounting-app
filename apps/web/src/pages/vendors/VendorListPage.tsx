@@ -13,6 +13,7 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
 import { daysAgoLocal, todayLocal } from '@/lib/dates';
+import { billOpenAmount, vendorOpenBalances, type VendorAgingRow } from '@/lib/vendorBalances';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { printReport } from '@/lib/reportExport';
 import { pickErr } from '@/lib/apiErrors';
@@ -31,7 +32,7 @@ type Vendor = {
   id: string; name: string; email: string | null; phone: string | null;
   default_terms_days: number; is_1099: boolean; is_active: boolean; has_transactions: boolean;
 };
-type Bill = { id: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string };
+type Bill = { id: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string; open_balance?: string | null };
 
 export default function VendorListPage() {
   const [bizId] = useActiveBusinessId();
@@ -42,6 +43,8 @@ export default function VendorListPage() {
   const [items, setItems] = useState<Vendor[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
+  // Each vendor's open balance, from A/P aging so it agrees with the ledger.
+  const [balances, setBalances] = useState<ReadonlyMap<string, number>>(new Map());
   const [showInactive, setShowInactive] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchOpen, setBatchOpen] = useState(false);
@@ -58,6 +61,12 @@ export default function VendorListPage() {
   }
   useEffect(() => { reload(); }, [bizId, showInactive]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setBills(r.data.bills)); }, [bizId]);
+  useEffect(() => {
+    if (!bizId) return;
+    api.get<{ rows: VendorAgingRow[] }>(`/businesses/${bizId}/reports/ap-aging`)
+      .then(r => setBalances(vendorOpenBalances(r.data.rows ?? [])))
+      .catch(() => setBalances(new Map()));
+  }, [bizId]);
 
   const today = todayLocal();
   const yearAgo = daysAgoLocal(365);
@@ -67,7 +76,8 @@ export default function VendorListPage() {
     let overdue = 0, overdueCount = 0, open = 0, openCount = 0, paid = 0, paidCount = 0;
     for (const b of bills) {
       if (b.bill_date < yearAgo) continue;
-      const amt = Number(b.total);
+      // An unpaid bill counts for what is left on it; a paid one for its total.
+      const amt = b.status === 'posted' ? billOpenAmount(b) : Number(b.total);
       if (b.status === 'posted') {
         if (b.due_date < today) { overdue += amt; overdueCount += 1; }
         else { open += amt; openCount += 1; }
@@ -76,19 +86,10 @@ export default function VendorListPage() {
     return { overdue, overdueCount, open, openCount, paid, paidCount };
   }, [bills, today, yearAgo]);
 
-  const openBalanceByVendor = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const b of bills) {
-      if (b.status !== 'posted') continue;
-      m.set(b.vendor_id, (m.get(b.vendor_id) ?? 0) + Number(b.total));
-    }
-    return m;
-  }, [bills]);
-
   type Row = Vendor & { open_balance: number };
   const rows: Row[] = useMemo(
-    () => items.map(v => ({ ...v, open_balance: openBalanceByVendor.get(v.id) ?? 0 })),
-    [items, openBalanceByVendor],
+    () => items.map(v => ({ ...v, open_balance: balances.get(v.id) ?? 0 })),
+    [items, balances],
   );
 
   const columns: Column<Row>[] = [

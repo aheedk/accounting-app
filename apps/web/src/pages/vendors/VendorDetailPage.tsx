@@ -14,6 +14,7 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { fmtDateTime, todayLocal } from '@/lib/dates';
+import { billOpenAmount, vendorOpenBalances, type VendorAgingRow } from '@/lib/vendorBalances';
 import { formatPhone } from '@/lib/phone';
 
 type VendorListItem = { id: string; name: string; is_active: boolean };
@@ -44,9 +45,7 @@ type Vendor = {
   default_terms_days: number;
   has_transactions: boolean;
 };
-type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string };
-// For the sidebar's "Sort by open balance" — business-wide, not just this vendor's.
-type VendorBillSummary = { vendor_id: string; status: string; total: string };
+type BillSummary = { id: string; bill_number: string; bill_date: string; due_date: string; status: string; total: string; open_balance?: string | null };
 type Account = { id: string; name: string };
 // Every transaction type this vendor can appear on (bills, checks, expenses,
 // journal entries, ...) — the unified transactions endpoint's contact_id
@@ -88,22 +87,14 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
 type VendorSortKey = 'name' | 'balance';
 
 function VendorSidebar({
-  vendors, bills, activeId, collapsed, onToggleCollapsed,
+  vendors, balances: openBalanceByVendor, activeId, collapsed, onToggleCollapsed,
 }: {
-  vendors: VendorListItem[]; bills: VendorBillSummary[]; activeId: string | undefined;
+  // Open balance of every vendor of the business, from A/P aging.
+  vendors: VendorListItem[]; balances: ReadonlyMap<string, number>; activeId: string | undefined;
   collapsed: boolean; onToggleCollapsed: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<VendorSortKey>('name');
-
-  const openBalanceByVendor = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const b of bills) {
-      if (b.status !== 'posted') continue;
-      m.set(b.vendor_id, (m.get(b.vendor_id) ?? 0) + Number(b.total));
-    }
-    return m;
-  }, [bills]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -177,7 +168,7 @@ export default function VendorDetailPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [vendorList, setVendorList] = useState<VendorListItem[]>([]);
-  const [allBills, setAllBills] = useState<VendorBillSummary[]>([]);
+  const [balances, setBalances] = useState<ReadonlyMap<string, number>>(new Map());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
@@ -194,7 +185,9 @@ export default function VendorDetailPage() {
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/vendors`, { params: { include_inactive: 'true' } }).then(r => setVendorList(r.data.vendors));
-    api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setAllBills(r.data.bills));
+    api.get<{ rows: VendorAgingRow[] }>(`/businesses/${bizId}/reports/ap-aging`)
+      .then(r => setBalances(vendorOpenBalances(r.data.rows ?? [])))
+      .catch(() => setBalances(new Map()));
   }, [bizId]);
 
   async function deleteVendor() {
@@ -213,7 +206,8 @@ export default function VendorDetailPage() {
   const stats = useMemo(() => {
     let open = 0, openCount = 0, overdue = 0, overdueCount = 0, paid = 0, paidCount = 0;
     for (const b of bills) {
-      const amt = Number(b.total);
+      // An unpaid bill counts for what is left on it; a paid one for its total.
+      const amt = b.status === 'posted' ? billOpenAmount(b) : Number(b.total);
       if (b.status === 'posted') {
         if (b.due_date < today) { overdue += amt; overdueCount += 1; }
         else { open += amt; openCount += 1; }
@@ -231,7 +225,7 @@ export default function VendorDetailPage() {
     <div className="flex items-start gap-6">
       <VendorSidebar
         vendors={vendorList}
-        bills={allBills}
+        balances={balances}
         activeId={vendor.id}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(c => !c)}
@@ -253,7 +247,8 @@ export default function VendorDetailPage() {
         <div className="flex items-start gap-2">
           <div className="mr-4 text-right">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Open balance</div>
-            <div className="text-2xl font-semibold font-mono">{fmtMoney(String(stats.open + stats.overdue))}</div>
+            {/* Unpaid bills less unused credits and payments, as on A/P aging. */}
+            <div className="text-2xl font-semibold font-mono">{fmtMoney(String(balances.get(vendor.id) ?? stats.open + stats.overdue))}</div>
           </div>
           <Button asChild variant="outline"><Link to={`/ap/bill-payments/new?vendor_id=${vendor.id}`}>Pay bills</Link></Button>
           <Button asChild><Link to={`/ap/bills/new?vendor_id=${vendor.id}`}>Create bill</Link></Button>

@@ -35,7 +35,6 @@ mark which meeting an item first came from.
 | 37 | Year end: net income into Retained Earnings. **Built 10-13** for the Trial Balance and General Ledger (the Balance Sheet already did it). Left: show Faizan, and ask whether he wants a posted closing entry as well. See "Retained Earnings" below | Aheed, Faizan |
 | 39 | Statement review: Equipment showed up in the bank account picker. Not reproduced; needs the company from the demo. See "Equipment in the bank picker" below | Aheed |
 | 40 | "This year" should follow the client's fiscal year everywhere. Today only the General Ledger does. See "Fiscal year" below | Riham |
-| 41 | Vendors list: the Open balance column is not right (Riham said so in the demo). See "Vendor balance" below | Riham |
 | 43 | Backups before real client data arrives on November 1: confirm the database is backed up, how often, and that a restore works. See "Security and data" below | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders, bank statement uploaded before the card statement and after | Faizan |
 | 17 | QA audit: done apart from emailing an invoice (now item 47), Estimate, and two decisions for the firm; see "Still needs an answer" **(10-01)** | Aheed, firm |
@@ -97,11 +96,6 @@ Ledger presets do this. These lists still use the calendar year: Transactions,
 the bank transactions inbox, Bills, Bill Payments, Payments, Credit Memos and
 Vendor Credits. Check the other reports as well.
 
-**Vendor balance (41).** The Vendors list works the open balance out in the
-browser. Not checked yet, but the likely cause is that it counts open bills and
-leaves out vendor credits and payments not yet applied, which is what the
-Accounts Payable overview had wrong before 10-08.
-
 **Security and data (43).** Said in the meeting: once small businesses use the
 app we are responsible for their data and its backup; a second environment that
 is copied to continuously was suggested. For November 1 the minimum is knowing
@@ -159,6 +153,7 @@ is item 28.
 | 35 | Payroll is out of the sidebar, + New and search. Its pages still open by address. "Add contractor" moved under Vendors in + New. The Payroll tick box on Setup → Users is still there | Aheed, 10-12 |
 | 42 | Audit history: it did nothing on a record not saved yet, which is what happened in the demo. On Journal Entry, Bank Deposit, Expense and Check it is now grayed out until the record is saved, and says why | Aheed, 10-12 |
 | 21 | Manual bank reconciliation: a worksheet and a history page under Banking. Since widened to any balance sheet account, with a Bank Register and a Summary report. Not reviewed or tested by Aheed yet | Riham, `569350c`, `9439e46`, `e06e0ed` |
+| 41 | Vendors list Open balance. Two causes: it added up the full amount of every unpaid bill (so a part-paid bill counted in full and credits were ignored), and the bills list only ever returned the newest 50 bills. It now shows the A/P aging figure, on the Vendors list, the vendor page and its side list; the Bills list returns up to 1000 and each bill carries what is left on it. Was Riham's; picked up by Aheed | Aheed, 10-13 |
 | 38 | Phone numbers are formatted the same way everywhere, and the company has a phone field | Riham, `4457f91` |
 | 45 | A check's own number shows in its page title | Riham, `20d58db` |
 

@@ -93,6 +93,23 @@ describe('pay bills', () => {
     }))).rejects.toThrow(/at least one bill/);
   });
 
+  // 10-10 meeting, item 41: the Vendors list added up bill totals, so a part-paid
+  // bill counted in full. The bills list now says what is left on each.
+  it('lists each bill with what is still owed on it', async () => {
+    const { biz, ctx, cash, p1, p2 } = await setup();
+    await t.db.transaction().execute(trx => pay.payBills(trx, ctx, {
+      payment_date: '2026-05-02', payment_method: 'ach', cash_account_id: cash.id,
+      items: [{ bill_id: p1.id, amount: '100.00' }, { bill_id: p2.id, amount: '50.00' }],
+    }));
+    const bills = await billSvc.listBills(t.db, { business_id: biz.id, limit: 1000 });
+    expect(bills.map(b => [b.bill_number, b.status, b.open_balance]).sort()).toEqual([
+      ['P-1', 'paid', '0.0000'],
+      ['P-2', 'posted', '200.0000'],     // 250 less the 50 paid
+      ['R-1', 'posted', '1000.0000'],
+    ]);
+    expect(await billSvc.listBills(t.db, { business_id: biz.id, limit: 2 })).toHaveLength(2);
+  });
+
   // 10-10 meeting, item 36: paying bills by check writes checks that can be printed.
   it('numbers one check per vendor from the starting number, in vendor name order', async () => {
     const { biz, ctx, cash, paper, landlord, p1, p2, rent } = await setup();

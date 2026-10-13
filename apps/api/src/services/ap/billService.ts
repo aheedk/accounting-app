@@ -1,5 +1,5 @@
 import { type Kysely, type Selectable, sql, type Transaction } from 'kysely';
-import { AUDIT, ERR, addMoney, mulMoney, toMoneyString } from '@accounting/shared';
+import { AUDIT, ERR, addMoney, mulMoney, subMoney, toMoneyString } from '@accounting/shared';
 import type { DB, BillStatus, BillLinesTable, JournalEntrySourceType } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { InvalidStateTransitionError, PreconditionError } from '../../lib/ledgerErrors.js';
@@ -193,7 +193,27 @@ export async function listBills(db: Kysely<DB>, q: { business_id: string; status
   let qb = db.selectFrom('bills').selectAll().where('business_id', '=', q.business_id).where('deleted_at', 'is', null);
   if (q.status) qb = qb.where('status', '=', q.status as BillStatus);
   if (q.vendor_id) qb = qb.where('vendor_id', '=', q.vendor_id);
-  return qb.orderBy('bill_date', 'desc').limit(q.limit ?? 50).offset(q.offset ?? 0).execute();
+  const bills = await qb.orderBy('bill_date', 'desc').limit(q.limit ?? 50).offset(q.offset ?? 0).execute();
+  if (bills.length === 0) return [];
+
+  // What is still owed on each: the total less posted payments and credits put
+  // against it, the same rule as A/P aging. A list that adds up totals counts
+  // a part-paid bill in full.
+  const applied = new Map<string, string>();
+  const apps = await db.selectFrom('bill_payment_applications as bpa')
+    .leftJoin('bill_payments as bp', 'bp.id', 'bpa.bill_payment_id')
+    .leftJoin('vendor_credits as vc', 'vc.id', 'bpa.vendor_credit_id')
+    .select(['bpa.bill_id', 'bpa.applied_amount'])
+    .where('bpa.bill_id', 'in', bills.map(b => b.id))
+    .where(eb => eb.or([eb('bp.status', '=', 'posted'), eb('vc.status', 'in', ['posted', 'applied'])]))
+    .execute();
+  for (const a of apps) applied.set(a.bill_id, toMoneyString(addMoney(applied.get(a.bill_id) ?? '0', a.applied_amount)));
+  return bills.map(b => ({
+    ...b,
+    open_balance: b.status === 'paid' || b.status === 'voided'
+      ? '0.0000'
+      : toMoneyString(subMoney(b.total, applied.get(b.id) ?? '0')),
+  }));
 }
 
 async function recomputeBillTotals(trx: Transaction<DB>, bill_id: string) {
