@@ -70,9 +70,13 @@ production yet.**
 ## Still to do
 
 1. Run both commands against production once and note the date here.
-2. Check what Railway keeps by itself. Look for Backups on the Postgres
-   service; whether it is there depends on the plan. Write down the schedule
-   and how long they are kept, or that there are none.
+2. **Checked 10-14: Railway keeps no regular backups.** The Postgres service's
+   Backups tab holds one backup Railway took before a security patch, and no
+   schedule is set. To turn one on: Postgres service → Backups → set a
+   schedule. Daily is kept 6 days, weekly about a month, monthly about three
+   months, and more than one can be on at once. Railway staff say scheduled
+   backups need the Pro plan; check which plan the project is on. A Railway
+   backup lives on Railway, so it does not replace our own copy (step 3).
 3. Decide how often we take our own copy and where it is kept. A dump on one
    laptop is not a backup; it should go somewhere off the machine and off
    Railway.
