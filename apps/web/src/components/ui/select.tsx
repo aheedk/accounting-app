@@ -246,7 +246,7 @@ export function AppSelect({
                     opt.disabled && 'cursor-not-allowed opacity-40',
                     // The current value stays visibly picked out even once hover/keyboard
                     // focus moves elsewhere — not just bold, a persistent tint.
-                    isSelected && 'bg-accent/40 font-medium',
+                    isSelected && 'bg-accent/70',
                     // One highlight for both mouse and keyboard, stronger than the
                     // selected tint so moving off the selected row still reads clearly.
                     isActive && 'bg-accent text-accent-foreground',

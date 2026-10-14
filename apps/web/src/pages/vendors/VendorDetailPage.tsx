@@ -572,7 +572,7 @@ export default function VendorDetailPage() {
                       <td className="p-3">
                         {(tx.type === 'expense' || tx.type === 'check') && tx.category && tx.category !== 'Split' ? (
                           <AppSelect
-                            className="h-8 w-full max-w-[16rem] rounded-md border bg-background px-2 text-sm disabled:opacity-60"
+                            className="h-8 w-max min-w-[12rem] rounded-md border bg-background px-2 text-sm disabled:opacity-60"
                             value={categoryAccounts.find(a => a.name === tx.category)?.id ?? ''}
                             disabled={recategorizingId === tx.id}
                             onChange={e => { if (e.target.value) { void recategorize(tx, e.target.value); } }}
@@ -586,7 +586,7 @@ export default function VendorDetailPage() {
                         ) : (
                           <div
                             title={tx.category === 'Split' ? 'This transaction has more than one category — open it to edit.' : 'Editing the category here isn’t supported for this transaction type.'}
-                            className="flex h-8 max-w-[16rem] cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
+                            className="flex h-8 w-max min-w-[12rem] cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
                           >
                             <span className="truncate">{tx.category ?? '—'}</span>
                             <ChevronDown className="h-3.5 w-3.5 shrink-0" />
