@@ -341,6 +341,42 @@ export async function updateExpense(
   return updated;
 }
 
+/**
+ * Re-point a single-line expense (or a check-by-expense row) at a different
+ * category account — the Transaction List tab's inline Category edit. Only
+ * valid when there's exactly one line: a split has no single account to swap,
+ * same as QBO disabling inline category edit on a split line. Delegates to
+ * updateExpense for the actual write, so it gets the same in-place JE update,
+ * reconciled/void guards, and audit trail as a full edit — this just holds
+ * every other field steady and changes the one thing the caller asked for.
+ */
+export async function recategorizeExpense(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { id: string; category_account_id: string },
+) {
+  const bizId = ctx.business_id!;
+  const expense = await trx.selectFrom('expense_transactions').selectAll()
+    .where('id', '=', input.id).where('business_id', '=', bizId).executeTakeFirst();
+  if (!expense) throw new NotFoundError('expense_transaction', input.id);
+
+  const lines = await trx.selectFrom('expense_transaction_lines').selectAll()
+    .where('expense_transaction_id', '=', input.id).orderBy('sort_order', 'asc').execute();
+  if (lines.length !== 1) {
+    throw new PreconditionError('This transaction has more than one category line — open it to edit a split.');
+  }
+
+  return updateExpense(trx, ctx, input.id, {
+    transaction_date: expense.transaction_date,
+    payee_text: expense.payee_text,
+    vendor_id: expense.vendor_id,
+    customer_id: expense.customer_id,
+    payment_account_id: expense.payment_account_id,
+    payment_method: expense.payment_method,
+    reference: expense.reference,
+    memo: expense.memo,
+    lines: [{ category_account_id: input.category_account_id, description: lines[0]!.description, amount: lines[0]!.amount }],
+  });
+}
+
 export async function voidExpense(
   trx: Transaction<DB>,
   ctx: ServiceCtx,

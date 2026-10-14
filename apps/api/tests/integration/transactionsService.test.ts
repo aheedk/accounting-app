@@ -187,4 +187,40 @@ describe('transactionsService.listTransactions', () => {
     expect(byAmountLte.total).toBe(1);
     expect(byAmountLte.rows[0]?.total_amount).toBe('60.0000');
   });
+
+  it('category is the single line account name, or Split across more than one, or null where the concept does not apply', async () => {
+    const { ctx, biz, expenseAcct, bankAccount, vendor } = await bootstrap();
+    const travelAcct = await makeAccount(t.db, biz.id, { name: 'Travel', account_type: 'expense' });
+
+    const singleLine = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+      transaction_date: '2026-04-02',
+      vendor_id: vendor.id,
+      payment_account_id: bankAccount.cash_account_id,
+      payment_method: 'ach',
+      lines: [{ category_account_id: expenseAcct.id, amount: '80.00' }],
+    }));
+
+    const splitLines = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, ctx, {
+      transaction_date: '2026-04-03',
+      vendor_id: vendor.id,
+      payment_account_id: bankAccount.cash_account_id,
+      payment_method: 'ach',
+      lines: [
+        { category_account_id: expenseAcct.id, amount: '30.00' },
+        { category_account_id: travelAcct.id, amount: '20.00' },
+      ],
+    }));
+
+    const deposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, ctx, {
+      deposit_date: '2026-04-01',
+      bank_account_id: bankAccount.id,
+      lines: [{ line_type: 'other_funds', account_id: expenseAcct.id, received_from: 'Walk-in', amount: '10.00' }],
+    }));
+
+    const { rows } = await listTransactions(t.db, { business_id: biz.id, limit: 50, offset: 0 });
+    const byId = new Map(rows.map(r => [r.id, r]));
+    expect(byId.get(singleLine.id)?.category).toBe('Office Supplies');
+    expect(byId.get(splitLines.id)?.category).toBe('Split');
+    expect(byId.get(deposit.id)?.category).toBeNull();
+  });
 });

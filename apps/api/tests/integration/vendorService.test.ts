@@ -4,6 +4,8 @@ import { makeFirm, makeBusiness, makeUser, makeVendor, seedCoa, seedYearPeriods 
 import * as vend from '../../src/services/ap/vendorService.js';
 import * as expenses from '../../src/services/ap/expenseTransactionService.js';
 import * as billSvc from '../../src/services/ap/billService.js';
+import * as paymentSvc from '../../src/services/ap/billPaymentService.js';
+import * as vendorCreditSvc from '../../src/services/ap/vendorCreditService.js';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
@@ -24,7 +26,7 @@ describe('vendorService', () => {
     const biz = await makeBusiness(t.db, firm.id);
     const user = await makeUser(t.db, firm.id, { role: 'accountant' });
     const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
-    return { firm, biz, ctx };
+    return { firm, biz, user, ctx };
   }
 
   async function setupWithCoa() {
@@ -148,5 +150,136 @@ describe('vendorService', () => {
     expect(await vend.listVendors(t.db, biz.id)).toHaveLength(1);
     await t.db.selectFrom('audit_logs').selectAll()
       .where('entity_id', '=', v.id).where('action', '=', AUDIT.VENDOR_REACTIVATE).executeTakeFirstOrThrow();
+  });
+
+  it('open_balance nets outstanding bills against this vendor\'s own unused credit, not just the bill total', async () => {
+    const { biz, ctx, cash, expense } = await setupWithCoa();
+    const vendor = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Supply' }));
+
+    // A $500 posted bill, partially paid $200 (still outstanding $300).
+    const billDraft = await t.db.transaction().execute(trx =>
+      billSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id,
+        bill_number: 'BILL-500', bill_date: '2026-04-15', due_date: '2026-05-15',
+        memo: null, terms: null,
+        lines: [{ description: 'Item', quantity: '1', unit_price: '500.0000', expense_account_id: expense.id }],
+      }));
+    const bill = await t.db.transaction().execute(trx => billSvc.postBill(trx, ctx, { bill_id: billDraft.bill.id }));
+
+    // A $250 payment, $200 of it applied to the bill above — $50 left unapplied.
+    const paymentDraft = await t.db.transaction().execute(trx =>
+      paymentSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id, payment_date: '2026-04-20',
+        payment_method: 'check', reference: 'check-1', amount: '250.0000',
+        cash_account_id: cash.id, memo: null,
+        initial_applications: [{ bill_id: bill.id, applied_amount: '200.0000' }],
+      }));
+    await t.db.transaction().execute(trx => paymentSvc.postBillPayment(trx, ctx, { bill_payment_id: paymentDraft.bill_payment.id }));
+
+    // A $75 vendor credit, not applied to anything.
+    const creditDraft = await t.db.transaction().execute(trx =>
+      vendorCreditSvc.createDraft(trx, ctx, {
+        business_id: biz.id, vendor_id: vendor.id, credit_date: '2026-04-22',
+        amount: '75.0000', offset_account_id: expense.id, memo: null,
+      }));
+    await t.db.transaction().execute(trx => vendorCreditSvc.postVendorCredit(trx, ctx, { vendor_credit_id: creditDraft.id }));
+
+    // 500 - 200 applied = 300 outstanding; less the $75 unused credit and the $50 unapplied payment = 175.
+    const [row] = await vend.listVendors(t.db, biz.id);
+    expect(row!.open_balance).toBe('175.0000');
+  });
+
+  it('addVendorNote records a timestamped note with its author, newest first', async () => {
+    const { biz, ctx, user } = await setup();
+    const vendor = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme' }));
+
+    await t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendor.id, note_text: 'Called about a late bill' }));
+    await t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendor.id, note_text: 'Confirmed new remit-to address' }));
+
+    const notes = await vend.listVendorNotes(t.db, biz.id, vendor.id);
+    expect(notes).toHaveLength(2);
+    expect(notes[0]!.note_text).toBe('Confirmed new remit-to address');
+    expect(notes[1]!.note_text).toBe('Called about a late bill');
+    expect(notes[0]!.author_name).toBe(user.full_name);
+  });
+
+  it('mergeVendors moves every reassignable record onto the survivor and deletes the merged-away vendor', async () => {
+    const { biz, ctx, cash, expense } = await setupWithCoa();
+    const vendorA = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Co' }));
+    const vendorB = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Company' }));
+
+    await t.db.transaction().execute(trx => expenses.createExpense(trx, ctx, {
+      transaction_date: '2026-04-15', vendor_id: vendorA.id,
+      payment_account_id: cash.id, payment_method: 'cash',
+      lines: [{ category_account_id: expense.id, amount: '40.00' }],
+    }));
+    const billDraft = await t.db.transaction().execute(trx => billSvc.createDraft(trx, ctx, {
+      business_id: biz.id, vendor_id: vendorA.id,
+      bill_number: 'BILL-900', bill_date: '2026-04-15', due_date: '2026-05-15',
+      memo: null, terms: null,
+      lines: [{ description: 'Item', quantity: '1', unit_price: '100.0000', expense_account_id: expense.id }],
+    }));
+    await t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendorA.id, note_text: 'Called them Tuesday' }));
+
+    const survivor = await t.db.transaction().execute(trx =>
+      vend.mergeVendors(trx, ctx, { from_vendor_id: vendorA.id, into_vendor_id: vendorB.id }),
+    );
+    expect(survivor.id).toBe(vendorB.id);
+
+    // vendorA is gone entirely.
+    const gone = await t.db.selectFrom('vendors').select('id').where('id', '=', vendorA.id).executeTakeFirst();
+    expect(gone).toBeUndefined();
+
+    // Everything that pointed at vendorA now points at vendorB.
+    const expenseRows = await t.db.selectFrom('expense_transactions').select('vendor_id').where('business_id', '=', biz.id).execute();
+    expect(expenseRows.every(r => r.vendor_id === vendorB.id)).toBe(true);
+    const billRow = await t.db.selectFrom('bills').select('vendor_id').where('id', '=', billDraft.bill.id).executeTakeFirstOrThrow();
+    expect(billRow.vendor_id).toBe(vendorB.id);
+    const notes = await vend.listVendorNotes(t.db, biz.id, vendorB.id);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.note_text).toBe('Called them Tuesday');
+
+    const auditLog = await t.db.selectFrom('audit_logs').selectAll()
+      .where('action', '=', AUDIT.VENDOR_MERGE).where('entity_id', '=', vendorB.id).executeTakeFirstOrThrow();
+    const before = (typeof auditLog.before_state === 'string' ? JSON.parse(auditLog.before_state) : auditLog.before_state) as { id: string; name: string };
+    expect(before.id).toBe(vendorA.id);
+    expect(before.name).toBe('Acme Co');
+  });
+
+  it('mergeVendors refuses when both vendors have a different tax id on file', async () => {
+    const { biz, ctx } = await setup();
+    const vendorA = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, {
+      business_id: biz.id, name: 'Acme Co', tax_id: '12-3456789', tax_id_type: 'EIN',
+    }));
+    const vendorB = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, {
+      business_id: biz.id, name: 'Acme Company', tax_id: '98-7654321', tax_id_type: 'EIN',
+    }));
+
+    await expect(
+      t.db.transaction().execute(trx => vend.mergeVendors(trx, ctx, { from_vendor_id: vendorA.id, into_vendor_id: vendorB.id })),
+    ).rejects.toMatchObject({ code: ERR.PRECONDITION_FAILED });
+  });
+
+  it('mergeVendors allows a matching tax id, and allows one side having none at all', async () => {
+    const { biz, ctx } = await setup();
+    const vendorA = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, {
+      business_id: biz.id, name: 'Acme Co', tax_id: '12-3456789', tax_id_type: 'EIN',
+    }));
+    const vendorB = await t.db.transaction().execute(trx => vend.createVendor(trx, ctx, { business_id: biz.id, name: 'Acme Company' }));
+
+    const survivor = await t.db.transaction().execute(trx =>
+      vend.mergeVendors(trx, ctx, { from_vendor_id: vendorA.id, into_vendor_id: vendorB.id }),
+    );
+    expect(survivor.id).toBe(vendorB.id);
+  });
+
+  it('addVendorNote refuses a vendor from another business', async () => {
+    const { ctx } = await setup();
+    const other = await setup();
+    const vendor = await t.db.transaction().execute(trx => vend.createVendor(trx, other.ctx, { business_id: other.biz.id, name: 'Acme' }));
+
+    await expect(
+      t.db.transaction().execute(trx => vend.addVendorNote(trx, ctx, { vendor_id: vendor.id, note_text: 'x' })),
+    ).rejects.toMatchObject({ code: ERR.NOT_FOUND });
   });
 });

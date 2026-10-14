@@ -1,4 +1,4 @@
-import { Kysely, type Transaction } from 'kysely';
+import { Kysely, sql, type Transaction } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
@@ -234,13 +234,133 @@ export async function deleteVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
   await auditRecord(trx, ctx, { action: AUDIT.VENDOR_DELETE, entity_type: 'vendor', entity_id: input.vendor_id, before, after: null });
 }
 
+/**
+ * Merge `from_vendor_id` into `into_vendor_id`: every record that points at
+ * the "from" vendor is repointed at the "into" vendor, then the "from"
+ * vendor is permanently deleted. The surviving vendor keeps its own id, name
+ * and settings untouched — only the other side's history moves over.
+ *
+ * Every table with a real FK to vendors gets reassigned: expense_transactions,
+ * checks (payee_id, vendor payees only), bills, bill_payments, vendor_credits,
+ * purchase_orders, vendor_notes. journal_entry_lines carries no vendor
+ * reference of its own (a JE's "contact" is read off its source document, via
+ * the unified transactions query) and bank_deposit_lines.received_from is
+ * free text, not a vendor_id — so neither needs a reassignment pass; moving
+ * the source documents already carries the JE's and the deposit line's vendor
+ * association along with them.
+ *
+ * Conflict rule: QBO refuses a merge across a currency or tax id mismatch.
+ * This app has no per-vendor currency at all (single-currency books), so
+ * that half never applies here; a tax id set on both sides that doesn't
+ * match is the one real conflict, checked by decrypting both.
+ */
+export async function mergeVendors(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { from_vendor_id: string; into_vendor_id: string },
+) {
+  const bizId = ctx.business_id!;
+  if (input.from_vendor_id === input.into_vendor_id) {
+    throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'Pick a different vendor to merge into');
+  }
+
+  const [from, into] = await Promise.all([
+    trx.selectFrom('vendors').selectAll().where('id', '=', input.from_vendor_id).where('business_id', '=', bizId).executeTakeFirst(),
+    trx.selectFrom('vendors').selectAll().where('id', '=', input.into_vendor_id).where('business_id', '=', bizId).executeTakeFirst(),
+  ]);
+  if (!from) throw new NotFoundError('vendor', input.from_vendor_id);
+  if (!into) throw new NotFoundError('vendor', input.into_vendor_id);
+
+  if (from.tax_id_encrypted && into.tax_id_encrypted) {
+    const fromTaxId = decryptField(Buffer.from(from.tax_id_encrypted));
+    const intoTaxId = decryptField(Buffer.from(into.tax_id_encrypted));
+    if (fromTaxId !== intoTaxId) {
+      throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'These vendors have different tax IDs on file and cannot be merged.');
+    }
+  }
+
+  await trx.updateTable('expense_transactions').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('checks').set({ payee_id: input.into_vendor_id })
+    .where('payee_id', '=', input.from_vendor_id).where('payee_type', '=', 'vendor').where('business_id', '=', bizId).execute();
+  await trx.updateTable('bills').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('bill_payments').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('vendor_credits').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('purchase_orders').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+  await trx.updateTable('vendor_notes').set({ vendor_id: input.into_vendor_id })
+    .where('vendor_id', '=', input.from_vendor_id).where('business_id', '=', bizId).execute();
+
+  await trx.deleteFrom('vendors').where('id', '=', input.from_vendor_id).execute();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.VENDOR_MERGE,
+    entity_type: 'vendor',
+    entity_id: input.into_vendor_id,
+    // Full snapshot of the deleted vendor, as required: it no longer exists
+    // anywhere else once this commits.
+    before: from,
+    // The audit row itself already carries who and when (user_id, created_at)
+    // — this just names both vendors in the one place a reader can't get that
+    // from the id alone, since "from" is gone after this commits.
+    after: {
+      summary: `Vendor "${from.name}" merged into Vendor "${into.name}"`,
+      merged_from_vendor_id: input.from_vendor_id,
+      merged_from_name: from.name,
+      merged_into_vendor_id: input.into_vendor_id,
+      merged_into_name: into.name,
+    },
+  });
+
+  return trx.selectFrom('vendors').selectAll().where('id', '=', input.into_vendor_id).executeTakeFirstOrThrow();
+}
+
+/**
+ * Open balance = outstanding posted bills (net of what's already applied to
+ * them) minus this vendor's own unused credit: vendor credits not yet
+ * applied, and bill payments with money left over unapplied. Same shape as
+ * apOverviewService's business-wide net_payable_total, just grouped per
+ * vendor instead of summed across all of them — a vendor with more credit
+ * than it owes reads as a negative balance, same as QuickBooks.
+ */
 export async function listVendors(
   db: Kysely<DB>, business_id: string, opts: { includeInactive?: boolean } = {},
 ) {
-  let q = db.selectFrom('vendors').selectAll()
-    .where('business_id', '=', business_id).where('deleted_at', 'is', null);
-  if (!opts.includeInactive) q = q.where('is_active', '=', true);
-  return q.orderBy('name').execute();
+  let q = db.selectFrom('vendors as v')
+    .selectAll('v')
+    .select(eb => [
+      eb.selectFrom('bills as b')
+        .leftJoin(
+          eb2 => eb2.selectFrom('bill_payment_applications')
+            .select(['bill_id', ({ fn }) => fn.sum<string>('applied_amount').as('applied')])
+            .groupBy('bill_id')
+            .as('p'),
+          join => join.onRef('p.bill_id', '=', 'b.id'),
+        )
+        .select(({ fn }) => fn.coalesce(fn.sum<string>(sql<string>`b.total - COALESCE(p.applied, 0)`), sql.lit('0')).as('v'))
+        .whereRef('b.vendor_id', '=', 'v.id')
+        .where('b.status', '=', 'posted')
+        .where('b.deleted_at', 'is', null)
+        .as('outstanding_bills'),
+      eb.selectFrom('vendor_credits')
+        .select(({ fn }) => fn.coalesce(fn.sum<string>('remaining_amount'), sql.lit('0')).as('v'))
+        .whereRef('vendor_id', '=', 'v.id')
+        .where('status', 'in', ['posted', 'applied'])
+        .as('unused_credits'),
+      eb.selectFrom('bill_payments')
+        .select(({ fn }) => fn.coalesce(fn.sum<string>('unapplied_amount'), sql.lit('0')).as('v'))
+        .whereRef('vendor_id', '=', 'v.id')
+        .where('status', '=', 'posted')
+        .as('unapplied_payments'),
+    ])
+    .where('v.business_id', '=', business_id).where('v.deleted_at', 'is', null);
+  if (!opts.includeInactive) q = q.where('v.is_active', '=', true);
+  const rows = await q.orderBy('v.name').execute();
+  return rows.map(({ outstanding_bills, unused_credits, unapplied_payments, ...v }) => ({
+    ...v,
+    open_balance: (Number(outstanding_bills) - Number(unused_credits) - Number(unapplied_payments)).toFixed(4),
+  }));
 }
 
 export async function getVendor(db: Kysely<DB>, business_id: string, vendor_id: string) {
@@ -273,4 +393,40 @@ export async function listContractors(db: Kysely<DB>, business_id: string) {
     .where('business_id', '=', business_id).where('deleted_at', 'is', null)
     .where('is_1099', '=', true)
     .orderBy('name').execute();
+}
+
+export async function listVendorNotes(db: Kysely<DB>, business_id: string, vendor_id: string) {
+  const rows = await db.selectFrom('vendor_notes as n')
+    .innerJoin('users as u', 'u.id', 'n.user_id')
+    .select(['n.id', 'n.note_text', 'n.created_at', 'n.user_id', 'u.full_name as author_name'])
+    .where('n.business_id', '=', business_id)
+    .where('n.vendor_id', '=', vendor_id)
+    .orderBy('n.created_at', 'desc')
+    .execute();
+  return rows;
+}
+
+export async function addVendorNote(
+  trx: Transaction<DB>, ctx: ServiceCtx, input: { vendor_id: string; note_text: string },
+) {
+  const vendor = await trx.selectFrom('vendors').select('id')
+    .where('id', '=', input.vendor_id).where('business_id', '=', ctx.business_id ?? '').where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  if (!vendor) throw new NotFoundError('vendor', input.vendor_id);
+
+  const row = await trx.insertInto('vendor_notes').values({
+    business_id: ctx.business_id ?? '',
+    vendor_id: input.vendor_id,
+    user_id: ctx.user_id,
+    note_text: input.note_text,
+  }).returningAll().executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.VENDOR_NOTE_CREATE,
+    entity_type: 'vendor',
+    entity_id: input.vendor_id,
+    before: null,
+    after: row,
+  });
+  return row;
 }

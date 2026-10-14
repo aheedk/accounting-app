@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import VendorDetailPage from './VendorDetailPage';
@@ -24,6 +24,21 @@ vi.mock('@/auth/useAuth', () => ({
 
 vi.mock('@/lib/apiClient', () => ({
   api: { get: apiGet, delete: apiDelete },
+}));
+
+// The Radix menu does not open under jsdom (it hangs), so its items render in place.
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div role="menu">{children}</div>,
+  DropdownMenuSeparator: () => <hr />,
+  DropdownMenuItem: ({ children, disabled, title, onSelect }: {
+    children: ReactNode; disabled?: boolean; title?: string; onSelect?: () => void; className?: string;
+  }) => (
+    <div role="menuitem" aria-disabled={disabled ? 'true' : undefined} title={title} onClick={() => { if (!disabled) onSelect?.(); }}>
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('react-router-dom', async importOriginal => {
@@ -88,15 +103,21 @@ describe('VendorDetailPage', () => {
     await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   }
 
-  function deleteButton() {
-    return Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Delete') as HTMLButtonElement;
+  // Delete sits in the "More vendor actions" menu.
+  async function deleteItem() {
+    return Array.from(container.querySelectorAll('[role="menuitem"]')).find(i => i.textContent === 'Delete') as HTMLElement;
+  }
+
+  function isDisabled(item: HTMLElement) {
+    return item.getAttribute('aria-disabled') === 'true';
   }
 
   it('deletes a vendor with no transactions and returns to the vendor list', async () => {
     await render();
-    expect(deleteButton().disabled).toBe(false);
+    const item = await deleteItem();
+    expect(isDisabled(item)).toBe(false);
 
-    await click(deleteButton());
+    await click(item);
 
     expect(window.confirm).toHaveBeenCalledWith('Permanently delete Clean Vendor? This cannot be undone.');
     expect(apiDelete).toHaveBeenCalledWith('/businesses/44444444-4444-4444-8444-444444444444/vendors/v2');
@@ -105,25 +126,27 @@ describe('VendorDetailPage', () => {
 
   it('grays out Delete with an explanatory title when the vendor has transactions', async () => {
     await render(vendor({ has_transactions: true }));
+    const item = await deleteItem();
 
-    expect(deleteButton().disabled).toBe(true);
-    expect(deleteButton().title).toMatch(/existing transactions/i);
+    expect(isDisabled(item)).toBe(true);
+    expect(item.title).toMatch(/existing transactions/i);
     expect(apiDelete).not.toHaveBeenCalled();
   });
 
   it('requires firm_admin: an accountant sees Delete disabled', async () => {
     authRole = 'accountant';
     await render();
+    const item = await deleteItem();
 
-    expect(deleteButton().disabled).toBe(true);
-    expect(deleteButton().title).toMatch(/firm admin/i);
+    expect(isDisabled(item)).toBe(true);
+    expect(item.title).toMatch(/firm admin/i);
   });
 
   it('shows the 409 error inline without navigating away on failure', async () => {
     apiDelete.mockRejectedValue({ response: { data: { error: { message: 'Cannot delete — vendor has existing transactions. Use "Make inactive" instead.' } } } });
     await render();
 
-    await click(deleteButton());
+    await click(await deleteItem());
 
     expect(container.textContent).toContain('Cannot delete — vendor has existing transactions');
     expect(navigate).not.toHaveBeenCalled();
@@ -203,18 +226,20 @@ describe('VendorDetailPage', () => {
     expect(Array.from(container.querySelectorAll('a')).find(a => a.textContent?.includes('Other Vendor'))).toBeUndefined();
   });
 
-  it('sorts the sidebar by open balance, taken from A/P aging', async () => {
+  it('sorts the sidebar by open balance, taken from the vendor list', async () => {
     apiGet.mockImplementation((url: string) => {
       if (url.endsWith('/vendors/v2')) return Promise.resolve({ data: vendor() });
       if (url.endsWith('/vendors')) {
         return Promise.resolve({
-          data: { vendors: [{ id: 'v2', name: 'Clean Vendor', is_active: true }, { id: 'v3', name: 'Other Vendor', is_active: true }] },
+          data: {
+            vendors: [
+              { id: 'v2', name: 'Clean Vendor', is_active: true, open_balance: '50.0000' },
+              { id: 'v3', name: 'Other Vendor', is_active: true, open_balance: '500.0000' },
+            ],
+          },
         });
       }
       if (url.endsWith('/bills')) return Promise.resolve({ data: { bills: [] } });
-      if (url.endsWith('/reports/ap-aging')) {
-        return Promise.resolve({ data: { rows: [{ id: 'v2', total: '50.0000' }, { id: 'v3', total: '500.0000' }] } });
-      }
       if (url.endsWith('/coa')) return Promise.resolve({ data: { accounts: [] } });
       if (url.endsWith('/transactions')) return Promise.resolve({ data: { transactions: [], total: 0 } });
       return Promise.resolve({ data: {} });
@@ -236,7 +261,6 @@ describe('VendorDetailPage', () => {
     const otherIdx = names.findIndex(t => t.includes('Other Vendor'));
     const cleanIdx = names.findIndex(t => t.includes('Clean Vendor'));
     // Other Vendor is owed 500, Clean Vendor 50, so Other sorts first.
-    expect(apiGet.mock.calls.some(([url]) => String(url).endsWith('/reports/ap-aging'))).toBe(true);
     expect(otherIdx).toBeGreaterThanOrEqual(0);
     expect(otherIdx).toBeLessThan(cleanIdx);
   });

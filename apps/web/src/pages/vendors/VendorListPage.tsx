@@ -13,7 +13,7 @@ import { MoneyBar } from '@/components/ui/MoneyBar';
 import { fmtMoney } from '@/lib/money';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
 import { daysAgoLocal, todayLocal } from '@/lib/dates';
-import { billOpenAmount, vendorOpenBalances, type VendorAgingRow } from '@/lib/vendorBalances';
+import { billOpenAmount } from '@/lib/vendorBalances';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { printReport } from '@/lib/reportExport';
 import { pickErr } from '@/lib/apiErrors';
@@ -31,6 +31,10 @@ const IMPORT_COLS = [
 type Vendor = {
   id: string; name: string; email: string | null; phone: string | null;
   default_terms_days: number; is_1099: boolean; is_active: boolean; has_transactions: boolean;
+  // Outstanding posted bills net of payments applied to them, less this
+  // vendor's own unused credit (unapplied vendor credits and bill-payment
+  // leftover) — computed server-side (vendorService.listVendors).
+  open_balance: string;
 };
 type Bill = { id: string; vendor_id: string; bill_date: string; due_date: string; status: string; total: string; open_balance?: string | null };
 
@@ -43,8 +47,6 @@ export default function VendorListPage() {
   const [items, setItems] = useState<Vendor[]>([]);
   const [excelBusy, setExcelBusy] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
-  // Each vendor's open balance, from A/P aging so it agrees with the ledger.
-  const [balances, setBalances] = useState<ReadonlyMap<string, number>>(new Map());
   const [showInactive, setShowInactive] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchOpen, setBatchOpen] = useState(false);
@@ -61,12 +63,6 @@ export default function VendorListPage() {
   }
   useEffect(() => { reload(); }, [bizId, showInactive]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setBills(r.data.bills)); }, [bizId]);
-  useEffect(() => {
-    if (!bizId) return;
-    api.get<{ rows: VendorAgingRow[] }>(`/businesses/${bizId}/reports/ap-aging`)
-      .then(r => setBalances(vendorOpenBalances(r.data.rows ?? [])))
-      .catch(() => setBalances(new Map()));
-  }, [bizId]);
 
   const today = todayLocal();
   const yearAgo = daysAgoLocal(365);
@@ -86,11 +82,8 @@ export default function VendorListPage() {
     return { overdue, overdueCount, open, openCount, paid, paidCount };
   }, [bills, today, yearAgo]);
 
-  type Row = Vendor & { open_balance: number };
-  const rows: Row[] = useMemo(
-    () => items.map(v => ({ ...v, open_balance: balances.get(v.id) ?? 0 })),
-    [items, balances],
-  );
+  type Row = Vendor;
+  const rows: Row[] = items;
 
   const columns: Column<Row>[] = [
     {
@@ -116,7 +109,7 @@ export default function VendorListPage() {
         ? <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-link">Yes</span>
         : <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">No</span>,
     },
-    { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => r.open_balance, render: r => <span className="font-mono">{fmtMoney(String(r.open_balance))}</span> },
+    { key: 'open_balance', header: 'Open balance', sortable: true, align: 'right', sortValue: r => Number(r.open_balance), render: r => <span className="font-mono">{fmtMoney(r.open_balance)}</span> },
   ];
 
   async function importRow(row: Record<string, string>) {

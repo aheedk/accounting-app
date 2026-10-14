@@ -24,8 +24,8 @@ each one works.
   and a bank account with a few checks already written on it.
 - For step 22, use a company with transactions in **two years** (last year and
   this one), or post a couple of dated last year.
-- Run `npm run db:migrate` first. Riham's merge added migrations `0098` and
-  `0099`; without them her reconcile and phone changes fail.
+- Run `npm run db:migrate` first. Riham's merges added migrations `0098` to
+  `0100`; without them her reconcile, phone and vendor notes changes fail.
 
 ## Top bar and sidebar
 
@@ -154,8 +154,9 @@ on a bank deposit (50), editing a saved check changes it in place with no void
 ## Vendor balances and long lists (10-10 item 41)
 
 - [ ] **24. Open balance is what is owed.** Pay part of a bill. Vendors list:
-  that vendor's Open balance drops by the amount paid, and matches the A/P Aging
-  report. Before, it was the sum of the bill totals, paid or not.
+  that vendor's Open balance drops by the amount paid. Add a vendor credit or
+  pay more than a bill: that comes off too. The vendor page and its side list
+  show the same figure. Before, it was the sum of the bill totals, paid or not.
 - [ ] **25. Lists past 50.** In a company with more than 50 bills or invoices,
   the Bills and Invoices lists, and the vendor and customer pages, show all of
   them. Before, they stopped at the newest 50 without saying so.

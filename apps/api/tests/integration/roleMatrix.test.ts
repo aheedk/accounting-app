@@ -57,8 +57,10 @@ const STAFF_MAY_WRITE = [
   'POST ~/messages',
   'POST ~/messages/read',
   'PATCH ~/checks/:id',
+  'PATCH ~/checks/:id/category',
   'PATCH ~/custom-reports/:id',
   'PATCH ~/expense-transactions/:id',
+  'PATCH ~/expense-transactions/:id/category',
   'PATCH ~/fixed-assets/:id',
   'PATCH ~/inventory-items/:id',
   'PATCH ~/receipts/:id/link',
@@ -98,6 +100,7 @@ const STAFF_MAY_WRITE = [
   'POST ~/sales-orders',
   'POST ~/shipping-labels',
   'POST ~/vendors',
+  'POST ~/vendors/:id/notes',
 ];
 
 // What only a firm admin may do: the firm's users and clients (adding one,
@@ -120,6 +123,7 @@ const FIRM_ADMIN_ONLY = [
   'GET /me/firm/users',
   'GET ~/employees/:id/ssn-reveal',
   'GET ~/vendors/:id/tax-id-reveal',
+  'POST ~/vendors/:id/merge',
   'PATCH /me/firm/users/:id',
   'PATCH ~',
   'PATCH ~/bank-accounts/:id',

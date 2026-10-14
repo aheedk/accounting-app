@@ -51,6 +51,24 @@ export function currentYearLocal(): number {
 }
 
 /**
+ * "This year"'s start/end for a business whose fiscal year starts in
+ * `startMonth` (1-12, from businesses.fiscal_year_start_month) — the fiscal
+ * year containing today, not the calendar year. startMonth 1 reduces to the
+ * plain calendar year, so a page that hasn't fetched the business yet can
+ * default to 1 and get today's existing calendar-year behavior unchanged.
+ * Mirrors GeneralLedgerPage's own fiscalYearStart/fiscalYearEnd, generalized
+ * so every "This year" preset in the app can share one implementation
+ * (2026-10-10 meeting, item 40) instead of each page rolling its own.
+ */
+export function fiscalYearBoundsLocal(startMonth: number, today: Date = new Date()): { start: string; end: string } {
+  const m = startMonth - 1;
+  const year = today.getMonth() >= m ? today.getFullYear() : today.getFullYear() - 1;
+  const start = new Date(year, m, 1);
+  const end = new Date(year + 1, m, 0);
+  return { start: dateToLocalIso(start), end: dateToLocalIso(end) };
+}
+
+/**
  * Tidy what a date box holds once the user leaves it (YYYY-MM-DD).
  *
  * A two-digit year means this century: typing 26 gives 2026, the way

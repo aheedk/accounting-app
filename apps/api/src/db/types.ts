@@ -387,6 +387,15 @@ export interface VendorsTable {
   deleted_at: Timestamp | null;
 }
 
+export interface VendorNotesTable {
+  id: Generated<string>;
+  business_id: string;
+  vendor_id: string;
+  user_id: string;
+  note_text: string;
+  created_at: Generated<Timestamp>;
+}
+
 export type ExpenseTransactionStatus = 'draft' | 'posted' | 'void';
 
 export interface ExpenseTransactionsTable {
@@ -1124,6 +1133,7 @@ export interface DB {
   payment_applications: PaymentApplicationsTable;
   credit_memos: CreditMemosTable;
   vendors: VendorsTable;
+  vendor_notes: VendorNotesTable;
   bills: BillsTable;
   bill_lines: BillLinesTable;
   bill_payments: BillPaymentsTable;
