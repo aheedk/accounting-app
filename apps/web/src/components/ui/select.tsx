@@ -205,7 +205,7 @@ export function AppSelect({
 
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 w-max min-w-full max-w-xs rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
+          className="absolute left-0 top-full z-50 mt-1 w-max min-w-full max-w-sm rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
         >
           <div className="flex items-center gap-2 border-b px-3 py-2">
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -252,7 +252,7 @@ export function AppSelect({
                     isActive && 'bg-accent text-accent-foreground',
                   )}
                 >
-                  <span className="flex-1 whitespace-nowrap">{opt.label}</span>
+                  <span className="flex-1 truncate">{opt.label}</span>
                   {opt.hint ? (
                     <span className="ml-2 shrink-0 text-xs italic text-muted-foreground">{opt.hint}</span>
                   ) : (
