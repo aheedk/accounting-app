@@ -11,6 +11,9 @@ mark which meeting an item first came from.
   about ten days.
 - **January 1, 2027** — planned launch to outside customers.
 
+To show what was built from this list (items 36, 37, 40, 41, 43), see steps 19
+to 27 of [`../qa/2026-10-12-faizan-video-1-demo.md`](../qa/2026-10-12-faizan-video-1-demo.md).
+
 ## What changed in this meeting
 
 - **Payroll comes out.** The firm is not doing a payroll module. A payroll

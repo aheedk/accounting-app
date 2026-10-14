@@ -1,9 +1,11 @@
-# Showing Faizan's first-video fixes — click-through
+# Showing the 10-12 and 10-13 fixes — click-through
 
-A walk through everything built from Faizan's first test video, in the order
-that is easiest to show. The item numbers are the ones in
-[`../meetings/2026-10-12-faizan-video-1.md`](../meetings/2026-10-12-faizan-video-1.md),
-which has the status of every item and the reasons behind each change.
+A walk through everything built from Faizan's first test video (steps 1 to 18)
+and from the 10-10 meeting's follow-ups (steps 19 to 27), in the order that is
+easiest to show. The item numbers are the ones in
+[`../meetings/2026-10-12-faizan-video-1.md`](../meetings/2026-10-12-faizan-video-1.md)
+and [`../meetings/2026-10-10-follow-ups.md`](../meetings/2026-10-10-follow-ups.md),
+which have the status of every item and the reasons behind each change.
 
 **None of this has been clicked through in a browser yet.** Run the whole list
 once yourself before showing it; it doubles as the test pass. Tick the box as
@@ -18,6 +20,12 @@ each one works.
   (step 16). An account with no detail type lands under Other Current Assets or
   Other Current Liabilities on the Balance Sheet.
 - Have one posted journal entry ready to reverse (step 12).
+- For steps 19 to 21, have two or three open bills from **different vendors**,
+  and a bank account with a few checks already written on it.
+- For step 22, use a company with transactions in **two years** (last year and
+  this one), or post a couple of dated last year.
+- Run `npm run db:migrate` first. Riham's merge added migrations `0098` and
+  `0099`; without them her reconcile and phone changes fail.
 
 ## Top bar and sidebar
 
@@ -103,9 +111,72 @@ on a bank deposit (50), editing a saved check changes it in place with no void
   page. Print or export the Balance Sheet and Profit & Loss: there is no Section
   column; each section is a heading row.
 
+## Paying bills by check (10-10 item 36)
+
+- [ ] **19. Numbered checks.** Accounts Payable → Pay Bills. Tick bills from two
+  or three vendors, set the method to Check. "Starting check no." is filled in
+  with the bank's next number (one after the highest check written on it, from
+  Check, Expense or an earlier bill payment). Pay. A panel lists one check per
+  vendor, numbered in a row from the starting number, vendors in name order.
+- [ ] **20. Print them.** In that panel, "Print on check stock" opens a PDF with
+  one check per page, laid out as a QuickBooks voucher check: check on top, two
+  stubs below listing the bills paid. "Print on plain paper" is the same checks
+  with labels and lines, for a test print. "Done" closes the panel.
+- [ ] **21. Print again later.** Pay Bills → Past payments, open one of the
+  payments just made. It shows "Check no." and the same two print buttons. A
+  check from + New → Check also has "Print on check stock".
+  *Not checked yet:* the positions are the standard voucher layout, not measured
+  against the firm's own check stock. Print one on plain paper, hold it over a
+  blank check, and see that the date, payee, amount and signature line fall in
+  the right places before printing real checks.
+
+## Year end (10-10 item 37)
+
+- [ ] **22. Trial Balance and General Ledger start a new year.** Reports → Trial
+  Balance, dated this year. Income and expense accounts show this fiscal year
+  only; last year's profit is in Retained Earnings, and a note under the table
+  says so with the amount. Debits still equal credits, and Retained Earnings
+  matches the Balance Sheet. Click an income account: its ledger starts at the
+  first day of the fiscal year. Nothing is posted to make this happen, the same
+  as QuickBooks; ask Faizan whether that is enough or he wants a closing entry.
+
+## "This year" is the client's fiscal year (10-10 item 40)
+
+- [ ] **23.** Setup → Entity, set "Fiscal year starts" to July and save. Then:
+  Accounting → Transactions with "This year" runs July 1 to June 30. So do the
+  "This year" filters on Bills, Bill Payments, Payments, Credit Memos, Vendor
+  Credits, Banking transactions and Reconcile history. Profit & Loss, Statement
+  of Cash Flows, Cash Activity and Customer Statement open on July 1. The
+  General Ledger keeps both: "This Year" is still the calendar year, and "This
+  Fiscal Year" is July to June. Set it back
+  to January afterwards.
+
+## Vendor balances and long lists (10-10 item 41)
+
+- [ ] **24. Open balance is what is owed.** Pay part of a bill. Vendors list:
+  that vendor's Open balance drops by the amount paid, and matches the A/P Aging
+  report. Before, it was the sum of the bill totals, paid or not.
+- [ ] **25. Lists past 50.** In a company with more than 50 bills or invoices,
+  the Bills and Invoices lists, and the vendor and customer pages, show all of
+  them. Before, they stopped at the newest 50 without saying so.
+
+## Behind the scenes (nothing to click)
+
+- [ ] **26. Backups (10-10 item 43).** `npm run db:backup` copies the database
+  to `backups/`; `npm run db:backup:verify` restores that copy into a throwaway
+  database and counts every table's rows. Tried against a test database only.
+  Running it once against production, and checking what Railway keeps by
+  itself, is in [`../guides/backups.md`](../guides/backups.md).
+- [ ] **27. Staff and imported bank lines.** A staff login is refused if it tries
+  to edit an imported bank transaction, in the service as well as the route.
+  Nothing showed this before, because the route already refused staff.
+
 ## Not ready to show
 
 - **Gear icon (56).** Waiting on Faizan to say which page.
 - **"No client selected" (68).** The client list is there (step 1); a top bar and
   sidebar with no client chosen need a sketch first.
 - **My Menu.** For discussion at the next meeting, not built or removed.
+- **Check stock fit (36).** Step 21: the layout has not been lined up against
+  the firm's checks. Faizan's own check PDF and stubs (item 34) are still to come.
+- **Closing entry (37).** Only if Faizan asks for a posted one; see step 22.
