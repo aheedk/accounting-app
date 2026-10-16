@@ -7,10 +7,11 @@ to run the app.
 |---|---|
 | [`backlog.md`](./backlog.md) | Open work that is not tied to a meeting: ops tasks, polish, integrations, plus a ledger of what has shipped from it. |
 | [`meetings/`](./meetings/) | Follow-ups from team meetings — what was asked, what is done, what is open. |
+| [`demos/`](./demos/) | What to click to show the work at a meeting, one file per meeting and presenter (`YYYY-MM-DD-<who>.md`, dated by the meeting it is shown at). |
 | [`guides/`](./guides/) | How-to guides. [`running-locally.md`](./guides/running-locally.md) starts the app and covers developer gotchas; [`backups.md`](./guides/backups.md) takes a copy of the database and proves it restores. |
 | [`specs/`](./specs/) | Design specs: how a feature is meant to work and why. Named `YYYY-MM-DD-<topic>-design.md`. |
 | `plans/` | Step-by-step implementation plans for work in progress (created as needed; removed once the work ships — git history keeps them). |
-| [`qa/`](./qa/) | Testing: the full-app audit (bugs by priority), the role audit (what a client, staff, an accountant and a firm admin can each see and do), the Chart of Accounts test guide, and click-throughs for showing a batch of fixes. |
+| [`qa/`](./qa/) | Testing: the full-app audit (bugs by priority), the role audit (what a client, staff, an accountant and a firm admin can each see and do), and the Chart of Accounts test guide. |
 
 ## Specs
 
