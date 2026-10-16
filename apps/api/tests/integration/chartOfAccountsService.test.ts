@@ -3,7 +3,8 @@ import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/te
 import { makeFirm, makeBusiness, makeUser, makeAccount, makeBankAccount, seedCoa, seedYearPeriods } from '../helpers/factories.js';
 import * as coa from '../../src/services/core/chartOfAccountsService.js';
 import * as ledger from '../../src/services/core/ledgerService.js';
-import { ERR } from '@accounting/shared';
+import { ERR, DETAIL_TYPES, accountGroup } from '@accounting/shared';
+import { sql } from 'kysely';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 
 const meta = { request_id: '00000000-0000-0000-0000-000000000001', ip_address: '127.0.0.1', user_agent: 'vitest' };
@@ -34,6 +35,35 @@ describe('chartOfAccountsService', () => {
     expect(ar?.is_system).toBe(true);
     const audits = await t.db.selectFrom('audit_logs').selectAll().execute();
     expect(audits.some(a => a.action === 'coa.create')).toBe(true);
+  });
+
+  it('the starting chart gives every account a listed detail type, so it groups the QuickBooks way', async () => {
+    const { biz, ctx } = await setup(t);
+    await t.db.transaction().execute(trx => coa.seedDefaultCoa(trx, ctx, { business_id: biz.id }));
+    const accounts = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).execute();
+    const listed = new Set(Object.values(DETAIL_TYPES).flat());
+    for (const a of accounts) {
+      expect(a.detail_type, a.code).not.toBeNull();
+      // Suspense and Opening Balance Equity keep detail types of their own.
+      if (a.detail_type !== 'Suspense') expect(listed.has(a.detail_type!), `${a.code} ${a.detail_type}`).toBe(true);
+    }
+    const groupOf = (code: string) => accountGroup(accounts.find(a => a.code === code)!);
+    expect(groupOf('1020')).toBe('Bank');
+    expect(groupOf('1100')).toBe('Accounts receivable (A/R)');
+    expect(groupOf('1500')).toBe('Fixed Assets');
+    expect(groupOf('2010')).toBe('Accounts payable (A/P)');
+    expect(groupOf('2500')).toBe('Long Term Liabilities');
+  });
+
+  it('fills in a starting-chart account only while it still is one', async () => {
+    const detailOf = async (code: string, name: string, type: string, key: string | null) =>
+      (await sql<{ d: string | null }>`SELECT coa_default_detail_type(${code}, ${name}, ${type}, ${key}) AS d`.execute(t.db)).rows[0]!.d;
+    expect(await detailOf('1500', 'Equipment', 'asset', null)).toBe('Machinery & Equipment');
+    // Renamed or retyped by the client: theirs, not ours to guess.
+    expect(await detailOf('1500', 'Shop Tools', 'asset', null)).toBeNull();
+    expect(await detailOf('1500', 'Equipment', 'expense', null)).toBeNull();
+    // A system account is known by its key whatever it is called now.
+    expect(await detailOf('1150', 'Trade Debtors', 'asset', 'accounts_receivable')).toBe('Accounts receivable (A/R)');
   });
 
   it('createAccount creates a non-system account', async () => {

@@ -310,6 +310,28 @@ describe('autoCodingService accounting rules without detail types', () => {
     expect(result!.lines[0]!.account_id).toBe(savings.id);
   });
 
+  it('never routes an unnamed transfer to the operating account by its Checking detail type', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'Default Chart');
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = {
+      user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta,
+    };
+    // As the default chart now tags them: the account the money leaves is a Checking.
+    await makeAccount(t.db, biz.id, { code: '1010', name: 'Cash on Hand', account_type: 'asset', detail_type: 'Cash on hand' });
+    const operating = await makeAccount(t.db, biz.id, { code: '1020', name: 'Operating Bank Account', account_type: 'asset', detail_type: 'Checking' });
+    const reserve = await makeAccount(t.db, biz.id, { code: '1030', name: 'Reserve', account_type: 'asset', detail_type: 'Savings' });
+    const bank = await makeBankAccount(t.db, biz.id, operating.id, { name: 'Operating' });
+
+    const result = await autoCoding.suggestCoding(t.db, ctx, input({
+      description: 'ONLINE TRANSFER 4821',
+      amount: '2500.0000',
+      bank_account_id: bank.id,
+    }));
+    expect(result).toMatchObject({ source_layer: 'accounting_rule' });
+    expect(result!.lines[0]!.account_id).toBe(reserve.id);
+  });
+
   it('still refuses to treat an asset clearing account as a card liability', async () => {
     const { ctx, bank } = await plainSetup();
     // Drop the liability card; only an asset "clearing" account remains.

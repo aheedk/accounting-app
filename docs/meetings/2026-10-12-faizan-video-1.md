@@ -73,7 +73,10 @@ each with a subtotal. Nothing new is stored: the account type is read from the
 detail type. **An account with no detail type shows under the plainest type**
 (Other Current Assets, Other Current Liabilities) until someone sets one, so the
 test companies' charts need a pass before this looks right in a demo. The P&L
-was already grouped this way.
+was already grouped this way. **Since 10-16** the starting chart a new company
+gets carries detail types, and existing companies' starting-chart accounts were
+filled in (migration `0101`); only accounts a client added or renamed are left
+blank. On the local test companies that left 4 and 5 accounts blank, of 34 and 36.
 
 **Reverse (61).** A change in behaviour, not a fix. Reverse used to ask for a
 reason and post straight away. It now opens the entry screen as the reversal
@@ -109,11 +112,7 @@ bank type or it is set up under Banking.
 
 ## Still to do
 
-1. Give accounts detail types so the Balance Sheet groups properly. On 10-16 the
-   two local test companies had 32 and 33 accounts without one, and the default
-   chart a new company starts with (`seed_default_coa`, migration `0009`) sets
-   none, so every new client has the same problem.
-2. The "no client selected" shell for item 68, after a sketch.
+1. The "no client selected" shell for item 68, after a sketch.
 
 ## Ask Faizan
 

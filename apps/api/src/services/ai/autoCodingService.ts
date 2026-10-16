@@ -219,7 +219,9 @@ function accountingRuleSuggestion(
         : null;
       const other = (named && findAccount(accounts, { nameLike: named, accountType: 'asset' }))
         || findAccount(accounts, {
-          detailTypes: ['Checking', 'Savings', 'Money Market', 'Cash on hand'],
+          // Not Checking or Cash on hand: the operating account the money
+          // leaves carries one of those.
+          detailTypes: ['Savings', 'Money Market'],
           // Deliberately not a bare /cash/: that would grab the operating
           // account the money is leaving.
           nameLike: /savings|money\s?market|checking/i,

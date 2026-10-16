@@ -17,8 +17,8 @@ Nothing new. An account already has:
 
 The QuickBooks **account type** sits between the two ("Bank", "Fixed Assets",
 "Long Term Liabilities"). It is not stored. It is worked out from the detail
-type, so there is no migration and no second column that can disagree with the
-first.
+type, so there is no second column that can disagree with the first. (Migration
+`0101`, below, only fills in detail types on the starting chart.)
 
 ## The list
 
@@ -86,12 +86,37 @@ set up under Banking is a **Bank** account whatever its detail type says.
 - **Profit & Loss.** Already grouped by detail type into cost of goods sold,
   expenses and other expenses (`profitLossService.expenseSection`). Not changed.
 
+## The starting chart (added 10-16)
+
+The chart a new company starts with (`seed_default_coa`) gave no account a
+detail type, so every new client's Balance Sheet piled up under Other Current
+Assets and Other Current Liabilities. Migration `0101` gives each starting
+account a QuickBooks detail type (Operating Bank Account → Checking, Equipment →
+Machinery & Equipment, Notes Payable → Notes Payable and so on), held in one SQL
+function, `coa_default_detail_type`.
+
+The same migration fills in existing companies, but only where nothing is
+guessed: a blank detail type on an account that still has the code, name and
+base type it was seeded with, or a system account (known by its system key
+whatever it is called now). A detail type someone chose is never overwritten,
+and an account the client added, renamed or retyped is left blank.
+
+Two knock-on effects, both deliberate:
+
+- **Depreciation Expense** gets QuickBooks' detail type Depreciation, which sits
+  under Other Expense, so on the P&L it moves from operating expenses to other
+  expenses. Net income does not change.
+- **Auto-coding transfers.** With Operating Bank Account tagged Checking, the
+  transfer rule's detail-type lookup could pick the account the money leaves.
+  It now looks for Savings and Money Market only; a transfer whose description
+  says "checking" still finds a checking account by name, as before.
+
 ## Not done here
 
-- **Existing accounts are not rewritten.** An account with no detail type shows
-  under the fallback type until someone gives it one in the edit form. If the
-  firm wants every client's chart tidied in one go, that is a data fix per
-  client and should be reviewed by an accountant, not guessed by a migration.
+- **Accounts outside the starting chart are not rewritten.** One with no detail
+  type shows under the fallback type until someone gives it one in the edit
+  form. Tidying a client's own accounts in one go is a data fix per client, to
+  be reviewed by an accountant, not guessed by a migration.
 - **Other Income on the P&L** is not broken out from Income yet.
 - **Importing a chart** still maps type names with its own alias table in
   `CoaListPage.tsx`; its detail names predate this list.
