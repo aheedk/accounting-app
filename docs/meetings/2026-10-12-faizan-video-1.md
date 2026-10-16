@@ -9,8 +9,7 @@ check stubs he sent with the video are not covered here.
 **Status on 2026-10-12, end of day:** of the 21 items, 15 are built, 1 is partly
 built (68), 4 were fixed or in place already (50, 51, 52, 70), and 1 is waiting
 on Faizan (56). Everything built passed the
-typecheck and the web tests. The API tests added today for the Balance Sheet
-were not run (Docker was off). How to show each item is in Aheed's demo for the
+typecheck and the web tests, and the Balance Sheet API tests passed on 10-16. How to show each item is in Aheed's demo for the
 10-16 meeting, [`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md).
 
 ## Bugs — something is broken
@@ -110,9 +109,11 @@ bank type or it is set up under Banking.
 
 ## Still to do
 
-1. Start Docker and run the API tests (`balanceSheetReport.test.ts` has a new one).
-2. Give the test companies' accounts detail types so the Balance Sheet groups properly.
-3. The "no client selected" shell for item 68, after a sketch.
+1. Give accounts detail types so the Balance Sheet groups properly. On 10-16 the
+   two local test companies had 32 and 33 accounts without one, and the default
+   chart a new company starts with (`seed_default_coa`, migration `0009`) sets
+   none, so every new client has the same problem.
+2. The "no client selected" shell for item 68, after a sketch.
 
 ## Ask Faizan
 
