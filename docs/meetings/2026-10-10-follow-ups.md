@@ -117,7 +117,7 @@ is item 28.
 | 25 | Modules per client, priced separately. Now tied to the two ways of selling (firms and small businesses) and to item 46 **(10-05)** |
 | 26 | Sign in with Microsoft 365 or Google **(10-05)** |
 | 27 | One login shared with the practice management software **(10-05)** |
-| 28 | Security review and testing; a standby copy of the database; a written recovery plan. One known hole: connecting the firm's Gmail needs no sign-in **(10-05)** |
+| 28 | Security review and testing; a standby copy of the database; a written recovery plan. The one known hole, connecting the firm's Gmail with no sign-in, was closed on 10-16 (see Done) **(10-05)** |
 | 29 | Mobile app, last **(10-05)** |
 | 48 | An assistant in the corner of the app that can answer questions and do things in it. Aheed's idea; agreed as a later thing |
 | 49 | A payroll partner, if payroll is ever offered |
@@ -146,6 +146,7 @@ is item 28.
 
 | # | What | Who |
 |---|---|---|
+| 28 | The Gmail hole from the security list. Connecting the firm's Gmail needed no sign-in: anyone who could reach the API could open `/auth/gmail` and become the mailbox the AI inbox reads. Now a firm admin starts it from AI → Document Inbox → Connect Gmail (`POST /gmail/connect`), and Google's reply is taken only with a signed 10-minute hand-off from that admin; the open address is gone. Recorded in the firm's Activity Log (Sign-ins and users). The rest of item 28 stays under Later | Aheed, 10-16 |
 | 35 | Payroll is out of the sidebar, + New and search. Its pages still open by address. "Add contractor" moved under Vendors in + New. The Payroll tick box on Setup → Users is still there | Aheed, 10-12 |
 | 42 | Audit history: it did nothing on a record not saved yet, which is what happened in the demo. On Journal Entry, Bank Deposit, Expense and Check it is now grayed out until the record is saved, and says why | Aheed, 10-12 |
 | 21 | Manual bank reconciliation: a worksheet and a history page under Banking. Since widened to any balance sheet account, with a Bank Register and a Summary report. Not reviewed or tested by Aheed yet | Riham, `569350c`, `9439e46`, `e06e0ed` |
@@ -196,7 +197,6 @@ Asked on 10-05 and not answered in this meeting:
 - **Staff entries.** Should the approval step (staff entries wait for an
   accountant) be on for the firm's clients? Also: staff can add a customer but
   not edit one, and an accountant cannot add a bank account or a tax code.
-- **Who may connect the firm's Gmail.** Today anyone who can reach the API can.
 - **Inventory.** Average cost, receiving through the bill, and shrinkage to cost
   of goods sold were chosen without the firm.
 - **Correcting a posted invoice** gives it a new number (INV-1042-R1).
@@ -207,7 +207,8 @@ Asked on 10-05 and not answered in this meeting:
   balance summaries, sales by customer, expenses by vendor.
 
 Answered in this meeting, and now items above: payroll and pay stubs (35),
-email from the app (47), what each role may do (46, in part).
+email from the app (47), what each role may do (46, in part). Who may connect
+the firm's Gmail was settled as a firm admin and built on 10-16 (28, in Done).
 
 ## Unclear
 

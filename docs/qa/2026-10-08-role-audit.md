@@ -67,8 +67,10 @@ Nothing returned a server error for any role, before or after.
 5. **Connecting the firm's Gmail needs no sign-in.** The address that starts it
    (`/auth/gmail`) and the one Google returns to can be opened by anyone who can reach
    the API, and whoever completes Google's consent becomes the mailbox the AI inbox
-   reads. It should be for a firm admin only. Left alone because it is the firm's own
-   setup step, and how that is done in production has to be known before it is locked.
+   reads. It should be for a firm admin only. **Fixed 10-16:** a firm admin starts it
+   from AI → Document Inbox → Connect Gmail (`POST /gmail/connect`, firm admin only),
+   and the callback takes Google's reply only with a signed 10-minute hand-off from
+   that admin. `/auth/gmail` is gone. A Gmail connected before keeps working.
 
 ## Features there should be
 

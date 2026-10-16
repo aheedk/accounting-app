@@ -246,6 +246,9 @@ export const AUDIT = {
   BANK_RECONCILIATION_FINISH: 'bank_reconciliation.finish',
   BANK_RECONCILIATION_CANCEL: 'bank_reconciliation.cancel',
   BANK_RECONCILIATION_UNDO: 'bank_reconciliation.undo',
+
+  // The firm's Gmail, read for documents sent to the AI inbox
+  GMAIL_CONNECT: 'gmail.connect',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

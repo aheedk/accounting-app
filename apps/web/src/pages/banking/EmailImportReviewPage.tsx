@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, Landmark, RefreshCw, History, ExternalLink, Sparkles, Info, Receipt } from 'lucide-react';
+import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, Landmark, RefreshCw, History, ExternalLink, Sparkles, Info, Receipt, Mail } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
@@ -361,6 +361,23 @@ export default function EmailImportReviewPage() {
     }
   }
 
+  // Only a firm admin connects the firm's Gmail: the API hands back Google's
+  // consent page, carrying a short-lived token that says who asked.
+  const [gmailError, setGmailError] = useState<string | null>(null);
+  async function handleConnectGmail() {
+    setGmailError(null);
+    // Opened before the request, so the browser does not treat it as a pop-up.
+    const win = window.open('', '_blank');
+    try {
+      const { data } = await api.post<{ url: string }>('/gmail/connect', {});
+      if (win) win.location.href = data.url;
+      else window.location.assign(data.url);
+    } catch (e: unknown) {
+      win?.close();
+      setGmailError(pickErr(e));
+    }
+  }
+
   async function handleRefresh() {
     setRefreshing(true);
     try {
@@ -709,6 +726,13 @@ export default function EmailImportReviewPage() {
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Checking Gmail…' : 'Refresh'}
           </button>
+          <button type="button" {...hideUnless(can.admin)} onClick={() => void handleConnectGmail()}
+            title="Choose the Gmail mailbox the AI inbox reads"
+            className="inline-flex items-center gap-2 h-9 rounded-md border px-4 text-sm font-medium transition-colors hover:bg-primary/5 hover:border-primary hover:text-link">
+            <Mail className="h-4 w-4" />
+            Connect Gmail
+          </button>
+          {gmailError && <span className="text-sm text-destructive">{gmailError}</span>}
         </div>
       )}
 

@@ -666,7 +666,7 @@ async function pollAllPdfEmails(db: Kysely<DB>, auth: GAuthClient): Promise<void
 async function poll(db: Kysely<DB>): Promise<void> {
   const auth = loadAuth();
   if (!auth) {
-    console.log('[gmail-worker] not configured — visit http://localhost:4000/auth/gmail to authorize');
+    console.log('[gmail-worker] not configured — a firm admin connects Gmail from the app (AI → Document Inbox, Connect Gmail)');
     return;
   }
   await pollAllPdfEmails(db, auth);

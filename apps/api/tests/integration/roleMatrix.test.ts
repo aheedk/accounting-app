@@ -106,7 +106,8 @@ const STAFF_MAY_WRITE = [
 // What only a firm admin may do: the firm's users and clients (adding one,
 // switching a login off, resetting its password or second step, signing it
 // out), a client's settings, bank accounts, tax codes and employees, deleting
-// records, reopening a period, and revealing a tax id or social security number.
+// records, reopening a period, revealing a tax id or social security number, and
+// connecting the firm's Gmail.
 const FIRM_ADMIN_ONLY = [
   'DELETE /me/firm/users/:id/business-access/:businessId',
   'DELETE ~/bank-deposits/:id',
@@ -129,6 +130,7 @@ const FIRM_ADMIN_ONLY = [
   'PATCH ~/bank-accounts/:id',
   'PATCH ~/tax-codes/:id',
   'POST /firm/businesses',
+  'POST /gmail/connect',
   'POST /me/firm/users',
   'POST /me/firm/users/:id/business-access',
   'POST /me/firm/users/:id/deactivate',
