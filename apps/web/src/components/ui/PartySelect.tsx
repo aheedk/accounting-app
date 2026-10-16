@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type Party = { id: string; type: 'vendor' | 'customer'; name: string };
@@ -12,7 +13,7 @@ export interface PartySelectProps {
   text: string;
   onPick: (party: Party) => void;
   onTextChange: (text: string) => void;
-  /** Shows "Add vendor" and "Add customer" pinned under the list. `typed` is the text in the box. */
+  /** Shows "+ Add … as a vendor / customer" pinned under the list. `typed` is the text in the box. */
   onAddNew?: (kind: Party['type'], typed: string) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -47,6 +48,12 @@ export function PartySelect({
     return parties.filter(p => p.name.toLowerCase().includes(q));
   }, [parties, displayValue]);
 
+  // The add rows follow the names in one keyboard list, as QuickBooks' "+ Add new":
+  // with no match, Enter on a typed name opens "Add vendor" with the name filled in.
+  const typed = selected ? '' : text.trim();
+  const addKinds: Party['type'][] = onAddNew ? ['vendor', 'customer'] : [];
+  const optionCount = filtered.length + addKinds.length;
+
   React.useEffect(() => {
     if (!open) return;
     function onMouseDown(e: MouseEvent) {
@@ -79,17 +86,25 @@ export function PartySelect({
     setOpen(false);
   }
 
+  function addNew(kind: Party['type']) {
+    setOpen(false);
+    onAddNew?.(kind, typed);
+  }
+
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
-      setActiveIdx(i => Math.min(i + 1, Math.max(filtered.length - 1, 0)));
+      setActiveIdx(i => Math.min(i + 1, Math.max(optionCount - 1, 0)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIdx(i => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
+      if (!open) return;
       const p = filtered[activeIdx];
-      if (open && p) { e.preventDefault(); pick(p); }
+      const kind = addKinds[activeIdx - filtered.length];
+      if (p) { e.preventDefault(); pick(p); }
+      else if (kind) { e.preventDefault(); addNew(kind); }
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -99,12 +114,15 @@ export function PartySelect({
     ? createPortal(
         <div
           ref={menuRef}
-          style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: menuPosition.width, zIndex: 9999 }}
+          // At least 18rem, so the add rows do not wrap under a narrow Payee box.
+          style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: Math.max(menuPosition.width, 288), zIndex: 9999 }}
           className="overflow-hidden rounded-md border bg-background shadow-md"
         >
           <div className="max-h-72 overflow-auto">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No matching vendor or customer — will be saved as typed</div>
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                {onAddNew ? 'No matching vendor or customer. Add one below, or leave it as typed.' : 'No matching vendor or customer — will be saved as typed'}
+              </div>
             ) : (
               <ul ref={listRef} role="listbox" className="py-1">
                 {filtered.map((p, i) => (
@@ -126,19 +144,27 @@ export function PartySelect({
               </ul>
             )}
           </div>
-          {onAddNew && (
-            <div className="flex gap-1 border-t p-1">
-              {(['vendor', 'customer'] as const).map(kind => (
-                <button
-                  key={kind}
-                  type="button"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => { setOpen(false); onAddNew(kind, selected ? '' : text.trim()); }}
-                  className="flex-1 rounded-sm px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
-                >
-                  Add {kind}
-                </button>
-              ))}
+          {addKinds.length > 0 && (
+            <div className="border-t py-1">
+              {addKinds.map((kind, k) => {
+                const idx = filtered.length + k;
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onMouseEnter={() => setActiveIdx(idx)}
+                    onClick={() => addNew(kind)}
+                    className={cn(
+                      'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary',
+                      idx === activeIdx && 'bg-accent',
+                    )}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{typed ? <>Add “{typed}” as a {kind}</> : <>Add new {kind}</>}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>,

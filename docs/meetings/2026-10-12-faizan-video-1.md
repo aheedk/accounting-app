@@ -33,7 +33,7 @@ meeting, [`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md).
 | 57 | Chart of accounts | Account type and detail type as in QuickBooks; Balance Sheet grouped by them | **Done.** See "Account types" below |
 | 58 | Bank deposit, Expense, Check | The bank account picker should list bank accounts only | **Done.** Expense lists bank accounts and credit cards. Check and Bank deposit already listed the Banking accounts only |
 | 59 | Expense, Check | Keep the bank chosen on the first one when entering several | **Done.** "Save and new" keeps it, and a new check, expense or deposit starts on the one last used |
-| 60 | Bank deposit, Expense | "Add new" in the customer / payee picker | **Done.** "Add vendor" and "Add customer" on Check and Expense; "Add new customer" under Received from on a deposit |
+| 60 | Bank deposit, Expense | "Add new" in the customer / payee picker | **Done.** `+ Add "name" as a vendor / customer` under the Payee list on Check and Expense, reachable with the arrow keys and Enter (made clearer 10-16); "Add new customer" under Received from on a deposit |
 | 61 | Journal entry | Reverse should open the entry screen so the date can be changed before posting | **Done.** See "Reverse" below |
 | 62 | Expense, Check, Bank deposit | A close (X) button on the page | **Done**, on Journal entry too. It, Cancel and "Save and close" go back to the page the record was opened from |
 | 63 | + New | Each entry should be openable in a new browser tab | **Done.** They are links now |
