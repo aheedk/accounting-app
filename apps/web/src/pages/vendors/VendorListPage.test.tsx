@@ -80,6 +80,17 @@ describe('VendorListPage', () => {
     return row.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
   }
 
+  it('the gear beside Action opens the table settings', async () => {
+    await render();
+    const gears = container.querySelectorAll('button[aria-label="Table settings"]');
+    // One gear, in the Action header; not a second one above the table.
+    expect(gears).toHaveLength(1);
+    expect(gears[0]!.closest('th')).not.toBeNull();
+    expect(document.body.textContent).not.toContain('Row height');
+    await click(gears[0]!);
+    expect(container.querySelector('h2')?.textContent).toBe('Table settings');
+  });
+
   it('shows the batch actions bar once a row is selected, with the right count', async () => {
     await render();
     expect(container.textContent).not.toContain('selected');

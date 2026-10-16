@@ -33,9 +33,9 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenuContent: ({ children }: { children: ReactNode }) => <div role="menu">{children}</div>,
   DropdownMenuSeparator: () => <hr />,
   DropdownMenuItem: ({ children, disabled, title, onSelect }: {
-    children: ReactNode; disabled?: boolean; title?: string; onSelect?: () => void; className?: string;
+    children: ReactNode; disabled?: boolean; title?: string; onSelect?: (e: { preventDefault: () => void }) => void; className?: string;
   }) => (
-    <div role="menuitem" aria-disabled={disabled ? 'true' : undefined} title={title} onClick={() => { if (!disabled) onSelect?.(); }}>
+    <div role="menuitem" aria-disabled={disabled ? 'true' : undefined} title={title} onClick={() => { if (!disabled) onSelect?.({ preventDefault: () => {} }); }}>
       {children}
     </div>
   ),
@@ -194,6 +194,16 @@ describe('VendorDetailPage', () => {
     expect(container.textContent).toContain('5545');
     const link = Array.from(container.querySelectorAll('a')).find(a => a.textContent === 'View/Edit');
     expect(link?.getAttribute('href')).toBe('/accounting/checks/c1');
+
+    // The gear's Columns list hides a column, and it stays hidden after a reload.
+    const headers = () => Array.from(container.querySelectorAll('thead th')).map(th => th.textContent);
+    expect(headers()).toContain('Payee');
+    const payee = Array.from(container.querySelectorAll('[role="menuitem"]')).find(i => i.textContent === 'Payee')!;
+    await click(payee);
+    expect(headers()).not.toContain('Payee');
+    expect(headers()).toContain('Category');
+    expect(window.localStorage.getItem('table_settings:undefined:vendor-transactions')).toContain('"visibleColumns":["type","ref_no","category"]');
+    window.localStorage.clear();
   });
 
   it('shows a vendor sidebar linking to each vendor, and folds/unfolds on toggle', async () => {

@@ -48,6 +48,8 @@ export default function VendorListPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
   const [showInactive, setShowInactive] = useState(false);
+  // The gear beside "Action" opens the table settings, as in QuickBooks.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
@@ -258,7 +260,16 @@ export default function VendorListPage() {
           selectedIds={selectedIds}
           onSelectedIdsChange={setSelectedIds}
           tableSettingsPageId="vendors"
-          actionsHeader={<span className="inline-flex items-center gap-1.5">Action <Settings className="h-3.5 w-3.5" /></span>}
+          externalSettingsOpen={settingsOpen}
+          onExternalSettingsOpenChange={setSettingsOpen}
+          actionsHeader={(
+            <span className="inline-flex items-center gap-1.5">
+              Action
+              <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Table settings" title="Table settings" className="rounded p-0.5 hover:bg-accent hover:text-foreground">
+                <Settings className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          )}
           actions={r => (
             <span className="relative inline-flex items-center gap-2">
               <Link className="text-link hover:underline" to={`/ap/bills/new?vendor_id=${r.id}`}>Create bill</Link>

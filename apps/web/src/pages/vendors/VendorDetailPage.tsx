@@ -20,6 +20,7 @@ import { billOpenAmount } from '@/lib/vendorBalances';
 import { formatPhone } from '@/lib/phone';
 import { printReport } from '@/lib/reportExport';
 import { humanizeCode } from '@/lib/labels';
+import { loadTableSettings, saveTableSettings } from '@/lib/tableSettings';
 
 // open_balance is what is owed, less unused credits and payments (vendorService.listVendors).
 type VendorListItem = { id: string; name: string; is_active: boolean; open_balance?: string };
@@ -64,6 +65,16 @@ type VendorTransaction = {
   contact_name: string | null;
   category: string | null;
 };
+
+// The transaction list's columns the gear can hide; Date, Total and Action always show.
+const TX_COLUMNS = [
+  { key: 'type', label: 'Type' },
+  { key: 'ref_no', label: 'No.' },
+  { key: 'payee', label: 'Payee' },
+  { key: 'category', label: 'Category' },
+] as const;
+const TX_COLUMN_KEYS: string[] = TX_COLUMNS.map(c => c.key);
+const TX_SETTINGS_PAGE = 'vendor-transactions';
 
 const TX_TYPE_LABELS: Record<string, string> = {
   deposit: 'Deposit', expense: 'Expense', check: 'Check', journal: 'Journal Entry',
@@ -191,6 +202,17 @@ export default function VendorDetailPage() {
   const [transactions, setTransactions] = useState<VendorTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<string>('transactions');
+  const [txColumns, setTxColumns] = useState<string[]>(() => (
+    user ? loadTableSettings(user.id, TX_SETTINGS_PAGE, TX_COLUMN_KEYS).visibleColumns : TX_COLUMN_KEYS
+  ));
+  const showCol = (key: string) => txColumns.includes(key);
+  function toggleTxColumn(key: string) {
+    const next = showCol(key) ? txColumns.filter(k => k !== key) : TX_COLUMN_KEYS.filter(k => k === key || showCol(k));
+    // At least one column stays; an empty choice would come back as "all" on reload.
+    if (next.length === 0) return;
+    setTxColumns(next);
+    if (user) saveTableSettings(user.id, TX_SETTINGS_PAGE, { ...loadTableSettings(user.id, TX_SETTINGS_PAGE, TX_COLUMN_KEYS), visibleColumns: next });
+  }
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [vendorList, setVendorList] = useState<VendorListItem[]>([]);
@@ -535,9 +557,23 @@ export default function VendorDetailPage() {
               <button type="button" aria-label="Print" onClick={printTransactions} className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
                 <Printer className="h-4 w-4" />
               </button>
-              <button type="button" aria-label="Table settings" onClick={() => showToast('Coming soon')} className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-                <Settings className="h-4 w-4" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="Table settings" title="Table settings" className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Columns</div>
+                  {TX_COLUMNS.map(c => (
+                    // preventDefault keeps the menu open while columns are ticked.
+                    <DropdownMenuItem key={c.key} onSelect={e => { e.preventDefault(); toggleTxColumn(c.key); }}>
+                      <input type="checkbox" readOnly checked={showCol(c.key)} className="mr-2 pointer-events-none" aria-label={c.label} />
+                      {c.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -554,10 +590,10 @@ export default function VendorDetailPage() {
                 <thead className="border-b">
                   <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <th className="p-3 text-left">Date</th>
-                    <th className="p-3 text-left">Type</th>
-                    <th className="p-3 text-left">No.</th>
-                    <th className="p-3 text-left">Payee</th>
-                    <th className="p-3 text-left">Category</th>
+                    {showCol('type') && <th className="p-3 text-left">Type</th>}
+                    {showCol('ref_no') && <th className="p-3 text-left">No.</th>}
+                    {showCol('payee') && <th className="p-3 text-left">Payee</th>}
+                    {showCol('category') && <th className="p-3 text-left">Category</th>}
                     <th className="p-3 text-right">Total</th>
                     <th className="p-3 text-right">Action</th>
                   </tr>
@@ -566,10 +602,10 @@ export default function VendorDetailPage() {
                   {filteredTransactions.map(tx => (
                     <tr key={`${tx.type}:${tx.id}`} className="border-b last:border-b-0 hover:bg-muted/30">
                       <td className="p-3 whitespace-nowrap">{tx.date}</td>
-                      <td className="p-3">{TX_TYPE_LABELS[tx.type] ?? tx.type}</td>
-                      <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>
-                      <td className="p-3">{tx.contact_name ?? <span className="text-muted-foreground">—</span>}</td>
-                      <td className="p-3">
+                      {showCol('type') && <td className="p-3">{TX_TYPE_LABELS[tx.type] ?? tx.type}</td>}
+                      {showCol('ref_no') && <td className="p-3 font-mono">{tx.ref_no ?? <span className="text-muted-foreground">—</span>}</td>}
+                      {showCol('payee') && <td className="p-3">{tx.contact_name ?? <span className="text-muted-foreground">—</span>}</td>}
+                      {showCol('category') && <td className="p-3">
                         {(tx.type === 'expense' || tx.type === 'check') && tx.category && tx.category !== 'Split' ? (
                           <AppSelect
                             className="h-8 w-full max-w-[12rem] rounded-md border bg-background px-2 text-sm disabled:opacity-60"
@@ -592,7 +628,7 @@ export default function VendorDetailPage() {
                             <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                           </div>
                         )}
-                      </td>
+                      </td>}
                       <td className="p-3 text-right font-mono">{fmtMoney(tx.total_amount)}</td>
                       <td className="p-3 text-right">
                         <Link className="text-link hover:underline" to={tx.path}>View/Edit</Link>
@@ -602,7 +638,7 @@ export default function VendorDetailPage() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t font-medium">
-                    <td className="p-3" colSpan={5}>Total</td>
+                    <td className="p-3" colSpan={1 + txColumns.length}>Total</td>
                     <td className="p-3 text-right font-mono">{fmtMoney(String(txTotal))}</td>
                     <td className="p-3"></td>
                   </tr>
