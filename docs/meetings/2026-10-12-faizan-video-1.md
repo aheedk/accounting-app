@@ -6,11 +6,13 @@ transcript. This is the output of item 34 in
 from that file. A second video is coming and gets its own file. The PDF and the
 check stubs he sent with the video are not covered here.
 
-**Status on 2026-10-12, end of day:** of the 21 items, 15 are built, 1 is partly
-built (68), 4 were fixed or in place already (50, 51, 52, 70), and 1 is waiting
-on Faizan (56). Everything built passed the
-typecheck and the web tests, and the Balance Sheet API tests passed on 10-16. How to show each item is in Aheed's demo for the
-10-16 meeting, [`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md).
+**Status on 2026-10-16:** of the 21 items, 17 are built and 4 were fixed or in
+place already (50, 51, 52, 70). Nothing is waiting on Faizan. On 10-16 Aheed
+passed on his answers (gear on the Vendors page, Check in + New is enough, a
+separate firm view, which header to remove, both orientations offered), and
+items 55, 56, 65 and 68 were finished from them. Typecheck, the web tests and
+the API tests pass. How to show each item is in Aheed's demo for the 10-16
+meeting, [`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md).
 
 ## Bugs — something is broken
 
@@ -21,8 +23,8 @@ typecheck and the web tests, and the Balance Sheet API tests passed on 10-16. Ho
 | 52 | Journal entry | The up and down arrow keys still raise and lower the debit and credit amounts | **Already fixed** on 10-07 (`896e7bb`): the amount box is a text box now. Retest on the current build |
 | 53 | Date boxes | Double-click should select the whole date so it can be typed over, as in QuickBooks | **Done.** Every date box is typed as text (10/12/2026); double-click or Ctrl+A selects all of it, and the calendar is behind a button |
 | 54 | General Ledger | After opening a transaction from the ledger, Back has to be pressed twice | **Done.** Saving was adding the same page to the history again; it replaces it now |
-| 55 | Reports | The report title is shown twice. Keep one header, on every page | **Done.** The page heading above the report header is gone on the eight report pages. On paper the header repeats on every page |
-| 56 | Unclear page | A gear icon next to the account and vendor does nothing | **Waiting on Faizan:** which page |
+| 55 | Reports | The report title is shown twice. Keep one header, on every page | **Done.** On paper, the browser's own top line (the time and the page title) is gone, so only the report's header prints, on every page (10-16). On screen, the page heading above the report header is gone on the eight report pages (10-12). See "Printing" below |
+| 56 | Vendors | A gear icon does nothing | **Done** (10-16). On the Vendors list, the gear beside Action opens the table settings. On a vendor's page, the gear lists the transaction columns to show or hide |
 
 ## Changes to how things work
 
@@ -36,7 +38,7 @@ typecheck and the web tests, and the Balance Sheet API tests passed on 10-16. Ho
 | 62 | Expense, Check, Bank deposit | A close (X) button on the page | **Done**, on Journal entry too. It, Cancel and "Save and close" go back to the page the record was opened from |
 | 63 | + New | Each entry should be openable in a new browser tab | **Done.** They are links now |
 | 64 | General Ledger | Sort by clicking a column heading | **Done.** First click A to Z, second Z to A, third back to date order. Sorting is inside each account |
-| 65 | Printing reports | Choose landscape or portrait | **Done.** The print page was forcing one, which removes the Layout choice from the browser's print dialog. It no longer forces one |
+| 65 | Printing reports | Choose landscape or portrait | **Done** (10-16). Print opens a preview with Portrait / Landscape and a Print button, as in QuickBooks. See "Printing" below |
 | 66 | Balance Sheet, P&L | Take out the Section column | **Done** in the print and the Excel export; each section is a heading row |
 
 ## New things
@@ -44,15 +46,14 @@ typecheck and the web tests, and the Balance Sheet API tests passed on 10-16. Ho
 | # | What | Status |
 |---|---|---|
 | 67 | Search box in the client list at the top | **Done** |
-| 68 | A firm dashboard with no client selected; the logo goes back to it | **Partly.** See "Firm dashboard" below |
+| 68 | A firm dashboard with no client selected; the logo goes back to it | **Done** (10-16). See "Firm view" below |
 | 69 | Browser tab names | **Done.** The tab says the page, then the company |
-| 70 | "Check" under Expenses in the menu | **Already there** in + New, under Expense. If he means the sidebar, ask |
+| 70 | "Check" under Expenses in the menu | **Already there** in + New, under Expense. Agreed on 10-16 that this is enough |
 
 ## To discuss, not to build yet
 
 - **My Menu** (the button at the bottom of the sidebar). Faizan does not think
-  it is needed. He wants to talk about it at the next meeting and then most
-  likely remove it.
+  it is needed. On 10-16 it was left as it is for now.
 
 ## Notes on the items
 
@@ -82,28 +83,38 @@ blank. On the local test companies that left 4 and 5 accounts blank, of 34 and 3
 reason and post straight away. It now opens the entry screen as the reversal
 (debits and credits swapped, first day of the next month, the same number with
 an R) and nothing posts until it is saved, so the date or anything else can be
-changed first. The original entry stays posted, as in QuickBooks. The old
-button voided the original; that is no longer offered on a journal entry, where
-Delete and editing in place cover it.
+changed first. The original entry stays posted, as in QuickBooks. On 10-16
+Faizan's request was restated as "Reverse should reverse the current entry and
+let us edit it", which is what this does, so nothing more was changed.
 
 **Date boxes (53).** This touches every date box in the app, so it is the first
 thing to try in the browser. Typing 10/12/26, 10-12-2026, 101226 or 10/12 all
 work; something that is not a date goes back to the last good one.
 
-**Printing (55, 65).** With no forced orientation the print dialog offers
-Layout again, and it starts on whatever the browser used last. The General
-Ledger used to open in landscape by itself; now that is one click in the dialog.
+**Printing (55, 65).** Faizan's screenshot (10-16) showed the line above the
+report header was the browser's own: the time on the left and "company ·
+report" in the middle, printed in the page's top margin. The print page now has
+no top margin, so the browser has nowhere to put it; the report heading, which
+repeats on every page, carries the top gap, and "Page X of Y" stays at the
+bottom. Print opens a preview first, with Orientation (Portrait / Landscape)
+and a Print button, as in QuickBooks; a report wider than six columns starts on
+landscape. Checked by printing to PDF in Edge (Chrome's engine): no browser
+line on any page, letter portrait or landscape as chosen. All in
+`apps/web/src/lib/reportExport.ts`, so every page that prints a list or report
+gets it. Excel and the jsPDF downloads are not changed.
 
-**Firm dashboard (68).** The firm-wide page already existed as Accounting →
-Client Overview: every client with receivables, payables, transactions waiting
-for review, open periods and the last reconciliation, and a click opens that
-client. What was done: the logo at the top of the sidebar goes there for a firm
-admin (to the dashboard for everyone else), and the page has a client search.
-What is not done: the top bar still shows the last client as selected while on
-that page, and the sidebar is still that client's. A true "no client selected"
-state changes the app shell and needs a sketch agreed with the firm first. Also
-open: Client Overview is firm admin only, so an accountant who is not an admin
-gets the client's dashboard from the logo.
+**Firm view (68).** Faizan wants a separate page with no client selected. Since
+10-16 it is `/firm`, in its own frame (`components/layout/FirmShell.tsx`), as in
+QuickBooks Accountant: a short sidebar (All clients), and a top bar that says
+"All clients · no client selected" instead of the last company. It shows the
+client list that was Client Overview: every client with receivables,
+payables, transactions waiting for review, open periods and the last
+reconciliation, a client search and an Add client button. Clicking a client
+opens that client's dashboard in the usual frame. The logo, "Back to practice"
+in the company switcher, Accounting → Client Overview and the search entry all
+go there, and the old address redirects. Printing from it is headed with no
+client's name. It is firm admin only, as the firm overview it shows is; an
+accountant who is not an admin still gets the client's dashboard from the logo.
 
 **Bank accounts only (58).** The rule for what a bank account is now comes from
 the account type list, so it also covers item 39 from the 10-10 notes (Equipment
@@ -112,18 +123,11 @@ bank type or it is set up under Banking.
 
 ## Still to do
 
-1. The "no client selected" shell for item 68, after a sketch.
+Nothing from this video. Still open around it: his PDF and check stubs (item 34
+in the 10-10 notes), and the second video.
 
 ## Ask Faizan
 
-- **Item 56, the gear icon.** The recording says "accountable and vendor here
-  the gear icon is not". It comes between the date boxes and the bank picker,
-  so it is probably on the Expense or Check page. Which page, and what should
-  the gear open?
-- **Item 70, which menu.** Check is already in + New under Expense. If he means
-  the sidebar, Checks sits under Accounts Payable and he wants it next to
-  Expenses.
 - **Which site he tests on**, and when the video was recorded (see "Already
   fixed").
-- **Item 55.** The header was read as "the page title above the report
-  header". If he meant something else on the printed page, say so.
+- **My Menu.** Remove it, or keep it? Left as it is on 10-16.

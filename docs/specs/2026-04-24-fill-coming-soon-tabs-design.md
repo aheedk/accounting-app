@@ -87,6 +87,7 @@ Every new feature must include:
 
 ### 3.4 Cross-business reads (Client Overview)
 - `firm_admin` already has a tenancy bypass via `effective_role`. Add a service `firmDashboardService.getFirmOverview(db, ctx)` that lists every business in the firm with computed metrics. Other roles get a 403 from the route.
+- Since 2026-10-16 the page lives at `/firm`, in the firm's own frame with no client selected (`FirmShell`); `/accounting/client-overview` redirects there. See item 68 in `../meetings/2026-10-12-faizan-video-1.md`.
 
 ### 3.5 Contractors model (resolves AP/Payroll duplication)
 - Add columns to `vendors`: `is_1099_contractor boolean default false`, `tax_id text` (encrypted via `fieldCrypto`), `tax_id_type enum('SSN','EIN')`.
