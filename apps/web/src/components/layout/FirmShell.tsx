@@ -1,21 +1,23 @@
-import { useEffect } from 'react';
-import { Link, Navigate, NavLink, Outlet } from 'react-router-dom';
-import { Building2, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, Outlet } from 'react-router-dom';
+import { Building2, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { roleLabel } from '@/lib/roleAccess';
 import { setExportCompany } from '@/lib/reportExport';
-import { SidebarBrand } from './Sidebar';
-
-const FIRM_HOME = '/firm';
+import { Sidebar } from './Sidebar';
+import { MobileNav } from './MobileNav';
 
 // The firm's own view, with no client selected (Faizan's item 68), as in
-// QuickBooks Accountant: its own short sidebar, and a top bar that names no
-// company. Picking a client opens that client's books in the usual AppShell.
+// QuickBooks Accountant: a top bar that names no company. The sidebar is the
+// usual one (10-16: an empty sidebar here read as broken), so any page is one
+// click away; it opens in the company last open. Picking a client in the list
+// opens that client's books in the usual AppShell.
 // Firm-wide, so it reads the login's firm role, not a role given for one company;
 // the firm overview it shows is a firm admin's (GET /firm-overview).
 export function FirmShell() {
   const { user, logout } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Nothing printed or exported from here is headed with a client's name.
   useEffect(() => { setExportCompany(''); }, []);
@@ -25,23 +27,21 @@ export function FirmShell() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground print:block print:h-auto print:overflow-visible">
-      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex print:hidden">
-        <SidebarBrand />
-        <nav className="flex-1 space-y-1 p-3">
-          <NavLink
-            to={FIRM_HOME}
-            end
-            className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-sidebar-hover text-white' : 'hover:bg-sidebar-hover'}`}
-          >
-            <Users className="h-4 w-4" /> All clients
-          </NavLink>
-        </nav>
-      </aside>
+      <div className="contents print:hidden">
+        <Sidebar />
+        <MobileNav open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+      </div>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
         <header className="relative z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/80 px-4 backdrop-blur print:hidden">
           <div className="flex min-w-0 items-center gap-2 text-sm">
-            {/* Below lg there is no sidebar, so the way back here is in the bar. */}
-            <Link to={FIRM_HOME} className="font-display text-lg tracking-tight lg:hidden">Accounting</Link>
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation menu"
+              className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <span className="inline-flex h-9 items-center gap-2 rounded-md border border-dashed border-input px-3 text-muted-foreground">
               <Building2 className="h-4 w-4 shrink-0" />
               <span className="font-medium text-foreground">All clients</span>

@@ -221,7 +221,10 @@ export function BookmarkMenu() {
         onClick={() => (open ? (setOpen(false), setEditing(null)) : openMenu())}
         aria-label="Bookmarks"
         aria-expanded={open}
-        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors text-sidebar-muted hover:bg-sidebar-hover hover:text-white"
+        className={cn(
+          'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold',
+          open ? 'bg-sidebar-active/[0.12] text-white' : 'text-sidebar-muted hover:bg-sidebar-hover/[0.08] hover:text-white',
+        )}
       >
         <Bookmark className="h-4 w-4 shrink-0" />
         <span>Bookmarks</span>

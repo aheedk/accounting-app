@@ -124,7 +124,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
-          {/* The firm's view with no client selected: its own frame, outside AppShell. */}
+          {/* The firm's view with no client selected: its own top bar, outside AppShell. */}
           <Route path="/firm" element={<FirmShell />}>
             <Route index element={<ClientOverviewPage />} />
           </Route>

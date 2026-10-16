@@ -167,10 +167,10 @@ export function MyMenu() {
         aria-label="My Menu"
         aria-expanded={open}
         className={cn(
-          'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold',
           open
-            ? 'bg-sidebar-active text-white'
-            : 'text-sidebar-muted hover:bg-sidebar-hover hover:text-white',
+            ? 'bg-sidebar-active/[0.12] text-white'
+            : 'text-sidebar-muted hover:bg-sidebar-hover/[0.08] hover:text-white',
         )}
       >
         <Menu className="h-4 w-4 shrink-0" />

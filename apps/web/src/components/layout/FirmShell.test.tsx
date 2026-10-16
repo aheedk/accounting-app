@@ -12,8 +12,9 @@ let authRole = 'firm_admin';
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({ user: { id: 'u1', full_name: 'Aheed K', role: authRole }, businesses: [], logout: vi.fn() }),
 }));
-// The sidebar's logo is all FirmShell borrows from it.
-vi.mock('./Sidebar', () => ({ SidebarBrand: () => <a href="/firm">Accounting</a> }));
+// The usual sidebar and drawer; their own tests cover what is in them.
+vi.mock('./Sidebar', () => ({ Sidebar: () => <nav>usual sidebar</nav> }));
+vi.mock('./MobileNav', () => ({ MobileNav: () => null }));
 
 describe('FirmShell', () => {
   let container: HTMLDivElement;
@@ -53,6 +54,8 @@ describe('FirmShell', () => {
     expect(container.textContent).toContain('All clients');
     expect(container.textContent).toContain('no client selected');
     expect(container.textContent).toContain('client list');
+    // The usual sidebar, not an empty one (10-16).
+    expect(container.textContent).toContain('usual sidebar');
     expect(container.textContent).not.toContain('Blue Widget Co.');
     expect(getExportCompany()).toBe('');
     expect(document.title).toBe('All clients - Accounting App');

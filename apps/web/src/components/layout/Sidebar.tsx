@@ -199,7 +199,7 @@ export function SidebarBrand() {
     <Link
       to={home}
       title={home === '/' ? 'Dashboard' : 'All clients'}
-      className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4 hover:bg-sidebar-hover"
+      className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4 transition-colors hover:bg-sidebar-hover/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
     >
       <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
         <BookOpen className="h-[18px] w-[18px]" />

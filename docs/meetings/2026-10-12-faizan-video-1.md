@@ -105,8 +105,9 @@ gets it. Excel and the jsPDF downloads are not changed.
 
 **Firm view (68).** Faizan wants a separate page with no client selected. Since
 10-16 it is `/firm`, in its own frame (`components/layout/FirmShell.tsx`), as in
-QuickBooks Accountant: a short sidebar (All clients), and a top bar that says
-"All clients · no client selected" instead of the last company. It shows the
+QuickBooks Accountant: a top bar that says "All clients · no client selected"
+instead of the last company. The sidebar is the usual one (at first it had
+only "All clients", which looked broken; changed the same day). It shows the
 client list that was Client Overview: every client with receivables,
 payables, transactions waiting for review, open periods and the last
 reconciliation, a client search and an Add client button. Clicking a client
