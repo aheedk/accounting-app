@@ -12,6 +12,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { MoneyBar } from '@/components/ui/MoneyBar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fmtMoney } from '@/lib/money';
@@ -198,8 +200,11 @@ export default function VendorDetailPage() {
   const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
   const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [vendorErr, setVendorErr] = useState<string | null>(null);
   const [bills, setBills] = useState<BillSummary[]>([]);
   const [transactions, setTransactions] = useState<VendorTransaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [transactionsErr, setTransactionsErr] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<string>('transactions');
   const [txColumns, setTxColumns] = useState<string[]>(() => (
@@ -220,6 +225,7 @@ export default function VendorDetailPage() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [notes, setNotes] = useState<VendorNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesErr, setNotesErr] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
@@ -246,8 +252,10 @@ export default function VendorDetailPage() {
   function loadNotes() {
     if (!bizId || !id) return;
     setNotesLoading(true);
+    setNotesErr(null);
     api.get(`/businesses/${bizId}/vendors/${id}/notes`)
       .then(r => setNotes(r.data.notes))
+      .catch((e: unknown) => setNotesErr(pickErr(e)))
       .finally(() => setNotesLoading(false));
   }
 
@@ -300,13 +308,25 @@ export default function VendorDetailPage() {
 
   function loadTransactions() {
     if (!bizId || !id) return;
+    setTransactionsLoading(true);
+    setTransactionsErr(null);
     api.get(`/businesses/${bizId}/transactions`, { params: { contact_id: id, page_size: 200, sort_key: 'date', sort_dir: 'desc' } })
-      .then(r => setTransactions(r.data.transactions));
+      .then(r => setTransactions(r.data.transactions))
+      .catch((e: unknown) => setTransactionsErr(pickErr(e)))
+      .finally(() => setTransactionsLoading(false));
+  }
+
+  function loadVendor() {
+    if (!bizId || !id) return;
+    setVendorErr(null);
+    api.get(`/businesses/${bizId}/vendors/${id}`)
+      .then(r => setVendor(r.data))
+      .catch((e: unknown) => setVendorErr(pickErr(e)));
   }
 
   useEffect(() => {
     if (!bizId || !id) return;
-    api.get(`/businesses/${bizId}/vendors/${id}`).then(r => setVendor(r.data));
+    loadVendor();
     api.get(`/businesses/${bizId}/bills`, { params: { vendor_id: id, limit: 1000 } }).then(r => setBills(r.data.bills));
     api.get(`/businesses/${bizId}/coa`).then(r => setAccounts(r.data.accounts));
     loadTransactions();
@@ -373,7 +393,22 @@ export default function VendorDetailPage() {
   // Same ordering as the expense/check line's own category picker (ExpensePage/CheckPage): expense accounts first.
   const categoryAccounts = [...accounts.filter(a => a.account_type === 'expense'), ...accounts.filter(a => a.account_type !== 'expense')];
 
-  if (!vendor) return <div>Loading…</div>;
+  if (!vendor) {
+    return (
+      <div className="flex items-start gap-6">
+        <VendorSidebar
+          vendors={vendorList}
+          activeId={undefined}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setSidebarCollapsed(c => !c)}
+          onStub={showToast}
+        />
+        <div className="min-w-0 flex-1">
+          {vendorErr ? <ErrorState message={vendorErr} onRetry={loadVendor} /> : <LoadingIndicator />}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex items-start gap-6">
       <VendorSidebar
@@ -512,7 +547,7 @@ export default function VendorDetailPage() {
               <Button type="button" disabled={!mergeTargetId} onClick={() => setMergeConfirming(true)}>Continue</Button>
             ) : (
               <Button type="button" variant="destructive" disabled={mergeBusy} onClick={() => { void confirmMerge(); }}>
-                {mergeBusy ? 'Merging…' : 'Merge'}
+                {mergeBusy ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Merging…</span> : 'Merge'}
               </Button>
             )}
           </DialogFooter>
@@ -578,7 +613,11 @@ export default function VendorDetailPage() {
           </div>
 
           <Card><CardContent className="p-0">
-            {filteredTransactions.length === 0 ? (
+            {transactionsLoading ? (
+              <LoadingIndicator skeleton rows={6} columns={7} />
+            ) : transactionsErr ? (
+              <ErrorState message={transactionsErr} onRetry={loadTransactions} />
+            ) : filteredTransactions.length === 0 ? (
               <EmptyState
                 title="No transactions yet"
                 hint="Bills, checks, expenses and payments for this vendor will show up here."
@@ -608,7 +647,7 @@ export default function VendorDetailPage() {
                       {showCol('category') && <td className="p-3">
                         {(tx.type === 'expense' || tx.type === 'check') && tx.category && tx.category !== 'Split' ? (
                           <AppSelect
-                            className="h-8 w-full max-w-[12rem] rounded-md border bg-background px-2 text-sm disabled:opacity-60"
+                            className="h-8 w-72 rounded-md border bg-background px-2 text-sm disabled:opacity-60"
                             value={categoryAccounts.find(a => a.name === tx.category)?.id ?? ''}
                             disabled={recategorizingId === tx.id}
                             onChange={e => { if (e.target.value) { void recategorize(tx, e.target.value); } }}
@@ -622,7 +661,7 @@ export default function VendorDetailPage() {
                         ) : (
                           <div
                             title={tx.category === 'Split' ? 'This transaction has more than one category — open it to edit.' : 'Editing the category here isn’t supported for this transaction type.'}
-                            className="flex h-8 max-w-[12rem] cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
+                            className="flex h-8 w-72 cursor-not-allowed items-center justify-between gap-1 rounded-md border bg-muted/40 px-2 text-sm text-muted-foreground"
                           >
                             <span className="truncate">{tx.category ?? '—'}</span>
                             <ChevronDown className="h-3.5 w-3.5 shrink-0" />
@@ -737,14 +776,18 @@ export default function VendorDetailPage() {
               />
               <div className="flex gap-2">
                 <Button type="button" size="sm" disabled={noteBusy || !noteDraft.trim()} onClick={() => { void saveNote(); }}>
-                  {noteBusy ? 'Saving…' : 'Save'}
+                  {noteBusy ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Saving…</span> : 'Save'}
                 </Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => { setAddingNote(false); setNoteDraft(''); }}>Cancel</Button>
               </div>
             </div>
           )}
 
-          {notes.length === 0 ? (
+          {notesLoading && notes.length === 0 ? (
+            <LoadingIndicator />
+          ) : notesErr ? (
+            <ErrorState message={notesErr} onRetry={loadNotes} />
+          ) : notes.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
               <FolderOpen className="h-10 w-10" />
               <div className="text-sm">No notes yet</div>

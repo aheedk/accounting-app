@@ -205,7 +205,7 @@ export function AppSelect({
 
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 w-max min-w-full max-w-xs rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
+          className="absolute left-0 top-full z-50 mt-1 w-max min-w-full max-w-sm rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
         >
           <div className="flex items-center gap-2 border-b px-3 py-2">
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -244,12 +244,15 @@ export function AppSelect({
                   className={cn(
                     'flex cursor-pointer select-none items-center px-3 py-2 text-sm',
                     opt.disabled && 'cursor-not-allowed opacity-40',
-                    isSelected && 'font-medium',
-                    // One highlight for both mouse and keyboard, so they never disagree.
+                    // The current value stays visibly picked out even once hover/keyboard
+                    // focus moves elsewhere — not just bold, a persistent tint.
+                    isSelected && 'bg-accent/70',
+                    // One highlight for both mouse and keyboard, stronger than the
+                    // selected tint so moving off the selected row still reads clearly.
                     isActive && 'bg-accent text-accent-foreground',
                   )}
                 >
-                  <span className="flex-1 whitespace-nowrap">{opt.label}</span>
+                  <span className="flex-1 truncate">{opt.label}</span>
                   {opt.hint ? (
                     <span className="ml-2 shrink-0 text-xs italic text-muted-foreground">{opt.hint}</span>
                   ) : (
