@@ -9,7 +9,7 @@ import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 // QBO-style company switcher: shows the current company and lets you jump to
 // another company, add a client, or return to the firm practice view.
 const DASHBOARD_PATH = '/';
-const PRACTICE_PATH = '/accounting/client-overview';
+const PRACTICE_PATH = '/firm';
 const ADD_CLIENT_PATH = '/clients/new';
 
 export function BusinessSwitcher() {

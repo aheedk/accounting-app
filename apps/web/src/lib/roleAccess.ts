@@ -34,7 +34,7 @@ const CLIENT_ONLY_PAGES = ['/documents/send'];
 
 // Pages where everything on them is for a firm admin. Hidden from the others
 // rather than opened and left to fail.
-const FIRM_ADMIN_PAGES = ['/setup/users', '/clients/new', '/accounting/client-overview', '/payroll/employees/new'];
+const FIRM_ADMIN_PAGES = ['/firm', '/setup/users', '/clients/new', '/accounting/client-overview', '/payroll/employees/new'];
 
 // Pages for an accountant and up. The activity log shows every record before and
 // after each change; the rest are forms the API takes only from an accountant, so

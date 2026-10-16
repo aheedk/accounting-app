@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileDown, Printer, Search } from 'lucide-react';
+import { FileDown, Plus, Printer, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -121,6 +121,10 @@ export default function ClientOverviewPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Client Overview</h1>
         <div className="flex items-center gap-2">
+          {/* The firm view has no company switcher, so adding a client starts here. */}
+          <Button size="sm" onClick={() => navigate('/clients/new')}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add client
+          </Button>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <input

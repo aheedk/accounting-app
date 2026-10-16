@@ -16,7 +16,7 @@ describe('canOpenPage', () => {
   });
 
   it('keeps firm-admin pages for the firm admin', () => {
-    for (const page of ['/setup/users', '/clients/new', '/accounting/client-overview']) {
+    for (const page of ['/firm', '/setup/users', '/clients/new', '/accounting/client-overview']) {
       expect(canOpenPage('firm_admin', page), page).toBe(true);
       expect(canOpenPage('accountant', page), page).toBe(false);
       expect(canOpenPage('staff', page), page).toBe(false);

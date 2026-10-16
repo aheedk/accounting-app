@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/auth/AuthContext';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
+import { FirmShell } from '@/components/layout/FirmShell';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import AccountPage from '@/pages/AccountPage';
@@ -123,6 +124,10 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
+          {/* The firm's view with no client selected: its own frame, outside AppShell. */}
+          <Route path="/firm" element={<FirmShell />}>
+            <Route index element={<ClientOverviewPage />} />
+          </Route>
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="/account" element={<AccountPage />} />
@@ -196,7 +201,8 @@ export default function App() {
             <Route path="/reports/1099" element={<TenNinetyNineReportPage />} />
 
             {/* Accounting (placeholders) */}
-            <Route path="/accounting/client-overview" element={<ClientOverviewPage />} />
+            {/* Client Overview moved to the firm view; old links and bookmarks land there. */}
+            <Route path="/accounting/client-overview" element={<Navigate to="/firm" replace />} />
             <Route path="/accounting/books-review" element={<BooksReviewPage />} />
             <Route path="/accounting/bank-accounts" element={<BankAccountListPage />} />
             <Route path="/accounting/bank-transactions" element={<BankTransactionsInboxPage />} />

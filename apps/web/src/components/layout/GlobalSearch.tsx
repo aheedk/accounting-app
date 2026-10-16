@@ -34,7 +34,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Document Inbox', group: 'AI', to: '/ai/inbox' },
   { label: 'Coding Rules', group: 'AI', to: '/ai/coding-rules' },
   // Accounting
-  { label: 'Client Overview', group: 'Accounting', to: '/accounting/client-overview' },
+  { label: 'Client Overview', group: 'Accounting', to: '/firm' },
   { label: 'Books Review', group: 'Accounting', to: '/accounting/books-review' },
   { label: 'Bank Accounts', group: 'Accounting', to: '/accounting/bank-accounts' },
   { label: 'Bank Transactions', group: 'Accounting', to: '/accounting/bank-transactions' },

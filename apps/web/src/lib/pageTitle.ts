@@ -30,6 +30,7 @@ export const PAGE_NAMES: Record<string, string> = {
   '/ai/coding-rules': 'Coding Rules',
   '/ai/suspense': 'Suspense',
   '/accounting/client-overview': 'Client Overview',
+  '/firm': 'All clients',
   '/accounting/books-review': 'Books Review',
   '/accounting/approvals': 'Approvals',
   '/accounting/bank-accounts': 'Bank Accounts',

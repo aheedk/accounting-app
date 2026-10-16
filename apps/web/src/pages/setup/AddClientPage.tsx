@@ -198,7 +198,7 @@ export default function AddClientPage() {
           <Button type="submit" disabled={busy || form.name.trim() === ''}>
             {busy ? 'Adding…' : 'Add client'}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => navigate('/accounting/client-overview')} disabled={busy}>
+          <Button type="button" variant="ghost" onClick={() => navigate('/firm')} disabled={busy}>
             Cancel
           </Button>
         </div>

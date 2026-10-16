@@ -107,7 +107,7 @@ const ALL_GROUPS: NavGroup[] = [
     label: 'Accounting',
     icon: BookOpen,
     children: [
-      { to: '/accounting/client-overview', label: 'Client Overview' },
+      { to: '/firm', label: 'Client Overview' },
       { to: '/accounting/books-review', label: 'Books Review' },
       { to: '/accounting/approvals', label: 'Approvals' },
       { to: '/accounting/bank-accounts', label: 'Bank Accounts' },
@@ -189,12 +189,12 @@ function useNavGroups(): NavGroup[] {
 }
 
 // Brand header shared by the desktop sidebar and the mobile drawer.
-// The logo is the way home, as in QuickBooks: for the firm, the list of all its
-// clients (Client Overview, which only a firm admin can load); for everyone
+// The logo is the way home, as in QuickBooks: for the firm, its own view with no
+// client selected (FirmShell, which only a firm admin can load); for everyone
 // else, the dashboard of the company that is open.
 export function SidebarBrand() {
   const { user } = useAuth();
-  const home = user?.role === 'firm_admin' ? '/accounting/client-overview' : '/';
+  const home = user?.role === 'firm_admin' ? '/firm' : '/';
   return (
     <Link
       to={home}
