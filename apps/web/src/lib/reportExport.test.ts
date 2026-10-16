@@ -57,6 +57,30 @@ describe('report export layout', () => {
     expect(html.match(/<tr class=/g)).toHaveLength(4);
   });
 
+  it("leaves the browser's own header line (time and page title) off the paper", () => {
+    const html = buildPrintHtml({ title: 'Balance Sheet', headers, rows });
+    // No top page margin, so the browser has nowhere to print it; the report
+    // heading, repeated on every page, carries the top gap instead.
+    expect(html).toMatch(/@page \{ margin: 0 12mm 18mm;/);
+    expect(html).toMatch(/th\.report-head \{[^}]*padding: 12mm 0 14px/);
+  });
+
+  it('asks for portrait or landscape before printing, as QuickBooks does', () => {
+    const narrow = buildPrintHtml({ title: 'Balance Sheet', headers, rows });
+    expect(narrow).toContain('<input type="radio" name="orientation" value="portrait" checked>');
+    expect(narrow).toContain('<input type="radio" name="orientation" value="landscape">');
+    expect(narrow).toContain('size: letter portrait');
+    expect(narrow).toContain('<button type="button" id="print">Print</button>');
+    // The dialog waits for the choice; the choice bar is not printed.
+    expect(narrow).not.toContain('window.onload');
+    expect(narrow).toMatch(/@media print \{[^}]*\.print-bar \{ display: none/);
+
+    // A wide report starts on landscape.
+    const wide = buildPrintHtml({ title: 'General Ledger', headers: ['A', 'B', 'C', 'D', 'E', 'F', 'G'], rows: [['1', '2', '3', '4', '5', '6', '7']] });
+    expect(wide).toContain('<input type="radio" name="orientation" value="landscape" checked>');
+    expect(wide).toContain('size: letter landscape');
+  });
+
   it('keeps a Date column from wrapping mid-value', () => {
     const html = buildPrintHtml({
       title: 'General Ledger',

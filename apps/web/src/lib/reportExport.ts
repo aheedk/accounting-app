@@ -108,10 +108,16 @@ export function buildPrintHtml(input: PrintReportInput, now: Date = new Date()):
   const dates = input.headers.map(header => DATE_HEADER.test(header));
   const cellClass = (index: number) => amounts[index] ? 'num' : dates[index] ? 'nowrap' : '';
   const running = [company, input.title].filter(Boolean).join(' · ');
-  // The @page rule below sets no `size`: a page that forces portrait or
-  // landscape makes the browser's print dialog take its own Layout choice away.
+  // The page opens as a preview with a Portrait / Landscape choice and a Print
+  // button, as in QuickBooks; a wide report starts on landscape. The choice sets
+  // the @page size, so the browser's own dialog has no Layout option to undo it.
   // The company, report name and period are the first row of the table head, so
   // the browser repeats them at the top of every printed page.
+  // The page has no top margin: that is where the browser prints its own line
+  // (the time and the page title), which Faizan asked to have gone. The report
+  // heading's padding makes the top gap on every page instead.
+  const orientation = input.headers.length > 6 ? 'landscape' : 'portrait';
+  const radio = (value: string) => `<input type="radio" name="orientation" value="${value}"${value === orientation ? ' checked' : ''}>`;
   const reportHead = `${company ? `<div class="company">${escapeHtml(company)}</div>` : ''}<div class="title">${escapeHtml(input.title)}</div>${input.subtitle ? `<div class="subtitle">${escapeHtml(input.subtitle)}</div>` : ''}`;
 
   const head = input.headers
@@ -129,10 +135,16 @@ export function buildPrintHtml(input: PrintReportInput, now: Date = new Date()):
   }).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(running)}</title><style>
-@page { margin: 14mm 12mm 18mm;
+@page { margin: 0 12mm 18mm;
   @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt Arial, sans-serif; color: #666; } }
-body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; margin: 0; }
-th.report-head { text-align: center; padding: 0 0 14px; border: 0; text-transform: none; letter-spacing: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; margin: 0; background: #e9e9e9; }
+.print-bar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #ccc; font-size: 13px; }
+.print-bar label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.print-bar button { margin-left: auto; padding: 6px 18px; font-size: 13px; color: #fff; background: #2563eb; border: 0; border-radius: 4px; cursor: pointer; }
+.sheet { box-sizing: border-box; width: 8.5in; margin: 16px auto; padding: 0 12mm 18mm; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+body[data-orientation="landscape"] .sheet { width: 11in; }
+@media print { .print-bar { display: none; } body { background: none; } .sheet { width: auto; margin: 0; padding: 0; box-shadow: none; } }
+th.report-head { text-align: center; padding: 12mm 0 14px; border: 0; text-transform: none; letter-spacing: 0; }
 .company { font-size: 16px; font-weight: 700; }
 .title { font-size: 13px; font-weight: 600; margin-top: 2px; }
 .subtitle { font-size: 10.5px; font-weight: 400; color: #444; margin-top: 2px; }
@@ -146,14 +158,25 @@ tr { page-break-inside: avoid; }
 tr.total td { font-weight: 700; border-top: 1px solid #111; border-bottom: 1px solid #111; }
 tr.section td { font-weight: 700; background: #f3f3f3; }
 footer { margin-top: 12px; font-size: 8.5px; color: #666; }
-</style></head><body>
+</style><style id="page-size">@page { size: letter ${orientation}; }</style></head><body data-orientation="${orientation}">
+<div class="print-bar"><strong>Orientation</strong><label>${radio('portrait')} Portrait</label><label>${radio('landscape')} Landscape</label><button type="button" id="print">Print</button></div>
+<div class="sheet">
 <table><thead><tr><th class="report-head" colspan="${input.headers.length}">${reportHead}</th></tr><tr>${head}</tr></thead><tbody>${body}</tbody></table>
 <footer>${escapeHtml(generatedLine(now))}</footer>
-<script>window.onload=function(){window.print()}</script>
+</div>
+<script>
+document.querySelectorAll('input[name="orientation"]').forEach(function (radio) {
+  radio.addEventListener('change', function () {
+    document.getElementById('page-size').textContent = '@page { size: letter ' + radio.value + '; }';
+    document.body.setAttribute('data-orientation', radio.value);
+  });
+});
+document.getElementById('print').addEventListener('click', function () { window.print(); });
+</script>
 </body></html>`;
 }
 
-/** Open the print dialog (print or "Save as PDF") for a report. */
+/** Open the print preview for a report: pick portrait or landscape, then Print (or "Save as PDF"). */
 export function printReport(input: PrintReportInput): void {
   const win = window.open('', '_blank');
   if (!win) return;
