@@ -53,7 +53,8 @@ meeting, [`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md).
 ## To discuss, not to build yet
 
 - **My Menu** (the button at the bottom of the sidebar). Faizan does not think
-  it is needed. On 10-16 it was left as it is for now.
+  it is needed. Decided in the 10-16 meeting: take it out (item 76 in
+  [`2026-10-16-follow-ups.md`](./2026-10-16-follow-ups.md)).
 
 ## Notes on the items
 
@@ -131,4 +132,4 @@ in the 10-10 notes), and the second video.
 
 - **Which site he tests on**, and when the video was recorded (see "Already
   fixed").
-- **My Menu.** Remove it, or keep it? Left as it is on 10-16.
+- ~~My Menu~~: answered in the 10-16 meeting, remove it (item 76).

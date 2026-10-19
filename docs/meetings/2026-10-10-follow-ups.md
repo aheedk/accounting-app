@@ -12,7 +12,10 @@ mark which meeting an item first came from.
 - **January 1, 2027** — planned launch to outside customers.
 
 What was built from this list is shown in Aheed's demo for the 10-16 meeting,
-[`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md).
+[`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md). Anything still
+open here is carried into
+[`2026-10-16-follow-ups.md`](./2026-10-16-follow-ups.md) with the same item
+number; work from that file.
 
 ## What changed in this meeting
 
