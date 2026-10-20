@@ -80,7 +80,18 @@ import { holdStaffEntries } from './middleware/approvalHold.js';
 
 export function makeApp(): Express {
   const app = express();
+  // Railway's proxy is the one hop in front of the API: req.ip is then the
+  // visitor's address, for the sign-in limit and the Activity Log, instead of
+  // the proxy's. Express takes the last X-Forwarded-For entry, which the proxy
+  // writes, so a visitor cannot choose it.
+  app.set('trust proxy', 1);
   app.use(requestId);
+  // Browsers take the declared type of everything the API sends, never a guess.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
   app.use(requestTiming);
   app.use(cors({
     origin: (origin, cb) => {

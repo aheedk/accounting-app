@@ -8,7 +8,7 @@ import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getEffectiveRate } from '../tax/taxCodeService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type InvoiceLineInput = {
   description: string;
@@ -100,7 +100,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function postInvoice(trx: Transaction<DB>, ctx: ServiceCtx, input: { invoice_id: string }) {
-  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).executeTakeFirst();
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!inv) throw new NotFoundError('invoice', input.invoice_id);
   if (inv.status !== 'draft') throw new InvalidStateTransitionError('invoice', inv.id, inv.status, 'posted');
 
@@ -158,7 +158,7 @@ export async function voidInvoice(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { invoice_id: string; void_reason: string },
 ) {
-  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).executeTakeFirst();
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!inv) throw new NotFoundError('invoice', input.invoice_id);
   if (inv.status !== 'posted' && inv.status !== 'paid') throw new InvalidStateTransitionError('invoice', inv.id, inv.status, 'voided');
 
@@ -277,7 +277,7 @@ export async function addLine(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { invoice_id: string; line: InvoiceLineInput },
 ) {
-  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).executeTakeFirst();
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!inv) throw new NotFoundError('invoice', input.invoice_id);
   if (inv.status !== 'draft') throw new InvalidStateTransitionError('invoice', inv.id, inv.status, 'mutate');
 
@@ -300,7 +300,7 @@ export async function addLine(
 export async function removeLine(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { invoice_id: string; line_id: string },
 ) {
-  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).executeTakeFirst();
+  const inv = await trx.selectFrom('invoices').selectAll().where('id', '=', input.invoice_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!inv) throw new NotFoundError('invoice', input.invoice_id);
   if (inv.status !== 'draft') throw new InvalidStateTransitionError('invoice', inv.id, inv.status, 'mutate');
 

@@ -4,7 +4,7 @@ import type { DB } from '../../db/types.js';
 import { BusinessRuleError, AuthError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export async function findPeriodForDate(db: Kysely<DB>, business_id: string, date: string) {
   return db.selectFrom('fiscal_periods')
@@ -46,7 +46,7 @@ export async function closePeriod(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { period_id: string },
 ) {
   const period = await trx.selectFrom('fiscal_periods').selectAll()
-    .where('id', '=', input.period_id).executeTakeFirst();
+    .where('id', '=', input.period_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!period) throw new BusinessRuleError(ERR.NOT_FOUND, `Period ${input.period_id} not found`);
   if (period.status === 'closed') throw new PreconditionError('Period is already closed');
 
@@ -79,7 +79,7 @@ export async function reopenPeriod(
   if (ctx.effective_role !== 'firm_admin') {
     throw new AuthError(ERR.FORBIDDEN, 'Only firm_admin can reopen periods');
   }
-  const period = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', input.period_id).executeTakeFirst();
+  const period = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', input.period_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!period) throw new BusinessRuleError(ERR.NOT_FOUND, `Period ${input.period_id} not found`);
   if (period.status === 'open') throw new PreconditionError('Period is already open');
 

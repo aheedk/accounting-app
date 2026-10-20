@@ -7,7 +7,7 @@ import { BillHasApplicationsError } from '../../lib/apErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type BillLineInput = {
   description: string;
@@ -84,7 +84,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function postBill(trx: Transaction<DB>, ctx: ServiceCtx, input: { bill_id: string }) {
-  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).executeTakeFirst();
+  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!bill) throw new NotFoundError('bill', input.bill_id);
   if (bill.status !== 'draft') throw new InvalidStateTransitionError('bill', bill.id, bill.status, 'posted');
 
@@ -130,7 +130,7 @@ export async function voidBill(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { bill_id: string; void_reason: string },
 ) {
-  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).executeTakeFirst();
+  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!bill) throw new NotFoundError('bill', input.bill_id);
   if (bill.status !== 'posted' && bill.status !== 'paid') throw new InvalidStateTransitionError('bill', bill.id, bill.status, 'voided');
 
@@ -229,7 +229,7 @@ export async function addLine(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { bill_id: string; line: BillLineInput },
 ) {
-  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).executeTakeFirst();
+  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!bill) throw new NotFoundError('bill', input.bill_id);
   if (bill.status !== 'draft') throw new InvalidStateTransitionError('bill', bill.id, bill.status, 'mutate');
 
@@ -252,7 +252,7 @@ export async function addLine(
 export async function removeLine(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { bill_id: string; line_id: string },
 ) {
-  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).executeTakeFirst();
+  const bill = await trx.selectFrom('bills').selectAll().where('id', '=', input.bill_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!bill) throw new NotFoundError('bill', input.bill_id);
   if (bill.status !== 'draft') throw new InvalidStateTransitionError('bill', bill.id, bill.status, 'mutate');
 

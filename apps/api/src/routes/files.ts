@@ -47,8 +47,9 @@ router.post('/businesses/:businessId/files', requireMinRole('staff'), upload.sin
 router.get('/businesses/:businessId/files/:id/download', async (req, res, next) => {
   try {
     const { row, buffer } = await files.streamFile(db, req.tenancy!.business_id, req.params['id']!);
-    res.setHeader('Content-Type', row.mime_type);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(row.original_name)}"`);
+    const headers = files.downloadHeaders(row.mime_type, row.original_name);
+    res.setHeader('Content-Type', headers.type);
+    res.setHeader('Content-Disposition', headers.disposition);
     res.setHeader('Content-Length', String(buffer.length));
     res.end(buffer);
   } catch (e) { next(e); }

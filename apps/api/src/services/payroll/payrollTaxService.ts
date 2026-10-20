@@ -4,7 +4,7 @@ import type { DB, PayrollTaxStatus, PayrollTaxPeriod } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry } from '../core/ledgerService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export async function recordLiability(trx: Transaction<DB>, ctx: ServiceCtx, input: {
   business_id: string;
@@ -38,7 +38,7 @@ export async function payLiability(trx: Transaction<DB>, ctx: ServiceCtx, input:
   payment_date: string;
 }) {
   const before = await trx.selectFrom('payroll_tax_liabilities').selectAll()
-    .where('id', '=', input.liability_id).executeTakeFirst();
+    .where('id', '=', input.liability_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('payroll_tax_liability', input.liability_id);
   if (before.status === 'paid') {
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'liability already paid');

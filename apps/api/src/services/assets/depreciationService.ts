@@ -6,7 +6,7 @@ import { NotFoundError } from '../../lib/errors.js';
 import { InvalidStateTransitionError, PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry } from '../core/ledgerService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type RunDepreciationInput = {
   fixed_asset_id: string;
@@ -19,7 +19,7 @@ export async function runDepreciation(
   input: RunDepreciationInput,
 ) {
   const asset = await trx.selectFrom('fixed_assets').selectAll()
-    .where('id', '=', input.fixed_asset_id)
+    .where('id', '=', input.fixed_asset_id).where('business_id', '=', scopeBusiness(ctx))
     .where('deleted_at', 'is', null)
     .executeTakeFirst();
   if (!asset) throw new NotFoundError('fixed_asset', input.fixed_asset_id);

@@ -5,7 +5,7 @@ import { BusinessRuleError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry } from './ledgerService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateAccountInput = {
   business_id: string;
@@ -133,7 +133,7 @@ export async function updateAccount(
   input: { account_id: string; patch: AccountPatch },
 ) {
   const row = await trx.selectFrom('chart_of_accounts').selectAll()
-    .where('id', '=', input.account_id).executeTakeFirst();
+    .where('id', '=', input.account_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!row) throw new BusinessRuleError(ERR.NOT_FOUND, `Account ${input.account_id} not found`);
 
   // A locked account only accepts being unlocked; every other change waits.

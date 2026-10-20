@@ -3,7 +3,7 @@ import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateLabelInput = {
   business_id: string;
@@ -55,7 +55,7 @@ export async function createLabel(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 
 export async function deleteLabel(trx: Transaction<DB>, ctx: ServiceCtx, input: { label_id: string }) {
   const before = await trx.selectFrom('shipping_labels').selectAll()
-    .where('id', '=', input.label_id).executeTakeFirst();
+    .where('id', '=', input.label_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('shipping_label', input.label_id);
   await trx.deleteFrom('shipping_labels').where('id', '=', input.label_id).execute();
   await auditRecord(trx, ctx, {

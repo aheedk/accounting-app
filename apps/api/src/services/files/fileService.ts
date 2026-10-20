@@ -13,6 +13,24 @@ export type UploadFileInput = {
   buffer: Buffer;
 };
 
+// Types a browser can show without running anything. A page that opens a file
+// in a tab does it through a blob: URL of the type sent here, and that page runs
+// in the app's own origin, where the sign-in token is kept. So an uploaded HTML
+// or SVG file (or anything else) is only ever sent as a plain download. Today's
+// pages save attachments rather than open them; this keeps a new one safe.
+const SHOWN_INLINE = new Set([
+  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain', 'text/csv',
+]);
+
+/** Content-Type and Content-Disposition for sending a stored file back. */
+export function downloadHeaders(mime_type: string, original_name: string): { type: string; disposition: string } {
+  const name = encodeURIComponent(original_name);
+  const mime = mime_type.split(';')[0]!.trim().toLowerCase();
+  return SHOWN_INLINE.has(mime)
+    ? { type: mime, disposition: `inline; filename="${name}"` }
+    : { type: 'application/octet-stream', disposition: `attachment; filename="${name}"` };
+}
+
 export async function uploadFile(trx: Transaction<DB>, ctx: ServiceCtx, input: UploadFileInput) {
   const stored = await fileStorage.store(input.buffer, input.mime_type);
   const row = await trx.insertInto('files').values({

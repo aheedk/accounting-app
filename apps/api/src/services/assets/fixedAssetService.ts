@@ -4,7 +4,7 @@ import type { DB, FixedAssetsTable } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type FixedAsset = Selectable<FixedAssetsTable>;
 
@@ -94,7 +94,7 @@ export async function updateFixedAsset(
   trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateFixedAssetInput,
 ): Promise<FixedAsset> {
   const before = await trx.selectFrom('fixed_assets').selectAll()
-    .where('id', '=', input.fixed_asset_id).executeTakeFirst();
+    .where('id', '=', input.fixed_asset_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('fixed_asset', input.fixed_asset_id);
 
   const updated = await trx.updateTable('fixed_assets').set({

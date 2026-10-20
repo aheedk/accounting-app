@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { schemas } from '@accounting/shared';
+import { ERR, schemas } from '@accounting/shared';
 import { db } from '../db/index.js';
 import { login, refresh, logout } from '../services/auth/authService.js';
 import * as account from '../services/auth/accountService.js';
@@ -7,6 +7,8 @@ import { hashRefreshToken } from '../services/auth/tokenService.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import { config } from '../config.js';
+import { AuthError } from '../lib/errors.js';
+import { addressRefusal, clearSignInFailures, recordFailedSignIn } from '../lib/loginThrottle.js';
 
 const router = Router();
 
@@ -32,9 +34,20 @@ function setRefreshCookie(res: Response, raw: string) {
 }
 
 router.post('/auth/login', async (req, res, next) => {
+  const address = req.ip ?? 'unknown';
   try {
+    const refusal = addressRefusal(address);
+    if (refusal) throw new AuthError(ERR.ACCOUNT_LOCKED, refusal);
     const body = schemas.loginRequestSchema.parse(req.body);
-    const out = await login(db, body, reqMeta(req));
+    let out: Awaited<ReturnType<typeof login>>;
+    try {
+      out = await login(db, body, reqMeta(req));
+    } catch (e: unknown) {
+      // A wrong password or code counts against the address; "a code is needed" does not.
+      if (e instanceof AuthError && e.code === ERR.INVALID_CREDENTIALS) recordFailedSignIn(address);
+      throw e;
+    }
+    clearSignInFailures(address);
     setRefreshCookie(res, out.refresh_token);
     const { refresh_token: _rt, ...publicOut } = out;
     void _rt;

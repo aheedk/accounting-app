@@ -8,7 +8,7 @@ import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
 import { nextCounter } from '../core/numberingService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateDraftCreditMemoInput = {
   business_id: string;
@@ -37,7 +37,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function postCreditMemo(trx: Transaction<DB>, ctx: ServiceCtx, input: { credit_memo_id: string }) {
-  const cm = await trx.selectFrom('credit_memos').selectAll().where('id', '=', input.credit_memo_id).executeTakeFirst();
+  const cm = await trx.selectFrom('credit_memos').selectAll().where('id', '=', input.credit_memo_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!cm) throw new NotFoundError('credit_memo', input.credit_memo_id);
   if (cm.status !== 'draft') throw new InvalidStateTransitionError('credit_memo', cm.id, cm.status, 'posted');
 
@@ -63,7 +63,7 @@ export async function applyToInvoice(
   input: { credit_memo_id: string; invoice_id: string; applied_amount: string },
 ) {
   if (parseFloat(input.applied_amount) <= 0) throw new PreconditionError('applied_amount must be > 0');
-  const cm = await trx.selectFrom('credit_memos').selectAll().where('id', '=', input.credit_memo_id).executeTakeFirst();
+  const cm = await trx.selectFrom('credit_memos').selectAll().where('id', '=', input.credit_memo_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!cm) throw new NotFoundError('credit_memo', input.credit_memo_id);
   if (cm.status !== 'posted' && cm.status !== 'applied') throw new InvalidStateTransitionError('credit_memo', cm.id, cm.status, 'apply');
   if (parseFloat(input.applied_amount) > parseFloat(cm.remaining_amount)) {
@@ -119,7 +119,7 @@ export async function applyToInvoice(
 export async function voidCreditMemo(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { credit_memo_id: string; void_reason: string },
 ) {
-  const cm = await trx.selectFrom('credit_memos').selectAll().where('id', '=', input.credit_memo_id).executeTakeFirst();
+  const cm = await trx.selectFrom('credit_memos').selectAll().where('id', '=', input.credit_memo_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!cm) throw new NotFoundError('credit_memo', input.credit_memo_id);
   if (cm.status !== 'posted' && cm.status !== 'applied') throw new InvalidStateTransitionError('credit_memo', cm.id, cm.status, 'voided');
 

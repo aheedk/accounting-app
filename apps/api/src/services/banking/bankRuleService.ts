@@ -4,7 +4,7 @@ import type { DB, BankRuleSignFilter } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateRuleInput = {
   business_id: string;
@@ -65,7 +65,7 @@ export async function createRule(trx: Transaction<DB>, ctx: ServiceCtx, input: C
 
 export async function updateRule(trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateRuleInput) {
   const before = await trx.selectFrom('bank_transaction_rules').selectAll()
-    .where('id', '=', input.rule_id).executeTakeFirst();
+    .where('id', '=', input.rule_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('bank_rule', input.rule_id);
 
   if (input.patch.offset_account_id !== undefined) {
@@ -101,7 +101,7 @@ export async function updateRule(trx: Transaction<DB>, ctx: ServiceCtx, input: U
 
 export async function deleteRule(trx: Transaction<DB>, ctx: ServiceCtx, input: { rule_id: string }) {
   const before = await trx.selectFrom('bank_transaction_rules').selectAll()
-    .where('id', '=', input.rule_id).executeTakeFirst();
+    .where('id', '=', input.rule_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('bank_rule', input.rule_id);
 
   await trx.updateTable('bank_transaction_rules').set({ deleted_at: sql`now()` })

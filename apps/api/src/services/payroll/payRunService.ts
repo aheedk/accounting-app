@@ -10,7 +10,7 @@ import type { DB, PayRunStatus } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type PayRunLineInput = {
   employee_id: string;
@@ -127,7 +127,7 @@ export async function finalize(
   input: { pay_run_id: string },
 ) {
   const run = await trx.selectFrom('pay_runs').selectAll()
-    .where('id', '=', input.pay_run_id).executeTakeFirst();
+    .where('id', '=', input.pay_run_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!run) throw new NotFoundError('pay_run', input.pay_run_id);
   if (run.status !== 'draft') {
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED, `pay run is ${run.status}, not draft`);
@@ -225,7 +225,7 @@ export async function voidPayRun(
   input: { pay_run_id: string; void_reason?: string },
 ) {
   const before = await trx.selectFrom('pay_runs').selectAll()
-    .where('id', '=', input.pay_run_id).executeTakeFirst();
+    .where('id', '=', input.pay_run_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('pay_run', input.pay_run_id);
   if (before.status === 'void') throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'already void');
 

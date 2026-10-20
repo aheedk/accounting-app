@@ -4,7 +4,7 @@ import type { DB, PayFrequency, W4FilingStatus } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { encryptField, decryptField, lastFour } from '../../lib/fieldCrypto.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateEmployeeInput = {
   business_id: string;
@@ -83,7 +83,7 @@ export async function updateEmployee(
   input: { employee_id: string; patch: Partial<CreateEmployeeInput> & { is_active?: boolean } },
 ) {
   const before = await trx.selectFrom('employees').selectAll()
-    .where('id', '=', input.employee_id).executeTakeFirst();
+    .where('id', '=', input.employee_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('employee', input.employee_id);
 
   let ssnPatch: Partial<{
@@ -130,7 +130,7 @@ export async function deleteEmployee(
   input: { employee_id: string },
 ) {
   const before = await trx.selectFrom('employees').selectAll()
-    .where('id', '=', input.employee_id).executeTakeFirst();
+    .where('id', '=', input.employee_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('employee', input.employee_id);
 
   await trx.updateTable('employees')

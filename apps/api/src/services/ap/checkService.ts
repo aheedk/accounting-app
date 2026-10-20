@@ -98,17 +98,24 @@ function payeeName(row: { vendor_name?: string | null; customer_name?: string | 
   return row.vendor_name ?? row.customer_name ?? row.payee_text;
 }
 
+// The payee must be this client's own vendor or customer; an id from another
+// client is refused rather than saved on the check (security review 2026-10-20).
 async function resolvePayeeName(
   trx: Transaction<DB>,
+  business_id: string,
   input: { payee_text?: string | null; payee_id?: string | null; payee_type?: CheckPayeeType | null },
 ): Promise<string | null> {
   if (input.payee_id && input.payee_type === 'vendor') {
-    const v = await trx.selectFrom('vendors').select('name').where('id', '=', input.payee_id).executeTakeFirst();
-    return v?.name ?? input.payee_text ?? null;
+    const v = await trx.selectFrom('vendors').select('name')
+      .where('id', '=', input.payee_id).where('business_id', '=', business_id).executeTakeFirst();
+    if (!v) throw new NotFoundError('vendor', input.payee_id);
+    return v.name;
   }
   if (input.payee_id && input.payee_type === 'customer') {
-    const c = await trx.selectFrom('customers').select('name').where('id', '=', input.payee_id).executeTakeFirst();
-    return c?.name ?? input.payee_text ?? null;
+    const c = await trx.selectFrom('customers').select('name')
+      .where('id', '=', input.payee_id).where('business_id', '=', business_id).executeTakeFirst();
+    if (!c) throw new NotFoundError('customer', input.payee_id);
+    return c.name;
   }
   return input.payee_text ?? null;
 }
@@ -249,7 +256,7 @@ export async function createCheck(trx: Transaction<DB>, ctx: ServiceCtx, input: 
     source_type: 'check',
     source_id: check.id,
     transaction_type: 'check',
-    payee_name: await resolvePayeeName(trx, input),
+    payee_name: await resolvePayeeName(trx, bizId, input),
     memo: input.memo ?? null,
     reference: checkNumber,
     lines: buildCheckJeLines(input.lines, bankAccount.cash_account_id, total, input.memo),
@@ -324,7 +331,7 @@ export async function updateCheck(
   // expenseTransactionService.updateExpense for why this replaced void+repost.
   let journalEntryId = before.journal_entry_id;
   const jeLines = buildCheckJeLines(input.lines, bankAccount.cash_account_id, total, input.memo);
-  const payeeName = await resolvePayeeName(trx, input);
+  const payeeName = await resolvePayeeName(trx, bizId, input);
   if (before.journal_entry_id) {
     const existingSource = await existingJeSource(trx, before.journal_entry_id);
     const je = await ledger.updateJournalEntry(trx, ctx, {

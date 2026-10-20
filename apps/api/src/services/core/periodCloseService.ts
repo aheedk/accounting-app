@@ -4,14 +4,14 @@ import type { DB } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { InvalidStateTransitionError, PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 import { suspenseBalance } from '../ai/suspenseService.js';
 
 export async function closePeriod(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { period_id: string; memo: string | null },
 ) {
-  const p = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', input.period_id).executeTakeFirst();
+  const p = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', input.period_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!p) throw new NotFoundError('fiscal_period', input.period_id);
   if (p.status !== 'open') throw new InvalidStateTransitionError('fiscal_period', p.id, p.status, 'closed');
 
@@ -56,7 +56,7 @@ export async function reopenPeriod(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { period_id: string; reason: string },
 ) {
-  const p = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', input.period_id).executeTakeFirst();
+  const p = await trx.selectFrom('fiscal_periods').selectAll().where('id', '=', input.period_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!p) throw new NotFoundError('fiscal_period', input.period_id);
   if (p.status !== 'closed') throw new InvalidStateTransitionError('fiscal_period', p.id, p.status, 'open');
 

@@ -8,7 +8,7 @@ import type {
 } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type Budget = Selectable<BudgetsTable>;
 export type BudgetLine = Selectable<BudgetLinesTable>;
@@ -76,7 +76,7 @@ export async function updateBudget(
   input: UpdateBudgetInput,
 ): Promise<Budget> {
   const before = await trx.selectFrom('budgets').selectAll()
-    .where('id', '=', input.budget_id)
+    .where('id', '=', input.budget_id).where('business_id', '=', scopeBusiness(ctx))
     .executeTakeFirst();
   if (!before) throw new NotFoundError('budget', input.budget_id);
 
@@ -106,7 +106,7 @@ export async function deleteBudget(
   input: DeleteBudgetInput,
 ): Promise<void> {
   const before = await trx.selectFrom('budgets').selectAll()
-    .where('id', '=', input.budget_id)
+    .where('id', '=', input.budget_id).where('business_id', '=', scopeBusiness(ctx))
     .executeTakeFirst();
   if (!before) throw new NotFoundError('budget', input.budget_id);
 
@@ -124,13 +124,13 @@ export async function deleteBudget(
 
 export async function setBudgetLine(
   trx: Transaction<DB>,
-  _ctx: ServiceCtx,
+  ctx: ServiceCtx,
   input: SetBudgetLineInput,
 ): Promise<BudgetLine> {
   // Verify the parent budget exists so we don't silently insert orphaned lines
   // when an arbitrary uuid is passed.
   const budget = await trx.selectFrom('budgets').select('id')
-    .where('id', '=', input.budget_id)
+    .where('id', '=', input.budget_id).where('business_id', '=', scopeBusiness(ctx))
     .executeTakeFirst();
   if (!budget) throw new NotFoundError('budget', input.budget_id);
 

@@ -3,7 +3,7 @@ import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateCustomerInput = {
   business_id: string;
@@ -118,7 +118,7 @@ export async function updateCustomer(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { customer_id: string; patch: Partial<CreateCustomerInput> & { is_active?: boolean } },
 ) {
-  const before = await trx.selectFrom('customers').selectAll().where('id', '=', input.customer_id).executeTakeFirst();
+  const before = await trx.selectFrom('customers').selectAll().where('id', '=', input.customer_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('customer', input.customer_id);
 
   const updated = await trx.updateTable('customers').set({
@@ -159,7 +159,7 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(trx: Transaction<DB>, ctx: ServiceCtx, input: { customer_id: string }) {
-  const before = await trx.selectFrom('customers').selectAll().where('id', '=', input.customer_id).executeTakeFirst();
+  const before = await trx.selectFrom('customers').selectAll().where('id', '=', input.customer_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('customer', input.customer_id);
 
   // The same rule as vendors: a customer with any history is made inactive, not deleted.

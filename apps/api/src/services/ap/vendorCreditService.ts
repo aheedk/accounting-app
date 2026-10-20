@@ -8,7 +8,7 @@ import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
 import { nextCounter } from '../core/numberingService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateDraftVendorCreditInput = {
   business_id: string;
@@ -37,7 +37,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function postVendorCredit(trx: Transaction<DB>, ctx: ServiceCtx, input: { vendor_credit_id: string }) {
-  const vc = await trx.selectFrom('vendor_credits').selectAll().where('id', '=', input.vendor_credit_id).executeTakeFirst();
+  const vc = await trx.selectFrom('vendor_credits').selectAll().where('id', '=', input.vendor_credit_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!vc) throw new NotFoundError('vendor_credit', input.vendor_credit_id);
   if (vc.status !== 'draft') throw new InvalidStateTransitionError('vendor_credit', vc.id, vc.status, 'posted');
 
@@ -63,7 +63,7 @@ export async function applyToBill(
   input: { vendor_credit_id: string; bill_id: string; applied_amount: string },
 ) {
   if (parseFloat(input.applied_amount) <= 0) throw new PreconditionError('applied_amount must be > 0');
-  const vc = await trx.selectFrom('vendor_credits').selectAll().where('id', '=', input.vendor_credit_id).executeTakeFirst();
+  const vc = await trx.selectFrom('vendor_credits').selectAll().where('id', '=', input.vendor_credit_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!vc) throw new NotFoundError('vendor_credit', input.vendor_credit_id);
   if (vc.status !== 'posted' && vc.status !== 'applied') throw new InvalidStateTransitionError('vendor_credit', vc.id, vc.status, 'apply');
   if (parseFloat(input.applied_amount) > parseFloat(vc.remaining_amount)) {
@@ -119,7 +119,7 @@ export async function applyToBill(
 export async function voidVendorCredit(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { vendor_credit_id: string; void_reason: string },
 ) {
-  const vc = await trx.selectFrom('vendor_credits').selectAll().where('id', '=', input.vendor_credit_id).executeTakeFirst();
+  const vc = await trx.selectFrom('vendor_credits').selectAll().where('id', '=', input.vendor_credit_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!vc) throw new NotFoundError('vendor_credit', input.vendor_credit_id);
   if (vc.status !== 'posted' && vc.status !== 'applied') throw new InvalidStateTransitionError('vendor_credit', vc.id, vc.status, 'voided');
 

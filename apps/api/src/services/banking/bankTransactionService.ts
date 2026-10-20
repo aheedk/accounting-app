@@ -5,7 +5,7 @@ import { NotFoundError } from '../../lib/errors.js';
 import { InvalidStateTransitionError, PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry } from '../core/ledgerService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type ImportRowInput = {
   transaction_date: string;
@@ -101,7 +101,7 @@ export async function undoImport(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { batch_id: string },
 ): Promise<{ deleted: number; kept: number }> {
   const batch = await trx.selectFrom('bank_import_batches').selectAll()
-    .where('id', '=', input.batch_id).executeTakeFirst();
+    .where('id', '=', input.batch_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!batch) throw new NotFoundError('bank_import_batch', input.batch_id);
   if (batch.undone_at) throw new PreconditionError('import batch already undone');
 
@@ -280,7 +280,7 @@ export async function unreview(
   input: { bank_transaction_id: string },
 ) {
   const bt = await trx.selectFrom('bank_transactions').selectAll()
-    .where('id', '=', input.bank_transaction_id).executeTakeFirst();
+    .where('id', '=', input.bank_transaction_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!bt) throw new NotFoundError('bank_transaction', input.bank_transaction_id);
   if (bt.is_reconciled) {
     throw new PreconditionError('Cannot unreview a reconciled bank transaction');

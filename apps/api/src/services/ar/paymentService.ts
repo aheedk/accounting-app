@@ -7,7 +7,7 @@ import { OverApplicationError, PaymentHasApplicationsError } from '../../lib/arE
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateDraftPaymentInput = {
   business_id: string;
@@ -62,7 +62,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function postPayment(trx: Transaction<DB>, ctx: ServiceCtx, input: { payment_id: string }) {
-  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('payment', input.payment_id);
   if (payment.status !== 'draft') throw new InvalidStateTransitionError('payment', payment.id, payment.status, 'posted');
 
@@ -98,7 +98,7 @@ async function applyToInvoiceInternal(
   trx: Transaction<DB>, ctx: ServiceCtx,
   args: { payment_id: string; invoice_id: string; applied_amount: string; audit: boolean },
 ) {
-  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', args.payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', args.payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('payment', args.payment_id);
   if (payment.status === 'voided') throw new InvalidStateTransitionError('payment', payment.id, 'voided', 'apply');
   if (parseFloat(args.applied_amount) <= 0) throw new PreconditionError('applied_amount must be > 0');
@@ -149,14 +149,14 @@ export async function addApplication(
   input: { payment_id: string; invoice_id: string; applied_amount: string },
 ) {
   await applyToInvoiceInternal(trx, ctx, { ...input, audit: true });
-  return trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).executeTakeFirstOrThrow();
+  return trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirstOrThrow();
 }
 
 export async function removeApplication(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { payment_id: string; application_id: string },
 ) {
-  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('payment', input.payment_id);
   const app = await trx.selectFrom('payment_applications').selectAll().where('id', '=', input.application_id).executeTakeFirst();
   if (!app || app.payment_id !== input.payment_id) throw new NotFoundError('payment_application', input.application_id);
@@ -178,7 +178,7 @@ export async function removeApplication(
 export async function voidPayment(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { payment_id: string; void_reason: string },
 ) {
-  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('payments').selectAll().where('id', '=', input.payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('payment', input.payment_id);
   if (payment.status !== 'posted') throw new InvalidStateTransitionError('payment', payment.id, payment.status, 'voided');
 

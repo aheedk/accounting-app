@@ -6,7 +6,7 @@ import { record as auditRecord } from '../audit/auditService.js';
 import * as invSvc from '../ar/invoiceService.js';
 import { adjustStock } from '../inventory/stockMovementService.js';
 import { nextNumber } from '../core/numberingService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateSOLineInput = {
   inventory_item_id: string;
@@ -69,7 +69,7 @@ export async function createSO(trx: Transaction<DB>, ctx: ServiceCtx, input: Cre
 
 export async function fulfill(trx: Transaction<DB>, ctx: ServiceCtx, input: { so_id: string }) {
   const before = await trx.selectFrom('sales_orders').selectAll()
-    .where('id', '=', input.so_id).executeTakeFirst();
+    .where('id', '=', input.so_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('sales_order', input.so_id);
   if (before.status === 'void') {
     throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'cannot fulfill a voided SO');
@@ -158,7 +158,7 @@ export async function fulfill(trx: Transaction<DB>, ctx: ServiceCtx, input: { so
 
 export async function voidSO(trx: Transaction<DB>, ctx: ServiceCtx, input: { so_id: string }) {
   const before = await trx.selectFrom('sales_orders').selectAll()
-    .where('id', '=', input.so_id).executeTakeFirst();
+    .where('id', '=', input.so_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('sales_order', input.so_id);
   if (before.status === 'fulfilled') {
     throw new BusinessRuleError(

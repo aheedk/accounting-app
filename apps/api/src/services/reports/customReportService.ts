@@ -3,7 +3,7 @@ import { AUDIT, schemas } from '@accounting/shared';
 import type { CustomReportDefinitionsTable, DB } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CustomReport = Selectable<CustomReportDefinitionsTable>;
 
@@ -57,7 +57,7 @@ export async function updateReport(
   input: UpdateCustomReportInput,
 ): Promise<CustomReport> {
   const before = await trx.selectFrom('custom_report_definitions').selectAll()
-    .where('id', '=', input.report_id)
+    .where('id', '=', input.report_id).where('business_id', '=', scopeBusiness(ctx))
     .executeTakeFirst();
   if (!before) throw new NotFoundError('custom_report', input.report_id);
 
@@ -87,7 +87,7 @@ export async function deleteReport(
   input: DeleteCustomReportInput,
 ): Promise<void> {
   const before = await trx.selectFrom('custom_report_definitions').selectAll()
-    .where('id', '=', input.report_id)
+    .where('id', '=', input.report_id).where('business_id', '=', scopeBusiness(ctx))
     .executeTakeFirst();
   if (!before) throw new NotFoundError('custom_report', input.report_id);
 

@@ -22,3 +22,13 @@ export function systemCtx(overrides: Partial<ServiceCtx> & Pick<ServiceCtx, 'fir
     ...overrides,
   };
 }
+
+/**
+ * The business a service call acts on. Services add it to every lookup of a
+ * record by id, so an id belonging to another client is simply not found.
+ * Every request under /businesses/:businessId and every scheduled job sets it.
+ */
+export function scopeBusiness(ctx: ServiceCtx): string {
+  if (!ctx.business_id) throw new Error('This action needs a business in the request context');
+  return ctx.business_id;
+}

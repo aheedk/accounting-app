@@ -1,7 +1,7 @@
 import { sql, type Transaction, type Kysely } from 'kysely';
 import { AUDIT, hasMinRole } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 import * as ledger from '../core/ledgerService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { nextCounter } from '../core/numberingService.js';
@@ -492,7 +492,7 @@ export async function wrapImportedDepositJournalEntry(
   if (!bankAccount) {
     const chartAccount = await trx.selectFrom('chart_of_accounts')
       .select(['name'])
-      .where('id', '=', input.chart_account_id)
+      .where('id', '=', input.chart_account_id).where('business_id', '=', scopeBusiness(ctx))
       .executeTakeFirstOrThrow();
     bankAccount = await trx.insertInto('bank_accounts').values({
       business_id: bizId,

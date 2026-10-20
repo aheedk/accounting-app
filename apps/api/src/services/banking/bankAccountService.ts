@@ -5,7 +5,7 @@ import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { computeAccountBalance } from '../core/ledgerService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateBankAccountInput = {
   business_id: string;
@@ -51,7 +51,7 @@ export async function createBankAccount(trx: Transaction<DB>, ctx: ServiceCtx, i
 
 export async function updateBankAccount(trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateBankAccountInput) {
   const before = await trx.selectFrom('bank_accounts').selectAll()
-    .where('id', '=', input.bank_account_id).executeTakeFirst();
+    .where('id', '=', input.bank_account_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('bank_account', input.bank_account_id);
 
   const updated = await trx.updateTable('bank_accounts').set({

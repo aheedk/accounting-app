@@ -10,7 +10,7 @@ import * as billService from '../ap/billService.js';
 import * as depositService from '../banking/bankDepositService.js';
 import * as expenseService from '../ap/expenseTransactionService.js';
 import * as checkService from '../ap/checkService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 import type { PaymentMethod, CheckPayeeType } from '../../db/types.js';
 
 export type RecurringTemplateRow = Selectable<RecurringTemplatesTable>;
@@ -118,7 +118,7 @@ export type UpdateTemplateInput = {
 
 export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateTemplateInput) {
   const before = await trx.selectFrom('recurring_templates').selectAll()
-    .where('id', '=', input.template_id).executeTakeFirst();
+    .where('id', '=', input.template_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('recurring_template', input.template_id);
 
   const patch: {
@@ -426,7 +426,7 @@ export async function deleteTemplate(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { template_id: string },
 ) {
   const before = await trx.selectFrom('recurring_templates').selectAll()
-    .where('id', '=', input.template_id).executeTakeFirst();
+    .where('id', '=', input.template_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('recurring_template', input.template_id);
   await trx.deleteFrom('recurring_templates').where('id', '=', input.template_id).execute();
   await auditRecord(trx, ctx, {

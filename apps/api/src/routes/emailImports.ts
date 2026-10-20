@@ -270,6 +270,8 @@ router.post(
         .selectFrom('email_import_staging')
         .selectAll()
         .where('id', '=', req.params['importId']!)
+        // Only this client's import: the id alone would reach another client's.
+        .where('business_id', '=', bizId)
         .where('status', '=', 'pending')
         .executeTakeFirst();
 
@@ -498,8 +500,10 @@ router.post(
     try {
       const result = await db
         .updateTable('email_import_staging')
-        .set({ status: 'rejected', business_id: req.tenancy!.business_id })
+        .set({ status: 'rejected' })
         .where('id', '=', req.params['importId']!)
+        // Only this client's import; a pending one always has its client set.
+        .where('business_id', '=', req.tenancy!.business_id)
         .where('status', '=', 'pending')
         .executeTakeFirst();
       if (!result.numUpdatedRows) { res.status(404).json({ error: 'Import not found or already processed' }); return; }

@@ -3,7 +3,7 @@ import { AUDIT } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export async function listForPeriod(db: Kysely<DB>, business_id: string, period_id: string) {
   return db.selectFrom('period_review_tasks').selectAll()
@@ -22,7 +22,7 @@ export type UpdateTaskInput = {
 
 export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: UpdateTaskInput) {
   const before = await trx.selectFrom('period_review_tasks').selectAll()
-    .where('id', '=', input.task_id).executeTakeFirst();
+    .where('id', '=', input.task_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('period_review_task', input.task_id);
 
   const isSigningOff = input.patch.status === 'done' && before.status !== 'done';

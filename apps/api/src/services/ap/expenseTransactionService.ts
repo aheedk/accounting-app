@@ -119,15 +119,22 @@ function payeeName(row: { vendor_name: string | null; customer_name: string | nu
  * join) carries the real name — not just a free-text fallback. */
 async function resolvePayeeName(
   trx: Transaction<DB>,
+  business_id: string,
   input: { payee_text?: string | null; vendor_id?: string | null; customer_id?: string | null },
 ): Promise<string | null> {
+  // This client's own vendor or customer only; an id from another client is
+  // refused rather than saved on the expense (security review 2026-10-20).
   if (input.vendor_id) {
-    const v = await trx.selectFrom('vendors').select('name').where('id', '=', input.vendor_id).executeTakeFirst();
-    return v?.name ?? input.payee_text ?? null;
+    const v = await trx.selectFrom('vendors').select('name')
+      .where('id', '=', input.vendor_id).where('business_id', '=', business_id).executeTakeFirst();
+    if (!v) throw new NotFoundError('vendor', input.vendor_id);
+    return v.name;
   }
   if (input.customer_id) {
-    const c = await trx.selectFrom('customers').select('name').where('id', '=', input.customer_id).executeTakeFirst();
-    return c?.name ?? input.payee_text ?? null;
+    const c = await trx.selectFrom('customers').select('name')
+      .where('id', '=', input.customer_id).where('business_id', '=', business_id).executeTakeFirst();
+    if (!c) throw new NotFoundError('customer', input.customer_id);
+    return c.name;
   }
   return input.payee_text ?? null;
 }
@@ -195,7 +202,7 @@ export async function createExpense(
     source_type: 'expense',
     source_id: expense.id,
     transaction_type: 'expense',
-    payee_name: await resolvePayeeName(trx, input),
+    payee_name: await resolvePayeeName(trx, bizId, input),
     memo: input.memo ?? null,
     reference: input.reference ?? null,
     lines: buildExpenseJeLines(input.lines, input.payment_account_id, total, input.memo),
@@ -283,7 +290,7 @@ export async function updateExpense(
   // explicit Void action.
   let journalEntryId = before.journal_entry_id;
   const jeLines = buildExpenseJeLines(input.lines, input.payment_account_id, total, input.memo);
-  const payeeName = await resolvePayeeName(trx, input);
+  const payeeName = await resolvePayeeName(trx, bizId, input);
   if (before.journal_entry_id) {
     const existingSource = await existingJeSource(trx, before.journal_entry_id);
     const je = await ledger.updateJournalEntry(trx, ctx, {

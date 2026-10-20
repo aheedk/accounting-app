@@ -4,7 +4,7 @@ import { AUDIT, ERR } from '@accounting/shared';
 import type { DB, UserRole } from '../../db/types.js';
 import { AuthError } from '../../lib/errors.js';
 import { config } from '../../config.js';
-import { verifyPassword } from './passwordHasher.js';
+import { hashPassword, verifyPassword } from './passwordHasher.js';
 import { decryptField } from '../../lib/fieldCrypto.js';
 import { verifyTotp } from './totp.js';
 import { revokeSession } from './sessionRevocation.js';
@@ -17,6 +17,14 @@ export type LoginInput = { email: string; password: string; code?: string | unde
 // Five wrong tries in a row hold the login for fifteen minutes. A firm admin
 // resetting the password lifts the hold.
 const MAX_FAILED_LOGINS = 5;
+
+// Checked against when the email is unknown, so a wrong email takes as long to
+// answer as a wrong password and the timing does not tell which emails have logins.
+let stubHash: Promise<string> | null = null;
+function unknownEmailHash(): Promise<string> {
+  stubHash ??= hashPassword(`no login has this password ${Math.random()}`);
+  return stubHash;
+}
 const LOCK_MINUTES = 15;
 export type ReqMeta = { request_id: string; ip_address: string; user_agent: string };
 
@@ -108,7 +116,10 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
     });
   }
 
-  if (!preUser || !(await verifyPassword(input.password, preUser.password_hash))) {
+  const passwordOk = preUser
+    ? await verifyPassword(input.password, preUser.password_hash)
+    : (await verifyPassword(input.password, await unknownEmailHash()), false);
+  if (!preUser || !passwordOk) {
     // If the user is unknown there is no firm to attribute the attempt to
     // (audit_logs.firm_id is NOT NULL), so nothing is recorded for it.
     if (preUser) await failed(preUser, 'password');

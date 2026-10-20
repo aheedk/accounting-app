@@ -3,7 +3,7 @@ import { AUDIT, ERR } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 import { encryptField, decryptField, lastFour } from '../../lib/fieldCrypto.js';
 
 export type CreateVendorInput = {
@@ -126,7 +126,7 @@ export async function updateVendor(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { vendor_id: string; patch: Partial<CreateVendorInput> },
 ) {
-  const before = await trx.selectFrom('vendors').selectAll().where('id', '=', input.vendor_id).executeTakeFirst();
+  const before = await trx.selectFrom('vendors').selectAll().where('id', '=', input.vendor_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('vendor', input.vendor_id);
 
   let taxIdPatch: Partial<{
@@ -222,7 +222,7 @@ export async function vendorIdsWithTransactions(db: Kysely<DB>, business_id: str
 }
 
 export async function deleteVendor(trx: Transaction<DB>, ctx: ServiceCtx, input: { vendor_id: string }) {
-  const before = await trx.selectFrom('vendors').selectAll().where('id', '=', input.vendor_id).executeTakeFirst();
+  const before = await trx.selectFrom('vendors').selectAll().where('id', '=', input.vendor_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before || before.deleted_at) throw new NotFoundError('vendor', input.vendor_id);
 
   if (await vendorHasAnyTransaction(trx, input.vendor_id)) {
@@ -313,7 +313,7 @@ export async function mergeVendors(
     },
   });
 
-  return trx.selectFrom('vendors').selectAll().where('id', '=', input.into_vendor_id).executeTakeFirstOrThrow();
+  return trx.selectFrom('vendors').selectAll().where('id', '=', input.into_vendor_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirstOrThrow();
 }
 
 /**

@@ -8,7 +8,7 @@ import { BillPaymentHasApplicationsError } from '../../lib/apErrors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { postJournalEntry, voidJournalEntry } from '../core/ledgerService.js';
 import { getSystemAccount } from '../core/chartOfAccountsService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreateDraftBillPaymentInput = {
   business_id: string;
@@ -63,7 +63,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 }
 
 export async function postBillPayment(trx: Transaction<DB>, ctx: ServiceCtx, input: { bill_payment_id: string }) {
-  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('bill_payment', input.bill_payment_id);
   if (payment.status !== 'draft') throw new InvalidStateTransitionError('bill_payment', payment.id, payment.status, 'posted');
 
@@ -99,7 +99,7 @@ async function applyToBillInternal(
   trx: Transaction<DB>, ctx: ServiceCtx,
   args: { bill_payment_id: string; bill_id: string; applied_amount: string; audit: boolean },
 ) {
-  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', args.bill_payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', args.bill_payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('bill_payment', args.bill_payment_id);
   if (payment.status === 'voided') throw new InvalidStateTransitionError('bill_payment', payment.id, 'voided', 'apply');
   if (parseFloat(args.applied_amount) <= 0) throw new PreconditionError('applied_amount must be > 0');
@@ -150,14 +150,14 @@ export async function addApplication(
   input: { bill_payment_id: string; bill_id: string; applied_amount: string },
 ) {
   await applyToBillInternal(trx, ctx, { ...input, audit: true });
-  return trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).executeTakeFirstOrThrow();
+  return trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirstOrThrow();
 }
 
 export async function removeApplication(
   trx: Transaction<DB>, ctx: ServiceCtx,
   input: { bill_payment_id: string; application_id: string },
 ) {
-  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('bill_payment', input.bill_payment_id);
   const app = await trx.selectFrom('bill_payment_applications').selectAll().where('id', '=', input.application_id).executeTakeFirst();
   if (!app || app.bill_payment_id !== input.bill_payment_id) throw new NotFoundError('bill_payment_application', input.application_id);
@@ -179,7 +179,7 @@ export async function removeApplication(
 export async function voidBillPayment(
   trx: Transaction<DB>, ctx: ServiceCtx, input: { bill_payment_id: string; void_reason: string },
 ) {
-  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).executeTakeFirst();
+  const payment = await trx.selectFrom('bill_payments').selectAll().where('id', '=', input.bill_payment_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!payment) throw new NotFoundError('bill_payment', input.bill_payment_id);
   if (payment.status !== 'posted') throw new InvalidStateTransitionError('bill_payment', payment.id, payment.status, 'voided');
 

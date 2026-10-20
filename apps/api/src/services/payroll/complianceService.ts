@@ -3,7 +3,7 @@ import { AUDIT } from '@accounting/shared';
 import type { DB, ComplianceItemStatus } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export async function listForBusiness(db: Kysely<DB>, business_id: string) {
   return db.selectFrom('compliance_items').selectAll()
@@ -21,7 +21,7 @@ export async function update(trx: Transaction<DB>, ctx: ServiceCtx, input: {
   };
 }) {
   const before = await trx.selectFrom('compliance_items').selectAll()
-    .where('id', '=', input.item_id).executeTakeFirst();
+    .where('id', '=', input.item_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('compliance_item', input.item_id);
 
   const updated = await trx.updateTable('compliance_items').set({

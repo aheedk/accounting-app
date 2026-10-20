@@ -4,7 +4,7 @@ import type { DB, PurchaseOrderStatus } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { nextNumber } from '../core/numberingService.js';
-import type { ServiceCtx } from '../../lib/ctx.js';
+import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
 
 export type CreatePOLineInput = {
   inventory_item_id: string;
@@ -64,7 +64,7 @@ export async function createPO(trx: Transaction<DB>, ctx: ServiceCtx, input: Cre
 
 export async function voidPO(trx: Transaction<DB>, ctx: ServiceCtx, input: { po_id: string }) {
   const before = await trx.selectFrom('purchase_orders').selectAll()
-    .where('id', '=', input.po_id).executeTakeFirst();
+    .where('id', '=', input.po_id).where('business_id', '=', scopeBusiness(ctx)).executeTakeFirst();
   if (!before) throw new NotFoundError('purchase_order', input.po_id);
 
   const receipts = await trx.selectFrom('item_receipts').select('id')

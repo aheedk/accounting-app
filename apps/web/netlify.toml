@@ -7,3 +7,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Security headers (security review 2026-10-20, docs/qa/2026-10-20-security-review.md).
+# The Content-Security-Policy is report-only for now: it blocks nothing and only
+# lists in the browser console what it would have blocked. Once the console on
+# the live site shows no reports, rename the key to Content-Security-Policy.
+# connect-src names the API (VITE_API_URL); change it with the API's address.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://accountingapi-production.up.railway.app; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
