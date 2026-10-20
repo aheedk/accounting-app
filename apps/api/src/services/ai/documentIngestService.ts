@@ -9,7 +9,7 @@ import {
   type ClientContext,
   type DocumentMediaType,
 } from '../../jobs/gmailWorker.js';
-import { normalizeCardLines, splitByAccount, type RawCardLine } from './statementImportService.js';
+import { normalizeCardLines, readStatementSummary, splitByAccount, type RawCardLine } from './statementImportService.js';
 import { saveCheckStubs } from './checkStubService.js';
 import { uploadFile } from '../files/fileService.js';
 import { BusinessRuleError } from '../../lib/errors.js';
@@ -119,6 +119,7 @@ export async function ingestUploadedPdf(
     const parts = isCard
       ? [{
           account_hint: [extracted.card_name, extracted.card_last4].filter(Boolean).join(' ') || null,
+          summary: readStatementSummary(extracted),
           lines: normalizeCardLines((extracted.transactions ?? []) as unknown as RawCardLine[]),
         }]
       : splitByAccount(extracted.transactions ?? [], extracted.accounts);
@@ -138,6 +139,7 @@ export async function ingestUploadedPdf(
           extracted_transactions: JSON.stringify(part.lines),
           statement_kind: isCard ? 'credit_card' : 'bank',
           account_hint: part.account_hint,
+          ...part.summary,
           status: 'pending',
           pdf_data: input.buffer,
         }).returning('id').executeTakeFirstOrThrow();

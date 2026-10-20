@@ -115,3 +115,38 @@ example checking and savings, 20 pages, ~160 lines). Two things follow:
 model is told to return MM/DD in that case rather than guess a year (it had
 filled in 2024 for July 2026 stubs), and `checkStubService.toIsoDate` takes
 the most recent such date, allowing a month of post-dating.
+
+## 4. Statement balances (item 72, added 2026-10-20)
+
+Item 72 in the 10-16 follow-ups: Reconcile should take the statement's ending
+balance and ending date from a statement already uploaded, with typing them in
+still possible. This is the reading half (Aheed); filling them in on the
+reconciliation page is Riham's.
+
+- **Read with the lines.** Each entry in a bank statement's `accounts` also
+  carries that account's `period_start`, `period_end`, `beginning_balance` and
+  `ending_balance`; a card statement carries the same four at the top, for the
+  previous and new balance owed. `statementImportService.readStatementSummary`
+  turns them into ISO dates and plain amounts (`$5,000.00` and `(12.50)` read
+  as `5000.00` and `-12.50`), and leaves anything misread empty rather than
+  guessing: a date that does not exist, or a period that ends before it starts.
+  `splitByAccount` gives each account's statement its own figures.
+- **Kept with the statement.** Migration `0105` adds those four columns to
+  `email_import_staging`, and `account_id`: the account the statement was
+  approved (or auto-posted) against. Until now only the free-text
+  `account_hint` said which account a statement was, and it is often blank.
+- **Checked on review.** The review page shows the period and balances under
+  the statement's account, editable. It checks that the beginning balance plus
+  the lines comes to the ending balance (`statementBalanceGap` in
+  `@accounting/shared`; on a card a charge raises what is owed and a payment or
+  refund lowers it). When it does not, it says by how much: a line the AI
+  missed or misread shows here before anything is posted. Approving saves the
+  balances as the reviewer left them.
+- **For Reconcile.** `GET /businesses/:id/email-imports/statement-balances?account_id=`
+  lists the approved statements of one account, newest period first, with
+  their period and balances. Statements approved before migration `0105` have
+  no `account_id` and are not listed; their balances are typed as before.
+
+Not done here: uploading a statement on the reconciliation page itself and
+keeping it attached to the reconciliation (the other part of item 72, after
+this one).

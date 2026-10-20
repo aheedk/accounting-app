@@ -43,7 +43,7 @@ too small to walk through. Only the firm view and My Menu were shown.
 
 | # | What | Owner |
 |---|---|---|
-| 72 | Reconciliation: take the statement ending balance and ending date from a bank statement already uploaded (AI inbox), with typing them in still possible. Also offer to upload the statement right on the reconciliation page, and keep it attached to the reconciliation. Uploaded statements do not keep their balances today, so the extraction has to read them first | Riham, Aheed (extraction) |
+| 72 | Reconciliation: take the statement ending balance and ending date from a bank statement already uploaded (AI inbox), with typing them in still possible. Also offer to upload the statement right on the reconciliation page, and keep it attached to the reconciliation. Uploaded statements did not keep their balances, so the extraction had to read them first. **Reading done 10-20 (Aheed):** the AI reads each statement's period and beginning and ending balance, the review page shows them (editable) and checks the lines add up to them, and approving keeps them with the account the statement was approved against; `GET /businesses/:id/email-imports/statement-balances?account_id=` lists them per account. **Left (Riham):** fill the reconciliation's ending balance and date from that, and the upload on the reconciliation page | Riham, Aheed (extraction) |
 | 34 | Faizan's first video is written up ([`2026-10-12-faizan-video-1.md`](./2026-10-12-faizan-video-1.md), items 50 to 70, all done). His PDF and the check stubs from the Teams chat are still to go through. He is recording more points in a second video **(10-10)** | Aheed |
 | 36 | Pay bills prints checks: built 10-13. Left: Faizan confirms the check stock the firm prints on, and a test print is lined up against it. Not asked in this meeting **(10-10)** | Aheed, Faizan |
 | 37 | Year end: built 10-13. Left: ask Faizan whether he wants a posted closing entry as well. Not asked in this meeting **(10-10)** | Aheed, Faizan |
@@ -74,9 +74,10 @@ cannot be changed). Where the statement upload belongs was settled as the
 reconciliation page itself, as QuickBooks has an attach-statement option there.
 Item 71 (the smarter matching) shipped 10-19, checked against TIME OUT's real
 March statement and Cash in Bank account; item 74 (the fixed report + PDF +
-Reports listing) shipped 10-19 as well. What's left of this group: 72's
-statement-upload/extraction half (Aheed) and the balance/date auto-fill once
-that's ready.
+Reports listing) shipped 10-19 as well. 72's reading half (Aheed) is done
+10-20: statements keep their period and balances and the account they were
+approved against. What's left of this group: the balance/date auto-fill on
+the reconciliation page (Riham), and uploading the statement there.
 
 **Item 71 — matching rules, for the firm to review.** None of this was asked
 for at this level of detail in the meeting; these are the specific calls made
@@ -199,6 +200,7 @@ What to click is in [`../demos/2026-10-20-aheed.md`](../demos/2026-10-20-aheed.m
 | 23 | A customer's purchase order, uploaded or emailed, waits in the AI inbox as a PO; approving it posts the sales invoice with the next invoice number, the PO number in the memo, the customer's terms, and the order's quantities and prices. Spec: the AI auto-coding spec, "A customer's purchase order" |
 | — | Setup → Company Settings: invoice number prefix and start number, default invoice and bill terms, default sales tax, default expense payment method. All invoices now follow one numbering rule (recurring ones and sales orders came out as INV-0001 beside the form's 1001). Spec: [`../specs/2026-10-20-company-settings-design.md`](../specs/2026-10-20-company-settings-design.md) |
 | 28 | Security review ([`../qa/2026-10-20-security-review.md`](../qa/2026-10-20-security-review.md)): a record's id can no longer reach another client's record (60 lookups and the AI inbox); payees on checks and expenses must be the client's own; uploaded files of types that can run code are only downloaded; sign-in limited per address; a wrong email answers as slowly as a wrong password; security headers on the web app (the script policy reports only, for now) |
+| 72 (reading) | Statements keep what they say about the account: the period and the beginning and ending balance, read by the AI, shown and editable on review with a check that the lines add up to them (a missed line shows before posting), and kept with the account the statement was approved against, for Reconcile. Spec: [`../specs/2026-10-04-card-statements-and-check-stubs-design.md`](../specs/2026-10-04-card-statements-and-check-stubs-design.md), section 4 |
 | 28, 43 | Recovery plan ([`../guides/recovery-plan.md`](../guides/recovery-plan.md)): what to do for each kind of failure, and which secrets to keep outside Railway |
 
 ## Decided — no work

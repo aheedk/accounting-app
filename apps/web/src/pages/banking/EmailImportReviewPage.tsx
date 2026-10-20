@@ -16,6 +16,8 @@ import { pickErr } from '@/lib/apiErrors';
 import CheckStubsPanel from './CheckStubsPanel';
 import { fmtQty } from '@/lib/labels';
 import { DateInput } from '@/components/ui/date-input';
+import { StatementSummaryFields } from './StatementSummaryFields';
+import { NO_SUMMARY, summaryFormOf, type SummaryForm } from '@/lib/statementSummary';
 import { todayLocal } from '@/lib/dates';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
@@ -56,6 +58,11 @@ type StagedImport = {
   statement_kind?: 'bank' | 'credit_card';
   account_hint?: string | null;
   suggested_statement_account_id?: string | null;
+  /** What the statement says about its account (item 72); null when the AI could not read it. */
+  period_start?: string | null;
+  period_end?: string | null;
+  beginning_balance?: string | null;
+  ending_balance?: string | null;
 };
 
 // ── Invoice types ─────────────────────────────────────────────────────────────
@@ -255,6 +262,7 @@ export default function EmailImportReviewPage() {
   const [autoPostNote, setAutoPostNote] = useState<string | null>(null);
   const [bankPosting, setBankPosting] = useState(false);
   const [bankError, setBankError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<SummaryForm>(NO_SUMMARY);
   const bankPostingRef = useRef(false);
 
   // Invoice state
@@ -327,6 +335,7 @@ export default function EmailImportReviewPage() {
     setIncluded({});
     setPayees({});
     setRemember({});
+    setSummary(NO_SUMMARY);
     setAutoPostNote(null);
     setLineAccountIds({});
     setLineIncluded({});
@@ -407,6 +416,7 @@ export default function EmailImportReviewPage() {
     // the reviewer's choice (choosing it is what runs auto-post).
     setBankAccountId(isCard(imp) ? imp.suggested_statement_account_id ?? '' : '');
     setBankError(null);
+    setSummary(summaryFormOf(imp));
     setRecorded({});
     autoUntickedRef.current = new Set();
     const initIncluded: Record<number, boolean> = {};
@@ -509,6 +519,10 @@ export default function EmailImportReviewPage() {
     if (!bankAccountId) { setBankError(isCard(selectedBank) ? 'Select the credit card account first.' : 'Select a bank account first.'); return; }
     const missing = selectedBank.extracted_transactions.findIndex((_, i) => included[i] && !offsets[i]);
     if (missing !== -1) { setBankError(`Select an offset account for row ${missing + 1}.`); return; }
+    if (summary.period_start && summary.period_end && summary.period_start > summary.period_end) {
+      setBankError('The statement period ends before it starts.');
+      return;
+    }
     bankPostingRef.current = true;
     setBankPosting(true);
     setBankError(null);
@@ -523,6 +537,12 @@ export default function EmailImportReviewPage() {
           payee_name: payees[i] ?? '',
           check_stub_id: stubIds[i] ?? null,
         })),
+        summary: {
+          period_start: summary.period_start || null,
+          period_end: summary.period_end || null,
+          beginning_balance: summary.beginning_balance || null,
+          ending_balance: summary.ending_balance || null,
+        },
       });
       setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
       setSelectedBank(null);
@@ -853,6 +873,9 @@ export default function EmailImportReviewPage() {
                   {(isCard(selectedBank) ? cardAccounts : bankAccounts).map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                 </AppSelect>
               </div>
+
+              <StatementSummaryFields kind={selectedBank.statement_kind ?? 'bank'} lines={selectedBank.extracted_transactions}
+                value={summary} onChange={setSummary} />
 
               {isCard(selectedBank) && (
                 <p className="text-xs text-muted-foreground">

@@ -1244,6 +1244,13 @@ export interface EmailImportStagingTable {
   created_at: Generated<string>;
   statement_kind: Generated<'bank' | 'credit_card'>;
   account_hint: string | null;
+  // What the statement says about its account (migration 0105); null when unread.
+  period_start: string | null;
+  period_end: string | null;
+  beginning_balance: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  ending_balance: ColumnType<string | null, string | number | null | undefined, string | number | null>;
+  /** The statement's own account, chosen when it was approved. */
+  account_id: string | null;
 }
 
 export interface CheckStubsTable {

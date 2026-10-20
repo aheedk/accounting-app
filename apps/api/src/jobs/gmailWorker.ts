@@ -6,7 +6,9 @@ import path from 'path';
 import { sql, type Kysely } from 'kysely';
 import { SUSPENSE_DETAIL_TYPE } from '@accounting/shared';
 import type { ExtractedCheck } from '../services/ai/checkStubService.js';
-import { normalizeCardLines, splitByAccount, type RawCardLine } from '../services/ai/statementImportService.js';
+import {
+  normalizeCardLines, readStatementSummary, splitByAccount, type RawCardLine, type RawStatementSummary,
+} from '../services/ai/statementImportService.js';
 import { saveCheckStubs } from '../services/ai/checkStubService.js';
 import { systemCtx } from '../lib/ctx.js';
 import type { DB } from '../db/types.js';
@@ -65,7 +67,8 @@ type ExtractedTransaction = {
   suggested_offset?: string;
 };
 
-export type StatementAccount = { name?: string; last4?: string };
+/** An account in a bank statement, with its own period and balances (item 72). */
+export type StatementAccount = { name?: string; last4?: string } & RawStatementSummary;
 
 type InvoiceLineItem = {
   description: string;
@@ -84,9 +87,13 @@ export type UnifiedResult = {
   transactions?: ExtractedTransaction[];
   /** Every account in the file; a bank's PDF often holds checking and savings together. */
   accounts?: StatementAccount[];
-  // credit_card_statement
+  // credit_card_statement; its period and balances are on the result itself
   card_name?: string;
   card_last4?: string;
+  period_start?: string;
+  period_end?: string;
+  beginning_balance?: string;
+  ending_balance?: string;
   // check_stubs
   checks?: ExtractedCheck[];
   // invoice; 'po' is a customer's purchase order, staged with the invoices
@@ -179,7 +186,14 @@ If this is a BANK STATEMENT return:
   "document_type": "bank_statement",
   "addressed_to": "exact name of the account holder / company this statement belongs to",
   "accounts": [
-    { "name": "account name as printed, e.g. Business Checking", "last4": "last four digits of the account number" }
+    {
+      "name": "account name as printed, e.g. Business Checking",
+      "last4": "last four digits of the account number",
+      "period_start": "MM/DD/YYYY — first day of this account's statement period",
+      "period_end": "MM/DD/YYYY — last day of this account's statement period (the statement date)",
+      "beginning_balance": "this account's beginning (opening / previous) balance for the period, e.g. 12000.00; negative if overdrawn",
+      "ending_balance": "this account's ending (closing / new) balance for the period, e.g. 15432.10; negative if overdrawn"
+    }
   ],
   "transactions": [
     {
@@ -195,7 +209,7 @@ If this is a BANK STATEMENT return:
   ]
 }
 List every account in the document under "accounts" and include every transaction from every account and every page.
-Leave out summary rows (opening/closing balance, totals) and keys you would leave empty.
+Leave summary rows (opening/closing balance, totals) out of "transactions": the balances belong on the account. Leave out keys you would leave empty.
 
 If this is a CREDIT CARD STATEMENT (a card issuer's statement listing purchases, payments and a new balance) return:
 {
@@ -203,6 +217,10 @@ If this is a CREDIT CARD STATEMENT (a card issuer's statement listing purchases,
   "addressed_to": "exact name of the cardholder / company this statement belongs to",
   "card_name": "issuer and card name, e.g. Chase Ink Business Cash",
   "card_last4": "last four digits of the card or account number, e.g. 1234",
+  "period_start": "MM/DD/YYYY — first day of the billing period",
+  "period_end": "MM/DD/YYYY — the statement closing date",
+  "beginning_balance": "the Previous Balance owed at the start of the period, e.g. 1200.00; negative if the card was in credit",
+  "ending_balance": "the New Balance owed at the closing date, e.g. 769.99; negative if the card is in credit",
   "transactions": [
     {
       "date": "MM/DD/YYYY (transaction date)",
@@ -552,7 +570,7 @@ async function processAnyMessage(
     }));
     // One email can carry several accounts (checking and savings); each is its own statement.
     const parts = statementKind === 'credit_card'
-      ? [{ account_hint: accountHint, lines: enrichedTxs }]
+      ? [{ account_hint: accountHint, summary: readStatementSummary(result), lines: enrichedTxs }]
       : splitByAccount(enrichedTxs, result.accounts);
     for (const [n, part] of parts.entries()) {
       // gmail_message_id is unique: the first part carries it (and marks the email
@@ -566,6 +584,7 @@ async function processAnyMessage(
         addressed_to: result.addressed_to ?? null,
         statement_kind: statementKind,
         account_hint: part.account_hint,
+        ...part.summary,
         pdf_data: pdfBuffer,
         business_id: businessId,
         status: 'pending',    // It writes its suggestions to a staging table with status 'pending'. A human reviews and approves in the UI 

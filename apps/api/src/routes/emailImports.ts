@@ -14,6 +14,7 @@ import {
   guessCardAccount,
   isCardStatementPayment,
   isInflow,
+  listStatementBalances,
   postStatementLines,
   statementDateToIso,
   type StatementKind,
@@ -50,7 +51,8 @@ router.get('/businesses/:businessId/email-imports', async (req, res, next) => {
       .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
                'received_at', 'extracted_transactions', 'status', 'addressed_to',
                'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at', 'source',
-               'statement_kind', 'account_hint'])
+               'statement_kind', 'account_hint',
+               'period_start', 'period_end', 'beginning_balance', 'ending_balance', 'account_id'])
       .orderBy('received_at', 'desc');
     // History: this business's own records + any auto-rejected records (no business match)
     // Pending: only this business's own records
@@ -199,6 +201,15 @@ router.get('/businesses/:businessId/email-imports/pending-count', async (req, re
   } catch (e) { next(e); }
 });
 
+// What Reconcile fills its ending balance and date from (item 72): the
+// approved statements of one account, newest period first.
+router.get('/businesses/:businessId/email-imports/statement-balances', async (req, res, next) => {
+  try {
+    const accountId = z.string().uuid().parse(req.query['account_id']);
+    res.json({ statements: await listStatementBalances(db, req.tenancy!.business_id, accountId) });
+  } catch (e) { next(e); }
+});
+
 // Serve the original PDF attachment
 router.get(
   '/businesses/:businessId/email-imports/:importId/pdf',
@@ -220,6 +231,9 @@ router.get(
   },
 );
 
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date as YYYY-MM-DD');
+const balance = z.string().regex(/^-?\d{1,15}(\.\d{1,4})?$/, 'An amount, e.g. 1234.56');
+
 const approveSchema = z.object({
   /** The statement's own account: the bank account, or the card for a card statement. */
   bank_account_id: z.string().uuid(),
@@ -234,6 +248,15 @@ const approveSchema = z.object({
     /** A check stub the reviewer accepted for this check. */
     check_stub_id: z.string().uuid().nullable().optional(),
   })),
+  /** The statement's period and balances as the reviewer left them (item 72). */
+  summary: z.object({
+    period_start: isoDate.nullable(),
+    period_end: isoDate.nullable(),
+    beginning_balance: balance.nullable(),
+    ending_balance: balance.nullable(),
+  }).refine(sm => !sm.period_start || !sm.period_end || sm.period_start <= sm.period_end, {
+    message: 'The statement period ends before it starts.',
+  }).optional(),
 });
 
 function parseLines(raw: unknown): StatementLine[] {
@@ -350,6 +373,9 @@ router.post(
             business_id: bizId,
             approved_by_user_id: serviceCtx.user_id,
             approved_at: new Date().toISOString(),
+            // Which account this statement is, for Reconcile (item 72).
+            account_id: body.bank_account_id,
+            ...(body.summary ?? {}),
           })
           .where('id', '=', staged.id)
           .execute();
@@ -475,6 +501,7 @@ router.post(
         await trx.updateTable('email_import_staging')
           .set({
             extracted_transactions: JSON.stringify(transactions),
+            account_id: body.bank_account_id,
             // Nothing left to review means the document is done.
             ...(remainingNow === 0 ? {
               status: 'approved',

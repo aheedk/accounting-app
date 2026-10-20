@@ -1,5 +1,5 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
-import { ERR } from '@accounting/shared';
+import { ERR, parseStatementAmount } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { BusinessRuleError } from '../../lib/errors.js';
@@ -368,27 +368,86 @@ export async function guessCardAccount(
   return creditCards.length === 1 ? creditCards[0]!.id : null;
 }
 
-export type StatementPart<L> = { account_hint: string | null; lines: L[] };
+/**
+ * What a statement says about its account as a whole (item 72): the period and
+ * the beginning and ending balance, as printed (a card's are what is owed).
+ * Dates are ISO; null for anything that could not be read.
+ */
+export type StatementSummary = {
+  period_start: string | null;
+  period_end: string | null;
+  beginning_balance: string | null;
+  ending_balance: string | null;
+};
+
+/** The same, as the model returns it: dates as MM/DD/YYYY, amounts as printed. */
+export type RawStatementSummary = {
+  period_start?: string | undefined;
+  period_end?: string | undefined;
+  beginning_balance?: string | number | undefined;
+  ending_balance?: string | number | undefined;
+};
+
+function readStatementDate(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value.trim())) return null;
+  const iso = statementDateToIso(value.trim());
+  const time = Date.parse(`${iso}T00:00:00Z`);
+  // 02/30/2026 parses to March 2; a date that does not round-trip was misread.
+  return Number.isNaN(time) || new Date(time).toISOString().slice(0, 10) !== iso ? null : iso;
+}
+
+export function readStatementSummary(raw: RawStatementSummary | undefined): StatementSummary {
+  const start = readStatementDate(raw?.period_start);
+  const end = readStatementDate(raw?.period_end);
+  return {
+    // A period that ends before it starts was misread; the end is what reconciling needs.
+    period_start: start && end && start > end ? null : start,
+    period_end: end,
+    beginning_balance: parseStatementAmount(raw?.beginning_balance),
+    ending_balance: parseStatementAmount(raw?.ending_balance),
+  };
+}
+
+export type StatementPart<L> = { account_hint: string | null; summary: StatementSummary; lines: L[] };
 
 /**
  * One file can hold several accounts (a bank's checking and savings for the
- * month). Each becomes its own statement, since each posts to its own account.
+ * month). Each becomes its own statement, since each posts to its own account,
+ * and carries that account's own period and balances.
  */
 export function splitByAccount<L extends { account_last4?: string | undefined }>(
   lines: L[],
-  accounts: Array<{ name?: string | undefined; last4?: string | undefined }> | undefined,
+  accounts: Array<{ name?: string | undefined; last4?: string | undefined } & RawStatementSummary> | undefined,
 ): Array<StatementPart<L>> {
   const known = (accounts ?? []).filter(a => a.name || a.last4);
-  const hintFor = (last4: string | undefined): string | null => {
+  const partFor = (last4: string | undefined, group: L[]): StatementPart<L> => {
     const account = known.find(a => last4 && a.last4 === last4) ?? (known.length === 1 ? known[0] : undefined);
     const parts = [account?.name, account?.last4 ?? last4].filter(Boolean);
-    return parts.length > 0 ? parts.join(' ') : null;
+    return { account_hint: parts.length > 0 ? parts.join(' ') : null, summary: readStatementSummary(account), lines: group };
   };
   const groups = new Map<string, L[]>();
   for (const line of lines) {
     const key = line.account_last4?.trim() ?? '';
     groups.set(key, [...(groups.get(key) ?? []), line]);
   }
-  if (groups.size <= 1) return [{ account_hint: hintFor(lines[0]?.account_last4), lines }];
-  return [...groups.entries()].map(([last4, group]) => ({ account_hint: hintFor(last4 || undefined), lines: group }));
+  if (groups.size <= 1) return [partFor(lines[0]?.account_last4, lines)];
+  return [...groups.entries()].map(([last4, group]) => partFor(last4 || undefined, group));
+}
+
+/**
+ * The approved statements of one account, newest period first, with what each
+ * says about the account: what Reconcile fills its ending balance and date
+ * from (item 72). Only statements approved since migration 0105 know their
+ * account.
+ */
+export async function listStatementBalances(db: Kysely<DB>, businessId: string, accountId: string) {
+  return db.selectFrom('email_import_staging')
+    .select(['id', 'statement_kind', 'account_hint', 'original_filename', 'email_subject',
+      'period_start', 'period_end', 'beginning_balance', 'ending_balance', 'approved_at'])
+    .where('business_id', '=', businessId)
+    .where('account_id', '=', accountId)
+    .where('status', '=', 'approved')
+    .orderBy(sql`period_end DESC NULLS LAST`)
+    .orderBy('approved_at', 'desc')
+    .execute();
 }

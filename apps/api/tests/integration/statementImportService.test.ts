@@ -68,15 +68,17 @@ describe('statement import', () => {
       { description: 'B', account_last4: '8344' },
       { description: 'C', account_last4: '2553' },
     ];
+    // Each part also carries its account's period and balances (item 72); none were read here.
+    const noSummary = { period_start: null, period_end: null, beginning_balance: null, ending_balance: null };
     expect(splitByAccount(lines, accounts)).toEqual([
-      { account_hint: 'Business Checking 2553', lines: [lines[0], lines[2]] },
-      { account_hint: 'Savings 8344', lines: [lines[1]] },
+      { account_hint: 'Business Checking 2553', summary: noSummary, lines: [lines[0], lines[2]] },
+      { account_hint: 'Savings 8344', summary: noSummary, lines: [lines[1]] },
     ]);
     // One account: a single statement named after it, whether or not lines are tagged.
     expect(splitByAccount([{ description: 'A' }], [accounts[0]!])).toEqual([
-      { account_hint: 'Business Checking 2553', lines: [{ description: 'A' }] },
+      { account_hint: 'Business Checking 2553', summary: noSummary, lines: [{ description: 'A' }] },
     ]);
-    expect(splitByAccount([{ description: 'A' }], undefined)).toEqual([{ account_hint: null, lines: [{ description: 'A' }] }]);
+    expect(splitByAccount([{ description: 'A' }], undefined)).toEqual([{ account_hint: null, summary: noSummary, lines: [{ description: 'A' }] }]);
   });
 
   it('posts a card statement against the card: charge and refund, but never the payment', async () => {
