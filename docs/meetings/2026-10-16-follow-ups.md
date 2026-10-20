@@ -40,11 +40,8 @@ too small to walk through. Only the firm view and My Menu were shown.
 
 | # | What | Owner |
 |---|---|---|
-| 71 | Reconciliation: tick what matches automatically. Compare the statement's lines with the ledger, tick every line found on both, and leave the rest as reconciling items (outstanding checks, deposits in transit). Nothing should need ticking by hand when the books were entered from that statement. See "Reconciliation" below | Riham |
 | 72 | Reconciliation: take the statement ending balance and ending date from a bank statement already uploaded (AI inbox), with typing them in still possible. Also offer to upload the statement right on the reconciliation page, and keep it attached to the reconciliation. Uploaded statements do not keep their balances today, so the extraction has to read them first | Riham, Aheed (extraction) |
-| 73 | Reconciliation: a "select all" box in the heading of the tick column, next to Date, as in QuickBooks | Riham |
 | 74 | Reconciliation reports: every completed reconciliation kept as a report that cannot be changed, with a PDF copy, listed under Reports → For my accountant → Reconciliation reports. Banking → Reconcile history already lists completed ones and shows each one's lines; what is missing is the report itself, the PDF and the listing under Reports | Riham |
-| 75 | Reconciliation was slow in the demo: starting one stayed "in progress" for a long time, showed a 17,000 difference with nothing ticked, and only went through after an earlier one was discarded. It had worked straight away the week before. Reproduce with the March statement and the Cash in Bank account. (Also, the first try was on Cash on Hand by mistake, and January was not in that account) | Riham |
 | 76 | Take My Menu out of the sidebar. Faizan: Bookmarks and + New do what it does. See the note on item 76 | Aheed |
 | 77 | Firm view: add a column for the last month whose books were closed. Open periods and the last reconciliation stay; a reconciliation is not the same as closing the books | Aheed |
 | 78 | Long account names in the Payment account box (Expense and the like) are cut off with "…" and there is no way to read them. Show the full name on hover | Aheed |
@@ -77,6 +74,10 @@ QuickBooks' "Reconciliation reports" under Reports → For my accountant (Faizan
 showed his two quarters there; each opens the balances and the transactions, and
 cannot be changed). Where the statement upload belongs was settled as the
 reconciliation page itself, as QuickBooks has an attach-statement option there.
+Item 71 (the smarter matching) shipped 10-19, checked against TIME OUT's real
+March statement and Cash in Bank account. What's left of this group: 72's
+statement-upload/extraction half (Aheed) and the balance/date auto-fill once
+that's ready, and 74's actual report + PDF + Reports listing.
 
 **My Menu (76).** Asked whether it is a QuickBooks thing; nobody knew, and
 Faizan said to take it off. He added that larger systems give each job its own
@@ -143,6 +144,9 @@ Reported by Riham in this meeting:
 | — | Vendor pages made more like QuickBooks: merging contacts, notes | Riham |
 | — | Changing a transaction's account on the vendor page now changes it in the books | Riham |
 | — | A loading indicator while a page loads, like QuickBooks' green dots | Riham |
+| 71 | Reconciliation ticks what matches automatically now. At Start, it compares the account's open items against an already-approved bank statement for that period and pre-checks the exact matches (amount + within 3 business days, description breaks a tie); genuine mismatches are left for the user. Tested against TIME OUT's real March statement — all 16 of 16 matched | Riham **(10-16)** |
+| 73 | "Select all" added to the tick column's header, for whatever the date/type/search filters are currently showing | Riham **(10-16)** |
+| 75 | Found the real cause of "stayed in progress for a long time": the worksheet was running one database query per row instead of one for all of them — fixed. The $17,000 difference itself wasn't a bug: a first-ever reconciliation on an account starts at a $0 beginning balance by design, so nothing ticked reads as the full statement amount until items are checked — which item 71 now does automatically | Riham **(10-16)** |
 
 Done before the meeting and in the demo, not walked through: every item from
 Faizan's first video (50 to 70), item 28's Gmail fix, and 35, 36, 37, 40, 41
