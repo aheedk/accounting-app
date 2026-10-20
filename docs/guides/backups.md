@@ -81,4 +81,7 @@ production yet.**
    laptop is not a backup; it should go somewhere off the machine and off
    Railway.
 4. The uploaded files on the Railway volume are not covered by any of this.
-5. A standby copy and a written recovery plan are item 28, later.
+5. The written recovery plan is [`recovery-plan.md`](./recovery-plan.md). It
+   also lists the secrets to keep outside Railway: without
+   `FIELD_ENCRYPTION_KEY` a restored database cannot read SSNs, tax IDs or
+   two-step sign-in secrets. A standby copy is item 28, later.
