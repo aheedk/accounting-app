@@ -51,7 +51,7 @@ usually carries the vendor's invoice number, typed in.
 
 ## Data
 
-Migration `0103_company_settings.sql` adds to `businesses`:
+Migration `0104_company_settings.sql` adds to `businesses`:
 
 | Column | Type |
 |---|---|

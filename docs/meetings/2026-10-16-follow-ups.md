@@ -44,13 +44,9 @@ too small to walk through. Only the firm view and My Menu were shown.
 | # | What | Owner |
 |---|---|---|
 | 72 | Reconciliation: take the statement ending balance and ending date from a bank statement already uploaded (AI inbox), with typing them in still possible. Also offer to upload the statement right on the reconciliation page, and keep it attached to the reconciliation. Uploaded statements do not keep their balances today, so the extraction has to read them first | Riham, Aheed (extraction) |
-| 76 | Take My Menu out of the sidebar. Faizan: Bookmarks and + New do what it does. See the note on item 76. **Done 10-20:** removed | Aheed |
-| 77 | Firm view: add a column for the last month whose books were closed. Open periods and the last reconciliation stay; a reconciliation is not the same as closing the books. **Done 10-20:** a "Books Closed Through" column (end of the latest closed period), also in the Excel download | Aheed |
-| 78 | Long account names in the Payment account box (Expense and the like) are cut off with "…" and there is no way to read them. Show the full name on hover. **Done 10-20:** hovering a cut-off name shows all of it, in the box and in its list, in every account and drop-down picker (Expense, Bill Payment, Pay Bills and the rest); the account list also opens wider than a narrow box | Aheed |
 | 34 | Faizan's first video is written up ([`2026-10-12-faizan-video-1.md`](./2026-10-12-faizan-video-1.md), items 50 to 70, all done). His PDF and the check stubs from the Teams chat are still to go through. He is recording more points in a second video **(10-10)** | Aheed |
 | 36 | Pay bills prints checks: built 10-13. Left: Faizan confirms the check stock the firm prints on, and a test print is lined up against it. Not asked in this meeting **(10-10)** | Aheed, Faizan |
 | 37 | Year end: built 10-13. Left: ask Faizan whether he wants a posted closing entry as well. Not asked in this meeting **(10-10)** | Aheed, Faizan |
-| 39 | Equipment in the bank picker **(10-10)**. **Done 10-20:** the likely cause was Equipment set up under Banking, which the API allowed. Banking now refuses equipment, receivables, other long-term assets and inventory, and every bank picker leaves them out even if set up before | Aheed |
 | 43 | Backups: the tool is built. Left: run it against production once (needs the connection string from Railway), and decide how often and where our own copy is kept. Uploaded files are in no backup yet; see the recovery plan. 10-20: [`../guides/recovery-plan.md`](../guides/recovery-plan.md) written **(10-10)** | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders **(10-10)** | Faizan |
 | 17 | QA audit: Estimate, emailing an invoice (item 47) and two decisions for the firm **(10-01)** | Aheed, firm |
@@ -147,7 +143,6 @@ other tabs (bookkeeping, workforce, multi-entity); not wanted for now.
 | 82 | More "it is working" signs while things load, like the loading dots Riham added. Faizan wants the app to look busy when it is busy |
 | 20 | Bank account connection **(10-01)** |
 | 21 | Reconciliation against a connected bank, after 20. The manual worksheet was shown in this meeting; items 71 to 75 come from it **(10-01)** |
-| 23 | Upload a customer's purchase order and turn it into a sales invoice **(10-05)**. **Done 10-20:** a purchase order, uploaded or emailed, shows in the AI inbox as a PO; approving it posts the sales invoice. See the AI auto-coding spec |
 | 24 | Stripe: clients pay their vendors from the app, and we get paid for the software. See 79 and 80 **(10-05)** |
 | 25 | Modules per client, priced separately **(10-05)** |
 | 26 | Sign in with Microsoft 365 or Google **(10-05)** |

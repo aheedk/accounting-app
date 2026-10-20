@@ -36,7 +36,7 @@ export interface BusinessesTable {
   staff_entries_need_approval: Generated<boolean>;
   /** Amount at or above which a long-lived tangible item is capitalized. */
   capitalization_threshold: ColumnType<string, string | number | undefined, string | number>;
-  // Company settings (migration 0103).
+  // Company settings (migration 0104).
   invoice_number_prefix: Generated<string>;
   /** Invoice numbers start here at the lowest; NULL means 1001. Bigint, read as a string. */
   invoice_next_number: ColumnType<string, string | number | null | undefined, string | number | null> | null;

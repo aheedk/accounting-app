@@ -114,7 +114,7 @@ emailed, becomes a sales invoice.
   quantity and unit price. A purchase order the client sent to its own supplier
   is `unknown`; it is not a bill.
 - `normalizeExtraction` (in `jobs/gmailWorker.ts`) stages it in
-  `invoice_import_staging` as `invoice_type = 'po'` (migration 0102), so the
+  `invoice_import_staging` as `invoice_type = 'po'` (migration 0103), so the
   upload path and the Gmail worker store it like any invoice.
 - In the AI inbox it is a blue **PO** under Invoices, with its own
   "Purchase orders" filter. Review picks the customer, the revenue accounts and
