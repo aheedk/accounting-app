@@ -269,4 +269,49 @@ describe('bank reconciliation worksheet', () => {
     const afterEdit = await recon.listHistory(t.db, d.ctx, {});
     expect(afterEdit.find(r => r.id === started.id)!.changes).toBe(1);
   });
+
+  it('pre-checks a row whose JE was already matched through the bank-feed inbox, and leaves the others unchecked', async () => {
+    const d = await setup(t);
+
+    const matchedExpense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-05', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '100.00' }],
+    }));
+    const unmatchedExpense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-06', payee_text: 'Office Depot', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '40.00' }],
+    }));
+    await t.db.insertInto('bank_transactions').values({
+      business_id: d.business.id, bank_account_id: d.bankAccount.id,
+      transaction_date: '2026-03-05', description: 'STAPLES', amount: '-100.00',
+      status: 'matched', matched_journal_entry_id: matchedExpense.journal_entry_id,
+      reviewed_at: new Date(), reviewed_by_user_id: d.ctx.user_id,
+    }).execute();
+
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '-140.00', statement_ending_date: '2026-03-31',
+    }));
+    const worksheet = await recon.getWorksheet(t.db, d.ctx, started.id);
+    const byId = new Map(worksheet.items.map(i => [i.transaction_id, i]));
+    expect(byId.get(matchedExpense.id)?.is_cleared).toBe(true);
+    expect(byId.get(unmatchedExpense.id)?.is_cleared).toBe(false);
+  });
+
+  it('saveProgress reports the same difference a fresh worksheet read would, without a second full scan', async () => {
+    const d = await setup(t);
+    const expense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-05', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '100.00' }],
+    }));
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '-100.00', statement_ending_date: '2026-03-31',
+    }));
+
+    const { summary } = await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
+      { transaction_type: 'expense', transaction_id: expense.id, is_cleared: true },
+    ]));
+    const freshRead = await recon.getWorksheet(t.db, d.ctx, started.id);
+    expect(summary.difference).toBe(freshRead.summary.difference);
+    expect(summary.difference).toBe('0.0000');
+  });
 });

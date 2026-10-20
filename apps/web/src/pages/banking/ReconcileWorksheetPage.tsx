@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -123,6 +123,25 @@ export default function ReconcileWorksheetPage() {
     });
   }
 
+  // Operates on the filtered/searched subset on screen, not every item in the
+  // reconciliation — ticking "all" while a search is narrowing the list
+  // should only touch what's visible, same as the per-row checkboxes below it.
+  const allVisibleChecked = visible.length > 0 && visible.every(i => cleared.get(key(i)));
+  const someVisibleChecked = visible.some(i => cleared.get(key(i)));
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someVisibleChecked && !allVisibleChecked;
+  }, [someVisibleChecked, allVisibleChecked]);
+
+  function toggleAllVisible() {
+    const nextValue = !allVisibleChecked;
+    setCleared(prev => {
+      const next = new Map(prev);
+      for (const i of visible) next.set(key(i), nextValue);
+      return next;
+    });
+  }
+
   async function saveForLater() {
     if (!bizId || !id) return;
     setBusy(true); setErr(null);
@@ -232,7 +251,17 @@ export default function ReconcileWorksheetPage() {
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
               <tr>
-                <th className="p-2 text-left w-10"></th>
+                <th className="p-2 text-left w-10">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allVisibleChecked}
+                    onChange={toggleAllVisible}
+                    disabled={visible.length === 0}
+                    aria-label="Select all"
+                    className="h-4 w-4"
+                  />
+                </th>
                 <th className="p-2 text-left">Date</th>
                 <th className="p-2 text-left">Type</th>
                 <th className="p-2 text-left">Ref no.</th>

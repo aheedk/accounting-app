@@ -267,14 +267,18 @@ export async function startReconciliation(
   return recon;
 }
 
-/** True once a transaction's own JE was matched through the bank-feed inbox and swept into a bulk review-lock — pre-check it the same way the old bank_transactions-based reconciliation did. */
-async function wasBankFeedMatched(db: Kysely<DB> | Transaction<DB>, journal_entry_id: string | null): Promise<boolean> {
-  if (!journal_entry_id) return false;
-  const row = await db.selectFrom('bank_transactions').select('id')
-    .where('matched_journal_entry_id', '=', journal_entry_id)
+/** Which of these journal entries was matched through the bank-feed inbox and
+ * swept into a bulk review-lock — pre-check those rows the same way the old
+ * bank_transactions-based reconciliation did. One query for every candidate
+ * instead of one per row: a worksheet with a year of history was running
+ * hundreds of these sequentially (see item 75, 2026-10-16 follow-ups). */
+async function bankFeedMatchedIds(db: Kysely<DB> | Transaction<DB>, journalEntryIds: string[]): Promise<Set<string>> {
+  if (journalEntryIds.length === 0) return new Set();
+  const rows = await db.selectFrom('bank_transactions').select('matched_journal_entry_id')
+    .where('matched_journal_entry_id', 'in', journalEntryIds)
     .where('status', 'in', ['matched', 'categorized'])
-    .executeTakeFirst();
-  return row !== undefined;
+    .execute();
+  return new Set(rows.map(r => r.matched_journal_entry_id).filter((v): v is string => v !== null));
 }
 
 async function savedClearedState(db: Kysely<DB> | Transaction<DB>, reconciliation_id: string) {
@@ -299,57 +303,31 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
   const items: WorksheetItem[] = [];
   const wrappedJeIds = new Set<string>();
 
-  if (bankRow) {
-    const deposits = await db.selectFrom('bank_deposits')
+  const deposits = bankRow
+    ? await db.selectFrom('bank_deposits')
       .select(['id', 'deposit_date', 'deposit_number', 'memo', 'total_amount', 'journal_entry_id'])
       .where('bank_account_id', '=', bankRow.id)
       .where('voided_at', 'is', null)
       .where('reconciliation_status', '!=', 'reconciled')
       .where('deposit_date', '<=', recon.statement_ending_date)
-      .execute();
-    for (const d of deposits) {
-      if (d.journal_entry_id) wrappedJeIds.add(d.journal_entry_id);
-      // Interest earned, created at Start, is a bank_deposits row under the hood —
-      // its cleared state was saved under the 'interest' item type, not 'deposit'.
-      const isInterest = saved.has(`interest:${d.id}`);
-      const type: ReconciliationItemType = isInterest ? 'interest' : 'deposit';
-      const key = `${type}:${d.id}`;
-      items.push({
-        transaction_type: type, transaction_id: d.id, transaction_date: d.deposit_date,
-        type_label: isInterest ? 'Interest Earned' : 'Deposit', ref_no: d.deposit_number, name: null, description: d.memo,
-        amount: toMoneyString(d.total_amount),
-        is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, d.journal_entry_id),
-        transaction_path: `/accounting/deposits/${d.id}`,
-      });
-    }
-
-    const checks = await db.selectFrom('checks as c')
+      .execute()
+    : [];
+  const checks = bankRow
+    ? await db.selectFrom('checks as c')
       .leftJoin('vendors as v', 'v.id', 'c.payee_id')
       .select(['c.id', 'c.payment_date', 'c.check_number', 'c.payee_text', 'v.name as vendor_name', 'c.memo', 'c.total_amount', 'c.journal_entry_id'])
       .where('c.bank_account_id', '=', bankRow.id)
       .where('c.status', '=', 'posted')
       .where('c.reconciliation_status', '!=', 'reconciled')
       .where('c.payment_date', '<=', recon.statement_ending_date)
-      .execute();
-    for (const c of checks) {
-      if (c.journal_entry_id) wrappedJeIds.add(c.journal_entry_id);
-      const key = `check:${c.id}`;
-      items.push({
-        transaction_type: 'check', transaction_id: c.id, transaction_date: c.payment_date,
-        type_label: 'Check', ref_no: c.check_number, name: c.vendor_name ?? c.payee_text, description: c.memo,
-        amount: toMoneyString(`-${c.total_amount}`),
-        is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, c.journal_entry_id),
-        transaction_path: `/accounting/checks/${c.id}`,
-      });
-    }
-  }
+      .execute()
+    : [];
 
   // Expenses paid from this account — works for any asset/liability payment
   // account (e.g. a credit card purchase), not only a registered bank account.
   // A charge credits the payment account, which increases a liability's own
   // balance (what's owed) the opposite way it decreases an asset's (cash on hand).
   const debitNormal = account.account_type === 'asset';
-  const expenseJeIds = new Set<string>();
   const expenses = await db.selectFrom('expense_transactions as e')
     .leftJoin('vendors as v', 'v.id', 'e.vendor_id')
     .select(['e.id', 'e.transaction_date', 'e.reference', 'e.payee_text', 'v.name as vendor_name', 'e.memo', 'e.total_amount', 'e.journal_entry_id', 'e.payment_method'])
@@ -358,6 +336,47 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
     .where('e.reconciliation_status', '!=', 'reconciled')
     .where('e.transaction_date', '<=', recon.statement_ending_date)
     .execute();
+
+  // One batched lookup for every candidate's bank-feed-matched state, instead
+  // of one query per row (see item 75, 2026-10-16 follow-ups — this is what
+  // made the worksheet "stay in progress for a long time" on an account with
+  // real history).
+  const candidateJeIds = [
+    ...deposits.map(d => d.journal_entry_id),
+    ...checks.map(c => c.journal_entry_id),
+    ...expenses.map(e => e.journal_entry_id),
+  ].filter((v): v is string => v !== null);
+  const matchedJeIds = await bankFeedMatchedIds(db, candidateJeIds);
+
+  for (const d of deposits) {
+    if (d.journal_entry_id) wrappedJeIds.add(d.journal_entry_id);
+    // Interest earned, created at Start, is a bank_deposits row under the hood —
+    // its cleared state was saved under the 'interest' item type, not 'deposit'.
+    const isInterest = saved.has(`interest:${d.id}`);
+    const type: ReconciliationItemType = isInterest ? 'interest' : 'deposit';
+    const key = `${type}:${d.id}`;
+    items.push({
+      transaction_type: type, transaction_id: d.id, transaction_date: d.deposit_date,
+      type_label: isInterest ? 'Interest Earned' : 'Deposit', ref_no: d.deposit_number, name: null, description: d.memo,
+      amount: toMoneyString(d.total_amount),
+      is_cleared: saved.get(key) ?? (d.journal_entry_id !== null && matchedJeIds.has(d.journal_entry_id)),
+      transaction_path: `/accounting/deposits/${d.id}`,
+    });
+  }
+
+  for (const c of checks) {
+    if (c.journal_entry_id) wrappedJeIds.add(c.journal_entry_id);
+    const key = `check:${c.id}`;
+    items.push({
+      transaction_type: 'check', transaction_id: c.id, transaction_date: c.payment_date,
+      type_label: 'Check', ref_no: c.check_number, name: c.vendor_name ?? c.payee_text, description: c.memo,
+      amount: toMoneyString(`-${c.total_amount}`),
+      is_cleared: saved.get(key) ?? (c.journal_entry_id !== null && matchedJeIds.has(c.journal_entry_id)),
+      transaction_path: `/accounting/checks/${c.id}`,
+    });
+  }
+
+  const expenseJeIds = new Set<string>();
   for (const e of expenses) {
     if (e.journal_entry_id) expenseJeIds.add(e.journal_entry_id);
     const isServiceCharge = saved.has(`service_charge:${e.id}`);
@@ -368,7 +387,7 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
       transaction_type: type, transaction_id: e.id, transaction_date: e.transaction_date,
       type_label: isServiceCharge ? 'Service Charge' : (isCheck ? 'Check' : 'Expense'), ref_no: e.reference, name: e.vendor_name ?? e.payee_text, description: e.memo,
       amount: toMoneyString(`${debitNormal ? '-' : ''}${e.total_amount}`),
-      is_cleared: saved.get(key) ?? await wasBankFeedMatched(db, e.journal_entry_id),
+      is_cleared: saved.get(key) ?? (e.journal_entry_id !== null && matchedJeIds.has(e.journal_entry_id)),
       transaction_path: `/accounting/expenses/${e.id}`,
     });
   }
@@ -451,10 +470,12 @@ export async function saveProgress(
   // it fresh rather than trust the client — only is_cleared is taken from input.
   const { items: liveItems } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, id);
   const liveByKey = new Map(liveItems.map(i => [`${i.transaction_type}:${i.transaction_id}`, i]));
+  const clearedByKey = new Map(liveItems.map(i => [`${i.transaction_type}:${i.transaction_id}`, i.is_cleared]));
 
   for (const input of inputItems) {
     const live = liveByKey.get(`${input.transaction_type}:${input.transaction_id}`);
     if (!live) continue;
+    clearedByKey.set(`${input.transaction_type}:${input.transaction_id}`, input.is_cleared);
     await trx.insertInto('reconciliation_items').values({
       reconciliation_id: id,
       transaction_type: input.transaction_type,
@@ -470,7 +491,25 @@ export async function saveProgress(
     })).execute();
   }
 
-  const { summary } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, id);
+  // The just-written cleared state fully determines the new difference —
+  // recomputing it from `liveItems` + what was just upserted avoids a second
+  // full getWorksheet() (another three-table scan) just to read it back.
+  let clearedBalance = toMoneyString(recon.beginning_balance);
+  for (const i of liveItems) {
+    if (clearedByKey.get(`${i.transaction_type}:${i.transaction_id}`)) {
+      clearedBalance = toMoneyString(addMoney(clearedBalance, i.amount));
+    }
+  }
+  const difference = toMoneyString(subMoney(toMoneyString(recon.statement_ending_balance), clearedBalance));
+  const summary = {
+    statement_beginning_balance: toMoneyString(recon.beginning_balance),
+    statement_ending_balance: toMoneyString(recon.statement_ending_balance),
+    cleared_balance: clearedBalance,
+    difference,
+    cleared_count: [...clearedByKey.values()].filter(Boolean).length,
+    total_count: liveItems.length,
+  };
+
   const updated = await trx.updateTable('reconciliations')
     .set({ difference: summary.difference })
     .where('id', '=', id).returningAll().executeTakeFirstOrThrow();
