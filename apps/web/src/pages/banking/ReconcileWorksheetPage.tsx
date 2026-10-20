@@ -23,6 +23,7 @@ type WorksheetItem = {
   description: string | null;
   amount: string;
   is_cleared: boolean;
+  auto_matched: boolean;
   transaction_path: string;
 };
 
@@ -33,6 +34,7 @@ type Summary = {
   difference: string;
   cleared_count: number;
   total_count: number;
+  auto_matched_count: number;
 };
 
 type Worksheet = {
@@ -112,6 +114,8 @@ export default function ReconcileWorksheetPage() {
       difference: difference.toFixed(2),
       cleared_count: clearedCount,
       total_count: items.length,
+      // Fixed at load time — unchecking an item doesn't change whether it was auto-matched.
+      auto_matched_count: data.summary.auto_matched_count,
     };
   }, [data, items, cleared]);
 
@@ -218,6 +222,15 @@ export default function ReconcileWorksheetPage() {
 
       {err && <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div>}
 
+      {liveSummary.auto_matched_count > 0 && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
+          Auto-matched {liveSummary.auto_matched_count} of {liveSummary.total_count} transactions against the uploaded bank statement.
+          {liveSummary.total_count - liveSummary.auto_matched_count > 0
+            ? ` ${liveSummary.total_count - liveSummary.auto_matched_count} item${liveSummary.total_count - liveSummary.auto_matched_count === 1 ? '' : 's'} need${liveSummary.total_count - liveSummary.auto_matched_count === 1 ? 's' : ''} your review.`
+            : ' Everything matched.'}
+        </div>
+      )}
+
       <Card>
         <button type="button" className="flex w-full items-center justify-between px-4 py-2 text-left" onClick={() => setCollapsed(c => !c)}>
           <span className="text-sm font-medium">Summary</span>
@@ -281,7 +294,17 @@ export default function ReconcileWorksheetPage() {
                 return (
                   <tr key={key(item)} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="p-2">
-                      <input type="checkbox" checked={isChecked} onChange={() => toggle(item)} className="h-4 w-4" />
+                      <div className="flex items-center gap-1.5">
+                        <input type="checkbox" checked={isChecked} onChange={() => toggle(item)} className="h-4 w-4" />
+                        {item.auto_matched && isChecked && (
+                          <span
+                            title="Auto-matched against the uploaded bank statement — uncheck if this isn't right"
+                            className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-700"
+                          >
+                            Auto
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-2 whitespace-nowrap">{fmtShortDate(item.transaction_date)}</td>
                     <td className="p-2 whitespace-nowrap">{item.type_label}</td>

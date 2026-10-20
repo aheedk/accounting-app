@@ -12,6 +12,7 @@ import { todayLocal } from '@/lib/dates';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { ReconcileNav } from './ReconcileNav';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
@@ -239,7 +240,9 @@ export default function ReconcilePage() {
 
         <div>
           <Button type="submit" {...hideUnless(can.accountant)} disabled={!canSubmit}>
-            {busy ? 'Starting…' : 'Start reconciling'}
+            {busy
+              ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Matching transactions against your statement…</span>
+              : 'Start reconciling'}
           </Button>
         </div>
       </form>

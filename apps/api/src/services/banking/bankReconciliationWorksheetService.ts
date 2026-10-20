@@ -9,6 +9,8 @@ import * as expenseSvc from '../ap/expenseTransactionService.js';
 import * as depositSvc from './bankDepositService.js';
 import { getOrCreateOpeningBalanceEquity } from '../core/chartOfAccountsService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { isInflow, statementDateToIso, type StatementLine } from '../ai/statementImportService.js';
+import { matchStatementLines, type MatchCandidateItem, type MatchStatementLine } from './reconciliationAutoMatch.js';
 
 export type StartReconciliationInput = {
   account_id: string;
@@ -33,6 +35,8 @@ export type WorksheetItem = {
   /** Signed: positive is a deposit (money in), negative is a payment (money out). */
   amount: string;
   is_cleared: boolean;
+  /** Pre-ticked by matching against an uploaded bank statement at Start, not by the user. */
+  auto_matched: boolean;
   transaction_path: string;
 };
 
@@ -139,6 +143,74 @@ export async function getStatus(db: Kysely<DB>, ctx: ServiceCtx, account_id: str
     beginning_balance: await computeBeginningBalance(db, account_id),
     in_progress_id: inProgress?.id ?? null,
   };
+}
+
+function calendarDaysBetween(aIso: string, bIso: string): number {
+  return Math.abs(Date.parse(`${aIso}T00:00:00Z`) - Date.parse(`${bIso}T00:00:00Z`)) / 86_400_000;
+}
+
+/**
+ * The reviewed bank statement (if any) that belongs to this reconciliation's
+ * account and period — item 71/72, 2026-10-16 follow-ups. An uploaded
+ * statement has no account_id of its own (email_import_staging only carries a
+ * free-text account_hint, often blank in practice), so this resolves it the
+ * same way a person would: only an already-approved bank statement counts (an
+ * unreviewed AI extraction shouldn't silently drive auto-ticking); its own
+ * latest line has to fall within 10 days of this statement's ending date
+ * (banks' last line rarely lands exactly on the period's close); and if more
+ * than one approved statement clears that bar, account_hint has to narrow it
+ * down to exactly one, or this returns null and the worksheet opens fully
+ * manual — never guessing which account a statement belongs to.
+ */
+async function resolveMatchingStatement(
+  trx: Transaction<DB>, bizId: string,
+  account: { name: string }, bankRow: { name: string; institution: string | null } | undefined,
+  statementEndingDate: string,
+): Promise<StatementLine[] | null> {
+  const staged = await trx.selectFrom('email_import_staging')
+    .select(['id', 'account_hint', 'extracted_transactions'])
+    .where('business_id', '=', bizId)
+    .where('statement_kind', '=', 'bank')
+    .where('status', '=', 'approved')
+    .execute();
+  if (staged.length === 0) return null;
+
+  const candidates: { account_hint: string | null; lines: StatementLine[] }[] = [];
+  for (const s of staged) {
+    let lines: StatementLine[] = [];
+    try {
+      const raw = s.extracted_transactions;
+      const parsed: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      lines = Array.isArray(parsed) ? (parsed as StatementLine[]) : [];
+    } catch { continue; }
+    if (lines.length === 0) continue;
+    const isoDates = lines.map(l => statementDateToIso(l.date)).sort();
+    const maxDate = isoDates[isoDates.length - 1]!;
+    if (calendarDaysBetween(maxDate, statementEndingDate) > 10) continue;
+    candidates.push({ account_hint: s.account_hint, lines });
+  }
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]!.lines;
+
+  const hintTargets = [bankRow?.name, bankRow?.institution, account.name]
+    .filter((v): v is string => !!v).map(v => v.toLowerCase());
+  const byHint = candidates.filter(c => c.account_hint
+    && hintTargets.some(t => c.account_hint!.toLowerCase().includes(t) || t.includes(c.account_hint!.toLowerCase())));
+  return byHint.length === 1 ? byHint[0]!.lines : null;
+}
+
+/** The candidate ledger items a statement line could account for: everything
+ * not already ticked some other way (service charge, interest, a bank-feed
+ * match) — those stay as they are, untouched by statement matching. */
+function matchCandidatesFrom(items: WorksheetItem[]): MatchCandidateItem[] {
+  return items.map(i => ({
+    key: `${i.transaction_type}:${i.transaction_id}`,
+    transaction_date: i.transaction_date,
+    amount: i.amount,
+    name: i.name,
+    description: i.description,
+    already_cleared: i.is_cleared,
+  }));
 }
 
 export async function startReconciliation(
@@ -256,12 +328,52 @@ export async function startReconciliation(
     }
   }
 
+  // Item 71: compare the account's candidate lines against an already-uploaded,
+  // approved bank statement for this period, and pre-tick whatever matches —
+  // once, here at Start, not on every later worksheet load (see
+  // reconciliationAutoMatch.ts for the actual matching rules). No statement
+  // for this account/period simply means no auto-ticks; the worksheet still
+  // opens, fully manual, same as it always has.
+  const statementLines = await resolveMatchingStatement(trx, bizId, account, bankRow, input.statement_ending_date);
+  let autoMatchedCount = 0;
+  if (statementLines && statementLines.length > 0) {
+    const worksheetSoFar = await getWorksheet(trx as unknown as Kysely<DB>, ctx, recon.id);
+    const candidateItems = matchCandidatesFrom(worksheetSoFar.items);
+    const matchLines: MatchStatementLine[] = statementLines.map(l => ({
+      date: statementDateToIso(l.date),
+      amount: l.amount,
+      description: l.description,
+      ...(l.payee_name !== undefined ? { payee_name: l.payee_name } : {}),
+      isInflow: isInflow(l),
+    }));
+    const matchedKeys = matchStatementLines(candidateItems, matchLines);
+    const byKey = new Map(worksheetSoFar.items.map(i => [`${i.transaction_type}:${i.transaction_id}`, i]));
+    for (const key of matchedKeys) {
+      const item = byKey.get(key);
+      if (!item) continue;
+      await trx.insertInto('reconciliation_items').values({
+        reconciliation_id: recon.id,
+        transaction_type: item.transaction_type,
+        transaction_id: item.transaction_id,
+        transaction_date: item.transaction_date,
+        description: item.description,
+        amount: item.amount,
+        is_cleared: true,
+        auto_matched: true,
+        cleared_at: sql`now()`,
+      }).onConflict(oc => oc.columns(['reconciliation_id', 'transaction_type', 'transaction_id']).doUpdateSet({
+        is_cleared: true, auto_matched: true, cleared_at: sql`now()`,
+      })).execute();
+    }
+    autoMatchedCount = matchedKeys.size;
+  }
+
   await auditRecord(trx, ctx, {
     action: AUDIT.BANK_RECONCILIATION_START,
     entity_type: 'reconciliation',
     entity_id: recon.id,
     before: null,
-    after: recon,
+    after: { ...recon, auto_matched_count: autoMatchedCount },
   });
 
   return recon;
@@ -281,13 +393,15 @@ async function bankFeedMatchedIds(db: Kysely<DB> | Transaction<DB>, journalEntry
   return new Set(rows.map(r => r.matched_journal_entry_id).filter((v): v is string => v !== null));
 }
 
+type SavedState = { is_cleared: boolean; auto_matched: boolean };
+
 async function savedClearedState(db: Kysely<DB> | Transaction<DB>, reconciliation_id: string) {
   const rows = await db.selectFrom('reconciliation_items')
-    .select(['transaction_type', 'transaction_id', 'is_cleared'])
+    .select(['transaction_type', 'transaction_id', 'is_cleared', 'auto_matched'])
     .where('reconciliation_id', '=', reconciliation_id)
     .execute();
-  const map = new Map<string, boolean>();
-  for (const r of rows) map.set(`${r.transaction_type}:${r.transaction_id}`, r.is_cleared);
+  const map = new Map<string, SavedState>();
+  for (const r of rows) map.set(`${r.transaction_type}:${r.transaction_id}`, { is_cleared: r.is_cleared, auto_matched: r.auto_matched });
   return map;
 }
 
@@ -355,11 +469,13 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
     const isInterest = saved.has(`interest:${d.id}`);
     const type: ReconciliationItemType = isInterest ? 'interest' : 'deposit';
     const key = `${type}:${d.id}`;
+    const savedEntry = saved.get(key);
     items.push({
       transaction_type: type, transaction_id: d.id, transaction_date: d.deposit_date,
       type_label: isInterest ? 'Interest Earned' : 'Deposit', ref_no: d.deposit_number, name: null, description: d.memo,
       amount: toMoneyString(d.total_amount),
-      is_cleared: saved.get(key) ?? (d.journal_entry_id !== null && matchedJeIds.has(d.journal_entry_id)),
+      is_cleared: savedEntry?.is_cleared ?? (d.journal_entry_id !== null && matchedJeIds.has(d.journal_entry_id)),
+      auto_matched: savedEntry?.auto_matched ?? false,
       transaction_path: `/accounting/deposits/${d.id}`,
     });
   }
@@ -367,11 +483,13 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
   for (const c of checks) {
     if (c.journal_entry_id) wrappedJeIds.add(c.journal_entry_id);
     const key = `check:${c.id}`;
+    const savedEntry = saved.get(key);
     items.push({
       transaction_type: 'check', transaction_id: c.id, transaction_date: c.payment_date,
       type_label: 'Check', ref_no: c.check_number, name: c.vendor_name ?? c.payee_text, description: c.memo,
       amount: toMoneyString(`-${c.total_amount}`),
-      is_cleared: saved.get(key) ?? (c.journal_entry_id !== null && matchedJeIds.has(c.journal_entry_id)),
+      is_cleared: savedEntry?.is_cleared ?? (c.journal_entry_id !== null && matchedJeIds.has(c.journal_entry_id)),
+      auto_matched: savedEntry?.auto_matched ?? false,
       transaction_path: `/accounting/checks/${c.id}`,
     });
   }
@@ -382,12 +500,14 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
     const isServiceCharge = saved.has(`service_charge:${e.id}`);
     const type: ReconciliationItemType = isServiceCharge ? 'service_charge' : 'expense';
     const key = `${type}:${e.id}`;
+    const savedEntry = saved.get(key);
     const isCheck = e.payment_method === 'check';
     items.push({
       transaction_type: type, transaction_id: e.id, transaction_date: e.transaction_date,
       type_label: isServiceCharge ? 'Service Charge' : (isCheck ? 'Check' : 'Expense'), ref_no: e.reference, name: e.vendor_name ?? e.payee_text, description: e.memo,
       amount: toMoneyString(`${debitNormal ? '-' : ''}${e.total_amount}`),
-      is_cleared: saved.get(key) ?? (e.journal_entry_id !== null && matchedJeIds.has(e.journal_entry_id)),
+      is_cleared: savedEntry?.is_cleared ?? (e.journal_entry_id !== null && matchedJeIds.has(e.journal_entry_id)),
+      auto_matched: savedEntry?.auto_matched ?? false,
       transaction_path: `/accounting/expenses/${e.id}`,
     });
   }
@@ -416,13 +536,15 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
     const isInterest = saved.has(`interest:${j.id}`);
     const type: ReconciliationItemType = isInterest ? 'interest' : 'journal_entry';
     const key = `${type}:${j.id}`;
+    const savedEntry = saved.get(key);
     const amount = toMoneyString(debitNormal ? subMoney(toMoneyString(j.debit), toMoneyString(j.credit)) : subMoney(toMoneyString(j.credit), toMoneyString(j.debit)));
     if (isZero(amount)) continue;
     items.push({
       transaction_type: type, transaction_id: j.id, transaction_date: j.entry_date,
       type_label: isInterest ? 'Interest Earned' : 'Journal Entry', ref_no: j.reference ?? j.journal_number, name: j.payee_name, description: j.memo,
       amount,
-      is_cleared: saved.get(key) ?? false,
+      is_cleared: savedEntry?.is_cleared ?? false,
+      auto_matched: savedEntry?.auto_matched ?? false,
       transaction_path: `/accounting/journal-entries/${j.id}`,
     });
   }
@@ -431,11 +553,13 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
 
   let clearedBalance = toMoneyString(recon.beginning_balance);
   let clearedCount = 0;
+  let autoMatchedCount = 0;
   for (const item of items) {
     if (item.is_cleared) {
       clearedBalance = toMoneyString(addMoney(clearedBalance, item.amount));
       clearedCount++;
     }
+    if (item.auto_matched) autoMatchedCount++;
   }
   const difference = toMoneyString(subMoney(toMoneyString(recon.statement_ending_balance), clearedBalance));
 
@@ -451,6 +575,7 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
       difference,
       cleared_count: clearedCount,
       total_count: items.length,
+      auto_matched_count: autoMatchedCount,
     },
   };
 }
@@ -508,6 +633,7 @@ export async function saveProgress(
     difference,
     cleared_count: [...clearedByKey.values()].filter(Boolean).length,
     total_count: liveItems.length,
+    auto_matched_count: liveItems.filter(i => i.auto_matched).length,
   };
 
   const updated = await trx.updateTable('reconciliations')

@@ -968,6 +968,7 @@ export interface ReconciliationItemsTable {
   is_cleared: Generated<boolean>;
   cleared_at: Timestamp | null;
   created_at: Generated<Timestamp>;
+  auto_matched: Generated<boolean>;
 }
 
 export type BankRuleSignFilter = 'any' | 'inflow_only' | 'outflow_only';

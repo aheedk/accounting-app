@@ -314,4 +314,61 @@ describe('bank reconciliation worksheet', () => {
     expect(summary.difference).toBe(freshRead.summary.difference);
     expect(summary.difference).toBe('0.0000');
   });
+
+  it('item 71: auto-ticks items that match an already-approved bank statement, and leaves the rest for manual review', async () => {
+    const d = await setup(t);
+
+    const matchedCheck = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-06', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '450.00' }],
+    }));
+    const matchedDeposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, d.ctx, {
+      bank_account_id: d.bankAccount.id, deposit_date: '2026-03-06',
+      lines: [{ line_type: 'other_funds', received_from: 'A Customer', account_id: d.salesIncome.id, amount: '1535.00' }],
+    }));
+    // No statement line anywhere near this — must stay unticked.
+    const unmatchedExpense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-20', payee_text: 'Random Vendor', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '77.00' }],
+    }));
+
+    await t.db.insertInto('email_import_staging').values({
+      business_id: d.business.id,
+      gmail_message_id: 'test-march-statement',
+      received_at: new Date(),
+      statement_kind: 'bank',
+      status: 'approved',
+      extracted_transactions: JSON.stringify([
+        { date: '03/06/2026', type: 'check', amount: '450.00', description: 'CHECK 1024 STAPLES' },
+        { date: '03/06/2026', type: 'deposit', amount: '1535.00', description: 'DEPOSIT' },
+        { date: '03/28/2026', type: 'check', amount: '999.00', description: 'CHECK UNRELATED' }, // nothing in the books matches this
+      ]),
+    }).execute();
+
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '1008.00', statement_ending_date: '2026-03-31',
+    }));
+    const worksheet = await recon.getWorksheet(t.db, d.ctx, started.id);
+    const byId = new Map(worksheet.items.map(i => [i.transaction_id, i]));
+
+    expect(byId.get(matchedCheck.id)).toMatchObject({ is_cleared: true, auto_matched: true });
+    expect(byId.get(matchedDeposit.id)).toMatchObject({ is_cleared: true, auto_matched: true });
+    expect(byId.get(unmatchedExpense.id)).toMatchObject({ is_cleared: false, auto_matched: false });
+    expect(worksheet.summary.auto_matched_count).toBe(2);
+  });
+
+  it('item 71: falls back to fully manual when no approved statement overlaps the period', async () => {
+    const d = await setup(t);
+    const expense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-06', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '450.00' }],
+    }));
+
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '-450.00', statement_ending_date: '2026-03-31',
+    }));
+    const worksheet = await recon.getWorksheet(t.db, d.ctx, started.id);
+    expect(worksheet.items.find(i => i.transaction_id === expense.id)).toMatchObject({ is_cleared: false, auto_matched: false });
+    expect(worksheet.summary.auto_matched_count).toBe(0);
+  });
 });
