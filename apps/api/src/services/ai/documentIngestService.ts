@@ -19,7 +19,7 @@ import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type IngestResult =
   | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
-  | { kind: 'invoice'; staging_id: string }
+  | { kind: 'invoice'; staging_id: string; invoice_type: 'ap' | 'ar' | 'po' }
   | { kind: 'check_stubs'; check_count: number };
 
 /**
@@ -87,7 +87,7 @@ export async function ingestUploadedPdf(
   if (extracted.document_type === 'unknown') {
     throw new BusinessRuleError(
       ERR.VALIDATION_FAILED,
-      `"${input.filename}" was not recognised as a bank or credit card statement, check stubs, or an invoice.`,
+      `"${input.filename}" was not recognised as a bank or credit card statement, check stubs, an invoice, or a customer's purchase order.`,
     );
   }
 
@@ -171,5 +171,5 @@ export async function ingestUploadedPdf(
     pdf_data: input.buffer,
   }).returning('id').executeTakeFirstOrThrow();
 
-  return { kind: 'invoice', staging_id: row.id };
+  return { kind: 'invoice', staging_id: row.id, invoice_type: extracted.invoice_type ?? 'ap' };
 }

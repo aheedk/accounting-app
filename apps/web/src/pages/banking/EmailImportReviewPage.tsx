@@ -15,6 +15,8 @@ import { useAddVendorQuick } from '@/components/addNew/useAddVendorQuick';
 import { pickErr } from '@/lib/apiErrors';
 import CheckStubsPanel from './CheckStubsPanel';
 import { fmtQty } from '@/lib/labels';
+import { DateInput } from '@/components/ui/date-input';
+import { todayLocal } from '@/lib/dates';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -73,7 +75,8 @@ type InvoiceImport = {
   email_subject: string | null;
   received_at: string;
   source: string | null;
-  invoice_type: 'ap' | 'ar';
+  /** 'po' is a customer's purchase order; approving it makes a sales invoice. */
+  invoice_type: 'ap' | 'ar' | 'po';
   vendor_customer: string | null;
   invoice_number: string | null;
   invoice_date: string | null;
@@ -85,6 +88,12 @@ type InvoiceImport = {
   status: string;
   addressed_to: string | null;
   rejection_reason: string | null;
+};
+
+const KIND_PILL: Record<InvoiceImport['invoice_type'], string> = {
+  ap: 'bg-red-100 text-red-700',
+  ar: 'bg-emerald-100 text-emerald-700',
+  po: 'bg-blue-100 text-blue-700',
 };
 
 type CoaAccount = { id: string; code: string; name: string; account_type: string; detail_type?: string | null };
@@ -250,13 +259,15 @@ export default function EmailImportReviewPage() {
 
   // Invoice state
   const [invoiceImports, setInvoiceImports] = useState<InvoiceImport[]>([]);
-  const [invoiceTab, setInvoiceTab] = useState<'all' | 'ap' | 'ar'>('all');
+  const [invoiceTab, setInvoiceTab] = useState<'all' | 'ap' | 'ar' | 'po'>('all');
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceImport | null>(null);
   const [lineAccountIds, setLineAccountIds] = useState<Record<number, string>>({});
   const [lineIncluded, setLineIncluded] = useState<Record<number, boolean>>({});
   const [lineRemember, setLineRemember] = useState<Record<number, boolean>>({});
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  // The sales invoice made from a purchase order is dated when it is approved, not on the order date.
+  const [poIssueDate, setPoIssueDate] = useState(todayLocal());
   const [invPosting, setInvPosting] = useState(false);
   const [invError, setInvError] = useState<string | null>(null);
   const invPostingRef = useRef(false);
@@ -557,6 +568,7 @@ export default function EmailImportReviewPage() {
     setInvError(null);
     setSelectedVendorId('');
     setSelectedCustomerId('');
+    setPoIssueDate(todayLocal());
     const initIncluded: Record<number, boolean> = {};
     const initAccounts: Record<number, string> = {};
     imp.line_items.forEach((li, i) => {
@@ -586,6 +598,7 @@ export default function EmailImportReviewPage() {
         .filter(l => l.include && l.account_id);
       await api.post(`/businesses/${bizId}/invoice-imports/${selectedInvoice.id}/approve`, {
         ...(isAp ? { vendor_id: selectedVendorId } : { customer_id: selectedCustomerId }),
+        ...(selectedInvoice.invoice_type === 'po' ? { issue_date: poIssueDate } : {}),
         line_items: linePayload,
       });
       setInvoiceImports(prev => prev.filter(im => im.id !== selectedInvoice.id));
@@ -1152,7 +1165,7 @@ export default function EmailImportReviewPage() {
                       <div key={imp.id} className="px-4 py-3">
                         <div className="flex items-center justify-between">
                           <div className="min-w-0 flex items-center gap-3">
-                            <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${imp.invoice_type === 'ap' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${KIND_PILL[imp.invoice_type]}`}>
                               {imp.invoice_type.toUpperCase()}
                             </span>
                             <div className="min-w-0">
@@ -1198,7 +1211,7 @@ export default function EmailImportReviewPage() {
                             {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
                             {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
                             {imp.vendor_customer && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'ap' ? 'Vendor' : 'Customer'}</span><span>{imp.vendor_customer}</span></>}
-                            {imp.invoice_number && <><span className="text-muted-foreground font-medium">Invoice #</span><span>{imp.invoice_number}</span></>}
+                            {imp.invoice_number && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'po' ? 'PO #' : 'Invoice #'}</span><span>{imp.invoice_number}</span></>}
                             {imp.invoice_date && <><span className="text-muted-foreground font-medium">Invoice date</span><span>{imp.invoice_date}</span></>}
                             {imp.due_date && <><span className="text-muted-foreground font-medium">Due date</span><span className="font-medium text-amber-600">{imp.due_date}</span></>}
                             {imp.total && <><span className="text-muted-foreground font-medium">Total</span><span className="font-semibold">{fmtMoney(imp.total)}</span></>}
@@ -1221,10 +1234,10 @@ export default function EmailImportReviewPage() {
         <>
           {!selectedInvoice && (
             <div className="flex gap-1 rounded-lg border bg-muted/20 p-1 w-fit">
-              {(['all', 'ap', 'ar'] as const).map(t => (
+              {(['all', 'ap', 'ar', 'po'] as const).map(t => (
                 <button key={t} type="button" onClick={() => setInvoiceTab(t)}
                   className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${invoiceTab === t ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  {t === 'all' ? 'All' : t === 'ap' ? 'AP — Bills' : 'AR — Invoices'}
+                  {t === 'all' ? 'All' : t === 'ap' ? 'AP — Bills' : t === 'ar' ? 'AR — Invoices' : 'Purchase orders'}
                   <span className="ml-1.5 text-xs text-muted-foreground">
                     ({t === 'all' ? invoiceImports.length : invoiceImports.filter(im => im.invoice_type === t).length})
                   </span>
@@ -1236,7 +1249,7 @@ export default function EmailImportReviewPage() {
           {filteredInvoices.length === 0 && !selectedInvoice && (
             <div className="rounded-lg border bg-muted/20 p-12 text-center">
               <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="font-medium">No pending {invoiceTab === 'all' ? '' : invoiceTab.toUpperCase() + ' '}invoices</p>
+              <p className="font-medium">{invoiceTab === 'po' ? 'No pending purchase orders' : `No pending ${invoiceTab === 'all' ? '' : invoiceTab.toUpperCase() + ' '}invoices`}</p>
               <p className="text-sm text-muted-foreground mt-1">Email invoice PDFs to the firm inbox and label them <code className="text-xs bg-muted px-1 py-0.5 rounded">invoices</code>.</p>
             </div>
           )}
@@ -1247,7 +1260,7 @@ export default function EmailImportReviewPage() {
                 <div key={imp.id} className="px-4 py-3 hover:bg-muted/20">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex items-center gap-3">
-                      <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${imp.invoice_type === 'ap' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${KIND_PILL[imp.invoice_type]}`}>
                         {imp.invoice_type.toUpperCase()}
                       </span>
                       <div className="min-w-0">
@@ -1287,7 +1300,7 @@ export default function EmailImportReviewPage() {
                       {imp.email_from && <><span className="text-muted-foreground font-medium">From</span><span className="truncate">{imp.email_from}</span></>}
                       {imp.email_subject && <><span className="text-muted-foreground font-medium">Subject</span><span className="truncate">{imp.email_subject}</span></>}
                       {imp.vendor_customer && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'ap' ? 'Vendor' : 'Customer'}</span><span>{imp.vendor_customer}</span></>}
-                      {imp.invoice_number && <><span className="text-muted-foreground font-medium">Invoice #</span><span>{imp.invoice_number}</span></>}
+                      {imp.invoice_number && <><span className="text-muted-foreground font-medium">{imp.invoice_type === 'po' ? 'PO #' : 'Invoice #'}</span><span>{imp.invoice_number}</span></>}
                       {imp.invoice_date && <><span className="text-muted-foreground font-medium">Invoice date</span><span>{imp.invoice_date}</span></>}
                       {imp.due_date && <><span className="text-muted-foreground font-medium">Due date</span><span className="font-medium text-amber-600">{imp.due_date}</span></>}
                       {imp.total && <><span className="text-muted-foreground font-medium">Total</span><span className="font-semibold">{fmtMoney(imp.total)}</span></>}
@@ -1303,11 +1316,11 @@ export default function EmailImportReviewPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${selectedInvoice.invoice_type === 'ap' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                    {selectedInvoice.invoice_type === 'ap' ? 'AP — Bill from Vendor' : 'AR — Invoice to Customer'}
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${KIND_PILL[selectedInvoice.invoice_type]}`}>
+                    {selectedInvoice.invoice_type === 'ap' ? 'AP — Bill from Vendor' : selectedInvoice.invoice_type === 'po' ? 'PO — Purchase order from Customer' : 'AR — Invoice to Customer'}
                   </span>
                   <div>
-                    <p className="font-medium">{selectedInvoice.vendor_customer ?? '(unknown)'} — Invoice #{selectedInvoice.invoice_number ?? '—'}</p>
+                    <p className="font-medium">{selectedInvoice.vendor_customer ?? '(unknown)'} — {selectedInvoice.invoice_type === 'po' ? 'PO' : 'Invoice'} #{selectedInvoice.invoice_number ?? '—'}</p>
                     <p className="text-xs text-muted-foreground">Date: {selectedInvoice.invoice_date ?? '—'} · Due: {selectedInvoice.due_date ?? '—'} · {selectedInvoice.source === 'upload' ? 'Uploaded' : 'Received'} {fmtDateTime(selectedInvoice.received_at)}</p>
                   </div>
                 </div>
@@ -1325,6 +1338,15 @@ export default function EmailImportReviewPage() {
               </div>
 
               <div className="rounded-lg border p-4 bg-muted/10 space-y-3">
+                {selectedInvoice.invoice_type === 'po' && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium whitespace-nowrap w-52">Invoice date</label>
+                    <DateInput value={poIssueDate} onChange={e => setPoIssueDate(e.target.value)} className="w-40" />
+                    <span className="text-xs text-muted-foreground">
+                      The sales invoice gets the next invoice number; the PO number goes in its memo.
+                    </span>
+                  </div>
+                )}
                 {selectedInvoice.invoice_type === 'ap' ? (
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium whitespace-nowrap w-52">Vendor</label>
@@ -1395,7 +1417,8 @@ export default function EmailImportReviewPage() {
                           </AppSelect>
                           <div className="mt-1 space-y-1">
                             <ConfidenceBadge suggestion={li.suggestion} />
-                            {lineIncluded[i] && lineAccountIds[i] && lineAccountIds[i] !== li.suggested_account_id && (
+                            {/* Only bills learn from a correction (vendor + line -> expense). */}
+                            {selectedInvoice.invoice_type === 'ap' && lineIncluded[i] && lineAccountIds[i] && lineAccountIds[i] !== li.suggested_account_id && (
                               <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
                                 <input
                                   type="checkbox"
@@ -1453,7 +1476,7 @@ export default function EmailImportReviewPage() {
                 <button type="button" {...hideUnless(can.accountant)} onClick={handleInvoiceApprove} disabled={invPosting}
                   className="inline-flex items-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white px-5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
                   <CheckCircle className="h-4 w-4" />
-                  {invPosting ? 'Posting…' : selectedInvoice.invoice_type === 'ap' ? 'Post as Bill' : 'Post as Invoice'}
+                  {invPosting ? 'Posting…' : selectedInvoice.invoice_type === 'ap' ? 'Post as Bill' : selectedInvoice.invoice_type === 'po' ? 'Create sales invoice' : 'Post as Invoice'}
                 </button>
               </div>
             </div>

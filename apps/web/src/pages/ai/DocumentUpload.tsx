@@ -12,7 +12,7 @@ type UploadState = { busy: boolean; error: string | null; done: string | null };
 
 type UploadResult =
   | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
-  | { kind: 'invoice'; staging_id: string }
+  | { kind: 'invoice'; staging_id: string; invoice_type?: 'ap' | 'ar' | 'po' }
   | { kind: 'check_stubs'; check_count: number };
 
 const ACCEPTED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
@@ -23,7 +23,7 @@ function describeResult(result: UploadResult): string {
     case 'bank_statement':
       return result.statement_count > 1 ? `${result.statement_count} bank statements (one per account)` : 'bank statement';
     case 'credit_card_statement': return 'credit card statement';
-    case 'invoice': return 'invoice';
+    case 'invoice': return result.invoice_type === 'po' ? 'customer purchase order (review it under Invoices to make the sales invoice)' : 'invoice';
     case 'check_stubs': return `${result.check_count} check stub${result.check_count === 1 ? '' : 's'} (see the Check stubs tab)`;
   }
 }
@@ -117,7 +117,7 @@ export default function DocumentUpload({ onUploaded }: Props) {
               choose a file
             </button>
             <p className="text-xs text-muted-foreground">
-              Bank statements and invoices. No need to email them in.
+              Bank statements, invoices and customers' purchase orders. No need to email them in.
             </p>
           </>
         )}

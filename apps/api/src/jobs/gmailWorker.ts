@@ -89,8 +89,9 @@ export type UnifiedResult = {
   card_last4?: string;
   // check_stubs
   checks?: ExtractedCheck[];
-  // invoice
-  invoice_type?: 'ap' | 'ar';
+  // invoice; 'po' is a customer's purchase order, staged with the invoices
+  // and turned into a sales invoice on approval (see normalizeExtraction)
+  invoice_type?: 'ap' | 'ar' | 'po';
   vendor_customer?: string;
   invoice_number?: string;
   invoice_date?: string;
@@ -100,6 +101,20 @@ export type UnifiedResult = {
   total?: string;
   line_items?: InvoiceLineItem[];
 };
+
+/** What the model may return: a purchase order is its own type until normalizeExtraction. */
+type RawExtraction = Omit<UnifiedResult, 'document_type'> & {
+  document_type: UnifiedResult['document_type'] | 'purchase_order';
+};
+
+/**
+ * A customer's purchase order is staged with the invoices as kind 'po', so the
+ * upload path and this worker store it without a branch of their own.
+ */
+export function normalizeExtraction(raw: RawExtraction): UnifiedResult {
+  if (raw.document_type === 'purchase_order') return { ...raw, document_type: 'invoice', invoice_type: 'po' };
+  return { ...raw, document_type: raw.document_type };
+}
 
 /** The model ran out of room before finishing the JSON (a very long statement). */
 export class ExtractionTooLongError extends Error {
@@ -239,7 +254,30 @@ If this is an INVOICE or BILL return:
   ]
 }
 
-If the document is none of these (bank statement, credit card statement, check stubs, invoice/bill) return:
+If this is a PURCHASE ORDER that a customer sent to the company (the customer is ordering goods or services FROM the company) return:
+{
+  "document_type": "purchase_order",
+  "addressed_to": "exact name of the supplier the order is placed with (the TO / VENDOR / SUPPLIER field) — the company receiving this order",
+  "vendor_customer": "the customer placing the order: the buyer that issued the purchase order (its letterhead, BILL TO or BUYER)",
+  "invoice_number": "the purchase order number",
+  "invoice_date": "MM/DD/YYYY — the order date",
+  "due_date": "MM/DD/YYYY — the requested delivery date, if shown",
+  "subtotal": "e.g. 1000.00",
+  "tax_amount": "e.g. 80.00, use 0.00 if none",
+  "total": "e.g. 1080.00",
+  "line_items": [
+    {
+      "description": "string",
+      "quantity": "e.g. 2",
+      "unit_price": "e.g. 500.00",
+      "amount": "e.g. 1000.00",
+      "suggested_account": "one revenue (income) account name from the chart of accounts above"
+    }
+  ]
+}
+A purchase order the company itself sent to one of its own suppliers is not a bill and not this; return { "document_type": "unknown" } for it.
+
+If the document is none of these (bank statement, credit card statement, check stubs, invoice/bill, a customer's purchase order) return:
 { "document_type": "unknown" }`,
         },
       ] as Anthropic.MessageParam['content'],
@@ -256,7 +294,7 @@ If the document is none of these (bank statement, credit card statement, check s
   const match = content.text.match(/\{[\s\S]*\}/);  // pull out the {...} block
   if (!match) return { document_type: 'unknown' };  // no JSON found -> fail safely
   try {
-    return JSON.parse(match[0]) as UnifiedResult;   // try to parse it
+    return normalizeExtraction(JSON.parse(match[0]) as RawExtraction);   // try to parse it
   } catch {
     return { document_type: 'unknown' };    // parse failed, fail safely
   }

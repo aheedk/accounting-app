@@ -144,7 +144,7 @@ other tabs (bookkeeping, workforce, multi-entity); not wanted for now.
 | 82 | More "it is working" signs while things load, like the loading dots Riham added. Faizan wants the app to look busy when it is busy |
 | 20 | Bank account connection **(10-01)** |
 | 21 | Reconciliation against a connected bank, after 20. The manual worksheet was shown in this meeting; items 71 to 75 come from it **(10-01)** |
-| 23 | Upload a customer's purchase order and turn it into a sales invoice **(10-05)** |
+| 23 | Upload a customer's purchase order and turn it into a sales invoice **(10-05)**. **Done 10-20:** a purchase order, uploaded or emailed, shows in the AI inbox as a PO; approving it posts the sales invoice. See the AI auto-coding spec |
 | 24 | Stripe: clients pay their vendors from the app, and we get paid for the software. See 79 and 80 **(10-05)** |
 | 25 | Modules per client, priced separately **(10-05)** |
 | 26 | Sign in with Microsoft 365 or Google **(10-05)** |

@@ -7,9 +7,12 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { createDraft as createDraftBill, postBill } from '../services/ap/billService.js';
 import { createDraft as createDraftInvoice, postInvoice } from '../services/ar/invoiceService.js';
+import { createInvoiceFromPurchaseOrder, purchaseOrderInvoiceLines } from '../services/ai/purchaseOrderImportService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import { findSuspenseAccount, getOrCreateSuspenseAccount } from '../services/core/chartOfAccountsService.js';
 import type { Request } from 'express';
+import { ERR } from '@accounting/shared';
+import { BusinessRuleError } from '../lib/errors.js';
 
 const router = Router();
 
@@ -145,7 +148,9 @@ router.get(
 
 const approveSchema = z.object({
   vendor_id: z.string().uuid().optional(),   // required for AP
-  customer_id: z.string().uuid().optional(), // required for AR
+  customer_id: z.string().uuid().optional(), // required for AR and PO
+  /** PO only: the sales invoice's date. Defaults to today; the order date is the customer's. */
+  issue_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   line_items: z.array(z.object({
     index: z.number().int().min(0),
     account_id: z.string().uuid(),
@@ -179,6 +184,7 @@ router.post(
       const entryDate = staged.invoice_date ? toIsoDate(staged.invoice_date) : new Date().toISOString().slice(0, 10);
       const dueDate = staged.due_date ? toIsoDate(staged.due_date) : entryDate;
       const isAp = staged.invoice_type === 'ap';
+      const isPo = staged.invoice_type === 'po';
 
       // Recomputed server-side: this comparison decides what gets learned, so
       // it must not be client-controlled.
@@ -257,6 +263,15 @@ router.post(
               was_correction: changed,
             });
           }
+        } else if (isPo) {
+          if (!body.customer_id) throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'Select a customer to create the invoice.');
+          await createInvoiceFromPurchaseOrder(trx, serviceCtx, {
+            business_id: bizId,
+            customer_id: body.customer_id,
+            po_number: staged.invoice_number,
+            issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
+            lines: purchaseOrderInvoiceLines(lineItems, included, { subtotal: staged.subtotal, tax_amount: staged.tax_amount }),
+          });
         } else {
           if (!body.customer_id) throw new Error('customer_id required for AR invoices');
           const invLines = included.map(item => {

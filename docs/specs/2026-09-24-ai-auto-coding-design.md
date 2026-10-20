@@ -104,6 +104,32 @@ Corrections are learned for **AP only**. An AR line maps customer + line ->
 revenue, which is a different key space from vendor + line -> expense, and is
 out of scope here.
 
+### A customer's purchase order (added 2026-10-20)
+
+From the 10-05 meeting (item 23): a customer's purchase order, uploaded or
+emailed, becomes a sales invoice.
+
+- The extraction prompt has a `purchase_order` type: the buyer is the customer,
+  the supplier it is addressed to is the client, and each line keeps its
+  quantity and unit price. A purchase order the client sent to its own supplier
+  is `unknown`; it is not a bill.
+- `normalizeExtraction` (in `jobs/gmailWorker.ts`) stages it in
+  `invoice_import_staging` as `invoice_type = 'po'` (migration 0102), so the
+  upload path and the Gmail worker store it like any invoice.
+- In the AI inbox it is a blue **PO** under Invoices, with its own
+  "Purchase orders" filter. Review picks the customer, the revenue accounts and
+  the invoice date (today by default; the order date is the customer's).
+- Approving it (`services/ai/purchaseOrderImportService.ts`) posts a sales
+  invoice like an AR import does, with three differences: it takes the next
+  invoice number, because the PO number is the customer's and goes in the memo
+  ("Customer PO #…"); terms and the due date follow the customer's default
+  terms; and quantity and unit price are kept, unless the line's numbers do
+  not multiply out or the order carries tax, when the line is one unit at its
+  amount with the tax spread by amount, as for an AR import.
+- It is posted, not left as a draft, because a draft invoice cannot be edited
+  in the app; the inbox review is the check. Nothing is learned from it (see
+  "Learning scope").
+
 ## Data model
 
 Migration `0066_ai_auto_coding.sql`:
