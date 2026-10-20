@@ -20,6 +20,7 @@ type FirmRow = {
   ap_balance: string;
   unreviewed_bank_txn_count: number;
   open_period_count: number;
+  last_closed_date: string | null;
   last_reconciliation_date: string | null;
 };
 
@@ -77,6 +78,8 @@ export default function ClientOverviewPage() {
     { key: 'ap_balance', header: 'AP Balance', align: 'right', sortable: true, sortValue: r => Number(r.ap_balance), render: r => <span className="font-mono">{fmtMoney(r.ap_balance)}</span> },
     { key: 'unreviewed_bank_txn_count', header: 'Unreviewed Txns', align: 'right', sortable: true, sortValue: r => r.unreviewed_bank_txn_count, render: r => r.unreviewed_bank_txn_count > 0 ? <span className="font-medium text-amber-700">{r.unreviewed_bank_txn_count}</span> : <span className="text-muted-foreground">0</span> },
     { key: 'open_period_count', header: 'Open Periods', align: 'right', sortable: true, sortValue: r => r.open_period_count, render: r => r.open_period_count },
+    // The books are closed through this date (Setup → Fiscal Periods); not the same as a reconciliation.
+    { key: 'last_closed_date', header: 'Books Closed Through', align: 'right', sortable: true, sortValue: r => r.last_closed_date ?? '', render: r => <span className="whitespace-nowrap">{fmtShortDate(r.last_closed_date)}</span> },
     { key: 'last_reconciliation_date', header: 'Last Reconciliation', align: 'right', sortable: true, sortValue: r => r.last_reconciliation_date ?? '', render: r => <span className="whitespace-nowrap">{fmtShortDate(r.last_reconciliation_date)}</span> },
   ];
 
@@ -97,13 +100,14 @@ export default function ClientOverviewPage() {
   const needle = query.trim().toLowerCase();
   const shownRows = needle ? rows.filter(r => r.business_name.toLowerCase().includes(needle)) : rows;
 
-  const dlHeaders = ['Business', 'AR Balance', 'AP Balance', 'Unreviewed Bank Txns', 'Open Periods', 'Last Reconciliation'];
+  const dlHeaders = ['Business', 'AR Balance', 'AP Balance', 'Unreviewed Bank Txns', 'Open Periods', 'Books Closed Through', 'Last Reconciliation'];
   const dlRows = () => rows.map(r => [
     r.business_name,
     r.ar_balance,
     r.ap_balance,
     String(r.unreviewed_bank_txn_count),
     String(r.open_period_count),
+    r.last_closed_date ?? '—',
     r.last_reconciliation_date ?? '—',
   ]);
 

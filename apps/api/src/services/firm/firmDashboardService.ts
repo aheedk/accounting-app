@@ -11,6 +11,8 @@ export type FirmOverviewRow = {
   ap_balance: string;
   unreviewed_bank_txn_count: number;
   open_period_count: number;
+  // End of the latest closed fiscal period: the books are closed through this date.
+  last_closed_date: string | null;
   last_reconciliation_date: string | null;
 };
 
@@ -22,6 +24,7 @@ export type FirmOverviewRow = {
 //   - invoices.total / bills.total              (0012 / 0017)
 //   - bank_transactions.status='unreviewed'     (0022)
 //   - bank_reconciliations.period_end           (0023)
+//   - fiscal_periods.ends_on / status='closed'
 //   - businesses.deleted_at                     (0003)
 export async function getFirmOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<FirmOverviewRow[]> {
   if (ctx.effective_role !== 'firm_admin') {
@@ -37,6 +40,7 @@ export async function getFirmOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<
       (COALESCE(ap.balance, 0) - COALESCE(apc.credits, 0))::text AS ap_balance,
       COALESCE(ut.cnt, 0)::int AS unreviewed_bank_txn_count,
       COALESCE(op.cnt, 0)::int AS open_period_count,
+      cp.last_closed::text AS last_closed_date,
       lr.last_period_end::text AS last_reconciliation_date
     FROM businesses b
     LEFT JOIN (
@@ -81,6 +85,10 @@ export async function getFirmOverview(db: Kysely<DB>, ctx: ServiceCtx): Promise<
       SELECT business_id, COUNT(*) AS cnt
         FROM fiscal_periods WHERE status = 'open' GROUP BY business_id
     ) op ON op.business_id = b.id
+    LEFT JOIN (
+      SELECT business_id, MAX(ends_on) AS last_closed
+        FROM fiscal_periods WHERE status = 'closed' GROUP BY business_id
+    ) cp ON cp.business_id = b.id
     LEFT JOIN (
       SELECT br.business_id, MAX(br.period_end) AS last_period_end
         FROM bank_reconciliations br GROUP BY br.business_id
