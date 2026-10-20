@@ -79,6 +79,41 @@ March statement and Cash in Bank account. What's left of this group: 72's
 statement-upload/extraction half (Aheed) and the balance/date auto-fill once
 that's ready, and 74's actual report + PDF + Reports listing.
 
+**Item 71 — matching rules, for the firm to review.** None of this was asked
+for at this level of detail in the meeting; these are the specific calls made
+to build it. Worth confirming with Faizan before relying on it for real
+clients:
+
+- A statement line and a book transaction only match on the **exact same
+  amount**. No rounding, no "close enough."
+- They also have to be dated within **3 business days** of each other (banks
+  often post a transaction a day or two after it happened). This window is a
+  judgment call — open to being tightened or loosened.
+- A deposit can only ever match a line that puts money in, and a
+  check/payment only a line that takes money out — never crossed, even if the
+  dollar amount happens to line up.
+- If more than one transaction fits the same amount and date window, the one
+  whose payee or memo shares a word with the statement line's description
+  wins (e.g. "REGIONS" appearing on both sides).
+- If it's still tied after that, whichever date is closest wins.
+- If it's still tied even then, **nothing is ticked** — both are left for the
+  user to check by hand rather than risk matching the wrong one.
+- Each book transaction and each statement line can only be used in one
+  match — never double-counted.
+- Only an uploaded statement that has already been **reviewed and approved**
+  (not one still sitting unreviewed) is used to auto-tick anything.
+- A statement counts as "for this reconciliation" when its own latest line is
+  within **10 days** of the statement ending date being reconciled, and — if
+  more than one approved statement could apply — only if the account name on
+  the upload clearly points to one of them. If it's unclear which statement
+  or which account, nothing is auto-ticked and the worksheet opens fully
+  manual, the same as it does today with no statement at all.
+- Related, from item 75: a reconciliation on an account for the first time
+  ever still starts from a $0 beginning balance (unchanged, existing
+  behavior) — so even with everything auto-matched, the difference won't
+  reach zero until every earlier period on that account has also been
+  reconciled. That's expected, not a bug in the matching.
+
 **My Menu (76).** Asked whether it is a QuickBooks thing; nobody knew, and
 Faizan said to take it off. He added that larger systems give each job its own
 dashboard and menus (accounts payable clerk, controller, CEO). That is later;
