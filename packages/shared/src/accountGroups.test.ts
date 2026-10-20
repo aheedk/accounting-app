@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { ACCOUNT_TYPE_GROUPS, DETAIL_TYPES, accountGroup, accountGroupsOf } from './accountGroups.js';
+import { ACCOUNT_TYPE_GROUPS, DETAIL_TYPES, accountGroup, accountGroupsOf, isNotMoneyAccount } from './accountGroups.js';
+
+describe('isNotMoneyAccount', () => {
+  it('knows equipment, receivables, long-term assets and inventory are not money', () => {
+    for (const detail_type of ['Machinery & Equipment', 'Equipment', 'Accounts receivable (A/R)', 'Security Deposits', 'Inventory']) {
+      expect(isNotMoneyAccount({ account_type: 'asset', detail_type })).toBe(true);
+    }
+  });
+
+  it('does not judge a bank, an account with no detail type, or a liability', () => {
+    expect(isNotMoneyAccount({ account_type: 'asset', detail_type: 'Checking' })).toBe(false);
+    expect(isNotMoneyAccount({ account_type: 'asset', detail_type: null })).toBe(false);
+    expect(isNotMoneyAccount({ account_type: 'asset', detail_type: 'Undeposited Funds' })).toBe(false);
+    expect(isNotMoneyAccount({ account_type: 'liability', detail_type: 'Credit Card' })).toBe(false);
+  });
+});
 
 describe('accountGroup', () => {
   it('reads the QuickBooks account type from the detail type', () => {

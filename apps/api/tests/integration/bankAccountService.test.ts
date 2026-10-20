@@ -49,6 +49,18 @@ describe('bankAccountService', () => {
     expect(audit).toHaveLength(1);
   });
 
+  it('createBankAccount refuses Equipment: it is not a bank account (item 39)', async () => {
+    const { biz, ctx } = await setup(t);
+    const equipment = await t.db.selectFrom('chart_of_accounts').selectAll()
+      .where('business_id', '=', biz.id).where('code', '=', '1500').executeTakeFirstOrThrow();
+    await expect(t.db.transaction().execute(trx =>
+      bankAcctSvc.createBankAccount(trx, ctx, {
+        business_id: biz.id, name: 'Equipment', institution: null, account_last_four: null,
+        cash_account_id: equipment.id,
+      }),
+    )).rejects.toThrow(/Equipment is not a bank account \(its type is Fixed Assets\)/);
+  });
+
   it('listBankAccounts: bank_balance sums imported transactions, excluding excluded rows', async () => {
     const { biz, ctx, user, cash } = await setup(t);
     const ba = await t.db.transaction().execute(trx =>

@@ -27,9 +27,14 @@ describe('statementBankAccounts', () => {
     expect(ids(statementBankAccounts(accounts, new Set(), 'equip'))).toEqual(['chk', 'sav', 'equip']);
   });
 
-  it('falls back to every asset except Suspense when no account is marked as a bank', () => {
+  it('falls back to the assets that may hold money when no account is marked as a bank', () => {
+    // Not Suspense, and not receivables or equipment (item 39: Equipment showed in this picker).
     const unmarked = accounts.filter(a => a.id !== 'chk' && a.id !== 'sav');
-    expect(ids(statementBankAccounts(unmarked, new Set(), ''))).toEqual(['old', 'ar', 'equip']);
+    expect(ids(statementBankAccounts(unmarked, new Set(), ''))).toEqual(['old']);
+  });
+
+  it('leaves out equipment even when it was set up under Banking', () => {
+    expect(ids(statementBankAccounts(accounts, new Set(['equip']), ''))).toEqual(['chk', 'sav']);
   });
 });
 

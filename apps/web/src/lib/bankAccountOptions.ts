@@ -1,4 +1,4 @@
-import { SUSPENSE_DETAIL_TYPE, accountGroup } from '@accounting/shared';
+import { SUSPENSE_DETAIL_TYPE, accountGroup, isNotMoneyAccount } from '@accounting/shared';
 
 type AccountOption = { id: string; account_type: string; detail_type?: string | null };
 
@@ -10,11 +10,13 @@ type AccountOption = { id: string; account_type: string; detail_type?: string | 
 export function statementBankAccounts<T extends AccountOption>(
   accounts: T[], bankingAccountIds: ReadonlySet<string>, selectedId: string,
 ): T[] {
-  // Suspense is an asset too, but never an account money is paid from or into.
-  const assets = accounts.filter(a => a.account_type === 'asset' && a.detail_type !== SUSPENSE_DETAIL_TYPE);
+  // Suspense is an asset too, but never an account money is paid from or into;
+  // nor is equipment or a receivable, even one set up under Banking by mistake (item 39).
+  const assets = accounts.filter(a => a.account_type === 'asset' && a.detail_type !== SUSPENSE_DETAIL_TYPE && !isNotMoneyAccount(a));
   const banks = assets.filter(a => bankingAccountIds.has(a.id) || accountGroup(a) === 'Bank');
   if (banks.length === 0) return assets;
-  const selected = assets.find(a => a.id === selectedId);
+  // The account already chosen stays listed, whatever it is, so the box never goes blank.
+  const selected = accounts.find(a => a.id === selectedId && a.account_type === 'asset');
   return selected && !banks.includes(selected) ? [...banks, selected] : banks;
 }
 

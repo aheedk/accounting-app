@@ -101,3 +101,19 @@ export function accountGroup(account: { account_type: string; detail_type?: stri
   }
   return DEFAULT_GROUP[account.account_type];
 }
+
+const NOT_MONEY: readonly AccountGroup[] = ['Fixed Assets', 'Accounts receivable (A/R)', 'Other Assets'];
+
+/**
+ * An asset whose detail type says plainly that it is not money held: equipment
+ * and other fixed assets, receivables, long-term assets, inventory. Such an
+ * account is never a bank account, whatever Banking says (item 39: Equipment
+ * once showed in a statement's bank picker). An asset with no detail type is
+ * not judged; old charts have many.
+ */
+export function isNotMoneyAccount(account: { account_type: string; detail_type?: string | null }): boolean {
+  const detail = (account.detail_type ?? '').trim().toLowerCase();
+  if (account.account_type !== 'asset' || !detail) return false;
+  const group = accountGroup(account);
+  return (group !== null && NOT_MONEY.includes(group)) || detail === 'inventory';
+}

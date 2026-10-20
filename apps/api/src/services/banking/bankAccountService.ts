@@ -1,5 +1,5 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
-import { AUDIT } from '@accounting/shared';
+import { AUDIT, accountGroup, isNotMoneyAccount } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { PreconditionError } from '../../lib/ledgerErrors.js';
@@ -30,6 +30,10 @@ export async function createBankAccount(trx: Transaction<DB>, ctx: ServiceCtx, i
     .where('id', '=', input.cash_account_id).where('business_id', '=', input.business_id).executeTakeFirst();
   if (!coa) throw new NotFoundError('chart_of_accounts', input.cash_account_id);
   if (coa.account_type !== 'asset') throw new PreconditionError('cash_account must be an asset account');
+  // Equipment or a receivable set up under Banking showed in every bank picker (item 39).
+  if (isNotMoneyAccount(coa)) {
+    throw new PreconditionError(`${coa.name} is not a bank account (its type is ${accountGroup(coa) ?? coa.detail_type}). Link a bank account, or change this account's type in the Chart of Accounts first.`);
+  }
 
   const row = await trx.insertInto('bank_accounts').values({
     business_id: input.business_id,

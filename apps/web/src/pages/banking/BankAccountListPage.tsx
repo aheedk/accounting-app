@@ -14,6 +14,7 @@ import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
 import { fmtMoney } from '@/lib/money';
+import { accountGroup, isNotMoneyAccount } from '@accounting/shared';
 
 function statusBadge(active: boolean) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium';
@@ -42,6 +43,7 @@ type CashAccountRow = {
   code: string;
   name: string;
   account_type: string;
+  detail_type?: string | null;
   is_system: boolean;
   is_active: boolean;
 };
@@ -71,7 +73,10 @@ export default function BankAccountListPage() {
     reload();
     api.get(`/businesses/${bizId}/coa`).then(r => {
       const rows = r.data.accounts as CashAccountRow[];
-      setCashAccounts(rows.filter(a => a.account_type === 'asset' && a.is_active && a.code.startsWith('10')));
+      // Accounts of type Bank, plus the 10xx cash range of older charts; never equipment
+      // or a receivable, which the API refuses anyway (item 39).
+      setCashAccounts(rows.filter(a => a.account_type === 'asset' && a.is_active && !isNotMoneyAccount(a)
+        && (accountGroup(a) === 'Bank' || a.code.startsWith('10'))));
     });
   }, [bizId]);
 
