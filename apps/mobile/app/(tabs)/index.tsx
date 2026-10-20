@@ -100,7 +100,7 @@ export default function DashboardScreen() {
               label="Overdue invoices"
               value={String(overdue.count)}
               sub={`$${fmtMoney(overdue.total)}`}
-              onPress={() => router.push('/(tabs)/clients')}
+              onPress={() => router.push('/invoices')}
             />
             <SummaryCard
               theme={theme}

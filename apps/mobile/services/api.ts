@@ -32,9 +32,52 @@ export type InvoiceRow = {
   due_date: string; status: string; total: string;
 };
 
-export async function listInvoices(businessId: string) {
-  const r = await api.get<{ invoices: InvoiceRow[] }>(`/businesses/${businessId}/invoices`, { params: { status: 'posted', limit: 500 } });
+export async function listInvoices(businessId: string, params: { status?: string; customer_id?: string } = {}) {
+  const r = await api.get<{ invoices: InvoiceRow[] }>(`/businesses/${businessId}/invoices`, {
+    params: {
+      limit: 500,
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.customer_id ? { customer_id: params.customer_id } : {}),
+    },
+  });
   return r.data.invoices;
+}
+
+// invoices.ts's list/detail routes return every InvoicesTable column — these
+// types only declare the subset the mobile screens actually use, same as
+// the web app's own InvoiceListPage/-DetailPage narrow their local types.
+export type InvoiceLine = {
+  id: string; line_number: number; description: string; quantity: string;
+  unit_price: string; line_subtotal: string; tax_amount: string; line_total: string;
+};
+
+export type InvoiceDetail = {
+  invoice: InvoiceRow & { subtotal: string; tax_total: string; memo: string | null; terms: string | null };
+  lines: InvoiceLine[];
+  amount_due: string;
+};
+
+export async function getInvoice(businessId: string, id: string) {
+  const r = await api.get<InvoiceDetail>(`/businesses/${businessId}/invoices/${id}`);
+  return r.data;
+}
+
+// customers.ts's list route returns every CustomersTable column plus two
+// computed fields (open_balance, has_transactions) — only the subset the
+// mobile screens use is declared here, same pattern as InvoiceRow above.
+export type CustomerRow = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
+};
+
+export async function listCustomers(businessId: string) {
+  const r = await api.get<{ customers: CustomerRow[] }>(`/businesses/${businessId}/customers`);
+  return r.data.customers;
+}
+
+export async function getCustomer(businessId: string, id: string) {
+  const r = await api.get<CustomerRow>(`/businesses/${businessId}/customers/${id}`);
+  return r.data;
 }
 
 export type InboxRow = { id: string; status: string; source: string; created_at: string };
