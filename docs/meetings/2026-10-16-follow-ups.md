@@ -14,7 +14,10 @@ meeting an item first came from.
   start the week after, so after 5 PM is the safe time).
 
 Aheed's demo for this meeting is
-[`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md). Most of it was
+[`../demos/2026-10-16-aheed.md`](../demos/2026-10-16-aheed.md). What was built
+after it, for the 10-20 meeting, is in
+[`../demos/2026-10-20-aheed.md`](../demos/2026-10-20-aheed.md) and under
+"Done since the meeting" below. Most of it was
 not shown: Aheed said the changes from Faizan's video were done and too many and
 too small to walk through. Only the firm view and My Menu were shown.
 
@@ -47,8 +50,8 @@ too small to walk through. Only the firm view and My Menu were shown.
 | 34 | Faizan's first video is written up ([`2026-10-12-faizan-video-1.md`](./2026-10-12-faizan-video-1.md), items 50 to 70, all done). His PDF and the check stubs from the Teams chat are still to go through. He is recording more points in a second video **(10-10)** | Aheed |
 | 36 | Pay bills prints checks: built 10-13. Left: Faizan confirms the check stock the firm prints on, and a test print is lined up against it. Not asked in this meeting **(10-10)** | Aheed, Faizan |
 | 37 | Year end: built 10-13. Left: ask Faizan whether he wants a posted closing entry as well. Not asked in this meeting **(10-10)** | Aheed, Faizan |
-| 39 | Equipment in the bank picker: look at Banking in the company from the 10-10 demo **(10-10)** | Aheed |
-| 43 | Backups: the tool is built. Left: run it against production once, and decide how often and where our own copy is kept **(10-10)** | Aheed, Riham |
+| 39 | Equipment in the bank picker **(10-10)**. **Done 10-20:** the likely cause was Equipment set up under Banking, which the API allowed. Banking now refuses equipment, receivables, other long-term assets and inventory, and every bank picker leaves them out even if set up before | Aheed |
+| 43 | Backups: the tool is built. Left: run it against production once (needs the connection string from Railway), and decide how often and where our own copy is kept. Uploaded files are in no backup yet; see the recovery plan. 10-20: [`../guides/recovery-plan.md`](../guides/recovery-plan.md) written **(10-10)** | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders **(10-10)** | Faizan |
 | 17 | QA audit: Estimate, emailing an invoice (item 47) and two decisions for the firm **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm. Item 74 adds one **(10-05)** | Aheed, firm |
@@ -149,7 +152,7 @@ other tabs (bookkeeping, workforce, multi-entity); not wanted for now.
 | 25 | Modules per client, priced separately **(10-05)** |
 | 26 | Sign in with Microsoft 365 or Google **(10-05)** |
 | 27 | One login shared with the practice management software **(10-05)** |
-| 28 | Security review and testing; a standby copy of the database; a written recovery plan. The Gmail hole is closed **(10-05)** |
+| 28 | Security review and testing; a standby copy of the database; a written recovery plan. The Gmail hole is closed. **10-20:** the review is done and its fixes are in ([`../qa/2026-10-20-security-review.md`](../qa/2026-10-20-security-review.md)), and the recovery plan is written ([`../guides/recovery-plan.md`](../guides/recovery-plan.md)). Left: a standby copy, and enforcing the web app's Content-Security-Policy **(10-05)** |
 | 29 | Mobile app, last **(10-05)** |
 | 48 | An assistant in the corner of the app **(10-10)** |
 | 49 | A payroll partner, if payroll is ever offered **(10-10)** |
@@ -187,6 +190,21 @@ Reported by Riham in this meeting:
 Done before the meeting and in the demo, not walked through: every item from
 Faizan's first video (50 to 70), item 28's Gmail fix, and 35, 36, 37, 40, 41
 and 42 from 10-10. See the demo.
+
+### Done since the meeting (Aheed, for 10-20)
+
+What to click is in [`../demos/2026-10-20-aheed.md`](../demos/2026-10-20-aheed.md).
+
+| # | What |
+|---|---|
+| 76 | My Menu taken out of the sidebar |
+| 77 | Firm view: a "Books Closed Through" column, the end of each client's latest closed period, also in the Excel download |
+| 78 | A cut-off account name shows in full on hover, in the box and its list, in every account picker and drop-down; the account list also opens wider than a narrow box |
+| 39 | Equipment (and receivables, long-term assets, inventory) can no longer be set up under Banking, and never shows in a bank picker |
+| 23 | A customer's purchase order, uploaded or emailed, waits in the AI inbox as a PO; approving it posts the sales invoice with the next invoice number, the PO number in the memo, the customer's terms, and the order's quantities and prices. Spec: the AI auto-coding spec, "A customer's purchase order" |
+| — | Setup → Company Settings: invoice number prefix and start number, default invoice and bill terms, default sales tax, default expense payment method. All invoices now follow one numbering rule (recurring ones and sales orders came out as INV-0001 beside the form's 1001). Spec: [`../specs/2026-10-20-company-settings-design.md`](../specs/2026-10-20-company-settings-design.md) |
+| 28 | Security review ([`../qa/2026-10-20-security-review.md`](../qa/2026-10-20-security-review.md)): a record's id can no longer reach another client's record (60 lookups and the AI inbox); payees on checks and expenses must be the client's own; uploaded files of types that can run code are only downloaded; sign-in limited per address; a wrong email answers as slowly as a wrong password; security headers on the web app (the script policy reports only, for now) |
+| 28, 43 | Recovery plan ([`../guides/recovery-plan.md`](../guides/recovery-plan.md)): what to do for each kind of failure, and which secrets to keep outside Railway |
 
 ## Decided — no work
 
