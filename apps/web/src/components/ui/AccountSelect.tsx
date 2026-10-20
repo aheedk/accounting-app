@@ -198,7 +198,8 @@ export function AccountSelect({
             position: 'fixed',
             top: menuPosition.top,
             left: menuPosition.left,
-            width: menuPosition.width,
+            // A narrow box (w-56 on Expense) still gets a menu wide enough to read names in.
+            width: Math.max(menuPosition.width, 288),
             zIndex: 9999,
           }}
           className="overflow-hidden rounded-md border bg-background shadow-md"
@@ -224,7 +225,7 @@ export function AccountSelect({
                     )}
                   >
                     <span className="w-14 font-mono text-xs text-muted-foreground">{a.code}</span>
-                    <span className="flex-1 truncate">{a.name}</span>
+                    <span className="flex-1 truncate" title={a.name}>{a.name}</span>
                     <AccountBadges type={a.account_type} />
                   </li>
                 ))}
@@ -271,6 +272,8 @@ export function AccountSelect({
           type="button"
           disabled={disabled}
           onClick={openMenu}
+          // A long name is cut off with "…"; hovering shows all of it.
+          {...(selected ? { title: `${selected.code} ${selected.name}` } : {})}
           className={cn(
             'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-left ring-offset-background',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

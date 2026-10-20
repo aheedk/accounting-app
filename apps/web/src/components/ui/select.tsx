@@ -197,7 +197,8 @@ export function AppSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="truncate text-left">{displayLabel}</span>
+        {/* A long name is cut off with "…"; hovering shows all of it. */}
+        <span className="truncate text-left" title={displayLabel}>{displayLabel}</span>
         <ChevronDown
           className={cn('ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}
         />
@@ -252,7 +253,7 @@ export function AppSelect({
                     isActive && 'bg-accent text-accent-foreground',
                   )}
                 >
-                  <span className="flex-1 truncate">{opt.label}</span>
+                  <span className="flex-1 truncate" title={opt.label}>{opt.label}</span>
                   {opt.hint ? (
                     <span className="ml-2 shrink-0 text-xs italic text-muted-foreground">{opt.hint}</span>
                   ) : (

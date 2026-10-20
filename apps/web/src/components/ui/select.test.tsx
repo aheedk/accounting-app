@@ -37,4 +37,21 @@ describe('AppSelect', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect((onChange.mock.calls[0]![0] as { target: { value: string } }).target.value).toBe('check');
   });
+
+  it('shows the whole name on hover when it is cut off', () => {
+    const long = '1010 — Operating Bank Account at First National Bank';
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(
+      <AppSelect value="a1" onChange={vi.fn()}>
+        <option value="a1">{long}</option>
+      </AppSelect>,
+    ));
+
+    const trigger = host.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
+    expect(trigger.querySelector(`[title="${long}"]`)).not.toBeNull();
+    act(() => trigger.click());
+    expect(document.querySelector(`[role="option"] [title="${long}"]`)).not.toBeNull();
+  });
 });
