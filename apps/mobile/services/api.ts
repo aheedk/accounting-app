@@ -102,3 +102,40 @@ export async function getJournalEntry(businessId: string, id: string) {
   const r = await api.get<JournalEntryDetail>(`/businesses/${businessId}/journal-entries/${id}`);
   return r.data;
 }
+
+// --- General Ledger (Phase 1, item 6) — shapes copied from
+// generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
+// chartOfAccounts.ts's /coa route, not guessed.
+
+export type CoaAccount = { id: string; code: string; name: string; account_type: string };
+
+export async function listChartOfAccounts(businessId: string) {
+  const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`);
+  return r.data.accounts;
+}
+
+export type GeneralLedgerLine = {
+  journal_entry_id: string; line_id: string; entry_date: string; transaction_label: string;
+  num: string | null; name: string | null; memo: string | null; split_account: string | null;
+  debit: string; credit: string; amount: string; running_balance: string;
+  status: 'posted' | 'voided'; is_reconciled: boolean;
+};
+
+export type GeneralLedgerAccount = {
+  account_id: string; account_code: string; account_name: string; account_type: string;
+  normal_balance: 'debit' | 'credit'; beginning_balance: string; total_debit: string;
+  total_credit: string; ending_balance: string; lines: GeneralLedgerLine[];
+};
+
+export type GeneralLedgerReport = {
+  period_start: string; period_end: string; account_id: string | null;
+  accounts: GeneralLedgerAccount[]; totals: { total_debit: string; total_credit: string };
+};
+
+export async function getGeneralLedger(
+  businessId: string,
+  params: { period_start: string; period_end: string; account_id?: string },
+) {
+  const r = await api.get<GeneralLedgerReport>(`/businesses/${businessId}/reports/general-ledger`, { params });
+  return r.data;
+}

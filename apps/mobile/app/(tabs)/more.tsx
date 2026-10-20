@@ -1,6 +1,7 @@
 import { View, StyleSheet } from 'react-native';
 import { Text, List, Divider, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import type { AppTheme } from '../../theme';
 import { spacing, typeScale } from '../../theme';
@@ -23,6 +24,14 @@ export default function MoreScreen() {
         <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>More</Text>
         {user && <Text style={{ color: theme.app.mutedForeground, marginTop: 2 }}>{user.full_name} · {user.email}</Text>}
       </View>
+
+      <List.Item
+        title="General Ledger"
+        onPress={() => router.push('/general-ledger')}
+        left={props => <List.Icon {...props} icon="format-list-numbered" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <Divider />
 
       {STUB_ITEMS.map(item => (
         <List.Item
