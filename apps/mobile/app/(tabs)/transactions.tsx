@@ -4,6 +4,7 @@ import { Text, TextInput, Chip, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { listTransactions, type TransactionRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
@@ -92,11 +93,14 @@ export default function TransactionsScreen() {
             </View>
           }
           renderItem={({ item }: { item: TransactionRow }) => (
-            // item.path is the WEB app's route (e.g. /accounting/expenses/:id) —
-            // not a mobile screen. Transaction detail (Phase 1, item 5) isn't
-            // built yet, so this intentionally does nothing rather than
-            // navigate to a route that doesn't exist here.
-            <TransactionRowItem row={item} theme={theme} onPress={() => {}} />
+            // item.path is the WEB app's route (e.g. /accounting/expenses/:id),
+            // not a mobile screen — navigate by type+id to our own detail route
+            // instead. Unsupported types land on a graceful dead-end there.
+            <TransactionRowItem
+              row={item}
+              theme={theme}
+              onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: item.id, type: item.type } })}
+            />
           )}
         />
       )}

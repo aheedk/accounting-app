@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, StyleSheet, RefreshControl, ScrollView } from 'react-native';
+import { View, StyleSheet, RefreshControl, ScrollView, Pressable } from 'react-native';
 import { Text, Card, Avatar, useTheme } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -121,7 +121,10 @@ export default function DashboardScreen() {
             ) : (
               recentTx.data?.transactions.map((tx, i) => (
                 <View key={`${tx.type}:${tx.id}`}>
-                  <Card.Content style={styles.txRow}>
+                  <Pressable
+                    style={({ pressed }) => [styles.txRow, { paddingHorizontal: spacing.md, opacity: pressed ? 0.6 : 1 }]}
+                    onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: tx.id, type: tx.type } })}
+                  >
                     <Avatar.Icon
                       size={36}
                       icon={isInflowType(tx.type) ? 'arrow-down' : 'arrow-up'}
@@ -137,7 +140,7 @@ export default function DashboardScreen() {
                       </Text>
                     </View>
                     <Text style={{ color: theme.app.foreground, fontWeight: '600' }}>${fmtMoney(tx.total_amount)}</Text>
-                  </Card.Content>
+                  </Pressable>
                   {i < (recentTx.data?.transactions.length ?? 0) - 1 && <View style={[styles.divider, { backgroundColor: theme.app.border }]} />}
                 </View>
               ))
