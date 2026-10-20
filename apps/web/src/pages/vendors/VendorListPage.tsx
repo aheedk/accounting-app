@@ -45,6 +45,7 @@ export default function VendorListPage() {
   const canMakeInactive = role !== undefined && hasMinRole(role, 'accountant');
 
   const [items, setItems] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
   const [showInactive, setShowInactive] = useState(false);
@@ -58,10 +59,14 @@ export default function VendorListPage() {
 
   async function reload() {
     if (!bizId) return;
-    const r = await api.get(`/businesses/${bizId}/vendors`, {
-      params: showInactive ? { include_inactive: 'true' } : {},
-    });
-    setItems(r.data.vendors);
+    try {
+      const r = await api.get(`/businesses/${bizId}/vendors`, {
+        params: showInactive ? { include_inactive: 'true' } : {},
+      });
+      setItems(r.data.vendors);
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { reload(); }, [bizId, showInactive]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000 } }).then(r => setBills(r.data.bills)); }, [bizId]);
@@ -252,6 +257,7 @@ export default function VendorListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

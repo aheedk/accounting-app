@@ -5,6 +5,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { pickErr } from '@/lib/apiErrors';
 import JournalEntryEditor from './JournalEntryEditor';
 import type { JournalEntryDetail } from './journalEntryTypes';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 export default function JournalDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +25,7 @@ export default function JournalDetailPage() {
 
   if (!businessId) return <div>Pick a business.</div>;
   if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <LoadingIndicator />;
   // Source-generated entries can only be changed from their source, so go there
   // directly. `?view=entry` is the way back to the read-only entry itself.
   if (data.source_path && searchParams.get('view') !== 'entry') {

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type PayRun = {
   id: string;
@@ -97,7 +98,7 @@ export default function PayRunListPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+                {loading && <tr><td colSpan={7}><LoadingIndicator /></td></tr>}
                 {runs.map(run => (
                   <tr key={run.id} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="p-3 font-mono whitespace-nowrap">{fmtShortDate(run.pay_date)}</td>

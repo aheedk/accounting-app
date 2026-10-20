@@ -47,6 +47,7 @@ export default function BankDepositListPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [items, setItems] = useState<Deposit[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<string>('3m');
   const [accountFilter, setAccountFilter] = useState<string>('all');
   const [refSearch, setRefSearch] = useState('');
@@ -57,11 +58,14 @@ export default function BankDepositListPage() {
   const reload = useCallback(async () => {
     if (!bizId) { setItems([]); return; }
     setErr(null);
+    setLoading(true);
     try {
       const r = await api.get<Deposit[]>(`/businesses/${bizId}/bank-deposits`);
       setItems(Array.isArray(r.data) ? r.data : []);
     } catch (e: unknown) {
       setErr(pickErr(e));
+    } finally {
+      setLoading(false);
     }
   }, [bizId]);
 
@@ -198,6 +202,7 @@ export default function BankDepositListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

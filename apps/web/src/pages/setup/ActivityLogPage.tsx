@@ -10,6 +10,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { fmtDateTime } from '@/lib/dates';
 import { activityRecordName, activityVerb } from '@/lib/activityLabels';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Row = {
   id: string;
@@ -157,7 +158,7 @@ export default function ActivityLogPage() {
       {hasMore && (
         <div className="text-center">
           <Button variant="outline" disabled={loading} onClick={() => void load(rows[rows.length - 1]?.created_at)}>
-            {loading ? 'Loading…' : 'Show older'}
+            {loading ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Loading…</span> : 'Show older'}
           </Button>
         </div>
       )}

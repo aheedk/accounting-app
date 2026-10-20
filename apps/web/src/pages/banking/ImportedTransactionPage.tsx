@@ -17,6 +17,7 @@ import { ComboInput } from '@/components/ui/ComboInput';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { AttachmentsPanel, useAttachments } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type TransactionType = 'check' | 'expense' | 'deposit' | 'credit_card_payment' | 'credit_card_credit';
 
@@ -160,7 +161,7 @@ export default function ImportedTransactionPage() {
       </div>
     );
   }
-  if (!txn || !form) return <div>Loading...</div>;
+  if (!txn || !form) return <LoadingIndicator />;
 
   const readOnly = !txn.can_edit;
   const moneyIn = txn.direction === 'in';
@@ -223,7 +224,7 @@ export default function ImportedTransactionPage() {
                   </div>
                   <div className="max-h-80 overflow-y-auto py-1">
                     {recentItems === null ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>
+                      <div className="px-4 py-3 text-primary"><LoadingIndicator size="sm" /></div>
                     ) : recentItems.length === 0 ? (
                       <p className="px-4 py-3 text-sm text-muted-foreground">Nothing yet.</p>
                     ) : (

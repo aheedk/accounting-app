@@ -53,6 +53,7 @@ export default function ExpenseListPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [items, setItems] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<string>('3m');
   const [accountFilter, setAccountFilter] = useState<string>('all');
   const [refSearch, setRefSearch] = useState('');
@@ -63,11 +64,14 @@ export default function ExpenseListPage() {
   const reload = useCallback(async () => {
     if (!bizId) { setItems([]); return; }
     setErr(null);
+    setLoading(true);
     try {
       const r = await api.get<{ expense_transactions: Expense[] }>(`/businesses/${bizId}/expense-transactions`);
       setItems(Array.isArray(r.data.expense_transactions) ? r.data.expense_transactions : []);
     } catch (e: unknown) {
       setErr(pickErr(e));
+    } finally {
+      setLoading(false);
     }
   }, [bizId]);
 
@@ -191,6 +195,7 @@ export default function ExpenseListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

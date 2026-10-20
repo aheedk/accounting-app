@@ -12,6 +12,7 @@ import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type FirmRow = {
   business_id: string;
@@ -94,7 +95,7 @@ export default function ClientOverviewPage() {
   }
 
   if (error) return <div className="text-sm text-destructive">{error}</div>;
-  if (!rows) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  if (!rows) return <LoadingIndicator />;
 
   // Find a client by typing; the totals above stay those of the whole firm.
   const needle = query.trim().toLowerCase();

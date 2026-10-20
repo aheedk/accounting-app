@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type AuditEntry = { id: string; action: string; created_at: string; user_name: string | null; before: unknown; after: unknown };
 
@@ -48,7 +49,7 @@ export function AuditHistoryModal({ url, onClose }: { url: string; onClose: () =
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
           {err && <p className="text-sm text-destructive">{err}</p>}
-          {!err && entries === null && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {!err && entries === null && <LoadingIndicator />}
           {!err && entries?.length === 0 && <p className="text-sm text-muted-foreground">No history yet.</p>}
           {entries && entries.length > 0 && (
             <ul className="space-y-4">

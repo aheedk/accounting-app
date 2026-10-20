@@ -57,6 +57,7 @@ export default function CheckListPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [items, setItems] = useState<Check[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<string>('3m');
   const [bankAccountFilter, setBankAccountFilter] = useState<string>('all');
   const [numberSearch, setNumberSearch] = useState('');
@@ -67,11 +68,14 @@ export default function CheckListPage() {
   const reload = useCallback(async () => {
     if (!bizId) { setItems([]); return; }
     setErr(null);
+    setLoading(true);
     try {
       const r = await api.get<{ checks: Check[] }>(`/businesses/${bizId}/checks`);
       setItems(Array.isArray(r.data.checks) ? r.data.checks : []);
     } catch (e: unknown) {
       setErr(pickErr(e));
+    } finally {
+      setLoading(false);
     }
   }, [bizId]);
 
@@ -203,6 +207,7 @@ export default function CheckListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

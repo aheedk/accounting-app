@@ -8,6 +8,7 @@ import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { fmtQty } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type LineItem = {
   description: string;
@@ -176,7 +177,7 @@ export default function InvoiceImportReviewPage() {
         </div>
       )}
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && <LoadingIndicator />}
 
       {!loading && filtered.length === 0 && !selectedImport && (
         <div className="rounded-lg border bg-muted/20 p-12 text-center">

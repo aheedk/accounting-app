@@ -9,6 +9,7 @@ import {
   recentJournalEntryDate,
   recentJournalEntryLabel,
 } from './journalRecent';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 export default function RecentJournalEntries({ businessId }: { businessId: string }) {
   const [open, setOpen] = useState(false);
@@ -109,7 +110,7 @@ export default function RecentJournalEntries({ businessId }: { businessId: strin
             </button>
           </div>
           {error && <p className="py-2 text-sm text-destructive">{error}</p>}
-          {!loaded && <p className="py-2 text-sm text-muted-foreground">Loading...</p>}
+          {!loaded && <LoadingIndicator className="py-4" />}
           {loaded && !error && entries.length === 0 && (
             <p className="py-2 text-sm text-muted-foreground">No journal entries yet.</p>
           )}
@@ -133,7 +134,7 @@ export default function RecentJournalEntries({ businessId }: { businessId: strin
               disabled={loadingMore}
               className="mt-3 text-sm font-medium text-link hover:underline disabled:opacity-50"
             >
-              {loadingMore ? 'Loading...' : 'View more'}
+              {loadingMore ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Loading…</span> : 'View more'}
             </button>
           )}
         </div>

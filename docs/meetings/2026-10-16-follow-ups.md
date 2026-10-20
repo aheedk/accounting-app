@@ -141,7 +141,7 @@ other tabs (bookkeeping, workforce, multi-entity); not wanted for now.
 | 79 | Stripe on invoices: a "Pay now" link on invoices sent to clients. Riham asked; Faizan said doable, maybe phase two |
 | 80 | Pay bills from the app, as Bill.com does; Stripe would go in Accounts Payable → Pay Bills. Joins item 24 |
 | 81 | A different dashboard and menus for each job (accounts payable person, controller, CEO). Faizan: phase two |
-| 82 | More "it is working" signs while things load, like the loading dots Riham added. Faizan wants the app to look busy when it is busy |
+| 82 | More "it is working" signs while things load, like the loading dots Riham added. Faizan wants the app to look busy when it is busy. **Done 10-20** (below) |
 | 20 | Bank account connection **(10-01)** |
 | 21 | Reconciliation against a connected bank, after 20. The manual worksheet was shown in this meeting; items 71 to 75 come from it **(10-01)** |
 | 24 | Stripe: clients pay their vendors from the app, and we get paid for the software. See 79 and 80 **(10-05)** |
@@ -202,6 +202,7 @@ What to click is in [`../demos/2026-10-20-aheed.md`](../demos/2026-10-20-aheed.m
 | 28 | Security review ([`../qa/2026-10-20-security-review.md`](../qa/2026-10-20-security-review.md)): a record's id can no longer reach another client's record (60 lookups and the AI inbox); payees on checks and expenses must be the client's own; uploaded files of types that can run code are only downloaded; sign-in limited per address; a wrong email answers as slowly as a wrong password; security headers on the web app (the script policy reports only, for now) |
 | 72 (reading) | Statements keep what they say about the account: the period and the beginning and ending balance, read by the AI, shown and editable on review with a check that the lines add up to them (a missed line shows before posting), and kept with the account the statement was approved against, for Reconcile. Spec: [`../specs/2026-10-04-card-statements-and-check-stubs-design.md`](../specs/2026-10-04-card-statements-and-check-stubs-design.md), section 4 |
 | 28, 43 | Recovery plan ([`../guides/recovery-plan.md`](../guides/recovery-plan.md)): what to do for each kind of failure, and which secrets to keep outside Railway |
+| 82 | Riham's loading dots everywhere the app waits: everywhere that said "Loading…" (56 pages and panels: records, overviews, reports, the recent-transactions drop-downs, and buttons such as Refresh and Run report, which show the dots beside the word), and the 14 lists that showed "No invoices found" (and the like) while still fetching, which now show the dots until the rows arrive |
 | 17 (Estimate) | Estimates, the QA audit's last missing transaction type: Accounts Receivable → Estimates and + New → Estimate. Pending, accepted (with who and when), rejected, shown as expired past their date; Create invoice makes a draft invoice with the next invoice number, the customer's terms and the estimate's lines, and closes the estimate. Save as PDF; search; the customer's page lists them. Spec: [`../specs/2026-10-20-estimates-design.md`](../specs/2026-10-20-estimates-design.md) |
 
 ## Decided — no work

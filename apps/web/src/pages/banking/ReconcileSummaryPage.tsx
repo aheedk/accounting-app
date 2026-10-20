@@ -10,6 +10,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { downloadAsExcel } from '@/lib/download';
 import { printReport } from '@/lib/reportExport';
 import { ReconcileNav } from './ReconcileNav';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type SummaryRow = {
   id: string;
@@ -140,7 +141,7 @@ export default function ReconcileSummaryPage() {
                     <tr>
                       <td colSpan={4} className="bg-muted/20 p-4">
                         {!detail ? (
-                          <div className="text-sm text-muted-foreground">Loading…</div>
+                          <LoadingIndicator className="py-4" />
                         ) : (
                           <div className="grid grid-cols-2 gap-6 text-xs">
                             <div>

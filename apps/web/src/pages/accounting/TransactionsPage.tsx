@@ -391,6 +391,7 @@ export default function TransactionsPage() {
   const [params, setParams] = useSearchParams();
 
   const [rows, setRows] = useState<TransactionRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   // The column the table is sorted by, sent to the server so the whole list is sorted, not one page of it.
@@ -428,6 +429,7 @@ export default function TransactionsPage() {
   const reload = useCallback(async () => {
     if (!bizId) { setRows([]); setTotal(0); return; }
     setErr(null);
+    setLoading(true);
     const range = presetRange(datePreset, customStart, customEnd, fiscalStartMonth);
     const query: Record<string, string> = {
       page: String(page),
@@ -452,6 +454,8 @@ export default function TransactionsPage() {
       setTotal(r.data.total);
     } catch (e: unknown) {
       setErr(pickErr(e));
+    } finally {
+      setLoading(false);
     }
   }, [bizId, typeFilter, datePreset, customStart, customEnd, refNo, contactId, amountFilter, page, sort.key, sort.dir, fiscalStartMonth]);
 
@@ -593,6 +597,7 @@ export default function TransactionsPage() {
             `pagination` prop here — column sort/visibility from Table
             Settings still apply, but only within the current page of rows. */}
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => `${r.type}:${r.id}`}
           columns={columns}

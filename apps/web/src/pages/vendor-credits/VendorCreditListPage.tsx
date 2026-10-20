@@ -47,13 +47,14 @@ export default function VendorCreditListPage() {
   // "This year" is the client's fiscal year, not January to December.
   const fiscalYear = useFiscalYear();
   const [items, setItems] = useState<VendorCreditSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('ytd');
   const [vendorQuery, setVendorQuery] = useState('');
 
-  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/vendor-credits`).then(r => setItems(r.data.vendor_credits)); }, [bizId]);
+  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/vendor-credits`).then(r => setItems(r.data.vendor_credits)).finally(() => setLoading(false)); }, [bizId]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/vendors`).then(r => setVendors(r.data.vendors)); }, [bizId]);
 
   const vendorMap = useMemo(() => new Map(vendors.map(v => [v.id, v.name])), [vendors]);
@@ -172,6 +173,7 @@ export default function VendorCreditListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

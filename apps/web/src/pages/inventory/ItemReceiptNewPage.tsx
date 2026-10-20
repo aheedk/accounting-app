@@ -10,6 +10,7 @@ import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { fmtQty } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -193,9 +194,7 @@ export default function ItemReceiptNewPage() {
               )}
               {selectedPoId && loadingPo && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    Loading…
-                  </td>
+                  <td colSpan={5}><LoadingIndicator /></td>
                 </tr>
               )}
               {selectedPoId && !loadingPo && poDetail && poDetail.lines.map((l) => {

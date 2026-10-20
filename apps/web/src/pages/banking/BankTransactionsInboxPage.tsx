@@ -17,6 +17,7 @@ import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
 import { fiscalYearRange, useFiscalYearStartMonth } from '@/lib/fiscalYear';
 import { CodingSuggestionHint, PREFILL_CONFIDENCE, type CodingSuggestion } from '@/components/CodingSuggestion';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
 type StatusFilter = BankTransactionStatus | 'all';
@@ -679,7 +680,7 @@ export default function BankTransactionsInboxPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={9}><LoadingIndicator /></td></tr>
             )}
             {!loading && visibleTxns.length === 0 && statusFilter === 'unreviewed' && (
               <tr>

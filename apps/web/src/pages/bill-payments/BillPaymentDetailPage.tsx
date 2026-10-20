@@ -14,6 +14,7 @@ import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { PostErrorNotice } from '@/components/SaveAndPost';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type BillPayment = {
   id: string;
@@ -134,7 +135,7 @@ export default function BillPaymentDetailPage() {
     }
   }
 
-  if (!data) return <div>Loading…</div>;
+  if (!data) return <LoadingIndicator />;
   const p = data.bill_payment;
   return (
     <div className="space-y-6">

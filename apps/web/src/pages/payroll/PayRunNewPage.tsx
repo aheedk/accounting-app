@@ -16,6 +16,7 @@ import { todayLocal } from '@/lib/dates';
 import { flashMessage } from '@/lib/flash';
 import { statementBankAccounts } from '@/lib/bankAccountOptions';
 import { blankPayLine, netPay, payRunTotals, withHours, withPayrollTaxes, type PayLine } from './payRunMath';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Employee = { id: string; full_name: string; default_pay_rate_cents: string; is_active: boolean };
 type Account = { id: string; code: string; name: string; account_type: string; detail_type?: string | null; is_active: boolean };
@@ -206,7 +207,7 @@ export default function PayRunNewPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {loading && <tr><td colSpan={10}><LoadingIndicator /></td></tr>}
               {lines.map(line => {
                 const employee = employees.find(e => e.id === line.employee_id);
                 if (!employee) return null;

@@ -15,6 +15,7 @@ import { AppSelect } from '../../components/ui/select';
 import { pickErr } from '@/lib/apiErrors';
 import { fmtLongDate } from '@/lib/dates';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 type W4FilingStatus = 'single' | 'married_jointly' | 'married_separately' | 'head_of_household';
@@ -155,7 +156,7 @@ export default function EmployeeDetailPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
   if (loadErr) return <div className="text-sm text-destructive">{loadErr}</div>;
-  if (!data) return <div>Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   return (
     <div className="space-y-6">

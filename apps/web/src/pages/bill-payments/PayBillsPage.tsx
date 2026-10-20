@@ -19,6 +19,7 @@ import { flashMessage } from '@/lib/flash';
 import { statementBankAccounts } from '@/lib/bankAccountOptions';
 import { billPaymentCheck, type CheckVendor } from '@/lib/billPaymentCheck';
 import { previewChecks, type CheckDocInput } from '@/lib/download';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type UnpaidBill = {
   bill_id: string; bill_number: string; vendor_id: string; vendor_name: string;
@@ -328,7 +329,7 @@ export default function PayBillsPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+                {loading && <tr><td colSpan={6}><LoadingIndicator /></td></tr>}
                 {!loading && shown.length === 0 && (
                   <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No bills match the filter.</td></tr>
                 )}

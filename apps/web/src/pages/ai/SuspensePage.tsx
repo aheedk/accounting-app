@@ -8,6 +8,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import { AccountSelect } from '@/components/ui/AccountSelect';
 import { Input } from '@/components/ui/input';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type SuspenseItem = {
   journal_entry_id: string;
@@ -133,7 +134,7 @@ export default function SuspensePage() {
       )}
 
       {loading ? (
-        <div className="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="rounded-md border"><LoadingIndicator /></div>
       ) : visible.length === 0 ? (
         <div className="rounded-md border px-4 py-12 text-center">
           <CheckCircle className="mx-auto mb-3 h-10 w-10 text-emerald-600" />

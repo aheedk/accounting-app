@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney, parseMoneyInput } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { PostErrorNotice } from '@/components/SaveAndPost';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type CreditMemo = {
   id: string;
@@ -78,7 +79,7 @@ export default function CreditMemoDetailPage() {
     finally { setBusy(false); }
   }
 
-  if (!data) return <div>Loading…</div>;
+  if (!data) return <LoadingIndicator />;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

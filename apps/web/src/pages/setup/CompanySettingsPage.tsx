@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppSelect } from '../../components/ui/select';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 // A client's own defaults, like QuickBooks' Account and settings -> Sales and
 // Expenses. Spec: docs/specs/2026-10-20-company-settings-design.md.
@@ -166,7 +167,7 @@ export default function CompanySettingsPage() {
       )}
 
       {!form ? (
-        err ? <p className="text-sm text-destructive">{err}</p> : <p className="text-sm text-muted-foreground">Loading…</p>
+        err ? <p className="text-sm text-destructive">{err}</p> : <LoadingIndicator />
       ) : (
         <form onSubmit={save} className="space-y-6">
           <Card>

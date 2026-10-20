@@ -6,6 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '@/components/ui/select';
 import { pickErr } from '@/lib/apiErrors';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
@@ -169,7 +170,7 @@ export default function AccountRegisterPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={8}><LoadingIndicator /></td></tr>
             )}
             {!loading && pageRows.length === 0 && (
               <tr>

@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 // Read-only payroll-side view of 1099 contractors. W-9 management lives on the
 // AP Contractors page; this page focuses on initiating payment via a Bill.
@@ -141,9 +142,7 @@ export default function PayrollContractorsPage() {
               )}
               {loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">
-                    Loading…
-                  </td>
+                  <td colSpan={6}><LoadingIndicator /></td>
                 </tr>
               )}
               {items.map(c => (

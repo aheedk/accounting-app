@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { pickErr } from '@/lib/apiErrors';
 import { todayLocal } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Period = {
   id: string;
@@ -165,7 +166,7 @@ export default function BooksReviewPage() {
           </CardHeader>
           <CardContent>
             {loadingTasks && tasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <LoadingIndicator />
             ) : tasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">No review tasks for this period yet.</p>
             ) : (

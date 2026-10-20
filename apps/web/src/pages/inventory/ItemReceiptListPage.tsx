@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type ItemReceipt = {
   id: string;
@@ -167,7 +168,7 @@ export default function ItemReceiptListPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+            <LoadingIndicator />
           ) : (
             <DataTable
               rows={rows}

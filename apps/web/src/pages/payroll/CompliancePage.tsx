@@ -10,6 +10,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { normalizeDateInput } from '@/lib/dates';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type ItemKey =
   | 'state_registration'
@@ -252,7 +253,7 @@ export default function CompliancePage() {
       )}
 
       {loading && items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <LoadingIndicator />
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-6 text-sm text-muted-foreground">

@@ -6,6 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { fmtMoney } from '@/lib/money';
 import { fmtQty } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -144,7 +145,7 @@ export default function SalesOrderDetailPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
   if (loadErr) return <div className="text-sm text-destructive">{loadErr}</div>;
-  if (!data) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   const customer = customers.find((c) => c.id === data.customer_id);
   const customerName = customer?.name ?? data.customer_id;

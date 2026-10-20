@@ -11,6 +11,7 @@ import { DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } fr
 import { fmtMoney } from '@/lib/money';
 import { fmtLongDate } from '@/lib/dates';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type FixedAssetStatus = 'active' | 'disposed';
 
@@ -106,7 +107,7 @@ export default function FixedAssetDetailPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
   if (loadErr) return <div className="text-sm text-destructive">{loadErr}</div>;
-  if (!data) return <div>Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   const history = data.depreciation_history ?? [];
 

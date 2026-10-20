@@ -13,6 +13,7 @@ import { parseMoneyInput } from '@/lib/money';
 import { cleanPhoneInput, settlePhoneInput } from '@/lib/phone';
 import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Address = {
   line1: string;
@@ -204,7 +205,7 @@ export default function VendorEditPage() {
   }
 
   if (!bizId || !id) return <div>Pick a business.</div>;
-  if (!form) return <div>Loading…</div>;
+  if (!form) return <LoadingIndicator />;
   return (
     <form className="space-y-4 max-w-4xl" onSubmit={submit}>
       <h1 className="text-2xl font-semibold">Edit Vendor</h1>

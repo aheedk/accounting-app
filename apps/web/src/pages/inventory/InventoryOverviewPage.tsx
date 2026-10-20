@@ -9,6 +9,7 @@ import { todayLocal } from '@/lib/dates';
 import { flashMessage } from '@/lib/flash';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Overview = {
   total_items_count: number;
@@ -62,7 +63,7 @@ export default function InventoryOverviewPage() {
   }
 
   if (error) return <div className="text-destructive">{error}</div>;
-  if (!data) return <div className="text-muted-foreground">Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   return (
     <div className="space-y-6">

@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type FixedAssetStatus = 'active' | 'disposed';
 
@@ -161,7 +162,7 @@ export default function FixedAssetListPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+            <LoadingIndicator />
           ) : (
             <DataTable
               rows={filtered}

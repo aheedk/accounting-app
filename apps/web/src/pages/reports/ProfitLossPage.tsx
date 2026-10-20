@@ -14,6 +14,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl } from '@/lib/reportDrilldown';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type PnlLine = {
   account_id: string;
@@ -126,7 +127,7 @@ export default function ProfitLossPage() {
             <DateInput value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
           </div>
           <Button variant="outline" onClick={() => { void load(); }} disabled={loading}>
-            {loading ? 'Loading…' : 'Refresh'}
+            {loading ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Loading…</span> : 'Refresh'}
           </Button>
           <div className="flex items-center gap-2">
             <div className="relative group">

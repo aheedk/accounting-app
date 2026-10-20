@@ -24,6 +24,7 @@ import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { previewDepositSummary, previewDepositSlipAndSummary, previewDepositAlignmentTest, type DepositDocInput } from '@/lib/download';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -711,7 +712,7 @@ export default function BankDepositPage() {
                 </div>
                 <div className="max-h-80 overflow-y-auto py-1">
                   {recentDeposits === null ? (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>
+                    <div className="px-4 py-3 text-primary"><LoadingIndicator size="sm" /></div>
                   ) : recentDeposits.length === 0 ? (
                     <p className="px-4 py-3 text-sm text-muted-foreground">No deposits yet.</p>
                   ) : (

@@ -6,6 +6,7 @@ import { fmtMoney } from '@/lib/money';
 import { FileDown, Printer } from 'lucide-react';
 import { downloadAsExcel } from '@/lib/download';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type RevenueByMonth = {
   month: string;
@@ -45,7 +46,7 @@ export default function ManagementReportsPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
   if (error) return <div className="text-sm text-destructive">{error}</div>;
-  if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   const maxRevenue = data.revenue_by_month.reduce((m, r) => {
     const v = Number(r.amount);

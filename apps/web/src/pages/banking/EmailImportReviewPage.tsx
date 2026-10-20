@@ -19,6 +19,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { StatementSummaryFields } from './StatementSummaryFields';
 import { NO_SUMMARY, summaryFormOf, type SummaryForm } from '@/lib/statementSummary';
 import { todayLocal } from '@/lib/dates';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -769,7 +770,7 @@ export default function EmailImportReviewPage() {
         </div>
       )}
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && <LoadingIndicator />}
 
       {/* ── BANK STATEMENTS TAB ─────────────────────────────────────────────── */}
       {!loading && topTab === 'bank' && (

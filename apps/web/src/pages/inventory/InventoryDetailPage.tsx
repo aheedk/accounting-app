@@ -13,6 +13,7 @@ import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { MoneyInput } from '@/components/ui/money-input';
 import { AppSelect } from '../../components/ui/select';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type StockMovementReason = 'adjustment' | 'opening_balance' | 'manual_in' | 'manual_out' | 'write_off';
 
@@ -151,7 +152,7 @@ export default function InventoryDetailPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
   if (loadErr) return <div className="text-sm text-destructive">{loadErr}</div>;
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <LoadingIndicator />;
 
   const lastMovement = data.stock_movements[0];
   const scrollToAdjust = () => document.getElementById('stock-adjust')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

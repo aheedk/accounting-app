@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AppSelect } from '../../components/ui/select';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 // Decision: skip the inline "mark vendor as 1099" form on this page.
 // Users flag a vendor as 1099 from the existing Vendors page (or by editing W-9 here,
@@ -177,7 +178,7 @@ export default function ContractorsPage() {
                 </tr>
               )}
               {loading && items.length === 0 && (
-                <tr><td colSpan={5} className="p-6 text-center text-sm text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={5}><LoadingIndicator /></td></tr>
               )}
               {items.map(c => {
                 const showRevealed = reveal && reveal.id === c.id;

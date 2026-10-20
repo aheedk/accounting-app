@@ -59,6 +59,7 @@ export default function BillListPage() {
   // A client or view-only login reads bills; entering and paying them is for staff and up.
   const canEnter = roleAtLeast(useEffectiveRole(), 'staff');
   const [items, setItems] = useState<BillSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [tab, setTab] = useState<string>('posted');
@@ -67,7 +68,8 @@ export default function BillListPage() {
 
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000, ...(tab ? { status: tab } : {}) } }).then(r => setItems(r.data.bills));
+    setLoading(true);
+    api.get(`/businesses/${bizId}/bills`, { params: { limit: 1000, ...(tab ? { status: tab } : {}) } }).then(r => setItems(r.data.bills)).finally(() => setLoading(false));
   }, [bizId, tab]);
   useEffect(() => {
     if (!bizId) return;
@@ -176,6 +178,7 @@ export default function BillListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

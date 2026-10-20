@@ -10,6 +10,7 @@ import { DetailField, DetailMetric, DetailPageHeader, baseDetailMenuActions } fr
 import { fmtMoney } from '@/lib/money';
 import { fmtLongDate } from '@/lib/dates';
 import { fmtQty } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type POStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
 
@@ -107,7 +108,7 @@ export default function PurchaseOrderDetailPage() {
   }
 
   if (!bizId) return <div>Pick a business.</div>;
-  if (!data) return <div>{err ?? 'Loading…'}</div>;
+  if (!data) return err ? <div>{err}</div> : <LoadingIndicator />;
 
   const canVoid = can.accountant && data.status !== 'void' && data.status !== 'received';
   const canReceive = can.staff && data.status !== 'void' && data.status !== 'received' && data.status !== 'closed';

@@ -57,6 +57,7 @@ export default function PurchaseOrderListPage() {
   const can = useCan();
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -67,11 +68,13 @@ export default function PurchaseOrderListPage() {
   useEffect(() => {
     if (!bizId) return;
     setErr(null);
+    setLoading(true);
     api
       .get<ListResponse>(`/businesses/${bizId}/purchase-orders`, {
         params: statusFilter ? { status: statusFilter } : {},
       })
       .then((r) => setItems(r.data.purchase_orders))
+      .finally(() => setLoading(false))
       .catch((e: unknown) => {
         const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
         setErr(msg ?? 'Failed to load purchase orders');
@@ -206,6 +209,7 @@ export default function PurchaseOrderListPage() {
       <Card>
         <CardContent className="p-0">
           <DataTable
+            loading={loading}
             rows={rows}
             getRowId={r => r.id}
             columns={columns}

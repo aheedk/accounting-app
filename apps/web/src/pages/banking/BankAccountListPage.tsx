@@ -53,6 +53,7 @@ export default function BankAccountListPage() {
   // The API takes these changes from a firm admin only.
   const isFirmAdmin = useEffectiveRole() === 'firm_admin';
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   const [cashAccounts, setCashAccounts] = useState<CashAccountRow[]>([]);
   const addAccount = useAddAccount(cashAccounts, account => setCashAccounts(prev => [...prev, account]));
@@ -64,8 +65,12 @@ export default function BankAccountListPage() {
 
   async function reload() {
     if (!bizId) return;
-    const r = await api.get(`/businesses/${bizId}/bank-accounts`);
-    setAccounts(r.data.bank_accounts);
+    try {
+      const r = await api.get(`/businesses/${bizId}/bank-accounts`);
+      setAccounts(r.data.bank_accounts);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -204,6 +209,7 @@ export default function BankAccountListPage() {
       <Card>
         <CardContent className="p-0">
           <DataTable
+            loading={loading}
             rows={filtered}
             getRowId={r => r.id}
             columns={columns}

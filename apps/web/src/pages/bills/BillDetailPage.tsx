@@ -12,6 +12,7 @@ import { fmtMoney } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
 import { PostErrorNotice } from '@/components/SaveAndPost';
 import { fmtQty } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Bill = {
   id: string;
@@ -96,7 +97,7 @@ export default function BillDetailPage() {
     finally { setBusy(false); }
   }
 
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <LoadingIndicator />;
   const bill = data.bill;
   const paid = Number(bill.total) - Number(data.amount_due);
   const canPost = isAccountant && bill.status === 'draft';

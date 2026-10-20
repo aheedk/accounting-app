@@ -34,13 +34,15 @@ export default function InvoiceListPage() {
   // A client login reads invoices; it does not write them.
   const canCreate = roleAtLeast(useEffectiveRole(), 'staff');
   const [items, setItems] = useState<InvoiceSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [excelBusy, setExcelBusy] = useState(false);
 
   useEffect(() => {
     if (!bizId) return;
-    api.get(`/businesses/${bizId}/invoices`, { params: statusFilter ? { status: statusFilter, limit: 1000 } : { limit: 1000 } }).then(r => setItems(r.data.invoices));
+    setLoading(true);
+    api.get(`/businesses/${bizId}/invoices`, { params: statusFilter ? { status: statusFilter, limit: 1000 } : { limit: 1000 } }).then(r => setItems(r.data.invoices)).finally(() => setLoading(false));
   }, [bizId, statusFilter]);
   useEffect(() => {
     if (!bizId) return;
@@ -111,6 +113,7 @@ export default function InvoiceListPage() {
       </div>
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Overview = {
   next_pay_date: string | null;
@@ -34,7 +35,7 @@ export default function PayrollOverviewPage() {
   }, [bizId]);
 
   if (error) return <div className="text-destructive">{error}</div>;
-  if (!data) return <div className="text-muted-foreground">Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   return (
     <div className="space-y-6">

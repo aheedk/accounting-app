@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import AiSettingsCard from './AiSettingsCard';
 import { Input } from '@/components/ui/input';
 import { AppSelect } from '../../components/ui/select';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type RuleLine = {
   account_id: string;
@@ -137,9 +138,7 @@ export default function CodingRulesPage() {
       )}
 
       {loading ? (
-        <div className="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
-          Loading…
-        </div>
+        <div className="rounded-md border"><LoadingIndicator /></div>
       ) : visible.length === 0 ? (
         <div className="rounded-md border px-4 py-10 text-center text-sm text-muted-foreground">
           {rules.length === 0

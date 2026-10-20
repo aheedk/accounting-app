@@ -37,6 +37,7 @@ import {
 } from '@/lib/generalLedgerCustomization';
 import { fmtMoney } from '@/lib/money';
 import { AppSelect } from '../../components/ui/select';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Account = {
   id: string;
@@ -710,7 +711,7 @@ export default function GeneralLedgerPage() {
             onClick={handleRunReport}
             disabled={loading}
           >
-            {loading ? 'Loading…' : 'Run report'}
+            {loading ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Loading…</span> : 'Run report'}
           </Button>
         </div>
       </div>

@@ -14,6 +14,7 @@ import { AppSelect } from '../../components/ui/select';
 import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
 import { CodingSuggestionHint, PREFILL_CONFIDENCE, type CodingSuggestion } from '@/components/CodingSuggestion';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
 type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
@@ -476,7 +477,7 @@ export default function IntegrationInboxPage() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{loading ? 'Loading…' : 'No transactions match the current filter.'}</td></tr>
+              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{loading ? <LoadingIndicator /> : 'No transactions match the current filter.'}</td></tr>
             )}
             {rows.map(t => {
               const n = parseFloat(t.amount);

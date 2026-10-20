@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
 
@@ -259,7 +260,7 @@ export default function SalesOrderListPage() {
           <Card>
             <CardContent className="p-0">
               {loading ? (
-                <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+                <LoadingIndicator />
               ) : (
                 <DataTable
                   rows={rows}

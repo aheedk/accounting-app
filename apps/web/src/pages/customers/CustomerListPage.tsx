@@ -41,6 +41,7 @@ type Customer = {
 export default function CustomerListPage() {
   const [bizId] = useActiveBusinessId();
   const [items, setItems] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   // The same batch actions, inactive switch and delete rule as Vendors.
   const can = useCan();
@@ -53,8 +54,12 @@ export default function CustomerListPage() {
 
   async function reload() {
     if (!bizId) return;
-    const r = await api.get(`/businesses/${bizId}/customers`, { params: showInactive ? { include_inactive: 'true' } : {} });
-    setItems(r.data.customers);
+    try {
+      const r = await api.get(`/businesses/${bizId}/customers`, { params: showInactive ? { include_inactive: 'true' } : {} });
+      setItems(r.data.customers);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { reload(); }, [bizId, showInactive]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -175,6 +180,7 @@ export default function CustomerListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={items}
           getRowId={r => r.id}
           columns={columns}

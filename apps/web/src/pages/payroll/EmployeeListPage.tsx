@@ -11,6 +11,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { UploadExcelButton } from '@/components/ui/UploadExcelButton';
 import { printReport } from '@/lib/reportExport';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 const IMPORT_COLS = [
   { key: 'full_name', header: 'Full Name', required: true },
@@ -233,7 +234,7 @@ export default function EmployeeListPage() {
       <Card>
         <CardContent className="p-0">
           {loading && items.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+            <LoadingIndicator />
           ) : (
             <DataTable
               rows={items}

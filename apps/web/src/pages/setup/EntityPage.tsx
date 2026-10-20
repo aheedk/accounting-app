@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppSelect } from '../../components/ui/select';
 import { cleanPhoneInput, settlePhoneInput } from '@/lib/phone';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type BusinessAddress = {
   line1?: string;
@@ -162,7 +163,7 @@ export default function EntityPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Entity</h1>
         {err && <p className="text-sm text-destructive">{err}</p>}
-        {!err && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!err && <LoadingIndicator />}
       </div>
     );
   }

@@ -16,6 +16,7 @@ import { generalLedgerDrilldownUrl, LEDGER_HISTORY_START } from '@/lib/reportDri
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type CashFlowLine = {
   entry_date: string;
@@ -136,7 +137,7 @@ export default function CashFlowPage() {
               ))}
             </AppSelect>
           </div>
-          <Button variant="outline" onClick={() => load()} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</Button>
+          <Button variant="outline" onClick={() => load()} disabled={loading}>{loading ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Loading…</span> : 'Refresh'}</Button>
           <div className="flex items-center gap-2">
             <div className="relative group">
               <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { if (!report) return; setExcelBusy(true); try { downloadAsExcel(['Date', 'Source', 'Memo', 'Debit', 'Credit', 'Net', 'Running Balance'], report.lines.map(l => [l.entry_date, l.source_type, l.memo ?? '', l.debit, l.credit, l.net_amount, l.running_balance]), `cash-flow-${periodStart}-${periodEnd}`, { title: 'Cash Activity', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}` }); } finally { setExcelBusy(false); } }} disabled={excelBusy || !report} aria-label="Export to Excel">

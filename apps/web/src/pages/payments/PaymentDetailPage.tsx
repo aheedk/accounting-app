@@ -14,6 +14,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { PostErrorNotice } from '@/components/SaveAndPost';
 import { humanizeCode } from '@/lib/labels';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Payment = {
   id: string;
@@ -122,7 +123,7 @@ export default function PaymentDetailPage() {
 
   const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, `${a.code} - ${a.name}`])), [accounts]);
 
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <LoadingIndicator />;
   const p = data.payment;
   const applied = Number(p.amount) - Number(p.unapplied_amount);
   const canPost = can.accountant && p.status === 'draft';

@@ -50,6 +50,7 @@ export default function PaymentListPage() {
   // "This year" is the client's fiscal year, not January to December.
   const fiscalYear = useFiscalYear();
   const [items, setItems] = useState<PaymentSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [excelBusy, setExcelBusy] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [methodFilter, setMethodFilter] = useState('');
@@ -57,7 +58,7 @@ export default function PaymentListPage() {
   const [dateFilter, setDateFilter] = useState<string>('ytd');
   const [customerQuery, setCustomerQuery] = useState('');
 
-  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/payments`).then(r => setItems(r.data.payments)); }, [bizId]);
+  useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/payments`).then(r => setItems(r.data.payments)).finally(() => setLoading(false)); }, [bizId]);
   useEffect(() => { if (bizId) api.get(`/businesses/${bizId}/customers?include_inactive=true`).then(r => setCustomers(r.data.customers)); }, [bizId]);
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
@@ -184,6 +185,7 @@ export default function PaymentListPage() {
 
       <Card><CardContent className="p-0">
         <DataTable
+          loading={loading}
           rows={rows}
           getRowId={r => r.id}
           columns={columns}

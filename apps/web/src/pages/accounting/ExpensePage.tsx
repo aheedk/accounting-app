@@ -23,6 +23,7 @@ import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -275,7 +276,7 @@ function AuditHistoryModal({ bizId, expenseId, onClose }: { bizId: string; expen
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
           {err && <p className="text-sm text-destructive">{err}</p>}
-          {!err && entries === null && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {!err && entries === null && <LoadingIndicator />}
           {!err && entries?.length === 0 && <p className="text-sm text-muted-foreground">No history yet.</p>}
           {entries && entries.length > 0 && (
             <ul className="space-y-4">
@@ -625,7 +626,7 @@ export default function ExpensePage() {
                 </div>
                 <div className="max-h-80 overflow-y-auto py-1">
                   {recentExpenses === null ? (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>
+                    <div className="px-4 py-3 text-primary"><LoadingIndicator size="sm" /></div>
                   ) : recentExpenses.length === 0 ? (
                     <p className="px-4 py-3 text-sm text-muted-foreground">No expenses yet.</p>
                   ) : (

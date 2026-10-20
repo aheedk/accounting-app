@@ -3,6 +3,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type TopVendor = {
   vendor_id: string;
@@ -39,7 +40,7 @@ export default function ApOverviewPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
   if (error) return <div className="text-sm text-destructive">{error}</div>;
-  if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  if (!data) return <LoadingIndicator />;
 
   return (
     <div className="space-y-6">

@@ -11,6 +11,7 @@ import { fiscalYearRange, useFiscalYearStartMonth } from '@/lib/fiscalYear';
 import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { ReconcileNav } from './ReconcileNav';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
@@ -209,7 +210,7 @@ export default function ReconcileHistoryPage() {
                   <tr>
                     <td colSpan={9} className="bg-muted/20 p-3">
                       {!detail ? (
-                        <div className="text-sm text-muted-foreground">Loading…</div>
+                        <LoadingIndicator className="py-4" />
                       ) : (
                         <CardContent className="p-0">
                           <div className="mb-2 text-xs text-muted-foreground">{r.items_cleared} transaction{r.items_cleared === 1 ? '' : 's'} cleared</div>

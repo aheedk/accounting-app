@@ -14,6 +14,7 @@ import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtMoney } from '@/lib/money';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type TrendPoint = { month: string; amount: string };
 
@@ -218,7 +219,7 @@ export default function PerformanceCenterPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Performance Center</h1>
         <div className="flex items-center gap-2">
-          {loading && <span className="text-sm text-muted-foreground">Loading…</span>}
+          {loading && <span className="text-primary"><LoadingIndicator size="sm" /></span>}
           <div className="flex rounded-md border" role="group" aria-label="Date range">
             {RANGES.map((r) => (
               <button
