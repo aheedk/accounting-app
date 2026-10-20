@@ -888,13 +888,30 @@ export async function listHistory(db: Kysely<DB>, ctx: ServiceCtx, q: { account_
   }));
 }
 
+/**
+ * Everything a fixed, standalone reconciliation report needs in one call: the
+ * reconciliation itself, who completed it, its account (with the same
+ * category label the worksheet and history already use), and every cleared
+ * line, frozen at Finish (see finishReconciliation) and never recomputed —
+ * the report reads exactly what was true the day this was completed, even if
+ * the account's name or a transaction's memo changes afterward.
+ */
 export async function getReconciliationDetail(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
-  const recon = await db.selectFrom('reconciliations').selectAll()
-    .where('id', '=', id).where('business_id', '=', ctx.business_id!).executeTakeFirst();
+  const recon = await db.selectFrom('reconciliations as r')
+    .leftJoin('users as u', 'u.id', 'r.completed_by_user_id')
+    .leftJoin('chart_of_accounts as a', 'a.id', 'r.account_id')
+    .selectAll('r')
+    .select(['a.code as account_code', 'a.name as account_name', 'a.account_type', 'a.detail_type', 'u.full_name as completed_by'])
+    .where('r.id', '=', id).where('r.business_id', '=', ctx.business_id!).executeTakeFirst();
   if (!recon) throw new NotFoundError('reconciliation', id);
+  const bankRow = await bankAccountFor(db, ctx.business_id!, recon.account_id);
   const items = await db.selectFrom('reconciliation_items').selectAll()
     .where('reconciliation_id', '=', id).orderBy('transaction_date').execute();
-  return { reconciliation: recon, items };
+  return {
+    reconciliation: recon,
+    category: reconcilableCategory({ account_type: recon.account_type!, detail_type: recon.detail_type }, !!bankRow),
+    items,
+  };
 }
 
 /** Only the latest completed reconciliation on an account may be undone — undoing an older one first requires undoing every newer one. Firm-admin only (checked at the route). */

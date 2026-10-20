@@ -371,4 +371,26 @@ describe('bank reconciliation worksheet', () => {
     expect(worksheet.items.find(i => i.transaction_id === expense.id)).toMatchObject({ is_cleared: false, auto_matched: false });
     expect(worksheet.summary.auto_matched_count).toBe(0);
   });
+
+  it('getReconciliationDetail carries the account and completed-by name a standalone report needs, not just the raw row', async () => {
+    const d = await setup(t);
+    const expense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-05', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '100.00' }],
+    }));
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '-100.00', statement_ending_date: '2026-03-31',
+    }));
+    await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
+      { transaction_type: 'expense', transaction_id: expense.id, is_cleared: true },
+    ]));
+    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+
+    const detail = await recon.getReconciliationDetail(t.db, d.ctx, started.id);
+    expect(detail.category).toBe('Bank');
+    expect(detail.reconciliation).toMatchObject({
+      account_code: '1010', account_name: 'Operating Checking', completed_by: 'Test User',
+    });
+    expect(detail.items).toHaveLength(1);
+  });
 });

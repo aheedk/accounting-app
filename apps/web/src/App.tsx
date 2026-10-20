@@ -52,6 +52,8 @@ import TenNinetyNineReportPage from '@/pages/reports/TenNinetyNineReportPage';
 import ProfitLossPage from '@/pages/reports/ProfitLossPage';
 import BalanceSheetPage from '@/pages/reports/BalanceSheetPage';
 import CashFlowPage from '@/pages/reports/CashFlowPage';
+import ReconciliationReportsPage from '@/pages/reports/ReconciliationReportsPage';
+import ReconciliationReportPage from '@/pages/reports/ReconciliationReportPage';
 import StatementOfCashFlowsPage from '@/pages/reports/StatementOfCashFlowsPage';
 import CustomReportsPage from '@/pages/reports/CustomReportsPage';
 import ManagementReportsPage from '@/pages/reports/ManagementReportsPage';
@@ -166,6 +168,8 @@ export default function App() {
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
+            <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />
+            <Route path="/reports/reconciliation/:id" element={<ReconciliationReportPage />} />
             <Route path="/reports/statement-of-cash-flows" element={<StatementOfCashFlowsPage />} />
             <Route path="/reports/custom" element={<CustomReportsPage />} />
             <Route path="/reports/management" element={<ManagementReportsPage />} />

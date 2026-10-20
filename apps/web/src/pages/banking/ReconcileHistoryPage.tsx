@@ -183,15 +183,26 @@ export default function ReconcileHistoryPage() {
                   <td className="p-3 text-muted-foreground">—</td>
                   <td className="p-3 capitalize">{r.status}</td>
                   <td className="p-3 text-right">
-                    {r.status === 'completed' && r.id === latestCompletedId && (
-                      <Button
-                        variant="outline" size="sm" disabled={busy}
-                        {...hideUnless(can.admin)}
-                        onClick={ev => { ev.stopPropagation(); void undo(r.id); }}
-                      >
-                        Undo
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {r.status === 'completed' && (
+                        <Link
+                          to={`/reports/reconciliation/${r.id}`}
+                          className="text-link hover:underline"
+                          onClick={ev => ev.stopPropagation()}
+                        >
+                          View report
+                        </Link>
+                      )}
+                      {r.status === 'completed' && r.id === latestCompletedId && (
+                        <Button
+                          variant="outline" size="sm" disabled={busy}
+                          {...hideUnless(can.admin)}
+                          onClick={ev => { ev.stopPropagation(); void undo(r.id); }}
+                        >
+                          Undo
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 {expanded === r.id && (
