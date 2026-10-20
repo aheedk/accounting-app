@@ -218,7 +218,8 @@ async function materializeOnce(
     });
   } else if (t.template_type === 'invoice') {
     const payload = parsePayload('invoice', t.payload) as schemas.RecurringInvoicePayload;
-    const invoice_number = await nextNumber(trx, t.business_id, 'invoice', 'INV');
+    // Numbered like every other invoice of the company (Company Settings).
+    const invoice_number = await invoiceService.getNextInvoiceNumber(trx, t.business_id);
     const created = await invoiceService.createDraft(trx, ctx, {
       business_id: t.business_id,
       customer_id: payload.customer_id,

@@ -69,6 +69,15 @@ export default function VendorNewPage() {
     opening_balance: '',
     opening_balance_as_of: today,
   });
+
+  // Terms start from the company's default (Setup -> Company Settings) until changed here.
+  useEffect(() => {
+    if (!bizId) return;
+    api.get<{ default_bill_terms_days?: number }>(`/businesses/${bizId}`).then(r => {
+      const days = r.data.default_bill_terms_days;
+      if (days !== undefined) setForm(f => (f.default_terms_days === 30 ? { ...f, default_terms_days: days } : f));
+    }).catch(() => undefined);
+  }, [bizId]);
   const [billing, setBilling] = useState<Address>(emptyAddress());
   const [accounts, setAccounts] = useState<Account[]>([]);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));

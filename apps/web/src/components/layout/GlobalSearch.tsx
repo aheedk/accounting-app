@@ -69,6 +69,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Shipping Labels', group: 'Inventory', to: '/inventory/shipping-labels' },
   // Setup
   { label: 'Entity', group: 'Setup', to: '/setup/entity' },
+  { label: 'Company Settings', group: 'Setup', to: '/setup/company-settings' },
   { label: 'Chart of Accounts Setup', group: 'Setup', to: '/setup/coa' },
   { label: 'Cost Centers', group: 'Setup', to: '/setup/cost-centers' },
   { label: 'Users', group: 'Setup', to: '/setup/users' },

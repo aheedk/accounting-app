@@ -112,7 +112,9 @@ export async function createVendor(trx: Transaction<DB>, ctx: ServiceCtx, input:
     opening_balance: input.opening_balance ?? null,
     opening_balance_as_of: input.opening_balance_as_of ?? null,
   };
-  if (input.default_terms_days !== undefined) values.default_terms_days = input.default_terms_days;
+  // Without terms of its own, a new vendor takes the company's default (Company Settings).
+  values.default_terms_days = input.default_terms_days ?? (await trx.selectFrom('businesses')
+    .select('default_bill_terms_days').where('id', '=', input.business_id).executeTakeFirstOrThrow()).default_bill_terms_days;
   if (input.is_1099 !== undefined) values.is_1099 = input.is_1099;
   if (input.is_active !== undefined) values.is_active = input.is_active;
 

@@ -161,6 +161,7 @@ const ALL_GROUPS: NavGroup[] = [
     icon: Settings,
     children: [
       { to: '/setup/entity', label: 'Entity' },
+      { to: '/setup/company-settings', label: 'Company Settings' },
       { to: '/setup/coa', label: 'Chart of Accounts' },
       { to: '/setup/cost-centers', label: 'Cost Centers' },
       { to: '/setup/users', label: 'Users' },

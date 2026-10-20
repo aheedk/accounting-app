@@ -43,10 +43,13 @@ anything) — a deliberate choice either way, not a one-line delete.
 ### Setup and admin settings
 Setup has the foundation; a real accounting workspace needs more company-level
 controls:
-- Numbering prefixes/settings UI for invoices, bills, POs, SOs (the race-safe
-  `numbering_counters` backend from migration `0051` is the substrate).
-- Defaults for terms, payment methods, invoice/bill settings.
-- Tax defaults and sales tax settings.
+- ~~Invoice numbering, default terms, payment method and sales tax~~: done
+  2026-10-20, Setup → Company Settings
+  (`docs/specs/2026-10-20-company-settings-design.md`).
+- Numbering settings for bills, POs and SOs (they still use the
+  `numbering_counters` counter from migration `0051`).
+- The rest of QuickBooks' Sales settings: late fees, deposits, discounts,
+  preferred delivery.
 - Fiscal close locks / period locks.
 - Audit log viewer.
 - Permission templates or role presets.

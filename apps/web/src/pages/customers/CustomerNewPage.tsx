@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -71,6 +71,15 @@ export default function CustomerNewPage() {
     opening_balance: '',
     opening_balance_as_of: today,
   });
+
+  // Terms start from the company's default (Setup -> Company Settings) until changed here.
+  useEffect(() => {
+    if (!bizId) return;
+    api.get<{ default_invoice_terms_days?: number }>(`/businesses/${bizId}`).then(r => {
+      const days = r.data.default_invoice_terms_days;
+      if (days !== undefined) setForm(f => (f.default_terms_days === 30 ? { ...f, default_terms_days: days } : f));
+    }).catch(() => undefined);
+  }, [bizId]);
   const [billing, setBilling] = useState<Address>(emptyAddress());
   const [shipping, setShipping] = useState<Address>(emptyAddress());
   const [shippingSame, setShippingSame] = useState(true);

@@ -106,7 +106,9 @@ export async function createCustomer(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   };
   if (input.shipping_same_as_billing !== undefined) values.shipping_same_as_billing = input.shipping_same_as_billing;
   if (input.invoice_language !== undefined) values.invoice_language = input.invoice_language;
-  if (input.default_terms_days !== undefined) values.default_terms_days = input.default_terms_days;
+  // Without terms of its own, a new customer takes the company's default (Company Settings).
+  values.default_terms_days = input.default_terms_days ?? (await trx.selectFrom('businesses')
+    .select('default_invoice_terms_days').where('id', '=', input.business_id).executeTakeFirstOrThrow()).default_invoice_terms_days;
 
   const row = await trx.insertInto('customers').values(values).returningAll().executeTakeFirstOrThrow();
 

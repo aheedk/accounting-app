@@ -334,6 +334,18 @@ export default function ExpensePage() {
   const [paymentAccountId, setPaymentAccountId] = useState('');
   const [transactionDate, setTransactionDate] = useState(todayLocal());
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  // The company's default payment method (Setup -> Company Settings), for a new expense.
+  const [defaultMethod, setDefaultMethod] = useState('cash');
+  useEffect(() => {
+    if (!bizId) return;
+    api.get<{ default_expense_payment_method?: string }>(`/businesses/${bizId}`).then(r => {
+      const method = r.data.default_expense_payment_method;
+      if (!method) return;
+      setDefaultMethod(method);
+      // Only a new expense still on the starting method; an open or restored one keeps its own.
+      if (isNew) setPaymentMethod(current => (current === 'cash' ? method : current));
+    }).catch(() => undefined);
+  }, [bizId, isNew]);
   const [reference, setReference] = useState('');
   const [memo, setMemo] = useState('');
   const [lines, setLines] = useState<ExpenseLine[]>([emptyLine(0), emptyLine(1)]);
@@ -504,7 +516,7 @@ export default function ExpensePage() {
           setExpense(null);
           setPayeeId(''); setPayeeType(''); setPayeeText('');
           // The payment account stays: the next expense is usually paid from the same one.
-          setTransactionDate(todayLocal()); setPaymentMethod('cash');
+          setTransactionDate(todayLocal()); setPaymentMethod(defaultMethod);
           setReference(''); setMemo(''); setLines([emptyLine(0), emptyLine(1)]);
           if (failedAttach) setErr(failedAttach);
         } else {

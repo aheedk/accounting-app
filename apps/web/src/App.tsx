@@ -85,6 +85,7 @@ import TransactionsPage from '@/pages/accounting/TransactionsPage';
 import CheckPage from '@/pages/accounting/CheckPage';
 import ExpenseListPage from '@/pages/accounting/ExpenseListPage';
 import EntityPage from '@/pages/setup/EntityPage';
+import CompanySettingsPage from '@/pages/setup/CompanySettingsPage';
 import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
 import CostCentersPage from '@/pages/setup/CostCentersPage';
@@ -244,6 +245,7 @@ export default function App() {
             {/* Setup */}
             <Route path="/clients/new" element={<AddClientPage />} />
             <Route path="/setup/entity" element={<EntityPage />} />
+            <Route path="/setup/company-settings" element={<CompanySettingsPage />} />
             <Route path="/setup/coa" element={<CoaListPage />} />
             <Route path="/setup/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/setup/cost-centers" element={<CostCentersPage />} />

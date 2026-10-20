@@ -71,6 +71,12 @@ router.patch('/businesses/:businessId', requireMinRole('firm_admin'), async (req
     if (body.ai_auto_post_enabled !== undefined) patch.ai_auto_post_enabled = body.ai_auto_post_enabled;
     if (body.staff_entries_need_approval !== undefined) patch.staff_entries_need_approval = body.staff_entries_need_approval;
     if (body.capitalization_threshold !== undefined) patch.capitalization_threshold = body.capitalization_threshold.toFixed(2);
+    if (body.invoice_number_prefix !== undefined) patch.invoice_number_prefix = body.invoice_number_prefix;
+    if (body.invoice_next_number !== undefined) patch.invoice_next_number = body.invoice_next_number;
+    if (body.default_invoice_terms_days !== undefined) patch.default_invoice_terms_days = body.default_invoice_terms_days;
+    if (body.default_bill_terms_days !== undefined) patch.default_bill_terms_days = body.default_bill_terms_days;
+    if (body.default_sales_tax_code_id !== undefined) patch.default_sales_tax_code_id = body.default_sales_tax_code_id;
+    if (body.default_expense_payment_method !== undefined) patch.default_expense_payment_method = body.default_expense_payment_method;
 
     const updated = await db.transaction().execute(trx =>
       bizSvc.updateBusiness(trx, ctxFromReq(req), {

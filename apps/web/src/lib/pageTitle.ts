@@ -73,6 +73,7 @@ export const PAGE_NAMES: Record<string, string> = {
   '/inventory/shipping-labels': 'Shipping Labels',
   '/clients/new': 'Add Client',
   '/setup/entity': 'Entity',
+  '/setup/company-settings': 'Company Settings',
   '/setup/coa': 'Chart of Accounts Setup',
   '/setup/cost-centers': 'Cost Centers',
   '/setup/users': 'Users',

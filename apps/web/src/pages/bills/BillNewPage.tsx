@@ -63,6 +63,16 @@ function BillNewPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The company's default terms (Setup -> Company Settings), until a vendor with its own is picked.
+  useEffect(() => {
+    if (!bizId) return;
+    api.get<{ default_bill_terms_days?: number }>(`/businesses/${bizId}`).then(r => {
+      const terms_days = r.data.default_bill_terms_days;
+      if (terms_days === undefined) return;
+      setHdr(h => (h.vendor_id ? h : { ...h, terms_days, due_date: addDays(h.bill_date, terms_days) }));
+    }).catch(() => undefined);
+  }, [bizId]);
+
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/vendors`).then(r => setVendors(r.data.vendors));

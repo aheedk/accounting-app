@@ -19,6 +19,13 @@ export type BusinessPatch = {
   staff_entries_need_approval?: boolean;
   /** Invoice lines at or above this amount are coded to a fixed asset, not expensed. */
   capitalization_threshold?: string;
+  // Company settings (Setup -> Company Settings).
+  invoice_number_prefix?: string;
+  invoice_next_number?: number | null;
+  default_invoice_terms_days?: number;
+  default_bill_terms_days?: number;
+  default_sales_tax_code_id?: string | null;
+  default_expense_payment_method?: string;
 };
 
 export type BusinessCreateInput = {
@@ -32,7 +39,10 @@ export type BusinessCreateInput = {
 const BUSINESS_COLUMNS = [
   'id', 'firm_id', 'name', 'legal_name', 'tax_id',
   'fiscal_year_start_month', 'address', 'phone', 'import_email',
-  'ai_auto_post_enabled', 'staff_entries_need_approval', 'capitalization_threshold', 'created_at', 'updated_at',
+  'ai_auto_post_enabled', 'staff_entries_need_approval', 'capitalization_threshold',
+  'invoice_number_prefix', 'invoice_next_number', 'default_invoice_terms_days', 'default_bill_terms_days',
+  'default_sales_tax_code_id', 'default_expense_payment_method',
+  'created_at', 'updated_at',
 ] as const;
 
 // Creates a new client business under the caller's firm, seeds it with the
@@ -129,6 +139,12 @@ export async function updateBusiness(
     ai_auto_post_enabled?: boolean;
     staff_entries_need_approval?: boolean;
     capitalization_threshold?: string;
+    invoice_number_prefix?: string;
+    invoice_next_number?: number | null;
+    default_invoice_terms_days?: number;
+    default_bill_terms_days?: number;
+    default_sales_tax_code_id?: string | null;
+    default_expense_payment_method?: string;
   } = {};
   if (input.patch.name !== undefined) updateSet.name = input.patch.name;
   if (input.patch.legal_name !== undefined) updateSet.legal_name = input.patch.legal_name;
@@ -146,6 +162,21 @@ export async function updateBusiness(
   if (input.patch.ai_auto_post_enabled !== undefined) updateSet.ai_auto_post_enabled = input.patch.ai_auto_post_enabled;
   if (input.patch.capitalization_threshold !== undefined) updateSet.capitalization_threshold = input.patch.capitalization_threshold;
   if (input.patch.staff_entries_need_approval !== undefined) updateSet.staff_entries_need_approval = input.patch.staff_entries_need_approval;
+  const p = input.patch;
+  if (p.invoice_number_prefix !== undefined) updateSet.invoice_number_prefix = p.invoice_number_prefix;
+  if (p.invoice_next_number !== undefined) updateSet.invoice_next_number = p.invoice_next_number;
+  if (p.default_invoice_terms_days !== undefined) updateSet.default_invoice_terms_days = p.default_invoice_terms_days;
+  if (p.default_bill_terms_days !== undefined) updateSet.default_bill_terms_days = p.default_bill_terms_days;
+  if (p.default_expense_payment_method !== undefined) updateSet.default_expense_payment_method = p.default_expense_payment_method;
+  if (p.default_sales_tax_code_id !== undefined) {
+    // Only this company's own tax code; an id from another company is refused.
+    if (p.default_sales_tax_code_id !== null) {
+      const code = await trx.selectFrom('tax_codes').select('id')
+        .where('id', '=', p.default_sales_tax_code_id).where('business_id', '=', input.business_id).executeTakeFirst();
+      if (!code) throw new NotFoundError('tax_code', p.default_sales_tax_code_id);
+    }
+    updateSet.default_sales_tax_code_id = p.default_sales_tax_code_id;
+  }
   if (Object.keys(updateSet).length === 0) return getBusiness(trx, input.business_id);
 
   const updated = await trx.updateTable('businesses')

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { phoneSchema } from '../phone.js';
+import { expensePaymentMethodSchema } from './expenseTransaction.js';
 
 export const businessAddressSchema = z.object({
   line1: z.string().max(200).optional(),
@@ -25,6 +26,14 @@ export const businessUpdateSchema = z.object({
   staff_entries_need_approval: z.boolean().optional(),
   /** Invoice lines at or above this amount are capitalized instead of expensed. */
   capitalization_threshold: z.coerce.number().min(0).max(10_000_000).optional(),
+  // Company settings (Setup -> Company Settings).
+  invoice_number_prefix: z.string().regex(/^[A-Za-z0-9-]{0,10}$/, 'Letters, digits and dashes only, up to 10').optional(),
+  /** Where invoice numbers start; null goes back to 1001. */
+  invoice_next_number: z.number().int().min(1).max(999_999_999).nullable().optional(),
+  default_invoice_terms_days: z.number().int().min(0).max(365).optional(),
+  default_bill_terms_days: z.number().int().min(0).max(365).optional(),
+  default_sales_tax_code_id: z.string().uuid().nullable().optional(),
+  default_expense_payment_method: expensePaymentMethodSchema.optional(),
 });
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
 

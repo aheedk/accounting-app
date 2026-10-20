@@ -27,8 +27,9 @@ async function nextSONumber(trx: Transaction<DB>, business_id: string): Promise<
   return nextNumber(trx, business_id, 'sales_order', 'SO');
 }
 
+// Numbered like every other invoice of the company (Company Settings).
 async function nextInvoiceNumber(trx: Transaction<DB>, business_id: string): Promise<string> {
-  return nextNumber(trx, business_id, 'invoice', 'INV');
+  return invSvc.getNextInvoiceNumber(trx, business_id);
 }
 
 export async function createSO(trx: Transaction<DB>, ctx: ServiceCtx, input: CreateSOInput) {

@@ -254,13 +254,30 @@ export async function listInvoices(db: Kysely<DB>, q: { business_id: string; sta
     .limit(q.limit ?? 50).offset(q.offset ?? 0).execute();
 }
 
+/**
+ * The one rule for numbering an invoice, whoever makes it: the form's
+ * suggestion, a customer purchase order, a recurring invoice, a sales order.
+ * Only numbers that are the company's prefix followed by digits alone count,
+ * so a corrected "1042-R1" or a number typed in another style is left out; the
+ * next is the highest of those plus one, never below the company's "start at".
+ * Spec: docs/specs/2026-10-20-company-settings-design.md.
+ */
 export async function getNextInvoiceNumber(db: Kysely<DB>, business_id: string): Promise<string> {
+  const biz = await db.selectFrom('businesses')
+    .select(['invoice_number_prefix', 'invoice_next_number'])
+    .where('id', '=', business_id)
+    .executeTakeFirstOrThrow();
+  const prefix = biz.invoice_number_prefix;
   const row = await db.selectFrom('invoices')
-    .select(sql<string>`COALESCE(MAX(NULLIF(regexp_replace(invoice_number, '[^0-9]', '', 'g'), '')::bigint), 1000) + 1`.as('next_number'))
+    .select(sql<string | null>`MAX(substring(invoice_number from ${prefix.length + 1}::int)::bigint)`.as('highest'))
     .where('business_id', '=', business_id)
     .where('deleted_at', 'is', null)
+    .where(sql<boolean>`starts_with(invoice_number, ${prefix})`)
+    .where(sql<boolean>`substring(invoice_number from ${prefix.length + 1}::int) ~ '^[0-9]{1,15}$'`)
     .executeTakeFirst();
-  return String(row?.next_number ?? 1001);
+  const after = row?.highest === null || row?.highest === undefined ? 0 : Number(row.highest) + 1;
+  const startAt = biz.invoice_next_number === null ? 1001 : Number(biz.invoice_next_number);
+  return `${prefix}${Math.max(after, startAt)}`;
 }
 
 async function recomputeInvoiceTotals(trx: Transaction<DB>, invoice_id: string) {

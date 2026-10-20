@@ -162,7 +162,8 @@ describe('recurringTemplateService', () => {
       .where('business_id', '=', biz.id).execute();
     expect(invoices).toHaveLength(1);
     expect(invoices[0]?.status).toBe('posted');
-    expect(invoices[0]?.invoice_number).toBe('INV-0001');
+    // The same numbering as the invoice form (Company Settings): no prefix, start at 1001.
+    expect(invoices[0]?.invoice_number).toBe('1001');
     expect(invoices[0]?.issue_date).toBe(today);
     const expectedDue = new Date(today + 'T00:00:00Z');
     expectedDue.setUTCDate(expectedDue.getUTCDate() + 15);

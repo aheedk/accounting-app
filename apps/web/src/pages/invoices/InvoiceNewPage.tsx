@@ -73,6 +73,20 @@ function InvoiceNewPage() {
   }
   const [taxCodeId, setTaxCodeId] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([blank(), blank()]);
+
+  // The company's defaults (Setup -> Company Settings): the terms until a customer
+  // with its own is picked, and the tax a new invoice starts with. A correction
+  // keeps what the original said.
+  useEffect(() => {
+    if (!bizId || replacesId) return;
+    api.get<{ default_invoice_terms_days?: number; default_sales_tax_code_id?: string | null }>(`/businesses/${bizId}`).then(r => {
+      const days = r.data.default_invoice_terms_days;
+      const terms = days === undefined ? undefined : TERMS_OPTIONS.find(t => t.days === days)?.label;
+      if (terms) setHdr(h => (h.customer_id ? h : { ...h, terms, due_date: addDaysLocal(h.issue_date, termsDays(terms)) }));
+      const tax = r.data.default_sales_tax_code_id;
+      if (tax) setTaxCodeId(current => current ?? tax);
+    }).catch(() => undefined);
+  }, [bizId, replacesId]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
