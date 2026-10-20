@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, useTheme } from 'react-native-paper';
+import { Text, TextInput, Button, Checkbox, useTheme } from 'react-native-paper';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [canOfferBiometric, setCanOfferBiometric] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(true);
 
   useEffect(() => {
     void (async () => {
@@ -28,6 +30,7 @@ export default function LoginScreen() {
         LocalAuthentication.hasHardwareAsync(),
         LocalAuthentication.isEnrolledAsync(),
       ]);
+      setCanOfferBiometric(hasHardware && enrolled);
       setBiometricAvailable(hasHardware && enrolled && !!remembered);
     })();
   }, []);
@@ -40,15 +43,20 @@ export default function LoginScreen() {
       await SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, email);
       // Keychain/Keystore-backed, same as the access token — gated behind a
       // biometric prompt on the way back out (unlockWithBiometrics), not
-      // plain on-device storage. Only remembered when biometric hardware is
-      // actually set up, so a device with neither Face ID nor a passcode
-      // enrolled never gets a password written to it this way.
+      // plain on-device storage. Only written when biometric hardware is
+      // actually set up AND the user has opted in via the checkbox below —
+      // a device with neither Face ID nor a passcode enrolled never gets a
+      // password written to it this way, and an unchecked box is honored
+      // even when the hardware supports it.
       const [hasHardware, enrolled] = await Promise.all([
         LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync(),
       ]);
-      if (hasHardware && enrolled) {
+      if (hasHardware && enrolled && rememberPassword) {
         await SecureStore.setItemAsync('acct_biometric_password', password);
         setBiometricAvailable(true);
+      } else {
+        await SecureStore.deleteItemAsync('acct_biometric_password');
+        setBiometricAvailable(false);
       }
     } catch {
       // error already surfaced via useAuth().error
@@ -110,6 +118,18 @@ export default function LoginScreen() {
             onSubmitEditing={() => { void submit(); }}
           />
 
+          {canOfferBiometric && (
+            <Checkbox.Item
+              label="Remember password for Face ID / Touch ID sign-in"
+              status={rememberPassword ? 'checked' : 'unchecked'}
+              onPress={() => setRememberPassword(v => !v)}
+              position="leading"
+              style={styles.rememberRow}
+              labelStyle={{ color: theme.app.foreground, fontSize: typeScale.caption }}
+              color={theme.app.primary}
+            />
+          )}
+
           {error && <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{error}</Text>}
 
           <Button
@@ -139,4 +159,5 @@ const styles = StyleSheet.create({
   brandName: { fontSize: typeScale.h2, fontWeight: '600' },
   card: { borderRadius: 16, padding: spacing.lg },
   input: { marginBottom: spacing.md },
+  rememberRow: { paddingHorizontal: 0, marginBottom: spacing.sm, marginLeft: -spacing.sm },
 });
