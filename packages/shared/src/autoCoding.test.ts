@@ -127,6 +127,7 @@ describe('normalizeLineKey', () => {
 describe('CODING_LAYERS', () => {
   it('orders layers so deterministic rules outrank vendor, history, and AI', () => {
     const order = CODING_LAYERS.map(layer => layer.id);
-    expect(order).toEqual(['learned_rule', 'accounting_rule', 'vendor_default', 'history', 'ai']);
+    // A check stub and Suspense came later; they sit after the AI's own proposal.
+    expect(order).toEqual(['learned_rule', 'accounting_rule', 'vendor_default', 'history', 'ai', 'check_stub', 'suspense']);
   });
 });

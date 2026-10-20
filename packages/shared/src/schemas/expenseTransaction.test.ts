@@ -4,15 +4,15 @@ import { expenseTransactionCreateSchema } from './expenseTransaction.js';
 const validExpense = {
   transaction_date: '2026-08-10',
   payee_text: 'Office Supply Store',
-  expense_account_id: '11111111-1111-4111-8111-111111111111',
   payment_account_id: '22222222-2222-4222-8222-222222222222',
-  payment_method: 'card',
-  amount: '42.50',
+  payment_method: 'credit_card',
+  // An expense has lines now, and the card method is split into credit and debit.
+  lines: [{ category_account_id: '11111111-1111-4111-8111-111111111111', amount: '42.50' }],
 };
 
 describe('expenseTransactionCreateSchema', () => {
   it('accepts a supported payment method', () => {
-    expect(expenseTransactionCreateSchema.parse(validExpense).payment_method).toBe('card');
+    expect(expenseTransactionCreateSchema.parse(validExpense).payment_method).toBe('credit_card');
   });
 
   it('requires a supported payment method', () => {
