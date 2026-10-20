@@ -67,13 +67,21 @@ describe('fiscalPeriodService', () => {
   });
 
   it('reopenPeriod requires firm_admin', async () => {
-    const acctSetup = await setup(t, 'accountant');
-    await seedYearPeriods(t.db, acctSetup.biz.id, 2026);
-    const period = (await periods.findPeriodForDate(t.db, acctSetup.biz.id, '2026-01-15'))!;
-    const adminSetup = await setup(t);
-    await t.db.transaction().execute(trx => periods.closePeriod(trx, adminSetup.ctx, { period_id: period.id }));
+    // Both roles must act on the SAME firm/business — closePeriod and
+    // reopenPeriod scope their period lookup by ctx.business_id, so two
+    // independent setup() calls (each minting its own firm+business) would
+    // never find each other's period.
+    const { firm, biz } = await setup(t);
+    await seedYearPeriods(t.db, biz.id, 2026);
+    const period = (await periods.findPeriodForDate(t.db, biz.id, '2026-01-15'))!;
+    const adminUser = await makeUser(t.db, firm.id, { role: 'firm_admin' });
+    const adminCtx: ServiceCtx = { user_id: adminUser.id, firm_id: firm.id, business_id: biz.id, effective_role: 'firm_admin', ...meta };
+    const acctUser = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const acctCtx: ServiceCtx = { user_id: acctUser.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
+
+    await t.db.transaction().execute(trx => periods.closePeriod(trx, adminCtx, { period_id: period.id }));
     await expect(
-      t.db.transaction().execute(trx => periods.reopenPeriod(trx, acctSetup.ctx, { period_id: period.id })),
+      t.db.transaction().execute(trx => periods.reopenPeriod(trx, acctCtx, { period_id: period.id })),
     ).rejects.toMatchObject({ code: ERR.FORBIDDEN });
   });
 });
