@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MyMenu } from './MyMenu';
 import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
@@ -504,7 +503,6 @@ export function Sidebar() {
   return (
     <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex">
       <SidebarBrand />
-      <MyMenu />
       <CreateMenu />
       <BookmarkMenu />
       <DesktopSidebarNav />
