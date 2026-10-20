@@ -15,6 +15,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Send documents', group: 'Dashboard', to: '/documents/send' },
   // Accounts Receivable
   { label: 'Customers', group: 'Accounts Receivable', to: '/customers' },
+  { label: 'Estimates', group: 'Accounts Receivable', to: '/estimates' },
   { label: 'Invoices', group: 'Accounts Receivable', to: '/invoices' },
   { label: 'Payments', group: 'Accounts Receivable', to: '/payments' },
   { label: 'Credit Memos', group: 'Accounts Receivable', to: '/credit-memos' },
@@ -104,7 +105,7 @@ function highlight(text: string, query: string): React.ReactNode {
 }
 
 type RecordResult = {
-  type: 'customer' | 'vendor' | 'invoice' | 'bill' | 'check';
+  type: 'customer' | 'vendor' | 'invoice' | 'estimate' | 'bill' | 'check';
   id: string; label: string; detail: string | null; path: string;
 };
 
@@ -112,7 +113,7 @@ type RecordResult = {
 // legacy Expense — see the API's SearchResult.path doc comment), so unlike
 // the other types this only needs a group label, not a path builder.
 const RECORD_GROUPS: Record<RecordResult['type'], string> = {
-  customer: 'Customers', vendor: 'Vendors', invoice: 'Invoices', bill: 'Bills', check: 'Checks',
+  customer: 'Customers', vendor: 'Vendors', invoice: 'Invoices', estimate: 'Estimates', bill: 'Bills', check: 'Checks',
 };
 
 function recordToPage(result: RecordResult): Page {

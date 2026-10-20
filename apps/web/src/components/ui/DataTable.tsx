@@ -5,6 +5,7 @@ import { downloadAsExcel, downloadAsPdf } from '@/lib/download';
 import { useAuth } from '@/auth/useAuth';
 import { TableSettingsDrawer, TableSettingsGearButton, type TableColumnDef } from '@/components/ui/TableSettingsDrawer';
 import { loadTableSettings, saveTableSettings, ROW_HEIGHT_CLASS } from '@/lib/tableSettings';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 export type Column<T> = {
   key: string;
@@ -38,6 +39,9 @@ export interface DataTableProps<T> {
   // that should stop propagation on those inner elements themselves.
   onRowClick?: (row: T) => void;
   emptyMessage?: ReactNode;
+  /** Still fetching: shows the loading dots where "no records" would be, so an
+   * empty table is never mistaken for an empty list (item 82). */
+  loading?: boolean;
   downloadable?: { filename: string; title: string };
   // QBO-style pager ("‹ Previous 1-75 Next ›"). Slices AFTER sorting so
   // column sorts operate on the full data set.
@@ -75,6 +79,7 @@ export function DataTable<T>({
   actionsHeader,
   onRowClick,
   emptyMessage = 'No records.',
+  loading = false,
   downloadable,
   pagination,
   tableSettingsPageId,
@@ -328,7 +333,7 @@ export function DataTable<T>({
           );
         })}
         {sortedRows.length === 0 && (
-          <tr><td colSpan={colSpan} className="p-6 text-center text-muted-foreground">{emptyMessage}</td></tr>
+          <tr><td colSpan={colSpan} className="p-6 text-center text-muted-foreground">{loading ? <LoadingIndicator className="py-4" /> : emptyMessage}</td></tr>
         )}
       </tbody>
     </table>

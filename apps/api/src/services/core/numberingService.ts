@@ -1,7 +1,7 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB } from '../../db/types.js';
 
-export type NumberedEntityType = 'invoice' | 'bill' | 'purchase_order' | 'sales_order';
+export type NumberedEntityType = 'invoice' | 'bill' | 'purchase_order' | 'sales_order' | 'estimate';
 
 /**
  * Race-safe per-business document numbering. The atomic upsert increments the

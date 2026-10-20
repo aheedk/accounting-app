@@ -629,6 +629,45 @@ export interface SalesOrderLinesTable {
   unit_price: ColumnType<string, string | number, string | number>;
 }
 
+// Spec: docs/specs/2026-10-20-estimates-design.md
+export type EstimateStatus = 'pending' | 'accepted' | 'rejected' | 'closed';
+
+export interface EstimatesTable {
+  id: Generated<string>;
+  business_id: string;
+  estimate_number: string;
+  customer_id: string;
+  estimate_date: ColumnType<string, string, string>;
+  expiration_date: ColumnType<string | null, string | null | undefined, string | null>;
+  status: Generated<EstimateStatus>;
+  memo: string | null;
+  subtotal: ColumnType<string, string | number | undefined, string | number>;
+  tax_total: ColumnType<string, string | number | undefined, string | number>;
+  total: ColumnType<string, string | number | undefined, string | number>;
+  accepted_by: string | null;
+  accepted_date: ColumnType<string | null, string | null | undefined, string | null>;
+  invoice_id: string | null;
+  closed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+}
+
+export interface EstimateLinesTable {
+  id: Generated<string>;
+  estimate_id: string;
+  line_number: number;
+  inventory_item_id: string | null;
+  description: string;
+  quantity: ColumnType<string, string | number, string | number>;
+  unit_price: ColumnType<string, string | number, string | number>;
+  revenue_account_id: string;
+  tax_code_id: string | null;
+  line_subtotal: ColumnType<string, string | number, string | number>;
+  tax_amount: ColumnType<string, string | number | undefined, string | number>;
+  line_total: ColumnType<string, string | number, string | number>;
+}
+
 export interface ShippingLabelsTable {
   id: Generated<string>;
   business_id: string;
@@ -1194,6 +1233,8 @@ export interface DB {
   messages: MessagesTable;
   message_reads: MessageReadsTable;
   approval_requests: ApprovalRequestsTable;
+  estimates: EstimatesTable;
+  estimate_lines: EstimateLinesTable;
 }
 
 export interface InvoiceImportStagingTable {

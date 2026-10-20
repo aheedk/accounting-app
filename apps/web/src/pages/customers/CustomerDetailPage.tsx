@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CreditCard, FileText } from 'lucide-react';
+import { ClipboardList, CreditCard, FileText } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DetailActivity, DetailField, DetailMetric, DetailPageHeader, DetailStatusBadge, baseDetailMenuActions } from '@/components/ui/detail-page';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { useCan } from '@/lib/roleAccess';
+import { ESTIMATE_STATUS_LABELS, estimateShownStatus, type Estimate } from '@/lib/estimates';
 import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { formatPhone } from '@/lib/phone';
@@ -44,11 +47,14 @@ export default function CustomerDetailPage() {
   const [bizId] = useActiveBusinessId();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
+  const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const can = useCan();
 
   useEffect(() => {
     if (!bizId || !id) return;
     api.get(`/businesses/${bizId}/customers/${id}`).then(r => setCustomer(r.data));
     api.get(`/businesses/${bizId}/invoices`, { params: { customer_id: id, limit: 1000 } }).then(r => setInvoices(r.data.invoices));
+    api.get<{ estimates: Estimate[] }>(`/businesses/${bizId}/estimates`, { params: { customer_id: id } }).then(r => setEstimates(r.data.estimates)).catch(() => setEstimates([]));
   }, [bizId, id]);
 
   const stats = useMemo(() => {
@@ -68,7 +74,8 @@ export default function CustomerDetailPage() {
     return { open, overdue, paid };
   }, [invoices]);
 
-  if (!customer) return <div>Loading...</div>;
+  if (!customer) return <LoadingIndicator />;
+  const today = todayLocal();
 
   const openBalance = stats.open + stats.overdue;
 
@@ -82,6 +89,7 @@ export default function CustomerDetailPage() {
         total={fmtMoney(openBalance)}
         actions={[
           { label: 'Receive payment', icon: <CreditCard className="h-4 w-4" />, to: `/payments/new?customer_id=${customer.id}`, variant: 'outline' },
+          ...(can.staff ? [{ label: 'New estimate', icon: <ClipboardList className="h-4 w-4" />, to: `/estimates/new?customer_id=${customer.id}`, variant: 'outline' as const }] : []),
           { label: 'New invoice', icon: <FileText className="h-4 w-4" />, to: `/invoices/new?customer_id=${customer.id}` },
         ]}
         menuActions={baseDetailMenuActions()}
@@ -117,6 +125,7 @@ export default function CustomerDetailPage() {
                 { label: 'Created', value: customer.created_at ? fmtDateTime(customer.created_at) : null },
                 { label: 'Last updated', value: customer.updated_at ? fmtDateTime(customer.updated_at) : null },
                 { label: 'Invoices', value: invoices.length ? `${invoices.length} total` : null },
+                { label: 'Estimates', value: estimates.length ? `${estimates.length} total` : null },
               ]}
             />
           </CardContent>
@@ -161,6 +170,41 @@ export default function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {estimates.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Estimates</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40">
+                <tr>
+                  <th className="p-3 text-left">Estimate</th>
+                  <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Expires</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estimates.map(e => {
+                  const shown = estimateShownStatus(e, today);
+                  return (
+                    <tr key={e.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="p-3 font-mono">
+                        <Link className="text-link hover:underline" to={`/estimates/${e.id}`}>{e.estimate_number}</Link>
+                      </td>
+                      <td className="p-3 whitespace-nowrap">{fmtLongDate(e.estimate_date)}</td>
+                      <td className="p-3 whitespace-nowrap">{e.expiration_date ? fmtLongDate(e.expiration_date) : '—'}</td>
+                      <td className="p-3"><DetailStatusBadge status={shown} label={ESTIMATE_STATUS_LABELS[shown]} /></td>
+                      <td className="p-3 text-right font-mono">{fmtMoney(e.total)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

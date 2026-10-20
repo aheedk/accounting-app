@@ -17,6 +17,7 @@ const CATEGORIES: CreateCategory[] = [
     heading: 'Customers',
     items: [
       { label: 'Invoice', to: '/invoices/new' },
+      { label: 'Estimate', to: '/estimates/new' },
       { label: 'Receive payment', to: '/payments/new' },
       { label: 'Statement', to: '/reports/customer-statement' },
       { label: 'Sales order', to: '/inventory/sales-orders/new' },

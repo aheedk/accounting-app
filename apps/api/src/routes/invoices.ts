@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as inv from '../services/ar/invoiceService.js';
+import { estimateForInvoice } from '../services/ar/estimateService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -46,7 +47,12 @@ router.get('/businesses/:businessId/invoices/next-number', async (req, res, next
 });
 
 router.get('/businesses/:businessId/invoices/:id', async (req, res, next) => {
-  try { res.json(await inv.getInvoiceWithLines(db, req.tenancy!.business_id, req.params['id']!)); }
+  try {
+    const business_id = req.tenancy!.business_id;
+    const invoice = await inv.getInvoiceWithLines(db, business_id, req.params['id']!);
+    // The estimate it was made from, if any (docs/specs/2026-10-20-estimates-design.md).
+    res.json({ ...invoice, estimate: await estimateForInvoice(db, business_id, invoice.invoice.id) });
+  }
   catch (e) { next(e); }
 });
 

@@ -14,6 +14,7 @@ import { fmtQty } from '@/lib/labels';
 import { cachedGet } from '@/lib/referenceDataCache';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
 import { roleAtLeast, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
+import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
 type Invoice = {
   id: string;
@@ -49,6 +50,8 @@ type InvoiceDetail = {
   invoice: Invoice;
   lines: InvoiceLine[];
   amount_due: string;
+  /** The estimate it was made from, if any. */
+  estimate?: { id: string; estimate_number: string } | null;
 };
 
 type Customer = { id: string; name: string; company_name: string | null; email: string | null };
@@ -131,7 +134,7 @@ export default function InvoiceDetailPage() {
     } catch (e: unknown) { setErr(pickErr(e)); }
   }
 
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <LoadingIndicator />;
   const inv = data.invoice;
   const paid = Number(inv.total) - Number(data.amount_due);
   const canPost = isAccountant && inv.status === 'draft';
@@ -177,6 +180,11 @@ export default function InvoiceDetailPage() {
             <DetailField label="Due date" value={fmtLongDate(inv.due_date)} />
             <DetailField label="Terms" value={inv.terms} />
             <DetailField label="Memo" value={inv.memo} />
+            {data.estimate && (
+              <DetailField label="From estimate" value={canOpen('/estimates')
+                ? <Link className="font-mono text-link hover:underline" to={`/estimates/${data.estimate.id}`}>{data.estimate.estimate_number}</Link>
+                : data.estimate.estimate_number} />
+            )}
             <DetailField label="Subtotal" value={fmtMoney(inv.subtotal)} />
             <DetailField label="Sales tax" value={fmtMoney(inv.tax_total)} />
           </CardContent>

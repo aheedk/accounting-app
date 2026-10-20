@@ -66,6 +66,7 @@ const ALL_GROUPS: NavGroup[] = [
     icon: Users,
     children: [
       { to: '/customers', label: 'Customers' },
+      { to: '/estimates', label: 'Estimates' },
       { to: '/invoices', label: 'Invoices' },
       { to: '/payments', label: 'Payments' },
       { to: '/credit-memos', label: 'Credit Memos' },

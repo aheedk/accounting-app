@@ -32,10 +32,10 @@ function labelFor(value: string): string {
 function toneForStatus(status: string): StatusTone {
   const s = status.toLowerCase();
   if (['draft', 'pending'].includes(s)) return 'draft';
-  if (['posted', 'active', 'sent', 'confirmed', 'received', 'fulfilled'].includes(s)) return 'posted';
+  if (['posted', 'active', 'sent', 'confirmed', 'received', 'fulfilled', 'accepted'].includes(s)) return 'posted';
   if (['paid', 'applied', 'closed'].includes(s)) return 'paid';
-  if (['overdue', 'partial'].includes(s)) return 'warning';
-  if (['void', 'voided', 'inactive', 'deleted'].includes(s)) return 'danger';
+  if (['overdue', 'partial', 'expired'].includes(s)) return 'warning';
+  if (['void', 'voided', 'inactive', 'deleted', 'rejected'].includes(s)) return 'danger';
   return 'neutral';
 }
 

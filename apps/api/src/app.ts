@@ -19,6 +19,7 @@ import trialBalanceRoutes from './routes/trialBalance.js';
 import customerRoutes from './routes/customers.js';
 import taxCodeRoutes from './routes/taxCodes.js';
 import invoiceRoutes from './routes/invoices.js';
+import estimateRoutes from './routes/estimates.js';
 import paymentRoutes from './routes/payments.js';
 import creditMemoRoutes from './routes/creditMemos.js';
 import agingReportRoutes from './routes/agingReport.js';
@@ -122,6 +123,7 @@ export function makeApp(): Express {
   app.use(customerRoutes);
   app.use(taxCodeRoutes);
   app.use(invoiceRoutes);
+  app.use(estimateRoutes);
   app.use(paymentRoutes);
   app.use(creditMemoRoutes);
   app.use(agingReportRoutes);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildInvoicePdf, invoiceTotalsRows, type InvoicePdfInput } from './invoicePdf';
+import { buildEstimatePdf, buildInvoicePdf, estimateTotalsRows, invoiceTotalsRows, type EstimatePdfInput, type InvoicePdfInput } from './invoicePdf';
 
 const invoice: InvoicePdfInput = {
   companyName: 'Green Gadgets Inc.',
@@ -39,5 +39,30 @@ describe('invoice PDF', () => {
     }
     expect(text).not.toContain('VOIDED');
     expect(buildInvoicePdf({ ...invoice, status: 'voided' }).output()).toContain('VOIDED');
+  });
+});
+
+// Item 17: an estimate prints like an invoice, with what it quotes and when it expires.
+describe('estimate PDF', () => {
+  const estimate: EstimatePdfInput = {
+    companyName: 'Green Gadgets Inc.',
+    companyAddressLines: ['100 Main Street'],
+    customerName: 'Tailspin Toys',
+    estimateNumber: 'EST-0007',
+    estimateDate: 'October 7, 2026',
+    expirationDate: 'November 6, 2026',
+    lines: invoice.lines,
+    subtotal: '389.5000', taxTotal: '31.1600', total: '420.6600',
+    memo: null,
+  };
+
+  it('quotes a total and owes nothing', () => {
+    expect(estimateTotalsRows(estimate)).toEqual([['Subtotal', '389.50'], ['Tax', '31.16'], ['Total', '420.66']]);
+  });
+
+  it('is headed ESTIMATE, with its number and expiration date', () => {
+    const text = buildEstimatePdf(estimate).output();
+    for (const expected of ['ESTIMATE', 'EST-0007', 'Expires', 'November 6, 2026', 'Consulting']) expect(text).toContain(expected);
+    expect(text).not.toContain('Balance due');
   });
 });

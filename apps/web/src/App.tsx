@@ -28,6 +28,9 @@ import CustomerDetailPage from '@/pages/customers/CustomerDetailPage';
 import InvoiceListPage from '@/pages/invoices/InvoiceListPage';
 import InvoiceNewPage from '@/pages/invoices/InvoiceNewPage';
 import InvoiceDetailPage from '@/pages/invoices/InvoiceDetailPage';
+import EstimateListPage from '@/pages/estimates/EstimateListPage';
+import EstimateFormPage from '@/pages/estimates/EstimateFormPage';
+import EstimateDetailPage from '@/pages/estimates/EstimateDetailPage';
 import PaymentListPage from '@/pages/payments/PaymentListPage';
 import PaymentNewPage from '@/pages/payments/PaymentNewPage';
 import PaymentDetailPage from '@/pages/payments/PaymentDetailPage';
@@ -147,6 +150,10 @@ export default function App() {
             <Route path="/invoices" element={<InvoiceListPage />} />
             <Route path="/invoices/new" element={<InvoiceNewPage />} />
             <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
+            <Route path="/estimates" element={<EstimateListPage />} />
+            <Route path="/estimates/new" element={<EstimateFormPage />} />
+            <Route path="/estimates/:id" element={<EstimateDetailPage />} />
+            <Route path="/estimates/:id/edit" element={<EstimateFormPage />} />
             <Route path="/payments" element={<PaymentListPage />} />
             <Route path="/payments/new" element={<PaymentNewPage />} />
             <Route path="/payments/:id" element={<PaymentDetailPage />} />

@@ -29,7 +29,8 @@ export type CreateDraftInput = {
   lines: InvoiceLineInput[];
 };
 
-async function computeLine(
+/** A line's subtotal, tax at the rate in force on `issue_date`, and total. Estimates use it too. */
+export async function computeLine(
   db: Kysely<DB> | Transaction<DB>, line: InvoiceLineInput, issue_date: string,
 ) {
   const subtotal = toMoneyString(mulMoney(line.quantity, line.unit_price));

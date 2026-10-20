@@ -49,7 +49,7 @@ too small to walk through. Only the firm view and My Menu were shown.
 | 37 | Year end: built 10-13. Left: ask Faizan whether he wants a posted closing entry as well. Not asked in this meeting **(10-10)** | Aheed, Faizan |
 | 43 | Backups: the tool is built. Left: run it against production once (needs the connection string from Railway), and decide how often and where our own copy is kept. Uploaded files are in no backup yet; see the recovery plan. 10-20: [`../guides/recovery-plan.md`](../guides/recovery-plan.md) written **(10-10)** | Aheed, Riham |
 | 44 | Card payment "waiting for the bank statement": test both orders **(10-10)** | Faizan |
-| 17 | QA audit: Estimate, emailing an invoice (item 47) and two decisions for the firm **(10-01)** | Aheed, firm |
+| 17 | QA audit: emailing an invoice (item 47) and two decisions for the firm. Estimate built 10-20 **(10-01)** | Aheed, firm |
 | 18 | Review the reports with the firm. Item 74 adds one **(10-05)** | Aheed, firm |
 | 11 | Make recurring on a bank deposit: Faizan says what is expected, then test it **(10-05)** | Riham, Faizan |
 | 14 | Test check stubs with a statement and stubs from the same client **(10-01)** | Aheed |
@@ -202,6 +202,7 @@ What to click is in [`../demos/2026-10-20-aheed.md`](../demos/2026-10-20-aheed.m
 | 28 | Security review ([`../qa/2026-10-20-security-review.md`](../qa/2026-10-20-security-review.md)): a record's id can no longer reach another client's record (60 lookups and the AI inbox); payees on checks and expenses must be the client's own; uploaded files of types that can run code are only downloaded; sign-in limited per address; a wrong email answers as slowly as a wrong password; security headers on the web app (the script policy reports only, for now) |
 | 72 (reading) | Statements keep what they say about the account: the period and the beginning and ending balance, read by the AI, shown and editable on review with a check that the lines add up to them (a missed line shows before posting), and kept with the account the statement was approved against, for Reconcile. Spec: [`../specs/2026-10-04-card-statements-and-check-stubs-design.md`](../specs/2026-10-04-card-statements-and-check-stubs-design.md), section 4 |
 | 28, 43 | Recovery plan ([`../guides/recovery-plan.md`](../guides/recovery-plan.md)): what to do for each kind of failure, and which secrets to keep outside Railway |
+| 17 (Estimate) | Estimates, the QA audit's last missing transaction type: Accounts Receivable → Estimates and + New → Estimate. Pending, accepted (with who and when), rejected, shown as expired past their date; Create invoice makes a draft invoice with the next invoice number, the customer's terms and the estimate's lines, and closes the estimate. Save as PDF; search; the customer's page lists them. Spec: [`../specs/2026-10-20-estimates-design.md`](../specs/2026-10-20-estimates-design.md) |
 
 ## Decided — no work
 

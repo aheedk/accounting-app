@@ -249,6 +249,13 @@ export const AUDIT = {
 
   // The firm's Gmail, read for documents sent to the AI inbox
   GMAIL_CONNECT: 'gmail.connect',
+
+  // Estimates (quotes that become invoices)
+  ESTIMATE_CREATE: 'estimate.create',
+  ESTIMATE_UPDATE: 'estimate.update',
+  ESTIMATE_STATUS: 'estimate.status',
+  ESTIMATE_CONVERT: 'estimate.convert',
+  ESTIMATE_DELETE: 'estimate.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
