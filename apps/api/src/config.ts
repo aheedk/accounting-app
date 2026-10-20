@@ -8,6 +8,9 @@ const schema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(180),
+  // Shorter than the web's, since a lost/stolen phone is a more common threat
+  // model than a lost browser session.
+  JWT_MOBILE_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });

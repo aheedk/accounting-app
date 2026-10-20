@@ -69,4 +69,81 @@ describe('auth routes', () => {
     expect(await names('admin@x.com')).toEqual(['Granted Co', 'Other Co']);
     expect(await names('acct@x.com')).toEqual(['Granted Co']);
   });
+
+  it('POST /auth/login with client: mobile returns the refresh token in the body, no cookie', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'Biz');
+    const user = await makeUser(t.db, firm.id, { email: 'm@x.com', password: 'pw12345678' });
+    await grantAccess(t.db, user.id, biz.id);
+
+    const app = makeApp();
+    const res = await request(app).post('/auth/login').send({ email: 'm@x.com', password: 'pw12345678', client: 'mobile' });
+    expect(res.status).toBe(200);
+    expect(res.body.access_token).toBeTruthy();
+    expect(res.body.refresh_token).toBeTruthy();
+    expect(res.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('POST /auth/refresh-mobile rotates the token and keeps working across restarts', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'Biz');
+    const user = await makeUser(t.db, firm.id, { email: 'm2@x.com', password: 'pw12345678' });
+    await grantAccess(t.db, user.id, biz.id);
+
+    const app = makeApp();
+    const login = await request(app).post('/auth/login').send({ email: 'm2@x.com', password: 'pw12345678', client: 'mobile' });
+    const firstRefreshToken = login.body.refresh_token as string;
+
+    const refreshed = await request(app).post('/auth/refresh-mobile').send({ refresh_token: firstRefreshToken });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.access_token).toBeTruthy();
+    expect(refreshed.body.refresh_token).toBeTruthy();
+    expect(refreshed.body.refresh_token).not.toBe(firstRefreshToken);
+
+    // Single-use: the rotated-out token no longer works.
+    const reuse = await request(app).post('/auth/refresh-mobile').send({ refresh_token: firstRefreshToken });
+    expect(reuse.status).toBe(401);
+
+    // The new one does.
+    const again = await request(app).post('/auth/refresh-mobile').send({ refresh_token: refreshed.body.refresh_token as string });
+    expect(again.status).toBe(200);
+  });
+
+  it('a mobile refresh token cannot be used on the web cookie route, or vice versa', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'Biz');
+    const user = await makeUser(t.db, firm.id, { email: 'm3@x.com', password: 'pw12345678' });
+    await grantAccess(t.db, user.id, biz.id);
+
+    const app = makeApp();
+    const mobileLogin = await request(app).post('/auth/login').send({ email: 'm3@x.com', password: 'pw12345678', client: 'mobile' });
+    const webLogin = await request(app).post('/auth/login').send({ email: 'm3@x.com', password: 'pw12345678' });
+    const webCookie = webLogin.headers['set-cookie']?.join(';') ?? '';
+    const webRaw = /acct_rt=([^;]+)/.exec(webCookie)?.[1];
+
+    // Mobile token replayed against the cookie-based route (as a cookie).
+    const crossed = await request(app).post('/auth/refresh').set('Cookie', `acct_rt=${mobileLogin.body.refresh_token as string}`);
+    expect(crossed.status).toBe(401);
+
+    // Web token replayed against the mobile body route.
+    const crossedBack = await request(app).post('/auth/refresh-mobile').send({ refresh_token: webRaw });
+    expect(crossedBack.status).toBe(401);
+  });
+
+  it('POST /auth/logout-mobile revokes the refresh token', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'Biz');
+    const user = await makeUser(t.db, firm.id, { email: 'm4@x.com', password: 'pw12345678' });
+    await grantAccess(t.db, user.id, biz.id);
+
+    const app = makeApp();
+    const login = await request(app).post('/auth/login').send({ email: 'm4@x.com', password: 'pw12345678', client: 'mobile' });
+    const rt = login.body.refresh_token as string;
+
+    const out = await request(app).post('/auth/logout-mobile').send({ refresh_token: rt });
+    expect(out.status).toBe(200);
+
+    const afterLogout = await request(app).post('/auth/refresh-mobile').send({ refresh_token: rt });
+    expect(afterLogout.status).toBe(401);
+  });
 });

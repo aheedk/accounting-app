@@ -93,6 +93,9 @@ export interface RefreshTokensTable {
   session_started_at: ColumnType<Date, string | Date | undefined, string | Date>;
   user_agent: string | null;
   ip_address: string | null;
+  // 'web' sessions refresh via the httpOnly cookie route; 'mobile' ones via
+  // /auth/refresh-mobile's body-based route (migration 0106).
+  token_type: Generated<'web' | 'mobile'>;
 }
 
 export interface AuditLogsTable {

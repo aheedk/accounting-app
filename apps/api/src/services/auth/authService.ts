@@ -3,12 +3,11 @@ import { sql } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB, UserRole } from '../../db/types.js';
 import { AuthError } from '../../lib/errors.js';
-import { config } from '../../config.js';
 import { hashPassword, verifyPassword } from './passwordHasher.js';
 import { decryptField } from '../../lib/fieldCrypto.js';
 import { verifyTotp } from './totp.js';
 import { revokeSession } from './sessionRevocation.js';
-import { generateRefreshToken, hashRefreshToken, signAccessToken } from './tokenService.js';
+import { generateRefreshToken, hashRefreshToken, refreshTtlDaysFor, signAccessToken, type RefreshTokenType } from './tokenService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
@@ -79,7 +78,9 @@ function ctxFromLogin(user: { id: string; firm_id: string; role: UserRole }, met
   };
 }
 
-export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): Promise<LoginResult> {
+export async function login(
+  db: Kysely<DB>, input: LoginInput, meta: ReqMeta, tokenType: RefreshTokenType = 'web',
+): Promise<LoginResult> {
   // Pre-check: load user + verify password OUTSIDE the success transaction so a
   // login_failed audit row is committed independently of the failure throw.
   const preUser = await db
@@ -146,10 +147,10 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
 
     const raw = generateRefreshToken();
     const token_hash = await hashRefreshToken(raw);
-    const expires_at = new Date(Date.now() + config.JWT_REFRESH_TTL_DAYS * 24 * 3600 * 1000);
+    const expires_at = new Date(Date.now() + refreshTtlDaysFor(tokenType) * 24 * 3600 * 1000);
     const session = await trx.insertInto('refresh_tokens').values({
       user_id: user.id, token_hash, expires_at: expires_at.toISOString() as unknown as string,
-      user_agent: meta.user_agent || null, ip_address: meta.ip_address || null,
+      user_agent: meta.user_agent || null, ip_address: meta.ip_address || null, token_type: tokenType,
     }).returning('session_id').executeTakeFirstOrThrow();
 
     await trx.updateTable('users').set({ last_login_at: sql`now()`, failed_login_count: 0, locked_until: null })
@@ -174,7 +175,9 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
   });
 }
 
-export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: ReqMeta): Promise<LoginResult> {
+export async function refresh(
+  db: Kysely<DB>, rawRefreshToken: string, meta: ReqMeta, expectedTokenType: RefreshTokenType = 'web',
+): Promise<LoginResult> {
   return db.transaction().execute(async (trx) => {
     const token_hash = await hashRefreshToken(rawRefreshToken);
     const row = await trx
@@ -185,6 +188,12 @@ export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: Req
     if (!row || row.revoked_at !== null || new Date(row.expires_at).getTime() < Date.now()) {
       throw new AuthError(ERR.TOKEN_EXPIRED, 'Refresh token invalid or expired');
     }
+    // A mobile token can only be refreshed through the mobile route and vice
+    // versa — otherwise a web cookie value replayed into the mobile body
+    // route (or the reverse) would silently inherit the wrong TTL.
+    if (row.token_type !== expectedTokenType) {
+      throw new AuthError(ERR.TOKEN_EXPIRED, 'Refresh token invalid or expired');
+    }
     const user = await trx.selectFrom('users').selectAll().where('id', '=', row.user_id).where('deleted_at', 'is', null).executeTakeFirst();
     if (!user) throw new AuthError(ERR.UNAUTHORIZED, 'User no longer exists');
     if (user.deactivated_at) throw new AuthError(ERR.UNAUTHORIZED, 'This login has been switched off');
@@ -193,12 +202,13 @@ export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: Req
     await trx.updateTable('refresh_tokens').set({ revoked_at: sql`now()` }).where('id', '=', row.id).execute();
     const newRaw = generateRefreshToken();
     const newHash = await hashRefreshToken(newRaw);
-    const expires_at = new Date(Date.now() + config.JWT_REFRESH_TTL_DAYS * 24 * 3600 * 1000);
+    const expires_at = new Date(Date.now() + refreshTtlDaysFor(row.token_type) * 24 * 3600 * 1000);
     await trx.insertInto('refresh_tokens').values({
       user_id: user.id, token_hash: newHash, expires_at: expires_at.toISOString() as unknown as string,
       session_id: row.session_id,
       session_started_at: row.session_started_at,
       user_agent: meta.user_agent || row.user_agent, ip_address: meta.ip_address || row.ip_address,
+      token_type: row.token_type,
     }).execute();
 
     const businesses = await businessesForUser(trx, user);

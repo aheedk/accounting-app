@@ -28,6 +28,12 @@ export function generateRefreshToken(): string {
   return crypto.randomBytes(32).toString('base64url');
 }
 
+export type RefreshTokenType = 'web' | 'mobile';
+
+export function refreshTtlDaysFor(tokenType: RefreshTokenType): number {
+  return tokenType === 'mobile' ? config.JWT_MOBILE_REFRESH_TTL_DAYS : config.JWT_REFRESH_TTL_DAYS;
+}
+
 // Deterministic so we can look up rows by hash. HMAC with refresh secret.
 export async function hashRefreshToken(raw: string): Promise<string> {
   return crypto.createHmac('sha256', config.JWT_REFRESH_SECRET).update(raw).digest('hex');

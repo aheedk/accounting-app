@@ -5,6 +5,9 @@ export const loginRequestSchema = z.object({
   password: z.string().min(8).max(200),
   // The 6-digit code from an authenticator app, for a login that has the second step on.
   code: z.string().regex(/^\d{6}$/).optional(),
+  // 'mobile' gets its refresh token back in the JSON body (no httpOnly
+  // cookie reaches a native client) and a shorter refresh-token lifetime.
+  client: z.enum(['web', 'mobile']).optional(),
 });
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
@@ -15,6 +18,9 @@ export const passwordChangeSchema = z.object({
   new_password: newPassword,
 });
 export type PasswordChange = z.infer<typeof passwordChangeSchema>;
+
+export const refreshMobileSchema = z.object({ refresh_token: z.string().min(1) });
+export type RefreshMobileRequest = z.infer<typeof refreshMobileSchema>;
 
 export const twoStepCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/, 'Enter the 6 digits') });
 export const twoStepOffSchema = z.object({ password: z.string().min(1).max(200) });

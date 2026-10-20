@@ -39,19 +39,27 @@ router.post('/auth/login', async (req, res, next) => {
     const refusal = addressRefusal(address);
     if (refusal) throw new AuthError(ERR.ACCOUNT_LOCKED, refusal);
     const body = schemas.loginRequestSchema.parse(req.body);
+    const tokenType = body.client === 'mobile' ? 'mobile' : 'web';
     let out: Awaited<ReturnType<typeof login>>;
     try {
-      out = await login(db, body, reqMeta(req));
+      out = await login(db, body, reqMeta(req), tokenType);
     } catch (e: unknown) {
       // A wrong password or code counts against the address; "a code is needed" does not.
       if (e instanceof AuthError && e.code === ERR.INVALID_CREDENTIALS) recordFailedSignIn(address);
       throw e;
     }
     clearSignInFailures(address);
-    setRefreshCookie(res, out.refresh_token);
-    const { refresh_token: _rt, ...publicOut } = out;
-    void _rt;
-    res.json(publicOut);
+    if (tokenType === 'mobile') {
+      // No httpOnly cookie reaches a native client — hand the refresh token
+      // back in the body instead; the mobile app is responsible for storing
+      // it in SecureStore.
+      res.json(out);
+    } else {
+      setRefreshCookie(res, out.refresh_token);
+      const { refresh_token: _rt, ...publicOut } = out;
+      void _rt;
+      res.json(publicOut);
+    }
   } catch (e) { next(e); }
 });
 
@@ -59,11 +67,22 @@ router.post('/auth/refresh', async (req, res, next) => {
   try {
     const raw = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     if (!raw) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'No refresh cookie' } });
-    const out = await refresh(db, raw, reqMeta(req));
+    const out = await refresh(db, raw, reqMeta(req), 'web');
     setRefreshCookie(res, out.refresh_token);
     const { refresh_token: _rt, ...publicOut } = out;
     void _rt;
     res.json(publicOut);
+  } catch (e) { next(e); }
+});
+
+// Mobile's counterpart to /auth/refresh: the refresh token travels in the
+// request body (rotated on every call) instead of an httpOnly cookie, since
+// a native client has no cookie jar the API can rely on.
+router.post('/auth/refresh-mobile', async (req, res, next) => {
+  try {
+    const body = schemas.refreshMobileSchema.parse(req.body);
+    const out = await refresh(db, body.refresh_token, reqMeta(req), 'mobile');
+    res.json(out);
   } catch (e) { next(e); }
 });
 
@@ -72,6 +91,14 @@ router.post('/auth/logout', async (req, res, next) => {
     const raw = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     if (raw) await logout(db, raw, reqMeta(req));
     res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/auth/logout-mobile', async (req, res, next) => {
+  try {
+    const body = schemas.refreshMobileSchema.parse(req.body);
+    await logout(db, body.refresh_token, reqMeta(req));
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
