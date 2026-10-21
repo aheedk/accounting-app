@@ -675,3 +675,39 @@ and the endpoint hit directly against the real dev API — response matched
 the hand-written type field-for-field (`rows[].{account_id,code,name,
 account_type,total_debit,total_credit,net}`, `totals.{total_debit,
 total_credit}`, `fiscal_year_start`, `retained_earnings_prior_years`).
+
+### Redesign chunk 8 (2026-10-21) — role-based drawer/Create filtering — done
+
+Until now, every nav drawer item and the Create tab's forms showed for
+every role, regardless of what the API would actually let that role do.
+Ported web's `apps/web/src/lib/roleAccess.ts` (`canOpenPage`/`useCanOpen`/
+`useEffectiveRole`) to a new `apps/mobile/lib/roleAccess.ts`, adapted to
+this app's own real routes rather than web's (most of web's pages don't
+exist on mobile yet, so the path allow-lists are mobile-specific, not a
+line-for-line copy):
+
+- `client` role: only Dashboard, Invoices (view), and the three financial
+  reports (`/pnl`, `/balance-sheet`, `/trial-balance`) stay visible in the
+  drawer — Transactions, Customers, Vendors, AI Document Inbox, and
+  General Ledger are hidden, matching web's `CLIENT_PAGES` allow-list (a
+  client only ever sees its own invoices/bills and the standard reports).
+- `viewer` role: sees everything staff can, but any `/new` form is
+  blocked — same rule as web. Mobile's only two "new" forms today are
+  Expense/Deposit, so the Create tab shows an explanatory message instead
+  of the form list, and the drawer's "Create" shortcut button is hidden,
+  for both `viewer` and `client`.
+- Role-denied items are dropped entirely (not shown disabled with a
+  note) — deliberately distinct from the "Desktop only" treatment used
+  for features this app hasn't built yet. A permission gap and a feature
+  gap are different things and read differently to the user: web itself
+  removes role-denied items rather than showing them, so mobile matches
+  that rather than inventing a new convention.
+- A group whose children are all role-denied is dropped too (e.g. the
+  whole AR group would disappear for a role that can't open any AR page),
+  same as web's `useNavGroups()` behavior.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors. Not re-tested against every role live (no
+device test this chunk) — the logic is a direct, narrowly-adapted port of
+web's already-shipped `canOpenPage`, which is covered by its own existing
+tests on the web side.

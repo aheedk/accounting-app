@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useNavDrawer } from '../hooks/useNavDrawer';
+import { useCanOpen } from '../lib/roleAccess';
 import { lightColors, fontFamily, typeScale, spacing, minTouchTarget } from '../theme';
 
 // Direct structural port of apps/web/src/components/layout/Sidebar.tsx's
@@ -102,6 +103,7 @@ export function NavDrawer() {
   const { isOpen, close } = useNavDrawer();
   const insets = useSafeAreaInsets();
   const { businesses, activeBusinessId, setActiveBusinessId } = useAuth();
+  const canOpen = useCanOpen();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const translateX = useSharedValue(-DRAWER_WIDTH);
@@ -153,15 +155,22 @@ export function NavDrawer() {
           ))}
         </Menu>
 
-        <Pressable style={styles.createButton} onPress={() => { close(); router.push('/(tabs)/create'); }}>
-          <MaterialCommunityIcons name="plus" size={18} color={lightColors.sidebar} />
-          <Text style={styles.createButtonText}>Create</Text>
-        </Pressable>
+        {canOpen('/expense/new') && (
+          <Pressable style={styles.createButton} onPress={() => { close(); router.push('/(tabs)/create'); }}>
+            <MaterialCommunityIcons name="plus" size={18} color={lightColors.sidebar} />
+            <Text style={styles.createButtonText}>Create</Text>
+          </Pressable>
+        )}
 
         <Divider style={styles.divider} />
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.lg }}>
           {NAV_GROUPS.map(group => {
+            // A role that can't open this path doesn't see it at all — same as
+            // web's Sidebar.tsx, which drops role-denied items rather than
+            // showing them disabled (that treatment is reserved for features
+            // this app hasn't built yet, a different kind of gap).
+            if (group.path && !canOpen(group.path)) return null;
             if (!group.children) {
               const disabled = !group.path;
               return (
@@ -177,6 +186,8 @@ export function NavDrawer() {
                 </Pressable>
               );
             }
+            const visibleChildren = group.children.filter(child => !child.path || canOpen(child.path));
+            if (visibleChildren.length === 0) return null;
             const isExpanded = expanded.has(group.id);
             return (
               <View key={group.id}>
@@ -192,7 +203,7 @@ export function NavDrawer() {
                   <Text style={styles.rowText}>{group.label}</Text>
                   <MaterialCommunityIcons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={lightColors.sidebarMuted} />
                 </Pressable>
-                {isExpanded && group.children.map(child => {
+                {isExpanded && visibleChildren.map(child => {
                   const disabled = !child.path;
                   return (
                     <Pressable
