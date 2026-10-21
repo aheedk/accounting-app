@@ -23,7 +23,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard" color={color as string} size={size} /> }}
+        options={{ title: 'Dashboard', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="transactions"
@@ -40,10 +40,11 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="clients"
-        options={{ title: 'Clients', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" color={color as string} size={size} /> }}
-      />
+      {/* Still a real route (reached from the nav drawer's Accounts
+          Receivable > Customers and Accounts Payable > Vendors), just no
+          longer one of the bottom bar's 4 shortcuts — the drawer is the
+          primary nav now, per the redesign brief. */}
+      <Tabs.Screen name="clients" options={{ href: null }} />
       <Tabs.Screen
         name="more"
         options={{ title: 'More', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="menu" color={color as string} size={size} /> }}

@@ -1,24 +1,21 @@
-import { View, StyleSheet } from 'react-native';
-import { List, Text, Divider, useTheme } from 'react-native-paper';
+import { View } from 'react-native';
+import { List, Divider, useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppHeader } from '../../components/AppHeader';
 import type { AppTheme } from '../../theme';
-import { spacing, typeScale } from '../../theme';
+import { spacing } from '../../theme';
 
 const STUB_ITEMS = [
-  { icon: 'checkbook', label: 'Check', note: 'Check writing stays on desktop' },
-  { icon: 'file-document-outline', label: 'Invoice', note: 'Coming in a later chunk' },
-  { icon: 'book-open-page-variant-outline', label: 'Journal Entry', note: 'Journal entries stay on desktop' },
+  { icon: 'file-document-outline', label: 'Invoice', note: 'Available on desktop' },
+  { icon: 'checkbook', label: 'Check', note: 'Available on desktop' },
+  { icon: 'book-open-page-variant-outline', label: 'Journal Entry', note: 'Available on desktop' },
 ] as const;
 
 export default function CreateScreen() {
   const theme = useTheme<AppTheme>();
-  const insets = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background, paddingTop: insets.top }}>
-      <View style={styles.header}>
-        <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>Create</Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader title="Create" />
 
       <List.Item
         title="Expense"
@@ -52,7 +49,3 @@ export default function CreateScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { padding: spacing.md, paddingBottom: spacing.sm },
-});

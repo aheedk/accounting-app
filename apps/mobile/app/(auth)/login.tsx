@@ -5,8 +5,8 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { LoadingIndicator } from '../../components/LoadingIndicator';
-import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
+import { AppButton } from '../../components/ui/AppButton';
+import { spacing, typeScale, type AppTheme } from '../../theme';
 
 const REMEMBERED_EMAIL_KEY = 'acct_remembered_email';
 
@@ -132,14 +132,15 @@ export default function LoginScreen() {
 
           {error && <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{error}</Text>}
 
-          <Button
-            mode="contained"
+          <AppButton
             onPress={() => { void submit(); }}
             disabled={busy || !email || !password}
-            style={{ minHeight: minTouchTarget, justifyContent: 'center', marginTop: spacing.sm }}
+            loading={busy}
+            fullWidth
+            style={{ marginTop: spacing.sm }}
           >
-            {busy ? <LoadingIndicator size="sm" /> : 'Sign in'}
-          </Button>
+            Sign in
+          </AppButton>
 
           {biometricAvailable && (
             <Button mode="text" onPress={() => { void unlockWithBiometrics(); }} style={{ marginTop: spacing.sm }}>

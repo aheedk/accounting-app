@@ -325,3 +325,100 @@ that decide whether the mobile app is actually useful day to day.
 - Stripe/payment-processor integration: no backend support exists at all;
   "Invoice paid" push notifications (item 7) depend on this shipping first.
 - Real logo/brand mark for the app icon — still needed from design.
+
+---
+
+## Visual-parity redesign (2026-10-21) — chunk 1 of N, foundation + nav shell done
+
+The app had drifted visually from web — Paper's default Material look (purple/
+teal accents, pill-shaped buttons, system font) instead of the brand. Request:
+make mobile unmistakably the same product as web (nav, colors, type, component
+shapes, layouts), not a generic Paper app, without silently dropping any
+feature it doesn't yet have (show disabled + "Available on desktop" instead).
+This is a large, multi-chunk effort; chunk 1 ships the foundation everything
+else depends on:
+
+**Colors** — re-derived every token straight from `apps/web/src/index.css`'s
+current HSL variables (a fresh conversion, not trusted from memory — the hex
+values turned out to already be right from an earlier chunk, but the *gap*
+was real: `theme/index.ts` only mapped a handful of MD3 roles, so Paper's
+own `secondary`/`tertiary`/`*Container` roles still fell back to stock
+Material purple/teal). Now every MD3 color role is explicitly mapped to an
+app token (brand only has one accent hue, so `tertiary` intentionally
+mirrors `primary` rather than inventing a third color Paper's scheme
+assumes exists). Confirmed live on a real simulator screenshot: buttons,
+links, and icons all render brand blue, not Material purple.
+
+**Typography** — web is Inter (body) + Fraunces (h1 page titles only, per
+web's own CSS comment: "reverted per feedback, everything else stays
+Inter") — loaded via `@expo-google-fonts/inter` + `/fraunces` and
+`expo-font`'s `useFonts`, gating the splash screen the same way the old
+system-font approach did. `Text.defaultProps` is set globally to
+`Inter_400Regular` so every existing screen's plain `<Text>` picks it up
+without a per-file rewrite; weight-specific spots (headings, emphasized
+rows) now reference `fontFamily.semibold`/`.medium` directly, since RN
+doesn't reliably synthesize bold from a single loaded weight. Type scale
+changed from the earlier phone-rescaled 22/17/14/13/12 to the web's exact
+24/18/15/14/12/11, per explicit instruction to match pixel-for-pixel.
+
+**Component shapes** — went with Option B (thin wrappers) since the brief
+said pick whichever gets to parity faster: `AppButton` (web's exact variant
+palette/weights, 6px radius, not Paper's pill), `AppCard` (white surface +
+our border + 6px radius, not Paper's elevation shadow), `StatusBadge`
+(consolidates the same green/red/blue/gray pill that had been copy-pasted
+as a local `StatusPill` function in 3+ screens). Swapped in: both forms'
+Save buttons, inbox's Approve/Reject, login's Sign in, Dashboard's cards —
+the highest-visibility primary actions. Paper's own components (Chip,
+SegmentedButtons, Menu, TextInput, Switch) are left as-is for now but
+render correctly brand-colored since the full MD3 role mapping fixes them
+too; swapping their shapes for wrapper primitives as well is follow-up
+scope, not done here.
+
+**Navigation** — replaced the 5-tab bottom bar with a left-sliding
+`NavDrawer` (Reanimated, backdrop + panel) that's a structural port of
+`apps/web/src/components/layout/Sidebar.tsx`'s `ALL_GROUPS` — same
+grouping, icons, ordering (Dashboard, Messages, Send documents,
+Transactions, Accounts Receivable, Accounts Payable, AI, Accounting,
+Reports, Inventory, Setup). Every item mobile hasn't built yet renders
+disabled with "Desktop only" instead of being omitted, per explicit
+instruction never to just hide a feature. Built mobile screens are wired
+in under their real web section (Customers/Vendors under AR/AP rather than
+their old standalone "Clients" tab, General Ledger under Reports, Document
+Inbox under AI). Bottom bar trimmed to the 4 shortcuts asked for
+(Dashboard, Transactions, Create, More) — `clients.tsx` is still a real
+route (reached from the drawer via a `?tab=` param), just no longer a tab
+icon.
+
+**Header** — new persistent `AppHeader` (hamburger/back · business name ·
+title · bell · initials avatar) ported structurally from web's `TopBar.tsx`,
+adapted per instruction (bell+avatar instead of the full search bar + name
++ role badge, which doesn't fit phone width the same way). Wired into every
+top-level/drawer-destination screen (Dashboard, Transactions, Create, More,
+Clients, Invoices, General Ledger, AI Inbox); detail screens pushed from a
+list (invoice/customer/vendor/transaction detail, the create/edit forms,
+Settings) intentionally keep their existing back-arrow Appbar pattern
+rather than re-opening the drawer — they're not primary nav destinations.
+
+**Verified**: full `tsc --noEmit` clean; a real Metro bundle export
+(`expo export --platform ios`) built all 2260 modules with no errors; and —
+unusually, the user had their own `expo start` already running against a
+booted simulator — a live screenshot taken mid-session confirms the header,
+drawer-adjacent chrome, blue brand color, Inter type, and trimmed 4-tab bar
+all render correctly together, not just in isolation.
+
+**Not done in this chunk** (explicitly carried to the next one — this
+request's items 3 and parts of 5/6 are a page-layout-by-page-layout effort
+too large for one pass):
+- Exact web page layout mirroring beyond what shipped: General Ledger's
+  exact column set, vendor/customer detail's 3-tab layout + summary
+  sidebar, the expense/deposit form's Cancel/Make recurring/More/Save
+  bottom bar, AI inbox's exact table-column parity.
+- Swapping Paper's Chip/SegmentedButtons/TextInput for wrapper primitives
+  (Option B applied to buttons/cards/badges only so far).
+- Drawer's role-based filtering (web's `useCanOpen`) — mobile's drawer
+  currently shows every group to every role; only the built-vs-not-built
+  gate exists today.
+- Tapping an item mid-sentence in the drawer was not interactively
+  verified (no UI-automation tooling in this environment, per the
+  session's standing note) — confirmed via the static screenshot and code
+  review only.

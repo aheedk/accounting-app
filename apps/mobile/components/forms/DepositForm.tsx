@@ -15,8 +15,9 @@ import { PickerField } from '../PickerField';
 import { DateField } from '../DateField';
 import { SearchablePicker } from '../SearchablePicker';
 import { LoadingIndicator } from '../LoadingIndicator';
+import { AppButton } from '../ui/AppButton';
 import { fmtMoney } from '../../lib/money';
-import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
+import { spacing, typeScale, type AppTheme } from '../../theme';
 
 type Line = DepositLineInput & { key: string };
 let lineKeySeq = 0;
@@ -222,14 +223,9 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
 
       {serverError ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{serverError}</Text> : null}
 
-      <Button
-        mode="contained"
-        onPress={() => void save()}
-        disabled={saving}
-        style={{ minHeight: minTouchTarget, justifyContent: 'center' }}
-      >
-        {saving ? <LoadingIndicator size="sm" /> : existingId ? 'Save changes' : 'Save deposit'}
-      </Button>
+      <AppButton onPress={() => void save()} loading={saving} fullWidth>
+        {existingId ? 'Save changes' : 'Save deposit'}
+      </AppButton>
     </ScrollView>
   );
 }

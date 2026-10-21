@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, RefreshControl } from 'react-native';
-import { Text, List, TextInput, Menu, Divider, SegmentedButtons, useTheme } from 'react-native-paper';
+import { Text, TextInput, SegmentedButtons, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
+import { AppHeader } from '../../components/AppHeader';
 import { listCustomers, listVendors, type CustomerRow, type VendorRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
@@ -18,11 +19,12 @@ type Tab = 'customers' | 'vendors';
 export default function ClientsScreen() {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
-  const { businesses, activeBusinessId, setActiveBusinessId } = useAuth();
-  const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>('customers');
+  const { activeBusinessId } = useAuth();
+  // Reached from the nav drawer's Accounts Receivable > Customers or
+  // Accounts Payable > Vendors — the ?tab param picks which list opens.
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(params.tab === 'vendors' ? 'vendors' : 'customers');
   const [search, setSearch] = useState('');
-  const activeBusiness = businesses.find(b => b.id === activeBusinessId);
 
   const customersQuery = useQuery({
     queryKey: ['customers', activeBusinessId],
@@ -46,43 +48,8 @@ export default function ClientsScreen() {
   }, [query.data, search]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background, paddingTop: insets.top }}>
-      <View style={styles.header}>
-        <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>Clients</Text>
-      </View>
-
-      <Menu
-        visible={switcherOpen}
-        onDismiss={() => setSwitcherOpen(false)}
-        anchor={
-          <List.Item
-            title={activeBusiness?.name ?? 'Pick a business'}
-            description="Tap to switch business"
-            onPress={() => setSwitcherOpen(true)}
-            left={props => <List.Icon {...props} icon="domain" color={theme.app.primary} />}
-            right={props => <List.Icon {...props} icon="chevron-down" color={theme.app.mutedForeground} />}
-            titleStyle={{ color: theme.app.foreground, fontWeight: '700' }}
-            descriptionStyle={{ color: theme.app.mutedForeground }}
-          />
-        }
-      >
-        {businesses.map(b => (
-          <Menu.Item
-            key={b.id}
-            title={b.name}
-            onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }}
-            trailingIcon={b.id === activeBusinessId ? 'check' : undefined}
-          />
-        ))}
-      </Menu>
-
-      <List.Item
-        title="Invoices"
-        onPress={() => router.push('/invoices')}
-        left={props => <List.Icon {...props} icon="file-document-outline" color={theme.app.foreground} />}
-        titleStyle={{ color: theme.app.foreground }}
-      />
-      <Divider style={{ marginBottom: spacing.sm }} />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader title={tab === 'customers' ? 'Customers' : 'Vendors'} />
 
       <View style={styles.listHeader}>
         <SegmentedButtons
@@ -141,7 +108,6 @@ export default function ClientsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { padding: spacing.md, paddingBottom: 0 },
   listHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
 });

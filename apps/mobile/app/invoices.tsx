@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, Appbar, Chip, useTheme } from 'react-native-paper';
+import { Text, Chip, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
+import { AppHeader } from '../components/AppHeader';
+import { StatusBadge, type BadgeStatus } from '../components/ui/StatusBadge';
 import { listInvoices, listCustomers, type InvoiceRow } from '../services/api';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../lib/money';
-import { spacing, typeScale, minTouchTarget, type AppTheme } from '../theme';
+import { spacing, typeScale, fontFamily, minTouchTarget, type AppTheme } from '../theme';
 
 type StatusFilter = 'all' | 'open' | 'overdue' | 'paid';
 const FILTERS: Array<{ value: StatusFilter; label: string }> = [
@@ -63,10 +65,7 @@ export default function InvoicesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Appbar.Header statusBarHeight={insets.top} style={{ backgroundColor: theme.app.surface }}>
-        <Appbar.BackAction onPress={() => router.back()} color={theme.app.foreground} />
-        <Appbar.Content title="Invoices" titleStyle={{ color: theme.app.foreground }} />
-      </Appbar.Header>
+      <AppHeader title="Invoices" />
 
       <View style={styles.filterBar}>
         {FILTERS.map(f => (
@@ -102,6 +101,11 @@ export default function InvoicesScreen() {
   );
 }
 
+// Invoice status is its own vocabulary, distinct from the transaction/JE
+// posted=green convention elsewhere — "posted" here means open/unpaid
+// (blue, same as Imported elsewhere), not settled.
+const INVOICE_BADGE: Record<string, BadgeStatus> = { posted: 'blue', paid: 'green', draft: 'gray', voided: 'red' };
+
 function InvoiceRowItem({ row, customerName, theme }: { row: InvoiceRow; customerName: string | undefined; theme: AppTheme }) {
   const overdue = row.status === 'posted' && row.due_date < todayIso();
   return (
@@ -110,33 +114,18 @@ function InvoiceRowItem({ row, customerName, theme }: { row: InvoiceRow; custome
       onPress={() => router.push({ pathname: '/invoice/[id]', params: { id: row.id } })}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ color: theme.app.foreground, fontWeight: '600' }} numberOfLines={1}>
+        <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }} numberOfLines={1}>
           {customerName ?? 'Customer'} · #{row.invoice_number}
         </Text>
         <Text style={{ color: overdue ? theme.app.statusRedFg : theme.app.mutedForeground, fontSize: typeScale.caption }}>
           Due {fmtShortDate(row.due_date)}{overdue ? ' · Overdue' : ''}
         </Text>
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={{ color: theme.app.foreground, fontWeight: '700' }}>${fmtMoney(row.total)}</Text>
-        <StatusPill status={row.status} theme={theme} />
+      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+        <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }}>${fmtMoney(row.total)}</Text>
+        <StatusBadge status={INVOICE_BADGE[row.status] ?? 'gray'} label={row.status} />
       </View>
     </Pressable>
-  );
-}
-
-function StatusPill({ status, theme }: { status: string; theme: AppTheme }) {
-  const map: Record<string, { bg: string; fg: string }> = {
-    posted: { bg: theme.app.statusBlueBg, fg: theme.app.statusBlueFg },
-    paid: { bg: theme.app.statusGreenBg, fg: theme.app.statusGreenFg },
-    draft: { bg: theme.app.statusGrayBg, fg: theme.app.statusGrayFg },
-    voided: { bg: theme.app.statusRedBg, fg: theme.app.statusRedFg },
-  };
-  const c = map[status] ?? { bg: theme.app.statusGrayBg, fg: theme.app.statusGrayFg };
-  return (
-    <View style={{ backgroundColor: c.bg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, marginTop: 2 }}>
-      <Text style={{ color: c.fg, fontSize: 10, fontWeight: '600', textTransform: 'capitalize' }}>{status}</Text>
-    </View>
   );
 }
 

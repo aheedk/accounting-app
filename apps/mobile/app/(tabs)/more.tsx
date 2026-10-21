@@ -1,10 +1,10 @@
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { Text, List, Divider, useTheme } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { AppHeader } from '../../components/AppHeader';
 import type { AppTheme } from '../../theme';
-import { spacing, typeScale } from '../../theme';
+import { spacing, fontFamily } from '../../theme';
 
 const STUB_ITEMS = [
   { icon: 'chart-box-outline', label: 'Reports' },
@@ -14,15 +14,19 @@ const STUB_ITEMS = [
 
 export default function MoreScreen() {
   const theme = useTheme<AppTheme>();
-  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background, paddingTop: insets.top }}>
-      <View style={styles.header}>
-        <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>More</Text>
-        {user && <Text style={{ color: theme.app.mutedForeground, marginTop: 2 }}>{user.full_name} · {user.email}</Text>}
-      </View>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader title="More" />
+
+      {user && (
+        <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.md }}>
+          <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold }}>{user.full_name}</Text>
+          <Text style={{ color: theme.app.mutedForeground, marginTop: 2 }}>{user.email}</Text>
+        </View>
+      )}
+      <Divider />
 
       <List.Item
         title="General Ledger"
@@ -42,7 +46,7 @@ export default function MoreScreen() {
         <List.Item
           key={item.label}
           title={item.label}
-          description="Coming in a later chunk"
+          description="Available on desktop"
           left={props => <List.Icon {...props} icon={item.icon} color={theme.app.mutedForeground} />}
           titleStyle={{ color: theme.app.foreground }}
           descriptionStyle={{ color: theme.app.mutedForeground }}
@@ -63,7 +67,3 @@ export default function MoreScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { padding: spacing.md, paddingBottom: spacing.sm },
-});

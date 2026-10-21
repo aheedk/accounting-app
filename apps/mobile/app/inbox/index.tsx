@@ -1,17 +1,18 @@
 import { View, StyleSheet, RefreshControl, Pressable } from 'react-native';
-import { Text, Appbar, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
+import { AppHeader } from '../../components/AppHeader';
 import { listEmailImports, type StagedImportRow } from '../../services/api';
 import { deriveImportTitle, deriveImportSubtitle, deriveImportStatus } from '../../lib/emailImportLabel';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { CameraCaptureButton } from '../../components/CameraCaptureButton';
-import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
+import { spacing, typeScale, fontFamily, minTouchTarget, type AppTheme } from '../../theme';
 
 const STATUS_LABELS: Record<ReturnType<typeof deriveImportStatus>, string> = {
   pending: 'Pending review', partially_reviewed: 'Partially reviewed',
@@ -31,11 +32,11 @@ export default function InboxScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Appbar.Header statusBarHeight={insets.top} style={{ backgroundColor: theme.app.surface }}>
-        <Appbar.BackAction onPress={() => router.back()} color={theme.app.foreground} />
-        <Appbar.Content title="AI Document Inbox" titleStyle={{ color: theme.app.foreground }} />
+      <AppHeader title="AI Document Inbox" />
+      <View style={[styles.scanRow, { borderBottomColor: theme.app.border }]}>
+        <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.medium, fontSize: typeScale.body }}>Scan a new document</Text>
         <CameraCaptureButton />
-      </Appbar.Header>
+      </View>
 
       {query.isLoading ? (
         <LoadingIndicator />
@@ -91,4 +92,8 @@ function StatusPill({ status, theme }: { status: ReturnType<typeof deriveImportS
 
 const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderWidth: 1, borderRadius: 12 },
+  scanRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
 });

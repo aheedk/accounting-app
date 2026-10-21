@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { View, StyleSheet, RefreshControl, ScrollView, Pressable } from 'react-native';
-import { Text, Card, Avatar, useTheme } from 'react-native-paper';
+import { Text, Avatar, useTheme } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
+import { AppHeader } from '../../components/AppHeader';
+import { AppCard } from '../../components/ui/AppCard';
 import { listTransactions, listInvoices, listEmailImports } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
@@ -12,7 +13,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { CameraCaptureButton } from '../../components/CameraCaptureButton';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { isInflowType } from '../../lib/transactions';
-import { spacing, typeScale, type AppTheme } from '../../theme';
+import { spacing, typeScale, fontFamily, type AppTheme } from '../../theme';
 
 const TX_TYPE_LABELS: Record<string, string> = {
   deposit: 'Deposit', expense: 'Expense', check: 'Check', journal: 'Journal Entry',
@@ -24,9 +25,7 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 
 export default function DashboardScreen() {
   const theme = useTheme<AppTheme>();
-  const insets = useSafeAreaInsets();
-  const { businesses, activeBusinessId } = useAuth();
-  const activeBusiness = businesses.find(b => b.id === activeBusinessId);
+  const { activeBusinessId } = useAuth();
 
   const recentTx = useQuery({
     queryKey: ['transactions', activeBusinessId, { recent: true }],
@@ -73,90 +72,93 @@ export default function DashboardScreen() {
 
   if (!activeBusinessId) {
     return (
-      <View style={styles.centered}>
-        <Text>Pick a business to get started.</Text>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader title="Dashboard" />
+        <View style={styles.centered}>
+          <Text>Pick a business to get started.</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.md }]}
-      refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
-    >
-      <View style={[styles.header, styles.headerRow]}>
-        <View>
-          <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground }}>VIEWING</Text>
-          <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>{activeBusiness?.name ?? '—'}</Text>
-        </View>
-        <CameraCaptureButton />
-      </View>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader title="Dashboard" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
+      >
+        <Pressable style={[styles.scanRow, { borderColor: theme.app.border, backgroundColor: theme.app.surface }]}>
+          <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.medium, fontSize: typeScale.body }}>Scan a receipt or statement</Text>
+          <CameraCaptureButton />
+        </Pressable>
 
-      {loading ? (
-        <LoadingIndicator />
-      ) : anyError ? (
-        <ErrorState onRetry={refresh} />
-      ) : (
-        <>
-          <View style={styles.cardsRow}>
-            <SummaryCard
-              theme={theme}
-              icon="file-document-alert"
-              tint={theme.app.statusRedFg}
-              tintBg={theme.app.statusRedBg}
-              label="Overdue invoices"
-              value={String(overdue.count)}
-              sub={`$${fmtMoney(overdue.total)}`}
-              onPress={() => router.push('/invoices')}
-            />
-            <SummaryCard
-              theme={theme}
-              icon="inbox-arrow-down"
-              tint={theme.app.statusBlueFg}
-              tintBg={theme.app.statusBlueBg}
-              label="AI Inbox"
-              value={String(inbox.data?.length ?? 0)}
-              sub="pending review"
-              onPress={() => router.push('/inbox')}
-            />
-          </View>
+        {loading ? (
+          <LoadingIndicator />
+        ) : anyError ? (
+          <ErrorState onRetry={refresh} />
+        ) : (
+          <>
+            <View style={styles.cardsRow}>
+              <SummaryCard
+                theme={theme}
+                icon="file-document-alert"
+                tint={theme.app.statusRedFg}
+                tintBg={theme.app.statusRedBg}
+                label="Overdue invoices"
+                value={String(overdue.count)}
+                sub={`$${fmtMoney(overdue.total)}`}
+                onPress={() => router.push('/invoices')}
+              />
+              <SummaryCard
+                theme={theme}
+                icon="inbox-arrow-down"
+                tint={theme.app.statusBlueFg}
+                tintBg={theme.app.statusBlueBg}
+                label="AI Inbox"
+                value={String(inbox.data?.length ?? 0)}
+                sub="pending review"
+                onPress={() => router.push('/inbox')}
+              />
+            </View>
 
-          <Text style={[styles.sectionTitle, { color: theme.app.foreground }]}>Recent transactions</Text>
-          <Card style={{ backgroundColor: theme.app.surface }}>
-            {recentTx.data?.transactions.length === 0 ? (
-              <Card.Content><EmptyState icon="receipt" message="No transactions yet." compact /></Card.Content>
-            ) : (
-              recentTx.data?.transactions.map((tx, i) => (
-                <View key={`${tx.type}:${tx.id}`}>
-                  <Pressable
-                    style={({ pressed }) => [styles.txRow, { paddingHorizontal: spacing.md, opacity: pressed ? 0.6 : 1 }]}
-                    onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: tx.id, type: tx.type } })}
-                  >
-                    <Avatar.Icon
-                      size={36}
-                      icon={isInflowType(tx.type) ? 'arrow-down' : 'arrow-up'}
-                      style={{ backgroundColor: isInflowType(tx.type) ? theme.app.statusGreenBg : theme.app.statusGrayBg }}
-                      color={isInflowType(tx.type) ? theme.app.statusGreenFg : theme.app.statusGrayFg}
-                    />
-                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                      <Text style={{ color: theme.app.foreground, fontWeight: '600' }} numberOfLines={1}>
-                        {tx.contact_name ?? TX_TYPE_LABELS[tx.type] ?? tx.type}
-                      </Text>
-                      <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>
-                        {TX_TYPE_LABELS[tx.type] ?? tx.type} · {fmtShortDate(tx.date)}
-                      </Text>
-                    </View>
-                    <Text style={{ color: theme.app.foreground, fontWeight: '600' }}>${fmtMoney(tx.total_amount)}</Text>
-                  </Pressable>
-                  {i < (recentTx.data?.transactions.length ?? 0) - 1 && <View style={[styles.divider, { backgroundColor: theme.app.border }]} />}
-                </View>
-              ))
-            )}
-          </Card>
-        </>
-      )}
-    </ScrollView>
+            <Text style={[styles.sectionTitle, { color: theme.app.foreground }]}>Recent transactions</Text>
+            <AppCard>
+              {recentTx.data?.transactions.length === 0 ? (
+                <EmptyState icon="receipt" message="No transactions yet." compact />
+              ) : (
+                recentTx.data?.transactions.map((tx, i) => (
+                  <View key={`${tx.type}:${tx.id}`}>
+                    <Pressable
+                      style={({ pressed }) => [styles.txRow, { paddingHorizontal: spacing.md, opacity: pressed ? 0.6 : 1 }]}
+                      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: tx.id, type: tx.type } })}
+                    >
+                      <Avatar.Icon
+                        size={36}
+                        icon={isInflowType(tx.type) ? 'arrow-down' : 'arrow-up'}
+                        style={{ backgroundColor: isInflowType(tx.type) ? theme.app.statusGreenBg : theme.app.statusGrayBg }}
+                        color={isInflowType(tx.type) ? theme.app.statusGreenFg : theme.app.statusGrayFg}
+                      />
+                      <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                        <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }} numberOfLines={1}>
+                          {tx.contact_name ?? TX_TYPE_LABELS[tx.type] ?? tx.type}
+                        </Text>
+                        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption, fontFamily: fontFamily.regular }}>
+                          {TX_TYPE_LABELS[tx.type] ?? tx.type} · {fmtShortDate(tx.date)}
+                        </Text>
+                      </View>
+                      <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }}>${fmtMoney(tx.total_amount)}</Text>
+                    </Pressable>
+                    {i < (recentTx.data?.transactions.length ?? 0) - 1 && <View style={[styles.divider, { backgroundColor: theme.app.border }]} />}
+                  </View>
+                ))
+              )}
+            </AppCard>
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -166,25 +168,28 @@ function SummaryCard({
   theme: AppTheme; icon: string; tint: string; tintBg: string; label: string; value: string; sub: string; onPress: () => void;
 }) {
   return (
-    <Card style={[styles.summaryCard, { backgroundColor: theme.app.surface }]} onPress={onPress}>
-      <Card.Content>
+    <Pressable onPress={onPress} style={{ flex: 1 }}>
+      <AppCard style={styles.summaryCard}>
         <Avatar.Icon size={32} icon={icon} style={{ backgroundColor: tintBg }} color={tint} />
-        <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground, marginTop: spacing.sm }}>{value}</Text>
-        <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground }}>{label}</Text>
-        <Text style={{ fontSize: typeScale.caption, color: tint, marginTop: 2 }}>{sub}</Text>
-      </Card.Content>
-    </Card>
+        <Text style={{ fontSize: typeScale.h1, fontFamily: fontFamily.semibold, color: theme.app.foreground, marginTop: spacing.sm }}>{value}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground, fontFamily: fontFamily.regular }}>{label}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: tint, marginTop: 2, fontFamily: fontFamily.medium }}>{sub}</Text>
+      </AppCard>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { marginBottom: spacing.lg },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  scanRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderRadius: 6, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    marginBottom: spacing.md,
+  },
   cardsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  summaryCard: { flex: 1 },
-  sectionTitle: { fontSize: typeScale.h2, fontWeight: '700', marginBottom: spacing.sm },
+  summaryCard: { flex: 1, padding: spacing.md },
+  sectionTitle: { fontSize: typeScale.h2, fontFamily: fontFamily.semibold, marginBottom: spacing.sm },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: spacing.md + 36 + spacing.sm },
 });

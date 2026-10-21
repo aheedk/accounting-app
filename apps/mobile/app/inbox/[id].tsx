@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Alert } from 'react-native';
-import { Text, Appbar, Checkbox, Button, TextInput, useTheme } from 'react-native-paper';
+import { Text, Appbar, Checkbox, TextInput, useTheme } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import { SearchablePicker, type PickerOption } from '../../components/Searchable
 import { ConfidenceBadge } from '../../components/ConfidenceBadge';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { AppButton } from '../../components/ui/AppButton';
 import { fmtMoney } from '../../lib/money';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
@@ -243,12 +244,12 @@ export default function InboxReviewScreen() {
 
       {imp ? (
         <View style={[styles.footer, { borderTopColor: theme.app.border, backgroundColor: theme.app.surface, paddingBottom: insets.bottom + spacing.sm }]}>
-          <Button mode="outlined" textColor={theme.app.destructive} onPress={reject} disabled={saving} style={{ flex: 1, marginRight: spacing.sm }}>
+          <AppButton variant="destructive" onPress={reject} disabled={saving} style={{ flex: 1, marginRight: spacing.sm }}>
             Reject
-          </Button>
-          <Button mode="contained" onPress={() => void approve()} disabled={saving || selectedCount === 0} style={{ flex: 1 }}>
-            {saving ? <LoadingIndicator size="sm" /> : `Approve selected (${selectedCount})`}
-          </Button>
+          </AppButton>
+          <AppButton onPress={() => void approve()} disabled={selectedCount === 0} loading={saving} style={{ flex: 1 }}>
+            {`Approve selected (${selectedCount})`}
+          </AppButton>
         </View>
       ) : null}
     </View>

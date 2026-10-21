@@ -16,6 +16,7 @@ import { PickerField } from '../PickerField';
 import { DateField } from '../DateField';
 import { SearchablePicker, type PickerOption } from '../SearchablePicker';
 import { LoadingIndicator } from '../LoadingIndicator';
+import { AppButton } from '../ui/AppButton';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
 const PAYMENT_METHODS: Array<{ value: ExpenseInput['payment_method']; label: string }> = [
@@ -281,14 +282,9 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
 
       {serverError ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{serverError}</Text> : null}
 
-      <Button
-        mode="contained"
-        onPress={() => void save()}
-        disabled={saving}
-        style={{ minHeight: minTouchTarget, justifyContent: 'center' }}
-      >
-        {saving ? <LoadingIndicator size="sm" /> : existingId ? 'Save changes' : 'Save expense'}
-      </Button>
+      <AppButton onPress={() => void save()} loading={saving} fullWidth>
+        {existingId ? 'Save changes' : 'Save expense'}
+      </AppButton>
     </ScrollView>
   );
 }

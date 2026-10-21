@@ -20,6 +20,14 @@ export const lightColors = {
   mutedForeground: '#6b7280',
   border: '#e1e3e5',
   input: '#d1d5db',
+  // --muted / --accent are the same light-gray surface on web (table
+  // headers, hover states); --secondary is a plain white pill with the
+  // same foreground as muted text.
+  muted: '#f3f4f6',
+  accent: '#f3f4f6',
+  accentForeground: '#384252',
+  secondary: '#ffffff',
+  secondaryForeground: '#384252',
 
   primary: '#2755b9',
   primaryHover: '#204697',
@@ -55,6 +63,11 @@ export const darkColors = {
   mutedForeground: '#99a3b8',
   border: '#2a3550',
   input: '#334066',
+  muted: '#1a2340',
+  accent: '#1a2340',
+  accentForeground: '#c5cbdb',
+  secondary: '#151d33',
+  secondaryForeground: '#c5cbdb',
 
   primary: '#5b8ae6',
   primaryHover: '#78a0ec',
