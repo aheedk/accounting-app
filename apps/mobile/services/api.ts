@@ -1,4 +1,5 @@
 import { api } from './apiClient';
+import type { ConfidenceBand, CodingLayerId } from '@accounting/shared';
 
 // Thin, typed wrappers over the same REST endpoints the web app calls —
 // no parallel backend, no mobile-specific routes. Response shapes mirror
@@ -119,11 +120,79 @@ export async function getVendor(businessId: string, id: string) {
   return r.data;
 }
 
-export type InboxRow = { id: string; status: string; source: string; created_at: string };
+// --- AI Document Inbox (batch item 4) — the real backend for this is
+// email-imports.ts, NOT integration-inbox.ts (that's an unrelated
+// CSV-reconciliation inbox for Stripe/PayPal/Shopify matching). Shapes
+// copied from emailImports.ts's StagedTransaction/StagedImportRow and
+// statementImportService.ts's StatementLine — confirmed by reading both,
+// not guessed. Known backend gaps, carried into how the mobile screens
+// work (documented again at point of use below):
+//  - No per-line PATCH — every edit (offset account, payee override,
+//    "remember") is bundled into one whole-statement approve call.
+//  - No real "partially reviewed" status — only pending/approved/rejected;
+//    a partial auto-post is inferred from each line's auto_posted flag.
+//  - No vendor_id on a line — vendor "detection" is just a free-text
+//    payee_name string, fuzzy-matched client-side against the vendor list.
+//  - Reject is whole-statement only — dropping one bad line is
+//    include: false on that line at approve time, not a separate action.
 
-export async function listPendingInbox(businessId: string) {
-  const r = await api.get<{ integration_inbox: InboxRow[] }>(`/businesses/${businessId}/integration-inbox`, { params: { status: 'pending' } });
-  return r.data.integration_inbox;
+export type StagedTransaction = {
+  date: string; // "MM/DD/YYYY" as extracted, not ISO
+  payee_name?: string;
+  description: string;
+  amount: string; // always unsigned — direction comes from `type`
+  type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
+  balance?: string;
+  check_number?: string;
+  card_type?: 'charge' | 'payment' | 'refund';
+  suggested_offset?: string;
+  suggested_account_id?: string;
+  suggestion?: { confidence: number; band: ConfidenceBand; source_layer: CodingLayerId } | null;
+  auto_posted?: boolean;
+  check_stub?: { id: string; check_number: string | null; payee_name: string | null; memo: string | null; amount: string; check_date: string | null; suggested_account_id: string | null } | null;
+};
+
+export type StagedImportRow = {
+  id: string;
+  email_from: string | null;
+  email_subject: string | null;
+  received_at: string;
+  extracted_transactions: StagedTransaction[];
+  status: 'pending' | 'approved' | 'rejected';
+  source: 'email' | 'upload';
+  statement_kind: 'bank' | 'credit_card';
+  account_hint: string | null;
+  account_id: string | null;
+  suggested_statement_account_id: string | null;
+};
+
+export async function listEmailImports(businessId: string) {
+  const r = await api.get<{ imports: StagedImportRow[] }>(`/businesses/${businessId}/email-imports`);
+  return r.data.imports;
+}
+
+export type ApproveTransactionInput = {
+  index: number; offset_account_id: string; include?: boolean; remember?: boolean;
+  payee_name?: string; check_stub_id?: string | null;
+};
+
+export async function approveEmailImport(
+  businessId: string, importId: string, body: { bank_account_id: string; transactions: ApproveTransactionInput[] },
+) {
+  const r = await api.post<{ ok: boolean; posted: number; learned: number }>(
+    `/businesses/${businessId}/email-imports/${importId}/approve`, body,
+  );
+  return r.data;
+}
+
+export async function rejectEmailImport(businessId: string, importId: string) {
+  const r = await api.post<{ ok: boolean }>(`/businesses/${businessId}/email-imports/${importId}/reject`, {});
+  return r.data;
+}
+
+export async function createVendor(businessId: string, name: string) {
+  const r = await api.post<{ id: string; name: string }>(`/businesses/${businessId}/vendors`, { name });
+  return r.data;
 }
 
 // --- Transaction detail — the 4 types Phase 1 scopes for mobile viewing.

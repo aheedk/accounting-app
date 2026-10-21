@@ -138,20 +138,57 @@ through Expo Go or the simulator yet.
   create → GL path works; the on-device tap-through flow itself still needs
   your own pass in Expo Go/the simulator.
 
-### 4. AI Document Inbox
-- **Inbox list:** pending imports grouped by statement/upload. Per card:
-  upload date, document name, transaction count, status badge (Pending
-  review / Approved / Partially reviewed).
-- **Statement review:** transaction list for one import. Per row: date,
-  description, signed amount (green deposit / red payment), AI-suggested
-  account + confidence indicator, detected vendor.
-- **Inline editing:** tap a row to expand; edit offset account (searchable
-  dropdown), vendor/payee (searchable, "+ Add new vendor" at the bottom),
-  description/memo — saved inline, no navigation away.
-- **Approve/Reject:** per-row checkbox (parity with web); "Approve selected"
-  posts to the ledger; "Reject" drops rows from the queue.
-- **Swipe gestures:** swipe right = approve one row, swipe left = reject.
-- Pull-to-refresh for new uploads.
+### 4. AI Document Inbox — done 2026-10-20 (checkbox approve/reject; swipe not started)
+
+**API gap-check done before building anything** (per instruction): the
+mobile wrapper this screen was going to extend (`listPendingInbox`, hitting
+`/integration-inbox`) turned out to be the wrong backend entirely — that's
+an unrelated CSV-reconciliation inbox for Stripe/PayPal/Shopify matching.
+The real AI Document Inbox lives in `emailImports.ts`
+(`GET /email-imports`, `.../approve`, `.../reject`). Gaps found there,
+flagged before writing any screen:
+- **No grouped/label endpoint** — `GET /email-imports` groups by statement
+  already, but there's no `document_name` field. Ported web's own
+  `deriveBankTitle`/`deriveBankSubtitle` client-side derivation
+  (`lib/emailImportLabel.ts`) instead of inventing a different label.
+- **No real "partially reviewed" status** — only `pending/approved/
+  rejected`. Inferred client-side from each line's `auto_posted` flag
+  (`deriveImportStatus`).
+- **No per-line PATCH.** Every edit (offset account, payee override,
+  "remember") is bundled into one whole-statement `approve` call — so the
+  review screen holds edits in local state only until Approve is tapped;
+  there's no "save this line, come back later."
+- **No `vendor_id` anywhere in this flow** — vendor "detection" is a
+  free-text `payee_name` string, fuzzy-matched client-side against the
+  vendor list (ported web's `bestVendorMatch`). Binding a line to a real
+  vendor record isn't something the API supports today.
+- **Reject is whole-statement only** — dropping one bad line is
+  `include: false` on that line at approve time, not a separate action.
+
+**What shipped, working within those constraints:**
+- Inbox list (`app/inbox/index.tsx`): one card per statement with the
+  derived title/subtitle and a status pill, pull-to-refresh.
+- Statement review (`app/inbox/[id].tsx`): there's no `GET /email-imports/
+  :id` either — reads from the same list query, same pattern already used
+  for customer/vendor detail. A "statement account" picker up top (bank vs.
+  card accounts, filtered the same way as the expense/deposit forms), then
+  one card per line: description, signed amount, `ConfidenceBadge` (direct
+  port of the web component, same colors/thresholds from
+  `@accounting/shared`), an editable payee field and offset-account field
+  (both via `SearchablePicker`, payee's footer offers "+ Add new vendor"
+  calling the real `POST /vendors`), a per-row include checkbox, and a
+  "remember this account for `<payee>`" checkbox. "Approve selected (`n`)"
+  and "Reject" (confirm dialog) sit in a sticky footer.
+- Checkbox approve/reject built and working first, per instruction; swipe
+  gestures (swipe right to approve, swipe left to reject) **not started** —
+  explicitly deprioritized as nice-to-have until the checkbox flow is
+  confirmed working.
+- Verified the real shapes against live pending data on the dev API (not
+  just reading the schema): `GET /email-imports` on the demo business
+  returned real rows matching the mobile types field-for-field. Didn't
+  execute an actual approve/reject against that data since it's real
+  seed/demo content, not a throwaway row — unlike the expense/GL check,
+  this one stops at "the contract matches," not "and it posted correctly."
 
 ### 5. Camera capture → AI Inbox
 - Camera button on the dashboard and in the AI Inbox screen (`expo-camera`

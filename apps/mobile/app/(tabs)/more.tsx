@@ -10,7 +10,6 @@ const STUB_ITEMS = [
   { icon: 'chart-box-outline', label: 'Reports' },
   { icon: 'book-open-variant', label: 'Chart of Accounts' },
   { icon: 'bank-check', label: 'Reconciliation' },
-  { icon: 'inbox-arrow-down-outline', label: 'AI Inbox' },
 ] as const;
 
 export default function MoreScreen() {
@@ -29,6 +28,12 @@ export default function MoreScreen() {
         title="General Ledger"
         onPress={() => router.push('/general-ledger')}
         left={props => <List.Icon {...props} icon="format-list-numbered" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="AI Document Inbox"
+        onPress={() => router.push('/inbox')}
+        left={props => <List.Icon {...props} icon="inbox-arrow-down-outline" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
       <Divider />

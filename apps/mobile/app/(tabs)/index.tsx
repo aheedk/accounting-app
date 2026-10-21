@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { listTransactions, listInvoices, listPendingInbox } from '../../services/api';
+import { listTransactions, listInvoices, listEmailImports } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
@@ -37,9 +37,12 @@ export default function DashboardScreen() {
     enabled: !!activeBusinessId,
     staleTime: 5 * 60_000, // item 7: invoices don't need to be as fresh as a transaction feed
   });
+  // Was pointed at the unrelated CSV-reconciliation inbox endpoint
+  // (/integration-inbox) — fixed to the real AI Document Inbox backend
+  // (email-imports.ts) while building the inbox review screen (item 4).
   const inbox = useQuery({
-    queryKey: ['inbox-pending', activeBusinessId],
-    queryFn: () => listPendingInbox(activeBusinessId!),
+    queryKey: ['email-imports', activeBusinessId],
+    queryFn: () => listEmailImports(activeBusinessId!),
     enabled: !!activeBusinessId,
   });
 
@@ -110,7 +113,7 @@ export default function DashboardScreen() {
               label="AI Inbox"
               value={String(inbox.data?.length ?? 0)}
               sub="pending review"
-              onPress={() => router.push('/(tabs)/more')}
+              onPress={() => router.push('/inbox')}
             />
           </View>
 
