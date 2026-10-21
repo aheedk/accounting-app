@@ -88,23 +88,55 @@ on a device/simulator — the integration tests cover the server contract and
 the interceptor logic was written to match it, but nothing here was run
 through Expo Go or the simulator yet.
 
-### 2. Vendor list and detail
-Same pattern as Customers (already built — should be fast):
-- Searchable list, open balance per vendor.
-- Detail: contact info tab, transaction list tab (tap a row → transaction
-  detail), vendor details tab.
-- Pull-to-refresh on both list and detail.
+### 2. Vendor list and detail — done 2026-10-20
+- Clients tab now has a Customers/Vendors segmented toggle; both lists
+  pull-to-refresh.
+- Vendor detail: open balance, contact info (tappable email/phone/website),
+  account number, 1099 flag, notes, plus a Details/Transactions segmented
+  toggle. Transactions tab uses the unified transactions endpoint's
+  `contact_id` filter (bills, checks, expenses, vendor credits — every AP
+  type, not just one), tapping through to the existing transaction detail
+  screen. Pull-to-refresh on both tabs.
+- Found and fixed a real bug while building this: `GET /customers/:id` and
+  `GET /vendors/:id` don't return `open_balance` (list-only computed
+  field) — the customer detail screen was reading it off that response
+  anyway and silently showing $0.00 regardless of the real balance. Both
+  detail screens now pull the balance from the cached list query instead.
 
-### 3. Create/edit transactions (currently read-only)
-- **New Expense:** payee dropdown (searchable), payment account dropdown,
-  native date picker, line items (category + description + amount, "Add
-  line"), memo, save.
-- **New Deposit:** bank account dropdown, native date picker, "other funds"
-  lines (account + description + amount), memo, save.
-- **Edit existing:** "Edit" in the transaction detail header opens the same
-  form pre-filled, saves through the same endpoints the web app uses.
-- Explicitly out of scope for mobile: check writing, journal entry creation
-  — stay on desktop.
+### 3. Create/edit expense + deposit — done 2026-10-20
+- **New Expense:** searchable payee picker (vendors, customers, or a
+  one-off free-text name), searchable payment-account picker (filtered the
+  same way the web app's `expensePaymentAccounts()` does — bank accounts
+  then credit cards, ported into `lib/bankAccountOptions.ts`), native date
+  picker, payment method, line items (searchable category picker +
+  description + amount, "Add line"/remove line), reference, memo, live
+  total, save.
+- **New Deposit:** searchable bank-account picker (`statementBankAccounts()`,
+  same port), native date picker, "other funds" lines (account +
+  description + amount), memo, live total, save. Deposits that already have
+  undeposited-funds lines (editing one) show those read-only — the API
+  keeps them server-side regardless of what's resent, so the form only
+  submits the other-funds subset it actually controls.
+- **Edit existing:** "Edit" in the transaction detail header (expense/
+  deposit only) opens the same form pre-filled from the real create/update
+  endpoints' full response shape (vendor_id/customer_id/payment_account_id/
+  category_account_id, not just display names — had to extend the mobile
+  `ExpenseDetail`/`DepositDetail` types to carry the actual ids once I hit
+  this while wiring up the edit form).
+- A shared `SearchablePicker` modal (in-memory filter, `FlashList`-backed)
+  and `PickerField`/`DateField` components back every dropdown/date input
+  across both forms, so picking an account stays fast even with hundreds of
+  accounts loaded — no network round trip per keystroke.
+- Explicitly out of scope, per the brief: check writing, journal entry
+  creation — stay on desktop.
+- **Verified end to end** (no UI automation available in this environment —
+  see the session's standing workaround note): created an expense via the
+  exact same endpoint/body shape `ExpenseForm` posts, then confirmed via
+  `GET /reports/general-ledger` that it landed as a balanced JE (debit to
+  the expense category, credit to the payment account) — then voided it to
+  clean up the test row. Confirms the request shape is right and the
+  create → GL path works; the on-device tap-through flow itself still needs
+  your own pass in Expo Go/the simulator.
 
 ### 4. AI Document Inbox
 - **Inbox list:** pending imports grouped by statement/upload. Per card:

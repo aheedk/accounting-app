@@ -132,11 +132,13 @@ export async function listPendingInbox(businessId: string) {
 // field names copied from the route handlers, not guessed.
 
 export type DepositDetail = {
-  id: string; deposit_date: string; deposit_number: string | null; memo: string | null;
+  id: string; bank_account_id: string; deposit_date: string; deposit_number: string | null; memo: string | null;
   total_amount: string; bank_account_name: string; editable: boolean; imported: boolean;
   is_reconciled: boolean; voided_at: string | null;
+  cash_back_account_id: string | null; cash_back_memo: string | null; cash_back_amount: string | null;
   lines: Array<{
-    id: string; line_type: string; received_from: string | null; description: string | null;
+    id: string; line_type: 'other_funds' | 'undeposited_funds'; payment_id: string | null;
+    received_from: string | null; account_id: string | null; description: string | null;
     payment_method: string | null; ref_no: string | null; amount: string;
     account_name: string | null; account_code: string | null;
   }>;
@@ -146,15 +148,72 @@ export async function getDeposit(businessId: string, id: string) {
   return r.data;
 }
 
+// bankDepositCreateSchema/-UpdateSchema shape. On update, 'undeposited_funds'
+// lines already on the deposit are kept server-side regardless of what's
+// sent — only 'other_funds' lines are caller-controlled (see getDeposit's
+// own lines, which the mobile edit screen only re-sends the other_funds
+// subset of).
+export type DepositLineInput = {
+  line_type?: 'other_funds' | 'undeposited_funds'; payment_id?: string | null;
+  received_from?: string | null; account_id?: string | null; description?: string | null;
+  payment_method?: string | null; ref_no?: string | null; amount: string; sort_order?: number;
+};
+export type DepositInput = {
+  bank_account_id: string; deposit_date: string; memo?: string | null;
+  lines: DepositLineInput[];
+  cash_back_account_id?: string | null; cash_back_memo?: string | null; cash_back_amount?: string | null;
+};
+
+export async function createDeposit(businessId: string, body: DepositInput) {
+  const r = await api.post<{ id: string }>(`/businesses/${businessId}/bank-deposits`, body);
+  return r.data;
+}
+
+export async function updateDeposit(businessId: string, id: string, body: DepositInput) {
+  const r = await api.patch<{ id: string }>(`/businesses/${businessId}/bank-deposits/${id}`, body);
+  return r.data;
+}
+
 export type ExpenseDetail = {
   id: string; transaction_date: string; payee_text: string | null; payee_name: string | null;
-  vendor_name: string | null; customer_name: string | null; payment_account_name: string;
+  vendor_id: string | null; customer_id: string | null;
+  vendor_name: string | null; customer_name: string | null;
+  payment_account_id: string; payment_account_name: string;
   payment_method: string; reference: string | null; memo: string | null; total_amount: string;
   status: string; editable: boolean; imported: boolean; is_reconciled: boolean;
-  lines: Array<{ id: string; category_name: string; category_code: string; description: string | null; amount: string }>;
+  lines: Array<{
+    id: string; category_account_id: string; category_name: string; category_code: string;
+    description: string | null; amount: string;
+  }>;
 };
 export async function getExpense(businessId: string, id: string) {
   const r = await api.get<ExpenseDetail>(`/businesses/${businessId}/expense-transactions/${id}`);
+  return r.data;
+}
+
+// Create/update bodies match expenseTransactionCreateSchema/-UpdateSchema in
+// packages/shared/src/schemas/expenseTransaction.ts exactly (same shape for
+// both — update is a full resend, not a partial patch; the API always
+// derives total_amount from the lines, there's no top-level total field).
+export type ExpenseLineInput = {
+  category_account_id: string; description?: string | null; amount: string; sort_order?: number;
+};
+export type ExpenseInput = {
+  transaction_date: string;
+  payee_text?: string | null; vendor_id?: string | null; customer_id?: string | null;
+  payment_account_id: string;
+  payment_method: 'cash' | 'check' | 'credit_card' | 'debit_card' | 'ach' | 'other';
+  reference?: string | null; memo?: string | null;
+  lines: ExpenseLineInput[];
+};
+
+export async function createExpense(businessId: string, body: ExpenseInput) {
+  const r = await api.post<{ id: string }>(`/businesses/${businessId}/expense-transactions`, body);
+  return r.data;
+}
+
+export async function updateExpense(businessId: string, id: string, body: ExpenseInput) {
+  const r = await api.patch<{ id: string }>(`/businesses/${businessId}/expense-transactions/${id}`, body);
   return r.data;
 }
 
@@ -189,11 +248,20 @@ export async function getJournalEntry(businessId: string, id: string) {
 // generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
 // chartOfAccounts.ts's /coa route, not guessed.
 
-export type CoaAccount = { id: string; code: string; name: string; account_type: string };
+export type CoaAccount = {
+  id: string; code: string; name: string; account_type: string; detail_type: string | null;
+};
 
 export async function listChartOfAccounts(businessId: string) {
   const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`);
   return r.data.accounts;
+}
+
+export type BankAccountRow = { id: string; name: string; cash_account_id: string };
+
+export async function listBankAccounts(businessId: string) {
+  const r = await api.get<{ bank_accounts: BankAccountRow[] }>(`/businesses/${businessId}/bank-accounts`);
+  return r.data.bank_accounts;
 }
 
 export type GeneralLedgerLine = {

@@ -14,11 +14,15 @@ import { ErrorState } from '../../components/ErrorState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { spacing, typeScale, type AppTheme } from '../../theme';
 
-// Phase 1 item 5 scopes mobile viewing to these 4 types — read-only for this
-// chunk (editing is a deliberate follow-up, not silently dropped). Any other
+// Phase 1 item 5 scoped mobile viewing to these 4 types. Any other
 // unified-transaction type (bill, payment, invoice, credit_memo, ...) lands
 // on its own list/detail screen later and is a graceful dead-end here.
 const SUPPORTED_TYPES = new Set(['deposit', 'expense', 'check', 'journal']);
+
+// Editing is scoped to expense/deposit only (batch item 3) — check writing
+// and journal entry creation stay desktop-only per the brief, so check/
+// journal detail stays read-only here.
+const EDITABLE_TYPES = new Set(['deposit', 'expense']);
 
 const TYPE_LABELS: Record<string, string> = {
   deposit: 'Deposit', expense: 'Expense', check: 'Check', journal: 'Journal Entry',
@@ -51,6 +55,17 @@ export default function TransactionDetailScreen() {
       <Appbar.Header statusBarHeight={insets.top} style={{ backgroundColor: theme.app.surface }}>
         <Appbar.BackAction onPress={() => router.back()} color={theme.app.foreground} />
         <Appbar.Content title={TYPE_LABELS[type] ?? 'Transaction'} titleStyle={{ color: theme.app.foreground }} />
+        {EDITABLE_TYPES.has(type) && query.data && 'editable' in query.data && query.data.editable ? (
+          <Appbar.Action
+            icon="pencil-outline"
+            color={theme.app.foreground}
+            onPress={() => router.push(
+              type === 'deposit'
+                ? { pathname: '/deposit/[id]/edit', params: { id } }
+                : { pathname: '/expense/[id]/edit', params: { id } },
+            )}
+          />
+        ) : null}
       </Appbar.Header>
 
       {!supported ? (
