@@ -1,25 +1,31 @@
 import { useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Linking, RefreshControl } from 'react-native';
-import { Text, Appbar, Card, SegmentedButtons, useTheme } from 'react-native-paper';
-import { useQuery } from '@tanstack/react-query';
+import { Text, Appbar, Card, SegmentedButtons, TextInput, useTheme } from 'react-native-paper';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { getVendor, listVendors, listTransactions, type TransactionRow } from '../../services/api';
+import {
+  getVendor, listVendors, listTransactions, listVendorNotes, addVendorNote, type TransactionRow,
+} from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
+import { AppButton } from '../../components/ui/AppButton';
+import { pickErr } from '../../services/apiClient';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
-import { spacing, typeScale, type AppTheme } from '../../theme';
+import { spacing, typeScale, fontFamily, type AppTheme } from '../../theme';
 
-type Tab = 'details' | 'transactions';
+// Same 3-tab layout as web's vendor detail (Transaction List, Vendor
+// Details, Notes) — Transactions first to match web's own tab order.
+type Tab = 'transactions' | 'details' | 'notes';
 
 export default function VendorDetailScreen() {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
   const { activeBusinessId } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [tab, setTab] = useState<Tab>('details');
+  const [tab, setTab] = useState<Tab>('transactions');
 
   const vendorQuery = useQuery({
     queryKey: ['vendor', activeBusinessId, id],
@@ -40,6 +46,30 @@ export default function VendorDetailScreen() {
     queryFn: () => listTransactions(activeBusinessId!, { contact_id: id, limit: 200 }),
     enabled: !!activeBusinessId && tab === 'transactions',
   });
+  const notesQuery = useQuery({
+    queryKey: ['vendor-notes', activeBusinessId, id],
+    queryFn: () => listVendorNotes(activeBusinessId!, id),
+    enabled: !!activeBusinessId && tab === 'notes',
+  });
+  const queryClient = useQueryClient();
+  const [newNote, setNewNote] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+
+  async function submitNote() {
+    if (!newNote.trim() || !activeBusinessId) return;
+    setAddingNote(true);
+    setNoteError(null);
+    try {
+      await addVendorNote(activeBusinessId, id, newNote.trim());
+      setNewNote('');
+      await queryClient.invalidateQueries({ queryKey: ['vendor-notes', activeBusinessId, id] });
+    } catch (e) {
+      setNoteError(pickErr(e));
+    } finally {
+      setAddingNote(false);
+    }
+  }
 
   const loading = vendorQuery.isLoading;
   const vendor = vendorQuery.data;
@@ -48,6 +78,7 @@ export default function VendorDetailScreen() {
     void vendorQuery.refetch();
     void vendorsListQuery.refetch();
     if (tab === 'transactions') void transactionsQuery.refetch();
+    if (tab === 'notes') void notesQuery.refetch();
   }
 
   return (
@@ -75,8 +106,9 @@ export default function VendorDetailScreen() {
               value={tab}
               onValueChange={v => setTab(v as Tab)}
               buttons={[
-                { value: 'details', label: 'Details' },
                 { value: 'transactions', label: 'Transactions' },
+                { value: 'details', label: 'Details' },
+                { value: 'notes', label: 'Notes' },
               ]}
             />
           </View>
@@ -110,11 +142,12 @@ export default function VendorDetailScreen() {
                 </Card.Content>
               </Card>
             </ScrollView>
-          ) : transactionsQuery.isLoading ? (
-            <LoadingIndicator />
-          ) : transactionsQuery.error ? (
-            <ErrorState onRetry={() => void transactionsQuery.refetch()} />
-          ) : (
+          ) : tab === 'transactions' ? (
+            transactionsQuery.isLoading ? (
+              <LoadingIndicator />
+            ) : transactionsQuery.error ? (
+              <ErrorState onRetry={() => void transactionsQuery.refetch()} />
+            ) : (
             <ScrollView
               contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
               refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
@@ -145,6 +178,45 @@ export default function VendorDetailScreen() {
                 ))
               )}
             </ScrollView>
+            )
+          ) : (
+            <ScrollView
+              contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+              refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.addNoteRow}>
+                <TextInput
+                  mode="outlined"
+                  placeholder="Add a note"
+                  value={newNote}
+                  onChangeText={setNewNote}
+                  multiline
+                  style={{ flex: 1, backgroundColor: theme.app.surface }}
+                />
+                <AppButton onPress={() => void submitNote()} loading={addingNote} disabled={!newNote.trim()}>Add</AppButton>
+              </View>
+              {noteError ? <Text style={{ color: theme.app.destructive, fontSize: typeScale.caption, marginBottom: spacing.sm }}>{noteError}</Text> : null}
+
+              {notesQuery.isLoading ? (
+                <LoadingIndicator size="sm" />
+              ) : notesQuery.error ? (
+                <ErrorState onRetry={() => void notesQuery.refetch()} />
+              ) : notesQuery.data?.length === 0 ? (
+                <EmptyState icon="note-text-outline" message="No notes yet." compact />
+              ) : (
+                notesQuery.data?.map(note => (
+                  <Card key={note.id} style={{ backgroundColor: theme.app.surface, marginBottom: spacing.sm }}>
+                    <Card.Content>
+                      <Text style={{ color: theme.app.foreground }}>{note.note_text}</Text>
+                      <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption, marginTop: spacing.xs, fontFamily: fontFamily.medium }}>
+                        {note.author_name} · {fmtShortDate(note.created_at)}
+                      </Text>
+                    </Card.Content>
+                  </Card>
+                ))
+              )}
+            </ScrollView>
           )}
         </>
       )}
@@ -164,6 +236,7 @@ function FieldRow({ label, value, theme, last, link }: { label: string; value: s
 const styles = StyleSheet.create({
   content: { padding: spacing.md },
   amountBlock: { alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.md },
+  addNoteRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginBottom: spacing.md },
   fieldRow: { marginBottom: spacing.sm },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: spacing.md },

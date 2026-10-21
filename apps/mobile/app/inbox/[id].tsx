@@ -4,6 +4,7 @@ import { Text, Appbar, Checkbox, TextInput, useTheme } from 'react-native-paper'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import {
   listEmailImports, listChartOfAccounts, listVendors, createVendor,
@@ -281,16 +282,15 @@ function LineCard({
 
       <ConfidenceBadge suggestion={tx.suggestion} />
 
-      <Pressable onPress={onPickPayee} style={styles.inlineField}>
-        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>Payee</Text>
-        <Text style={{ color: theme.app.foreground }}>{state?.payeeName || 'Tap to set'}</Text>
-      </Pressable>
+      <EditableField
+        theme={theme} label="Payee" value={state?.payeeName || null} placeholder="Tap to pick a vendor"
+        onPress={onPickPayee}
+      />
 
-      <Pressable onPress={onPickOffset} style={styles.inlineField}>
-        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>Offset account</Text>
-        <Text style={{ color: offsetError ? theme.app.destructive : theme.app.foreground }}>{offsetAccount?.label ?? 'Tap to set'}</Text>
-        {offsetError ? <Text style={{ color: theme.app.destructive, fontSize: typeScale.caption, marginTop: 2 }}>{offsetError}</Text> : null}
-      </Pressable>
+      <EditableField
+        theme={theme} label="Offset account" value={offsetAccount?.label ?? null} placeholder="Tap to pick an account"
+        onPress={onPickOffset} error={offsetError}
+      />
 
       <Pressable style={styles.rememberRow} onPress={() => onToggleRemember(!state?.remember)}>
         <Checkbox status={state?.remember ? 'checked' : 'unchecked'} onPress={() => onToggleRemember(!state?.remember)} color={theme.app.primary} />
@@ -298,6 +298,34 @@ function LineCard({
           Remember this account for {state?.payeeName || 'this payee'}
         </Text>
       </Pressable>
+    </View>
+  );
+}
+
+// Payee/Offset account previously rendered as plain text once set, with no
+// visual cue they were still tappable — looked identical to a static label.
+// Styled like the rest of the app's PickerField now (bordered box + chevron)
+// so it unambiguously reads as an editable control, same as web's inline
+// dropdowns on this screen.
+function EditableField({
+  theme, label, value, placeholder, onPress, error,
+}: { theme: AppTheme; label: string; value: string | null; placeholder: string; onPress: () => void; error?: string }) {
+  return (
+    <View style={{ marginBottom: spacing.sm }}>
+      <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption, marginBottom: 2 }}>{label}</Text>
+      <Pressable
+        onPress={onPress}
+        style={[
+          styles.editableField,
+          { borderColor: error ? theme.app.destructive : theme.app.border, backgroundColor: theme.app.page },
+        ]}
+      >
+        <Text style={{ color: value ? theme.app.foreground : theme.app.mutedForeground, flex: 1 }} numberOfLines={1}>
+          {value ?? placeholder}
+        </Text>
+        <MaterialCommunityIcons name="chevron-down" size={18} color={theme.app.mutedForeground} />
+      </Pressable>
+      {error ? <Text style={{ color: theme.app.destructive, fontSize: typeScale.caption, marginTop: 2 }}>{error}</Text> : null}
     </View>
   );
 }
@@ -323,7 +351,10 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md },
   lineCard: { borderWidth: 1, borderRadius: 12, padding: spacing.sm, marginBottom: spacing.sm },
   lineTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
-  inlineField: { paddingVertical: spacing.xs, marginLeft: minTouchTarget - 24 },
+  editableField: {
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 6,
+    paddingHorizontal: spacing.sm, minHeight: minTouchTarget - 8,
+  },
   rememberRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs },
   footer: {
     flexDirection: 'row', padding: spacing.md, borderTopWidth: StyleSheet.hairlineWidth,

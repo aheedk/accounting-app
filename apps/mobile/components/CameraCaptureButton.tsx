@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import { IconButton, ActivityIndicator, useTheme } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
@@ -14,11 +15,14 @@ import type { AppTheme } from '../theme';
 // uses (POST /businesses/:businessId/ai/documents) — one endpoint handles
 // both, per the backend research. Kept deliberately simple per the brief:
 // open camera, take photo, upload, show a processing state. No cropping/
-// retake UI, no batch upload — one photo at a time.
+// retake UI, no batch upload — one file at a time. Three sources: camera,
+// photo library, or Files (expo-document-picker — iCloud Drive, a
+// downloaded statement PDF, anything already saved to the device).
 
 function guessMimeType(uri: string, reported?: string): string {
   if (reported) return reported;
   const ext = uri.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
   if (ext === 'png') return 'image/png';
   if (ext === 'webp') return 'image/webp';
   return 'image/jpeg'; // the server's allowlist doesn't include HEIC — camera captures are jpeg on both platforms by default
@@ -29,6 +33,19 @@ export function CameraCaptureButton() {
   const { activeBusinessId } = useAuth();
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+
+  async function uploadAndHandle(file: { uri: string; name: string; type: string }) {
+    if (!activeBusinessId) return;
+    setUploading(true);
+    try {
+      const uploaded = await uploadDocument(activeBusinessId, file);
+      await handleUploadResult(uploaded);
+    } catch (e) {
+      Alert.alert('Couldn\'t process that document', pickErr(e));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function pickAndUpload(source: 'camera' | 'library') {
     const permission = source === 'camera'
@@ -45,20 +62,28 @@ export function CameraCaptureButton() {
     if (result.canceled || !result.assets[0]) return;
 
     const asset = result.assets[0];
-    if (!activeBusinessId) return;
-    setUploading(true);
-    try {
-      const uploaded = await uploadDocument(activeBusinessId, {
-        uri: asset.uri,
-        name: asset.fileName ?? `capture-${Date.now()}.jpg`,
-        type: guessMimeType(asset.uri, asset.mimeType),
-      });
-      await handleUploadResult(uploaded);
-    } catch (e) {
-      Alert.alert('Couldn\'t process that document', pickErr(e));
-    } finally {
-      setUploading(false);
-    }
+    await uploadAndHandle({
+      uri: asset.uri,
+      name: asset.fileName ?? `capture-${Date.now()}.jpg`,
+      type: guessMimeType(asset.uri, asset.mimeType),
+    });
+  }
+
+  // The server's own allowlist (ai.ts's UPLOAD_TYPES) — same 4 types the
+  // camera/library path can produce, now also pickable straight out of
+  // Files (iCloud Drive, a downloaded PDF statement, etc.).
+  async function pickFromFiles() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    await uploadAndHandle({
+      uri: asset.uri,
+      name: asset.name,
+      type: guessMimeType(asset.uri, asset.mimeType ?? undefined),
+    });
   }
 
   async function handleUploadResult(result: DocumentUploadResult) {
@@ -84,6 +109,7 @@ export function CameraCaptureButton() {
     Alert.alert('Add a document', 'Take a photo of a receipt, bill, or statement', [
       { text: 'Take Photo', onPress: () => void pickAndUpload('camera') },
       { text: 'Choose from Library', onPress: () => void pickAndUpload('library') },
+      { text: 'Choose from Files', onPress: () => void pickFromFiles() },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }

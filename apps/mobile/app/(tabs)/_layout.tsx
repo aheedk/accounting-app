@@ -40,11 +40,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* Still a real route (reached from the nav drawer's Accounts
-          Receivable > Customers and Accounts Payable > Vendors), just no
-          longer one of the bottom bar's 4 shortcuts — the drawer is the
-          primary nav now, per the redesign brief. */}
-      <Tabs.Screen name="clients" options={{ href: null }} />
       <Tabs.Screen
         name="more"
         options={{ title: 'More', tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="menu" color={color as string} size={size} /> }}

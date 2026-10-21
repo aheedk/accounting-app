@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Modal, Portal, Text, TextInput, useTheme } from 'react-native-paper';
+import { Modal, Portal, Text, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import { Pressable } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppTextInput } from './ui/AppTextInput';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../theme';
 
 export type PickerOption = { id: string; label: string; sublabel?: string };
@@ -40,15 +42,13 @@ export function SearchablePicker({
     <Portal>
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={[styles.sheet, { backgroundColor: theme.app.surface }]}>
         <Text style={{ fontSize: typeScale.h2, fontWeight: '700', color: theme.app.foreground, marginBottom: spacing.sm }}>{title}</Text>
-        <TextInput
-          mode="outlined"
+        <AppTextInput
           placeholder={placeholder}
           value={query}
           onChangeText={setQuery}
-          dense
           autoFocus
-          style={{ marginBottom: spacing.sm }}
-          left={<TextInput.Icon icon="magnify" />}
+          containerStyle={{ marginBottom: spacing.sm }}
+          left={<MaterialCommunityIcons name="magnify" size={18} color={theme.app.mutedForeground} />}
         />
         <View style={styles.list}>
           <FlashList

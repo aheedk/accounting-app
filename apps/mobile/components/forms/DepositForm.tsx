@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, TextInput, Button, IconButton, useTheme } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, Button, IconButton, useTheme } from 'react-native-paper';
+import { AppTextInput } from '../ui/AppTextInput';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import {
-  listChartOfAccounts, listBankAccounts, createDeposit, updateDeposit,
+  listChartOfAccounts, listBankAccounts, createDeposit, updateDeposit, voidDeposit, deleteDeposit,
   type DepositDetail, type DepositInput, type DepositLineInput,
 } from '../../services/api';
 import { pickErr } from '../../services/apiClient';
@@ -15,7 +15,7 @@ import { PickerField } from '../PickerField';
 import { DateField } from '../DateField';
 import { SearchablePicker } from '../SearchablePicker';
 import { LoadingIndicator } from '../LoadingIndicator';
-import { AppButton } from '../ui/AppButton';
+import { TransactionFormFooter } from './TransactionFormFooter';
 import { fmtMoney } from '../../lib/money';
 import { spacing, typeScale, type AppTheme } from '../../theme';
 
@@ -25,7 +25,6 @@ const newLine = (): Line => ({ key: `l${lineKeySeq++}`, line_type: 'other_funds'
 
 export function DepositForm({ existing, existingId }: { existing?: DepositDetail; existingId?: string }) {
   const theme = useTheme<AppTheme>();
-  const insets = useSafeAreaInsets();
   const { activeBusinessId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -59,6 +58,8 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
   const [fieldErrors, setFieldErrors] = useState<{ bankAccount?: string; lines?: string }>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const effectiveExistingId = copied ? undefined : existingId;
 
   const bankingAccountIds = useMemo(
     () => new Set((bankAccountsQuery.data ?? []).map(b => b.cash_account_id)),
@@ -109,7 +110,7 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
           .filter(l => l.account_id && parseFloat(l.amount) > 0)
           .map((l, i) => ({ line_type: 'other_funds', account_id: l.account_id, description: l.description || null, amount: l.amount, sort_order: i })),
       };
-      if (existingId) await updateDeposit(activeBusinessId!, existingId, body);
+      if (effectiveExistingId) await updateDeposit(activeBusinessId!, effectiveExistingId, body);
       else await createDeposit(activeBusinessId!, body);
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['transaction-detail'] });
@@ -121,10 +122,50 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
     }
   }
 
+  async function handleVoid() {
+    if (!existingId) return;
+    Alert.alert('Void this deposit?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Void', style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await voidDeposit(activeBusinessId!, existingId);
+              await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+              await queryClient.invalidateQueries({ queryKey: ['transaction-detail'] });
+              router.back();
+            } catch (e) { setServerError(pickErr(e)); }
+          })();
+        },
+      },
+    ]);
+  }
+
+  async function handleDelete() {
+    if (!existingId) return;
+    Alert.alert('Delete this deposit?', 'This permanently removes it. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await deleteDeposit(activeBusinessId!, existingId);
+              await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+              router.back();
+            } catch (e) { setServerError(pickErr(e)); }
+          })();
+        },
+      },
+    ]);
+  }
+
   if (loadingLookups) return <LoadingIndicator />;
 
   return (
-    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <DateField label="Date" value={date} onChange={setDate} />
 
       <PickerField
@@ -182,23 +223,18 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
               options={(coaQuery.data ?? []).map(a => ({ id: a.id, label: `${a.code} — ${a.name}` }))}
               onSelect={(id) => updateLine(line.key, { account_id: id })}
             />
-            <TextInput
-              mode="outlined"
+            <AppTextInput
               placeholder="Description (optional)"
               value={line.description ?? ''}
               onChangeText={(v) => updateLine(line.key, { description: v })}
-              dense
-              style={{ marginBottom: spacing.sm, backgroundColor: theme.app.surface }}
+              containerStyle={{ marginBottom: spacing.sm }}
             />
-            <TextInput
-              mode="outlined"
+            <AppTextInput
               placeholder="0.00"
               value={line.amount}
               onChangeText={(v) => updateLine(line.key, { amount: v.replace(/[^0-9.]/g, '') })}
               keyboardType="decimal-pad"
-              dense
-              left={<TextInput.Affix text="$" />}
-              style={{ backgroundColor: theme.app.surface }}
+              left={<Text style={{ color: theme.app.mutedForeground }}>$</Text>}
             />
           </View>
         );
@@ -207,13 +243,13 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
         Add line
       </Button>
 
-      <TextInput
-        mode="outlined"
+      <AppTextInput
         label="Memo"
         value={memo}
         onChangeText={setMemo}
         multiline
-        style={{ marginBottom: spacing.lg, backgroundColor: theme.app.surface }}
+        style={{ minHeight: 64, textAlignVertical: 'top' }}
+        containerStyle={{ marginBottom: spacing.lg }}
       />
 
       <View style={[styles.totalRow, { borderColor: theme.app.border }]}>
@@ -222,11 +258,18 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
       </View>
 
       {serverError ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{serverError}</Text> : null}
-
-      <AppButton onPress={() => void save()} loading={saving} fullWidth>
-        {existingId ? 'Save changes' : 'Save deposit'}
-      </AppButton>
     </ScrollView>
+      <TransactionFormFooter
+        existingId={effectiveExistingId}
+        journalEntryId={existing?.journal_entry_id}
+        saving={saving}
+        saveLabel={effectiveExistingId ? 'Save changes' : 'Save deposit'}
+        onSave={() => void save()}
+        onCopy={existingId ? () => setCopied(true) : undefined}
+        onVoid={existingId ? () => void handleVoid() : undefined}
+        onDelete={existingId ? () => void handleDelete() : undefined}
+      />
+    </View>
   );
 }
 

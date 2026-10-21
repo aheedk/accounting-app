@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
-import { Text, Menu, Divider } from 'react-native-paper';
+import { Text, Divider } from 'react-native-paper';
+import { AppMenu, AppMenuItem } from './ui/AppMenu';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useNavDrawer } from '../hooks/useNavDrawer';
+import { useCanOpen } from '../lib/roleAccess';
 import { lightColors, fontFamily, typeScale, spacing, minTouchTarget } from '../theme';
 
 // Direct structural port of apps/web/src/components/layout/Sidebar.tsx's
@@ -26,7 +28,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'ar', label: 'Accounts Receivable', icon: 'account-group-outline',
     children: [
-      { label: 'Customers', path: '/(tabs)/clients', params: { tab: 'customers' } },
+      { label: 'Customers', path: '/clients', params: { tab: 'customers' } },
       { label: 'Invoices', path: '/invoices' },
       { label: 'Payments' },
       { label: 'Credit Memos' },
@@ -40,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Overview' },
       { label: 'Expense Transactions' },
       { label: 'Checks' },
-      { label: 'Vendors', path: '/(tabs)/clients', params: { tab: 'vendors' } },
+      { label: 'Vendors', path: '/clients', params: { tab: 'vendors' } },
       { label: 'Bills' },
       { label: 'Pay Bills' },
       { label: 'Bill Payments' },
@@ -63,18 +65,20 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Client Overview' }, { label: 'Books Review' }, { label: 'Approvals' },
       { label: 'Bank Accounts' }, { label: 'Bank Transactions' }, { label: 'Integration Transactions' },
-      { label: 'Receipts' }, { label: 'Reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts' },
+      { label: 'Receipts' }, { label: 'Reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
       { label: 'Recurring Transactions' }, { label: 'Fixed Assets' }, { label: 'Journal' },
     ],
   },
   {
     id: 'reports', label: 'Reports', icon: 'chart-bar',
     children: [
-      { label: 'Standard Reports' }, { label: 'Profit & Loss' }, { label: 'Balance Sheet' },
+      { label: 'Standard Reports' },
+      { label: 'Profit & Loss', path: '/pnl' },
+      { label: 'Balance Sheet', path: '/balance-sheet' },
       { label: 'General Ledger', path: '/general-ledger' },
-      { label: 'Cash Flows' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
+      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
       { label: 'Management Reports' }, { label: 'Performance Center' }, { label: 'Financial Planning' },
-      { label: 'Spreadsheet Sync' }, { label: 'Trial Balance' },
+      { label: 'Spreadsheet Sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },
   {
@@ -87,7 +91,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'setup', label: 'Setup', icon: 'cog-outline',
     children: [
-      { label: 'Entity' }, { label: 'Company Settings' }, { label: 'Chart of Accounts' },
+      { label: 'Entity' }, { label: 'Company Settings' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
       { label: 'Cost Centers' }, { label: 'Users' }, { label: 'Activity Log' },
       { label: 'Tax Codes' }, { label: 'Fiscal Periods' },
     ],
@@ -100,6 +104,7 @@ export function NavDrawer() {
   const { isOpen, close } = useNavDrawer();
   const insets = useSafeAreaInsets();
   const { businesses, activeBusinessId, setActiveBusinessId } = useAuth();
+  const canOpen = useCanOpen();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const translateX = useSharedValue(-DRAWER_WIDTH);
@@ -135,7 +140,7 @@ export function NavDrawer() {
           <Text style={{ color: '#fff', fontFamily: fontFamily.display, fontSize: 17 }}>Accounting</Text>
         </View>
 
-        <Menu
+        <AppMenu
           visible={switcherOpen}
           onDismiss={() => setSwitcherOpen(false)}
           anchor={
@@ -147,19 +152,26 @@ export function NavDrawer() {
           }
         >
           {businesses.map(b => (
-            <Menu.Item key={b.id} title={b.name} onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }} trailingIcon={b.id === activeBusinessId ? 'check' : undefined} />
+            <AppMenuItem key={b.id} title={b.name} onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }} trailingIcon={b.id === activeBusinessId ? 'check' : undefined} />
           ))}
-        </Menu>
+        </AppMenu>
 
-        <Pressable style={styles.createButton} onPress={() => { close(); router.push('/(tabs)/create'); }}>
-          <MaterialCommunityIcons name="plus" size={18} color={lightColors.sidebar} />
-          <Text style={styles.createButtonText}>Create</Text>
-        </Pressable>
+        {canOpen('/expense/new') && (
+          <Pressable style={styles.createButton} onPress={() => { close(); router.push('/(tabs)/create'); }}>
+            <MaterialCommunityIcons name="plus" size={18} color={lightColors.sidebar} />
+            <Text style={styles.createButtonText}>Create</Text>
+          </Pressable>
+        )}
 
         <Divider style={styles.divider} />
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.lg }}>
           {NAV_GROUPS.map(group => {
+            // A role that can't open this path doesn't see it at all — same as
+            // web's Sidebar.tsx, which drops role-denied items rather than
+            // showing them disabled (that treatment is reserved for features
+            // this app hasn't built yet, a different kind of gap).
+            if (group.path && !canOpen(group.path)) return null;
             if (!group.children) {
               const disabled = !group.path;
               return (
@@ -175,6 +187,8 @@ export function NavDrawer() {
                 </Pressable>
               );
             }
+            const visibleChildren = group.children.filter(child => !child.path || canOpen(child.path));
+            if (visibleChildren.length === 0) return null;
             const isExpanded = expanded.has(group.id);
             return (
               <View key={group.id}>
@@ -190,7 +204,7 @@ export function NavDrawer() {
                   <Text style={styles.rowText}>{group.label}</Text>
                   <MaterialCommunityIcons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={lightColors.sidebarMuted} />
                 </Pressable>
-                {isExpanded && group.children.map(child => {
+                {isExpanded && visibleChildren.map(child => {
                   const disabled = !child.path;
                   return (
                     <Pressable

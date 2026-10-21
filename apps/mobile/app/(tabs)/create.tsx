@@ -1,7 +1,8 @@
 import { View } from 'react-native';
-import { List, Divider, useTheme } from 'react-native-paper';
+import { List, Divider, Text, useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
 import { AppHeader } from '../../components/AppHeader';
+import { useCanOpen } from '../../lib/roleAccess';
 import type { AppTheme } from '../../theme';
 import { spacing } from '../../theme';
 
@@ -13,6 +14,25 @@ const STUB_ITEMS = [
 
 export default function CreateScreen() {
   const theme = useTheme<AppTheme>();
+  const canOpen = useCanOpen();
+  // A view-only login and a client login can't post a new expense/deposit —
+  // same "no /new forms" rule as every other role-gated form in this app
+  // (see lib/roleAccess.ts), not a desktop-only feature gap.
+  const canCreate = canOpen('/expense/new');
+
+  if (!canCreate) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader title="Create" />
+        <View style={{ padding: spacing.lg, alignItems: 'center' }}>
+          <Text style={{ color: theme.app.mutedForeground, textAlign: 'center' }}>
+            Your role doesn't have permission to create new transactions.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <AppHeader title="Create" />

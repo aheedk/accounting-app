@@ -1,5 +1,5 @@
 import { api } from './apiClient';
-import type { ConfidenceBand, CodingLayerId } from '@accounting/shared';
+import type { ConfidenceBand, CodingLayerId, AccountGroup } from '@accounting/shared';
 
 // Thin, typed wrappers over the same REST endpoints the web app calls —
 // no parallel backend, no mobile-specific routes. Response shapes mirror
@@ -20,16 +20,31 @@ export type TransactionRow = {
   path: string;
 };
 
+export type TransactionSortKey = 'date' | 'type' | 'ref_no' | 'due_date' | 'balance' | 'total_amount' | 'updated_at';
+
 export async function listTransactions(
-  businessId: string, params: { limit?: number; type?: string; contact_id?: string } = {},
+  businessId: string,
+  params: {
+    limit?: number; type?: string; contact_id?: string;
+    date_start?: string; date_end?: string; ref_no?: string;
+    amount_op?: 'eq' | 'between' | 'lt' | 'lte' | 'gt' | 'gte'; amount_value?: string; amount_value2?: string;
+    sort_key?: TransactionSortKey; sort_dir?: 'asc' | 'desc';
+  } = {},
 ) {
   const r = await api.get<{ transactions: TransactionRow[]; total: number }>(
     `/businesses/${businessId}/transactions`,
     {
       params: {
-        page_size: params.limit ?? 50, sort_key: 'date', sort_dir: 'desc',
+        page_size: params.limit ?? 50,
+        sort_key: params.sort_key ?? 'date', sort_dir: params.sort_dir ?? 'desc',
         ...(params.type ? { type: params.type } : {}),
         ...(params.contact_id ? { contact_id: params.contact_id } : {}),
+        ...(params.date_start ? { date_start: params.date_start } : {}),
+        ...(params.date_end ? { date_end: params.date_end } : {}),
+        ...(params.ref_no ? { ref_no: params.ref_no } : {}),
+        ...(params.amount_op ? { amount_op: params.amount_op } : {}),
+        ...(params.amount_value ? { amount_value: params.amount_value } : {}),
+        ...(params.amount_value2 ? { amount_value2: params.amount_value2 } : {}),
       },
     },
   );
@@ -82,9 +97,18 @@ export type CustomerRow = {
   phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
 };
 
+export type Address = {
+  line1?: string | null; line2?: string | null; city?: string | null;
+  state?: string | null; postal_code?: string | null; country?: string | null;
+} | null;
+
 export type CustomerDetail = {
   id: string; name: string; company_name: string | null; email: string | null;
   phone: string | null; mobile: string | null; is_active: boolean;
+  website: string | null; default_terms_days: number;
+  opening_balance: string | null; opening_balance_as_of: string | null;
+  billing_address: Address; shipping_address: Address; notes: string | null;
+  created_at: string; updated_at: string;
 };
 
 export async function listCustomers(businessId: string) {
@@ -117,6 +141,18 @@ export async function listVendors(businessId: string) {
 
 export async function getVendor(businessId: string, id: string) {
   const r = await api.get<VendorDetail>(`/businesses/${businessId}/vendors/${id}`);
+  return r.data;
+}
+
+export type VendorNote = { id: string; note_text: string; created_at: string; user_id: string; author_name: string };
+
+export async function listVendorNotes(businessId: string, vendorId: string) {
+  const r = await api.get<{ notes: VendorNote[] }>(`/businesses/${businessId}/vendors/${vendorId}/notes`);
+  return r.data.notes;
+}
+
+export async function addVendorNote(businessId: string, vendorId: string, noteText: string) {
+  const r = await api.post<VendorNote>(`/businesses/${businessId}/vendors/${vendorId}/notes`, { note_text: noteText });
   return r.data;
 }
 
@@ -203,7 +239,7 @@ export async function createVendor(businessId: string, name: string) {
 export type DepositDetail = {
   id: string; bank_account_id: string; deposit_date: string; deposit_number: string | null; memo: string | null;
   total_amount: string; bank_account_name: string; editable: boolean; imported: boolean;
-  is_reconciled: boolean; voided_at: string | null;
+  is_reconciled: boolean; voided_at: string | null; journal_entry_id: string | null;
   cash_back_account_id: string | null; cash_back_memo: string | null; cash_back_amount: string | null;
   lines: Array<{
     id: string; line_type: 'other_funds' | 'undeposited_funds'; payment_id: string | null;
@@ -243,6 +279,15 @@ export async function updateDeposit(businessId: string, id: string, body: Deposi
   return r.data;
 }
 
+export async function voidDeposit(businessId: string, id: string) {
+  const r = await api.post(`/businesses/${businessId}/bank-deposits/${id}/void`);
+  return r.data;
+}
+
+export async function deleteDeposit(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/bank-deposits/${id}`);
+}
+
 export type ExpenseDetail = {
   id: string; transaction_date: string; payee_text: string | null; payee_name: string | null;
   vendor_id: string | null; customer_id: string | null;
@@ -250,6 +295,7 @@ export type ExpenseDetail = {
   payment_account_id: string; payment_account_name: string;
   payment_method: string; reference: string | null; memo: string | null; total_amount: string;
   status: string; editable: boolean; imported: boolean; is_reconciled: boolean;
+  journal_entry_id: string | null;
   lines: Array<{
     id: string; category_account_id: string; category_name: string; category_code: string;
     description: string | null; amount: string;
@@ -286,6 +332,15 @@ export async function updateExpense(businessId: string, id: string, body: Expens
   return r.data;
 }
 
+export async function voidExpense(businessId: string, id: string) {
+  const r = await api.post(`/businesses/${businessId}/expense-transactions/${id}/void`);
+  return r.data;
+}
+
+export async function deleteExpense(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/expense-transactions/${id}`);
+}
+
 export type CheckDetail = {
   id: string; check_number: string | null; payee_text: string | null; payee_name: string | null;
   vendor_name: string | null; customer_name: string | null; bank_account_name: string;
@@ -317,13 +372,44 @@ export async function getJournalEntry(businessId: string, id: string) {
 // generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
 // chartOfAccounts.ts's /coa route, not guessed.
 
+// Full row shape from ChartOfAccountsTable (apps/api/src/db/types.ts),
+// widened from the original picker-only {id,code,name,account_type,
+// detail_type} now that a full Chart of Accounts list/detail screen needs
+// is_active/is_locked/description/parent_id too — additive, so every
+// existing picker call site (ExpenseForm/DepositForm/general-ledger.tsx,
+// which only read code/name) keeps working unchanged.
 export type CoaAccount = {
-  id: string; code: string; name: string; account_type: string; detail_type: string | null;
+  id: string; code: string; name: string;
+  account_type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  parent_id: string | null; detail_type: string | null; description: string | null;
+  is_system: boolean; is_active: boolean; is_locked: boolean; system_key: string | null;
+  created_at: string; updated_at: string;
 };
 
-export async function listChartOfAccounts(businessId: string) {
-  const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`);
+export async function listChartOfAccounts(businessId: string, params: { include_inactive?: boolean } = {}) {
+  const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`, {
+    params: params.include_inactive ? { include_inactive: 'true' } : undefined,
+  });
   return r.data.accounts;
+}
+
+export type CoaAccountDetail = CoaAccount & { balance: string };
+
+export async function getAccount(businessId: string, accountId: string) {
+  const r = await api.get<CoaAccountDetail>(`/businesses/${businessId}/coa/${accountId}`);
+  return r.data;
+}
+
+export type AccountRegisterRow = {
+  journal_entry_id: string; line_id: string; entry_date: string; reference: string | null;
+  source_type: string; memo: string | null; debit: string; credit: string; balance: string;
+  is_voided: boolean; counter_account: string | null;
+};
+export type AccountRegister = { account: CoaAccount; rows: AccountRegisterRow[]; ending_balance: string };
+
+export async function getAccountRegister(businessId: string, accountId: string) {
+  const r = await api.get<AccountRegister>(`/businesses/${businessId}/coa/${accountId}/register`);
+  return r.data;
 }
 
 export type BankAccountRow = { id: string; name: string; cash_account_id: string };
@@ -381,5 +467,88 @@ export async function uploadDocument(
   const r = await api.post<DocumentUploadResult>(`/businesses/${businessId}/ai/documents`, form, {
     timeout: 45_000,
   });
+  return r.data;
+}
+
+// --- Profit & Loss and Balance Sheet — shapes copied from
+// profitLossService.ts's PnlReport and balanceSheetService.ts's
+// BalanceSheetReport (confirmed by reading both service files directly;
+// neither has a shared zod/TS type in packages/shared — even the web pages
+// each redeclare their own local copy of these shapes, so this is the same
+// pattern, not a shortcut).
+
+export type PnlLine = { account_id: string; account_code: string; account_name: string; amount: string };
+export type PnlReport = {
+  period_start: string; period_end: string;
+  revenue_lines: PnlLine[]; revenue_total: string;
+  expense_lines: PnlLine[]; expense_total: string;
+  gross_profit: string; operating_expenses_total: string; operating_income: string;
+  other_expenses_total: string; net_income: string;
+};
+
+export async function getPnl(businessId: string, params: { period_start: string; period_end: string }) {
+  const r = await api.get<PnlReport>(`/businesses/${businessId}/reports/pnl`, { params });
+  return r.data;
+}
+
+export type BsLine = { account_id: string; account_code: string; account_name: string; amount: string; group: AccountGroup };
+export type BalanceSheetReport = {
+  as_of: string;
+  asset_lines: BsLine[]; assets_total: string;
+  liability_lines: BsLine[]; liabilities_total: string;
+  equity_lines: BsLine[]; equity_total: string;
+  net_income_ytd: string; fiscal_year_start: string;
+  retained_earnings_prior_years: string;
+  liabilities_equity_total: string; in_balance: boolean;
+};
+
+export async function getBalanceSheet(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<BalanceSheetReport>(`/businesses/${businessId}/reports/balance-sheet`, { params });
+  return r.data;
+}
+
+// --- Trial Balance — shape copied from trialBalanceService.ts / the
+// trialBalance route directly (packages/shared's trialBalanceResponseSchema
+// is stale/incomplete, confirmed by reading the route+service code; same
+// "no shared report type" pattern as Pnl/BalanceSheet above).
+
+export type TbRow = {
+  account_id: string; code: string; name: string;
+  account_type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  total_debit: string; total_credit: string; net: string;
+};
+export type TrialBalanceReport = {
+  as_of: string;
+  rows: TbRow[];
+  totals: { total_debit: string; total_credit: string };
+  fiscal_year_start: string;
+  retained_earnings_prior_years: string;
+};
+
+export async function getTrialBalance(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<TrialBalanceReport>(`/businesses/${businessId}/reports/trial-balance`, { params });
+  return r.data;
+}
+
+// --- Statement of Cash Flows — shape copied from
+// statementOfCashFlowsService.ts directly (packages/shared has no zod
+// schema for this response at all — its cashFlowQuerySchema belongs to the
+// separate, unrelated /reports/cash-flow "Cash Activity by Account"
+// register report, not this one; don't confuse the two routes).
+
+export type CfLine = { account_id: string; account_code: string; account_name: string; amount: string };
+export type StatementOfCashFlowsReport = {
+  period_start: string; period_end: string;
+  net_income: string;
+  operating_adjustments: CfLine[]; operating_total: string;
+  investing: CfLine[]; investing_total: string;
+  financing: CfLine[]; financing_total: string;
+  net_change_in_cash: string;
+  cash_beginning: string;
+  cash_ending: string;
+};
+
+export async function getStatementOfCashFlows(businessId: string, params: { period_start: string; period_end: string }) {
+  const r = await api.get<StatementOfCashFlowsReport>(`/businesses/${businessId}/reports/statement-of-cash-flows`, { params });
   return r.data;
 }

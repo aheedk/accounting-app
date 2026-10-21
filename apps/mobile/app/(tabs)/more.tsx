@@ -7,8 +7,6 @@ import type { AppTheme } from '../../theme';
 import { spacing, fontFamily } from '../../theme';
 
 const STUB_ITEMS = [
-  { icon: 'chart-box-outline', label: 'Reports' },
-  { icon: 'book-open-variant', label: 'Chart of Accounts' },
   { icon: 'bank-check', label: 'Reconciliation' },
 ] as const;
 
@@ -29,6 +27,30 @@ export default function MoreScreen() {
       <Divider />
 
       <List.Item
+        title="Profit & Loss"
+        onPress={() => router.push('/pnl')}
+        left={props => <List.Icon {...props} icon="chart-line" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Balance Sheet"
+        onPress={() => router.push('/balance-sheet')}
+        left={props => <List.Icon {...props} icon="scale-balance" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Trial Balance"
+        onPress={() => router.push('/trial-balance')}
+        left={props => <List.Icon {...props} icon="table-check" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Statement of Cash Flows"
+        onPress={() => router.push('/cash-flow')}
+        left={props => <List.Icon {...props} icon="cash-sync" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
         title="General Ledger"
         onPress={() => router.push('/general-ledger')}
         left={props => <List.Icon {...props} icon="format-list-numbered" color={theme.app.foreground} />}
@@ -38,6 +60,12 @@ export default function MoreScreen() {
         title="AI Document Inbox"
         onPress={() => router.push('/inbox')}
         left={props => <List.Icon {...props} icon="inbox-arrow-down-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Chart of Accounts"
+        onPress={() => router.push('/chart-of-accounts')}
+        left={props => <List.Icon {...props} icon="book-open-variant" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
       <Divider />
