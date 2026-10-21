@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { listInvoices, listCustomers, type InvoiceRow } from '../services/api';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ErrorState } from '../components/ErrorState';
+import { EmptyState } from '../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../lib/money';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../theme';
 
@@ -91,11 +92,7 @@ export default function InvoicesScreen() {
           keyExtractor={i => i.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.app.border }} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No invoices match.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState icon="file-document-outline" message="No invoices match." />}
           renderItem={({ item }: { item: InvoiceRow }) => (
             <InvoiceRowItem row={item} customerName={customerNames.get(item.customer_id)} theme={theme} />
           )}
@@ -146,5 +143,4 @@ function StatusPill({ status, theme }: { status: string; theme: AppTheme }) {
 const styles = StyleSheet.create({
   filterBar: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  empty: { alignItems: 'center', paddingTop: spacing.xxl },
 });

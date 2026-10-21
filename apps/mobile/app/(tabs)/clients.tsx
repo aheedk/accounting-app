@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { listCustomers, listVendors, type CustomerRow, type VendorRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { fmtMoney } from '../../lib/money';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
@@ -114,11 +115,7 @@ export default function ClientsScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
           refreshControl={<RefreshControl refreshing={query.isFetching && !query.isLoading} onRefresh={() => void query.refetch()} tintColor={theme.app.primary} />}
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.app.border }} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No {tab} match.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState icon="account-search-outline" message={`No ${tab} match.`} />}
           renderItem={({ item }: { item: CustomerRow | VendorRow }) => (
             <Pressable
               style={({ pressed }) => [styles.row, { minHeight: minTouchTarget + 16, opacity: pressed ? 0.6 : 1 }]}
@@ -147,5 +144,4 @@ const styles = StyleSheet.create({
   header: { padding: spacing.md, paddingBottom: 0 },
   listHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  empty: { alignItems: 'center', paddingTop: spacing.xxl },
 });

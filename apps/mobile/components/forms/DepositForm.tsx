@@ -55,7 +55,8 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
 
   const [bankAccountPickerOpen, setBankAccountPickerOpen] = useState(false);
   const [accountPickerFor, setAccountPickerFor] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ bankAccount?: string; lines?: string }>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const bankingAccountIds = useMemo(
@@ -83,18 +84,20 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
     setLines(prev => (prev.length > 1 ? prev.filter(l => l.key !== key) : prev));
   }
 
-  function validate(): string | null {
-    if (!bankAccountId) return 'Pick a bank account.';
+  function validate(): typeof fieldErrors {
     const validLines = lines.filter(l => l.account_id && parseFloat(l.amount) > 0);
-    if (validLines.length === 0 && undepositedLines.length === 0) return 'Add at least one line with an account and an amount.';
-    if (total <= 0) return 'The deposit total must be greater than zero.';
-    return null;
+    const errors: typeof fieldErrors = {};
+    if (!bankAccountId) errors.bankAccount = 'Pick a bank account.';
+    if (validLines.length === 0 && undepositedLines.length === 0) errors.lines = 'Add at least one line with an account and an amount.';
+    else if (total <= 0) errors.lines = 'The deposit total must be greater than zero.';
+    return errors;
   }
 
   async function save() {
-    const validationError = validate();
-    if (validationError) { setError(validationError); return; }
-    setError(null);
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setServerError(null);
     setSaving(true);
     try {
       const body: DepositInput = {
@@ -111,7 +114,7 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
       await queryClient.invalidateQueries({ queryKey: ['transaction-detail'] });
       router.back();
     } catch (e) {
-      setError(pickErr(e));
+      setServerError(pickErr(e));
     } finally {
       setSaving(false);
     }
@@ -127,6 +130,7 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
         label="Bank account"
         value={selectedBankAccount ? selectedBankAccount.name : null}
         onPress={() => setBankAccountPickerOpen(true)}
+        error={fieldErrors.bankAccount}
       />
       <SearchablePicker
         visible={bankAccountPickerOpen}
@@ -153,6 +157,9 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
       )}
 
       <Text style={[styles.sectionTitle, { color: theme.app.foreground }]}>Other funds</Text>
+      {fieldErrors.lines ? (
+        <Text style={{ color: theme.app.destructive, fontSize: typeScale.caption, marginBottom: spacing.sm }}>{fieldErrors.lines}</Text>
+      ) : null}
       {lines.map(line => {
         const account = coaQuery.data?.find(a => a.id === line.account_id);
         return (
@@ -213,7 +220,7 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
         <Text style={{ color: theme.app.foreground, fontWeight: '700', fontSize: typeScale.h2 }}>${total.toFixed(2)}</Text>
       </View>
 
-      {error ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{error}</Text> : null}
+      {serverError ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{serverError}</Text> : null}
 
       <Button
         mode="contained"

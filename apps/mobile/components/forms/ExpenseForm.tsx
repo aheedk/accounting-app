@@ -78,7 +78,8 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
   const [paymentAccountPickerOpen, setPaymentAccountPickerOpen] = useState(false);
   const [categoryPickerFor, setCategoryPickerFor] = useState<string | null>(null);
   const [methodMenuOpen, setMethodMenuOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ payee?: string; paymentAccount?: string; lines?: string }>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const bankingAccountIds = useMemo(
@@ -111,19 +112,21 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
     setLines(prev => (prev.length > 1 ? prev.filter(l => l.key !== key) : prev));
   }
 
-  function validate(): string | null {
-    if (!payeeLabel) return 'Pick a payee.';
-    if (!paymentAccountId) return 'Pick a payment account.';
+  function validate(): typeof fieldErrors {
     const validLines = lines.filter(l => l.category_account_id && parseFloat(l.amount) > 0);
-    if (validLines.length === 0) return 'Add at least one line with a category and an amount.';
-    if (total <= 0) return 'The expense total must be greater than zero.';
-    return null;
+    const errors: typeof fieldErrors = {};
+    if (!payeeLabel) errors.payee = 'Pick a payee.';
+    if (!paymentAccountId) errors.paymentAccount = 'Pick a payment account.';
+    if (validLines.length === 0) errors.lines = 'Add at least one line with a category and an amount.';
+    else if (total <= 0) errors.lines = 'The expense total must be greater than zero.';
+    return errors;
   }
 
   async function save() {
-    const validationError = validate();
-    if (validationError) { setError(validationError); return; }
-    setError(null);
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setServerError(null);
     setSaving(true);
     try {
       const body: ExpenseInput = {
@@ -143,7 +146,7 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
       await queryClient.invalidateQueries({ queryKey: ['transaction-detail'] });
       router.back();
     } catch (e) {
-      setError(pickErr(e));
+      setServerError(pickErr(e));
     } finally {
       setSaving(false);
     }
@@ -155,7 +158,7 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
     <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
       <DateField label="Date" value={date} onChange={setDate} />
 
-      <PickerField label="Payee" value={payeeLabel} onPress={() => setPayeePickerOpen(true)} />
+      <PickerField label="Payee" value={payeeLabel} onPress={() => setPayeePickerOpen(true)} error={fieldErrors.payee} />
       <SearchablePicker
         visible={payeePickerOpen}
         onDismiss={() => setPayeePickerOpen(false)}
@@ -173,6 +176,7 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
         label="Payment account"
         value={paymentAccountName ? `${paymentAccountName.code} — ${paymentAccountName.name}` : null}
         onPress={() => setPaymentAccountPickerOpen(true)}
+        error={fieldErrors.paymentAccount}
       />
       <SearchablePicker
         visible={paymentAccountPickerOpen}
@@ -205,6 +209,9 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
       </View>
 
       <Text style={[styles.sectionTitle, { color: theme.app.foreground }]}>Lines</Text>
+      {fieldErrors.lines ? (
+        <Text style={{ color: theme.app.destructive, fontSize: typeScale.caption, marginBottom: spacing.sm }}>{fieldErrors.lines}</Text>
+      ) : null}
       {lines.map(line => {
         const category = categoryOptions.find(a => a.id === line.category_account_id);
         return (
@@ -272,7 +279,7 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
         <Text style={{ color: theme.app.foreground, fontWeight: '700', fontSize: typeScale.h2 }}>${total.toFixed(2)}</Text>
       </View>
 
-      {error ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{error}</Text> : null}
+      {serverError ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{serverError}</Text> : null}
 
       <Button
         mode="contained"

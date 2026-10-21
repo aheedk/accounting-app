@@ -61,7 +61,9 @@ export default function InboxReviewScreen() {
   const [lineState, setLineState] = useState<Record<number, LineState> | null>(null);
   const [offsetPickerFor, setOffsetPickerFor] = useState<number | null>(null);
   const [payeePickerFor, setPayeePickerFor] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [statementAccountError, setStatementAccountError] = useState<string | undefined>(undefined);
+  const [missingOffsetIndexes, setMissingOffsetIndexes] = useState<Set<number>>(new Set());
+  const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Seed local edit state once, the first time the import and lookups are
@@ -109,16 +111,19 @@ export default function InboxReviewScreen() {
       await queryClient.invalidateQueries({ queryKey: ['vendors', activeBusinessId] });
       updateLine(index, { payeeName: name });
     } catch (e) {
-      setError(pickErr(e));
+      setServerError(pickErr(e));
     }
   }
 
   async function approve() {
     if (!imp || !lineState) return;
-    if (!statementAccountId) { setError('Pick the statement\'s own account first.'); return; }
-    const missingOffset = Object.entries(lineState).find(([, s]) => s.include && !s.offsetAccountId);
-    if (missingOffset) { setError('Every included line needs an offset account.'); return; }
-    setError(null);
+    const missingOffset = new Set(
+      Object.entries(lineState).filter(([, s]) => s.include && !s.offsetAccountId).map(([index]) => Number(index)),
+    );
+    setStatementAccountError(statementAccountId ? undefined : 'Pick the statement\'s own account first.');
+    setMissingOffsetIndexes(missingOffset);
+    if (!statementAccountId || missingOffset.size > 0) return;
+    setServerError(null);
     setSaving(true);
     try {
       await approveEmailImport(activeBusinessId!, imp.id, {
@@ -137,7 +142,7 @@ export default function InboxReviewScreen() {
       await queryClient.invalidateQueries({ queryKey: ['email-imports', activeBusinessId] });
       router.back();
     } catch (e) {
-      setError(pickErr(e));
+      setServerError(pickErr(e));
     } finally {
       setSaving(false);
     }
@@ -157,7 +162,7 @@ export default function InboxReviewScreen() {
               await queryClient.invalidateQueries({ queryKey: ['email-imports', activeBusinessId] });
               router.back();
             } catch (e) {
-              setError(pickErr(e));
+              setServerError(pickErr(e));
             } finally {
               setSaving(false);
             }
@@ -190,6 +195,7 @@ export default function InboxReviewScreen() {
             label={imp.statement_kind === 'credit_card' ? 'Card account' : 'Bank account'}
             value={coaQuery.data?.find(a => a.id === statementAccountId) ? `${coaQuery.data!.find(a => a.id === statementAccountId)!.code} — ${coaQuery.data!.find(a => a.id === statementAccountId)!.name}` : null}
             onPress={() => setStatementAccountPickerOpen(true)}
+            error={statementAccountError}
           />
           <SearchablePicker
             visible={statementAccountPickerOpen}
@@ -211,6 +217,7 @@ export default function InboxReviewScreen() {
               onToggleRemember={(v) => updateLine(index, { remember: v })}
               onPickOffset={() => setOffsetPickerFor(index)}
               onPickPayee={() => setPayeePickerFor(index)}
+              offsetError={missingOffsetIndexes.has(index) ? 'Pick an offset account.' : undefined}
             />
           ))}
 
@@ -230,7 +237,7 @@ export default function InboxReviewScreen() {
             footer={<AddVendorFooter theme={theme} onAdd={(name) => { if (payeePickerFor !== null) void handleAddVendor(payeePickerFor, name); setPayeePickerFor(null); }} />}
           />
 
-          {error ? <Text style={{ color: theme.app.destructive, marginTop: spacing.sm }}>{error}</Text> : null}
+          {serverError ? <Text style={{ color: theme.app.destructive, marginTop: spacing.sm }}>{serverError}</Text> : null}
         </ScrollView>
       )}
 
@@ -249,12 +256,12 @@ export default function InboxReviewScreen() {
 }
 
 function LineCard({
-  tx, state, theme, coaOptions, vendorOptions, onToggleInclude, onToggleRemember, onPickOffset, onPickPayee,
+  tx, state, theme, coaOptions, vendorOptions, onToggleInclude, onToggleRemember, onPickOffset, onPickPayee, offsetError,
 }: {
   tx: StagedTransaction; state: LineState | undefined; theme: AppTheme;
   coaOptions: PickerOption[]; vendorOptions: PickerOption[];
   onToggleInclude: (v: boolean) => void; onToggleRemember: (v: boolean) => void;
-  onPickOffset: () => void; onPickPayee: () => void;
+  onPickOffset: () => void; onPickPayee: () => void; offsetError?: string;
 }) {
   const inflow = isInflowLine(tx);
   const offsetAccount = coaOptions.find(a => a.id === state?.offsetAccountId);
@@ -280,7 +287,8 @@ function LineCard({
 
       <Pressable onPress={onPickOffset} style={styles.inlineField}>
         <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>Offset account</Text>
-        <Text style={{ color: theme.app.foreground }}>{offsetAccount?.label ?? 'Tap to set'}</Text>
+        <Text style={{ color: offsetError ? theme.app.destructive : theme.app.foreground }}>{offsetAccount?.label ?? 'Tap to set'}</Text>
+        {offsetError ? <Text style={{ color: theme.app.destructive, fontSize: typeScale.caption, marginTop: 2 }}>{offsetError}</Text> : null}
       </Pressable>
 
       <Pressable style={styles.rememberRow} onPress={() => onToggleRemember(!state?.remember)}>

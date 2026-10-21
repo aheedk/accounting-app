@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { listTransactions, type TransactionRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
@@ -87,11 +88,7 @@ export default function TransactionsScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
           refreshControl={<RefreshControl refreshing={query.isFetching && !query.isLoading} onRefresh={() => void query.refetch()} tintColor={theme.app.primary} />}
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.app.border }} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No transactions match.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState icon="format-list-bulleted" message="No transactions match." />}
           renderItem={({ item }: { item: TransactionRow }) => (
             // item.path is the WEB app's route (e.g. /accounting/expenses/:id),
             // not a mobile screen — navigate by type+id to our own detail route
@@ -148,5 +145,4 @@ function StatusPill({ status, theme }: { status: string; theme: AppTheme }) {
 const styles = StyleSheet.create({
   header: { padding: spacing.md, paddingBottom: 0 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  empty: { alignItems: 'center', paddingTop: spacing.xxl },
 });

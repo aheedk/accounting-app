@@ -9,6 +9,7 @@ import { listEmailImports, type StagedImportRow } from '../../services/api';
 import { deriveImportTitle, deriveImportSubtitle, deriveImportStatus } from '../../lib/emailImportLabel';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { CameraCaptureButton } from '../../components/CameraCaptureButton';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
@@ -47,11 +48,7 @@ export default function InboxScreen() {
           contentContainerStyle={{ padding: spacing.md, paddingBottom: insets.bottom + spacing.xxl }}
           refreshControl={<RefreshControl refreshing={query.isFetching && !query.isLoading} onRefresh={() => void query.refetch()} tintColor={theme.app.primary} />}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No pending reviews.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState icon="check-circle-outline" message="No pending reviews." />}
           renderItem={({ item }: { item: StagedImportRow }) => {
             const status = deriveImportStatus(item);
             return (
@@ -94,5 +91,4 @@ function StatusPill({ status, theme }: { status: ReturnType<typeof deriveImportS
 
 const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderWidth: 1, borderRadius: 12 },
-  empty: { alignItems: 'center', paddingTop: spacing.xxl },
 });

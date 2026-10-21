@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getVendor, listVendors, listTransactions, type TransactionRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { spacing, typeScale, type AppTheme } from '../../theme';
 
@@ -119,9 +120,7 @@ export default function VendorDetailScreen() {
               refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
             >
               {transactionsQuery.data?.transactions.length === 0 ? (
-                <View style={styles.content}>
-                  <Text style={{ color: theme.app.mutedForeground }}>No transactions yet.</Text>
-                </View>
+                <EmptyState icon="swap-horizontal" message="No transactions yet." />
               ) : (
                 transactionsQuery.data?.transactions.map((tx: TransactionRow, i) => (
                   <View key={`${tx.type}:${tx.id}`}>

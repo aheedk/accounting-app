@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getCustomer, listCustomers, listInvoices } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { spacing, typeScale, type AppTheme } from '../../theme';
 
@@ -91,7 +92,7 @@ export default function CustomerDetailScreen() {
               {invoicesQuery.isLoading ? (
                 <LoadingIndicator size="sm" />
               ) : invoicesQuery.data?.length === 0 ? (
-                <Text style={{ color: theme.app.mutedForeground }}>No invoices yet.</Text>
+                <EmptyState icon="file-document-outline" message="No invoices yet." compact />
               ) : (
                 invoicesQuery.data?.map((inv, i) => (
                   <View key={inv.id}>

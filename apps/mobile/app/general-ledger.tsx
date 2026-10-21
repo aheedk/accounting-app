@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { listChartOfAccounts, getGeneralLedger, type GeneralLedgerLine } from '../services/api';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ErrorState } from '../components/ErrorState';
+import { EmptyState } from '../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../lib/money';
 import { spacing, typeScale, type AppTheme } from '../theme';
 
@@ -106,9 +107,7 @@ export default function GeneralLedgerScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}>
           {glQuery.data?.accounts.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No activity in this period.</Text>
-            </View>
+            <EmptyState icon="chart-line" message="No activity in this period." />
           ) : (
             glQuery.data?.accounts.map(acct => (
               <List.Accordion
@@ -184,7 +183,6 @@ function GlLineRow({ line, theme }: { line: GeneralLedgerLine; theme: AppTheme }
 
 const styles = StyleSheet.create({
   filterBar: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  empty: { alignItems: 'center', paddingTop: spacing.xxl },
   balanceRow: {
     flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth,

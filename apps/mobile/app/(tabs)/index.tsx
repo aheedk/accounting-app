@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { listTransactions, listInvoices, listEmailImports } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { CameraCaptureButton } from '../../components/CameraCaptureButton';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { isInflowType } from '../../lib/transactions';
@@ -124,7 +125,7 @@ export default function DashboardScreen() {
           <Text style={[styles.sectionTitle, { color: theme.app.foreground }]}>Recent transactions</Text>
           <Card style={{ backgroundColor: theme.app.surface }}>
             {recentTx.data?.transactions.length === 0 ? (
-              <Card.Content><Text style={{ color: theme.app.mutedForeground }}>Nothing yet.</Text></Card.Content>
+              <Card.Content><EmptyState icon="receipt" message="No transactions yet." compact /></Card.Content>
             ) : (
               recentTx.data?.transactions.map((tx, i) => (
                 <View key={`${tx.type}:${tx.id}`}>
