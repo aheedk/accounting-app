@@ -1,0 +1,502 @@
+<title>Bank Deposits Engineering Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper: #faf7f0;
+    --paper-raised: #ffffff;
+    --ink: #1f2420;
+    --ink-soft: #595f54;
+    --ink-faint: #8b8778;
+    --rule: #ded6c2;
+    --rule-strong: #c7bda2;
+    --accent: #2d6a4f;
+    --accent-ink: #1d4735;
+    --accent-soft: #e4ede6;
+    --danger: #a13d2f;
+    --danger-soft: #f4e4df;
+    --shadow: 0 1px 2px rgba(31, 36, 32, 0.06), 0 8px 24px rgba(31, 36, 32, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #15171a;
+      --paper-raised: #1b1e22;
+      --ink: #e9e5d8;
+      --ink-soft: #a9a494;
+      --ink-faint: #716d60;
+      --rule: #32352f;
+      --rule-strong: #43463e;
+      --accent: #6aba94;
+      --accent-ink: #bfe6d1;
+      --accent-soft: rgba(106, 186, 148, 0.12);
+      --danger: #e2887a;
+      --danger-soft: rgba(226, 136, 122, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #15171a;
+    --paper-raised: #1b1e22;
+    --ink: #e9e5d8;
+    --ink-soft: #a9a494;
+    --ink-faint: #716d60;
+    --rule: #32352f;
+    --rule-strong: #43463e;
+    --accent: #6aba94;
+    --accent-ink: #bfe6d1;
+    --accent-soft: rgba(106, 186, 148, 0.12);
+    --danger: #e2887a;
+    --danger-soft: rgba(226, 136, 122, 0.12);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .page {
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+  }
+
+  /* ── Memo header ───────────────────────────────────────────── */
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 1.1rem;
+    margin-bottom: 0.9rem;
+  }
+  .masthead h1 {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.85rem;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .masthead .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    padding: 0.2rem 0.5rem;
+    white-space: nowrap;
+  }
+  .meta-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    padding-bottom: 1.75rem;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 2rem;
+  }
+  .meta-row dt { text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.15rem; }
+  .meta-row dd { margin: 0; color: var(--ink-soft); }
+
+  /* ── Trial-balance style summary strip ────────────────────── */
+  .ledger-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    margin-bottom: 2.75rem;
+    overflow: hidden;
+  }
+  .ledger-strip .cell {
+    padding: 1rem 1.1rem;
+    border-right: 1px solid var(--rule);
+  }
+  .ledger-strip .cell:last-child { border-right: none; }
+  .ledger-strip .num {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--accent-ink);
+  }
+  .ledger-strip .num.was-broken { color: var(--danger); }
+  .ledger-strip .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    margin-top: 0.25rem;
+  }
+
+  /* ── Section structure ─────────────────────────────────────── */
+  section { margin-bottom: 2.75rem; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+  }
+  .section-head .idx {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+  .section-head h2 {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.28rem;
+    margin: 0;
+  }
+  .section-dek {
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    margin: -0.6rem 0 1.2rem;
+    max-width: 38rem;
+  }
+
+  .entries { display: flex; flex-direction: column; gap: 0; }
+  .entry {
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 0.9rem;
+    padding: 0.95rem 0 0.95rem 0.1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .entries .entry:first-child { border-top: 1px solid var(--rule); }
+  .entry .bar { border-radius: 2px; background: var(--rule-strong); }
+  .entry.fixed .bar { background: var(--danger); }
+  .entry.built .bar { background: var(--accent); }
+  .entry-body h3 {
+    font-size: 0.97rem;
+    font-weight: 600;
+    margin: 0 0 0.3rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .entry-body h3 .mono {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--ink-faint);
+  }
+  .entry-body p { margin: 0; color: var(--ink-soft); font-size: 0.9rem; max-width: 36rem; }
+  .entry-body .impact {
+    display: inline-block;
+    margin-top: 0.45rem;
+    font-size: 0.76rem;
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--danger);
+  }
+  .entry.built .entry-body .impact { color: var(--accent-ink); }
+
+  /* ── Flag / watch list ─────────────────────────────────────── */
+  .watchlist {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--ink-faint);
+    border-radius: 0 6px 6px 0;
+    padding: 1.1rem 1.3rem;
+  }
+  .watchlist ul { margin: 0; padding-left: 1.1rem; }
+  .watchlist li { margin-bottom: 0.55rem; font-size: 0.9rem; color: var(--ink-soft); }
+  .watchlist li:last-child { margin-bottom: 0; }
+  .watchlist li strong { color: var(--ink); font-weight: 600; }
+
+  /* ── Before/after timing table ─────────────────────────────── */
+  .timing-table {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.84rem;
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 1.3rem;
+  }
+  .timing-row {
+    display: grid;
+    grid-template-columns: 1fr 7.5rem 7.5rem;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .timing-row:last-child { border-bottom: none; }
+  .timing-row span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .timing-head {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .timing-row .was { color: var(--danger); }
+  .timing-row .now { color: var(--accent-ink); font-weight: 600; }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .meta-row, .ledger-strip { grid-template-columns: 1fr 1fr; }
+    .ledger-strip .cell:nth-child(2) { border-right: none; }
+    .ledger-strip .cell:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  }
+</style>
+
+<div class="page">
+
+  <div class="masthead">
+    <h1>Bank Deposits — Engineering Notes</h1>
+    <span class="tag">for tomorrow's meeting</span>
+  </div>
+  <dl class="meta-row">
+    <div><dt>Scope</dt><dd>Bank Deposits + GL drill-through</dd></div>
+    <div><dt>Touched</dt><dd>16 files, 3 migrations, 1 script</dd></div>
+    <div><dt>Environment</dt><dd>Dev DB (Railway) — migrated live</dd></div>
+  </dl>
+
+  <div class="ledger-strip">
+    <div class="cell">
+      <div class="num was-broken">6</div>
+      <div class="label">Real bugs found</div>
+    </div>
+    <div class="cell">
+      <div class="num">117 → 0</div>
+      <div class="label">Deposits unwrapped</div>
+    </div>
+    <div class="cell">
+      <div class="num">7</div>
+      <div class="label">Bank accounts auto-registered</div>
+    </div>
+    <div class="cell">
+      <div class="num">294 / 294</div>
+      <div class="label">Tests passing</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <span class="idx">01</span>
+      <h2>What was actually broken</h2>
+    </div>
+    <p class="section-dek">The feature had never been exercised against real data — every one of these would have surfaced the first time someone tried to use it.</p>
+    <div class="entries">
+      <div class="entry fixed">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Deposits could never post <span class="mono">journal_entry_source_type enum</span></h3>
+          <p>The Postgres enum backing journal entries never had <code>'bank_deposit'</code> added to it. Creating any deposit would crash the moment it tried to post its journal entry.</p>
+          <span class="impact">Zero deposits existed in the database before this fix</span>
+        </div>
+      </div>
+      <div class="entry fixed">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>"Make Recurring" rejected every attempt <span class="mono">recurring_template_type enum</span></h3>
+          <p>Wired up on the frontend, but the backend's enum migration tried to add <code>'deposit'</code> via a text CHECK constraint on what is actually a real Postgres enum column — a no-op that would fail on first use.</p>
+          <span class="impact">Every "Save template" click would 500</span>
+        </div>
+      </div>
+      <div class="entry fixed">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Deleting a deposit never worked <span class="mono">deleteDeposit()</span></h3>
+          <p>Missing a <code>source_guard</code> when voiding the journal entry, so the void was rejected as "source-generated" — for every deposit, not just edge cases.</p>
+          <span class="impact">Delete was dead on arrival for any deposit</span>
+        </div>
+      </div>
+      <div class="entry fixed">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Cash-back validation was unreachable code</h3>
+          <p>"Cash back exceeds total" can only be true when the net total is already ≤ 0 — a different check that always fired first, so the specific message never actually showed.</p>
+          <span class="impact">Caught by writing the first real test for it</span>
+        </div>
+      </div>
+      <div class="entry fixed">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>The bank account dropdown was always empty <span class="mono">GET /bank-accounts</span></h3>
+          <p>The endpoint returns <code>{ bank_accounts: [...] }</code>, but the page checked <code>Array.isArray(response.data)</code> — false for that shape, so the list silently resolved to empty every time.</p>
+          <span class="impact">Broke account auto-select on new deposits too, not just editing</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="idx">02</span>
+      <h2>The GL drill-through investigation</h2>
+    </div>
+    <p class="section-dek">Clicking a "Deposit" row in the General Ledger opened the raw Journal Entry screen. Tracing it to the database, not just the code, found the real shape of the problem.</p>
+    <div class="entries">
+      <div class="entry">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>All 117 existing deposits came from AI coding, not manual entry</h3>
+          <p>Every "Deposit" row in the GL was posted by the bank-statement AI coding pipeline (<span class="mono">emailImports.ts</span>) — none were backed by an actual deposit record, because that table didn't exist in this database yet.</p>
+        </div>
+      </div>
+      <div class="entry">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>5 of 7 businesses had never registered a bank account</h3>
+          <p>They were importing statements and posting deposits against a GL cash account, but no <span class="mono">bank_accounts</span> row existed to tie a deposit record to.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="idx">03</span>
+      <h2>What was built</h2>
+    </div>
+    <div class="entries">
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Deposits are editable after posting</h3>
+          <p>Date, memo, bank account, other-funds lines, and cash-back can now be changed post-save — previously the page only supported create and read.</p>
+        </div>
+      </div>
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Recurring deposits work end-to-end</h3>
+          <p>Schema, service, and scheduler gating fixed; added a manual "Run now" action so unscheduled/reminder templates are actually usable, not just stored.</p>
+        </div>
+      </div>
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>AI-coded deposits now wrap into real deposit records</h3>
+          <p>Non-destructively — the original journal entry and its link back to the import batch are untouched. Happens automatically going forward; backfilled for all 117 historical entries.</p>
+        </div>
+      </div>
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Every deposit opens directly in edit mode</h3>
+          <p>No separate view vs. edit screen, same as QuickBooks — including AI-imported ones. The "Imported" badge is now informational only; change anything and hit Save, it overwrites in place.</p>
+        </div>
+      </div>
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>"Recent Deposits" history popover</h3>
+          <p>The clock icon top-left now opens a dropdown of the 10 most recent deposits (date + amount), click-through to any of them — matching the QuickBooks pattern.</p>
+        </div>
+      </div>
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>New validation rules</h3>
+          <p>Can't deposit into the same account you're depositing from; every line needs an account; cash-back can't exceed the deposit total.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="idx">04</span>
+      <h2>Worth raising in the room</h2>
+    </div>
+    <div class="watchlist">
+      <ul>
+        <li><strong>Bank accounts were auto-created</strong> for the 7 businesses that never had one — named from the GL cash account their deposits already use. Worth a quick sanity check on the names.</li>
+        <li><strong>Editing a deposit doesn't let you change which Undeposited Funds payments are included</strong> — a deliberate simplification, not an oversight; that set stays fixed once posted.</li>
+        <li><strong>The "Balance" shown next to the account is the bank-feed balance, not the book balance</strong> — reads $0.00 for any account that's never had a CSV statement imported, even with real deposits posted against it. Not yet fixed; flagging for a decision on which number belongs there.</li>
+        <li><strong>No PDF deposit slip yet</strong> — Print still opens the browser print dialog rather than generating a formatted PDF.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="idx">05</span>
+      <h2>Chasing the 10-second delay</h2>
+    </div>
+    <p class="section-dek">Every click into a deposit took 10–15 seconds. Several plausible-sounding diagnoses — including ones pasted in from other tools — got tested against the real system and discarded before the actual cause surfaced. Worth walking through, since the method is as reusable as the fix.</p>
+    <div class="entries">
+      <div class="entry">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>CORS was blocking the one test that would have settled it early</h3>
+          <p>Testing a production build (<span class="mono">vite preview</span>, port 4173) couldn't even log in — that origin wasn't in <code>CORS_ALLOWED_ORIGINS</code>. Fixed first so a real dev-vs-production comparison was possible at all.</p>
+        </div>
+      </div>
+      <div class="entry">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Pool size and raw query speed both checked out</h3>
+          <p>25 concurrent queries fired through the exact production pool config (<code>max: 10</code>) finished in 789ms total. Individual queries — including the full General Ledger query chain — ran 100–130ms direct against the real database. Neither explained a multi-second delay, let alone ten.</p>
+        </div>
+      </div>
+      <div class="entry">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Live instrumentation proved the database wasn't the bottleneck</h3>
+          <p>Added real request timing and DB pool utilization logging directly to the running server. Result: <code>waiting: 0</code> on every single slow request — idle, available connections sitting unused for the full 10+ seconds. Whatever was slow, it wasn't Postgres.</p>
+        </div>
+      </div>
+      <div class="entry fixed">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Root cause: 50 routers, each quietly re-running tenancy middleware</h3>
+          <p>Every route file mounts its own <code>router.use('/businesses/:businessId', requireAuth, resolveBusiness)</code>. Express matches that as a path <em>prefix</em>, so a request to a late-mounted router silently re-triggers every earlier-mounted router's auth + tenancy DB lookups first. <span class="mono">bankDepositsRouter</span> sits 61st of 61 — about 60 redundant round trips stacked in front of the real handler. Mount position predicted delay severity exactly.</p>
+          <span class="impact">Every route in the app was paying this tax, proportional to mount order</span>
+        </div>
+      </div>
+      <div class="entry built">
+        <div class="bar"></div>
+        <div class="entry-body">
+          <h3>Two-line fix, app-wide benefit</h3>
+          <p>Both middlewares now short-circuit when the request has already been authenticated / resolved earlier in its own chain — safe, since the JWT and <code>businessId</code> don't change mid-request. No router files touched.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="timing-table">
+      <div class="timing-row timing-head"><span>Endpoint</span><span>Before</span><span>After</span></div>
+      <div class="timing-row"><span>bank-deposits (list)</span><span class="was">10.3–12.6s</span><span class="now">343–810ms</span></div>
+      <div class="timing-row"><span>bank-deposits (single)</span><span class="was">10.5–12.3s</span><span class="now">568–575ms</span></div>
+      <div class="timing-row"><span>email-imports/pending-count</span><span class="was">9.8–11.4s</span><span class="now">444–917ms</span></div>
+      <div class="timing-row"><span>reports/general-ledger</span><span class="was">2.8–3.5s</span><span class="now">978–998ms</span></div>
+      <div class="timing-row"><span>coa / customers / vendors / bank-accounts</span><span class="was">335ms–3.7s</span><span class="now">374–859ms</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>22 new tests · 294/294 passing</span>
+    <span>3 migrations applied to dev DB</span>
+    <span>typecheck + lint clean</span>
+  </footer>
+
+</div>
