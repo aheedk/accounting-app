@@ -20,16 +20,31 @@ export type TransactionRow = {
   path: string;
 };
 
+export type TransactionSortKey = 'date' | 'type' | 'ref_no' | 'due_date' | 'balance' | 'total_amount' | 'updated_at';
+
 export async function listTransactions(
-  businessId: string, params: { limit?: number; type?: string; contact_id?: string } = {},
+  businessId: string,
+  params: {
+    limit?: number; type?: string; contact_id?: string;
+    date_start?: string; date_end?: string; ref_no?: string;
+    amount_op?: 'eq' | 'between' | 'lt' | 'lte' | 'gt' | 'gte'; amount_value?: string; amount_value2?: string;
+    sort_key?: TransactionSortKey; sort_dir?: 'asc' | 'desc';
+  } = {},
 ) {
   const r = await api.get<{ transactions: TransactionRow[]; total: number }>(
     `/businesses/${businessId}/transactions`,
     {
       params: {
-        page_size: params.limit ?? 50, sort_key: 'date', sort_dir: 'desc',
+        page_size: params.limit ?? 50,
+        sort_key: params.sort_key ?? 'date', sort_dir: params.sort_dir ?? 'desc',
         ...(params.type ? { type: params.type } : {}),
         ...(params.contact_id ? { contact_id: params.contact_id } : {}),
+        ...(params.date_start ? { date_start: params.date_start } : {}),
+        ...(params.date_end ? { date_end: params.date_end } : {}),
+        ...(params.ref_no ? { ref_no: params.ref_no } : {}),
+        ...(params.amount_op ? { amount_op: params.amount_op } : {}),
+        ...(params.amount_value ? { amount_value: params.amount_value } : {}),
+        ...(params.amount_value2 ? { amount_value2: params.amount_value2 } : {}),
       },
     },
   );

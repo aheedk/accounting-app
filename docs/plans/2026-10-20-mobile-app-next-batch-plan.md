@@ -465,23 +465,40 @@ just working in isolation.
 summary sidebar layout, AI inbox exact table columns, Paper component
 shape swap-out beyond buttons/cards/badges, drawer role filtering.
 
-### Redesign chunk 3 (not started) — Transactions list filter/sort redesign
+### Redesign chunk 3 (2026-10-21) — Transactions list filter/sort redesign — done
 
-User feedback 2026-10-21: the current horizontal row of type chips (All/
-Deposits/Expenses/Checks/JEs/Bills/Invoices) above the transaction list
-feels cluttered — "suffocated." Replace with a single Filter button that
-opens a panel (match web's theme — our surface/border/radius tokens, not a
-native action sheet) holding the same filters web's own
-`/accounting/transactions` page has (`apps/web/src/pages/accounting/
-TransactionsPage.tsx`, confirmed real/backed controls per
-`docs/backlog.md`'s "Unified Transactions page" entry): date range,
-transaction type, reference number, contact, and amount (with the
-operator/amount-type options web's `AmountFilter` component has — eq/
-between/lt/lte/gt/gte, and line/total/line-or-total). The unified
-transactions endpoint (`listTransactions` in `services/api.ts`) already
-accepts `type`/`contact_id` — extending it to the rest (`date_start`/
-`date_end`/`ref_no`/`amount_op`/`amount_value`/`amount_value2`) is
-mechanical, since `transactionsService.ts` on the API already supports all
-of them (confirmed in the research behind the original mobile build-out).
-Sort (currently fixed to date desc) should also become user-controlled,
-matching web's sortable columns.
+User feedback 2026-10-21: the horizontal row of type chips (All/Deposits/
+Expenses/Checks/JEs/Bills/Invoices) above the transaction list felt
+cluttered — "suffocated." Replaced with a single **Filter** button (shows
+an active-count badge, e.g. "Filter (2)") that opens
+`components/TransactionFilterPanel.tsx` — a modal sheet in our own surface/
+border/radius tokens (not a native action sheet), holding the same filters
+web's `/accounting/transactions` page has (read directly from
+`TransactionsPage.tsx` before building, not assumed): type, date range
+(the same 12-preset set — Last 7/14/30 days, Last 3 months, Previous week/
+month/quarter, This week, This year, Last year, Last 7 years, Custom — plus
+`presetRange()`/`fiscalYearRange()` ported math so mobile computes identical
+start/end dates to web, including using the active business's actual
+`fiscal_year_start_month` for This/Last year), reference number, contact
+(combined vendor+customer searchable picker, since the API's `contact_id`
+already matches either), and amount (operator — equals/between/less than/
+less or equal/greater than/greater or equal — with a second value field
+when "Between" is picked).
+
+`services/api.ts`'s `listTransactions` extended with `date_start`/
+`date_end`/`ref_no`/`amount_op`/`amount_value`/`amount_value2`/`sort_key`/
+`sort_dir` — mechanical, since `transactionsService.ts` on the API already
+accepted all of them (confirmed, not assumed). New `lib/transactionFilters.ts`
+holds the ported preset logic plus `countActiveFilters()` for the button's
+badge.
+
+**Not done**: user-controlled sort (still fixed to date desc) — the panel
+and query plumbing support `sort_key`/`sort_dir` already, just no UI control
+for it yet; the "Amount type" (line/total/line-or-total) option web's
+`AmountFilter` has was dropped for v1 since the unified transactions row
+only carries each transaction's total (not its lines), so line-level
+filtering wouldn't do anything different from total — same limitation
+already documented for the equivalent web feature in `docs/backlog.md`.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors.

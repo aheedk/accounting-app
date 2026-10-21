@@ -1,40 +1,50 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, RefreshControl, Pressable } from 'react-native';
-import { Text, TextInput, Chip, useTheme } from 'react-native-paper';
+import { Text, TextInput, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { AppHeader } from '../../components/AppHeader';
+import { TransactionFilterPanel } from '../../components/TransactionFilterPanel';
 import { StatusBadge, statusToBadge } from '../../components/ui/StatusBadge';
 import { listTransactions, type TransactionRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
+import { EMPTY_FILTERS, countActiveFilters, presetRange, type TransactionFilters } from '../../lib/transactionFilters';
 import { spacing, typeScale, fontFamily, minTouchTarget, type AppTheme } from '../../theme';
-
-const TYPE_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'deposit', label: 'Deposits' },
-  { value: 'expense', label: 'Expenses' },
-  { value: 'check', label: 'Checks' },
-  { value: 'journal', label: 'JEs' },
-  { value: 'bill', label: 'Bills' },
-  { value: 'invoice', label: 'Invoices' },
-] as const;
 
 export default function TransactionsScreen() {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
-  const { activeBusinessId } = useAuth();
-  const [typeFilter, setTypeFilter] = useState('');
+  const { businesses, activeBusinessId } = useAuth();
+  const [filters, setFilters] = useState<TransactionFilters>(EMPTY_FILTERS);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [search, setSearch] = useState('');
 
+  const fiscalStartMonth = businesses.find(b => b.id === activeBusinessId)?.fiscal_year_start_month ?? 1;
+  const range = useMemo(
+    () => presetRange(filters.datePreset, filters.dateStart, filters.dateEnd, fiscalStartMonth),
+    [filters.datePreset, filters.dateStart, filters.dateEnd, fiscalStartMonth],
+  );
+
   const query = useQuery({
-    queryKey: ['transactions', activeBusinessId, { type: typeFilter }],
-    queryFn: () => listTransactions(activeBusinessId!, { limit: 200, type: typeFilter || undefined }),
+    queryKey: ['transactions', activeBusinessId, filters, range.start, range.end],
+    queryFn: () => listTransactions(activeBusinessId!, {
+      limit: 200,
+      type: filters.type || undefined,
+      contact_id: filters.contactId ?? undefined,
+      date_start: range.start ?? undefined,
+      date_end: range.end ?? undefined,
+      ref_no: filters.refNo.trim() || undefined,
+      amount_op: filters.amountOp ?? undefined,
+      amount_value: filters.amountValue || undefined,
+      amount_value2: filters.amountValue2 || undefined,
+    }),
     enabled: !!activeBusinessId,
   });
 
@@ -45,38 +55,39 @@ export default function TransactionsScreen() {
     return items.filter(r => (r.contact_name ?? '').toLowerCase().includes(q) || (r.memo ?? '').toLowerCase().includes(q));
   }, [query.data, search]);
 
+  const activeCount = countActiveFilters(filters);
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <AppHeader title="Transactions" />
       <View style={styles.header}>
-        <TextInput
-          mode="outlined"
-          placeholder="Search payee or memo"
-          value={search}
-          onChangeText={setSearch}
-          dense
-          style={{ marginTop: spacing.sm, backgroundColor: theme.app.surface }}
-          left={<TextInput.Icon icon="magnify" />}
-        />
+        <View style={styles.searchRow}>
+          <TextInput
+            mode="outlined"
+            placeholder="Search payee or memo"
+            value={search}
+            onChangeText={setSearch}
+            dense
+            style={{ flex: 1, backgroundColor: theme.app.surface }}
+            left={<TextInput.Icon icon="magnify" />}
+          />
+          <Pressable
+            onPress={() => setFilterPanelOpen(true)}
+            style={[styles.filterButton, { borderColor: activeCount > 0 ? theme.app.primary : theme.app.border, backgroundColor: theme.app.surface }]}
+          >
+            <MaterialCommunityIcons name="filter-variant" size={18} color={activeCount > 0 ? theme.app.primary : theme.app.foreground} />
+            <Text style={{ color: activeCount > 0 ? theme.app.primary : theme.app.foreground, fontFamily: fontFamily.medium, fontSize: typeScale.body }}>
+              Filter{activeCount > 0 ? ` (${activeCount})` : ''}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      <FlashList
-        horizontal
-        data={TYPE_FILTERS as unknown as { value: string; label: string }[]}
-        keyExtractor={f => f.value}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm }}
-        style={{ flexGrow: 0, marginBottom: spacing.xs }}
-        renderItem={({ item }) => (
-          <Chip
-            selected={typeFilter === item.value}
-            onPress={() => setTypeFilter(item.value)}
-            style={{ marginRight: spacing.xs, minHeight: minTouchTarget - 12 }}
-            selectedColor={theme.app.primary}
-          >
-            {item.label}
-          </Chip>
-        )}
+      <TransactionFilterPanel
+        visible={filterPanelOpen}
+        onDismiss={() => setFilterPanelOpen(false)}
+        filters={filters}
+        onApply={(next) => { setFilters(next); setFilterPanelOpen(false); }}
       />
 
       {query.isLoading ? (
@@ -130,6 +141,11 @@ function TransactionRowItem({ row, theme, onPress }: { row: TransactionRow; them
 }
 
 const styles = StyleSheet.create({
-  header: { padding: spacing.md, paddingBottom: 0 },
+  header: { padding: spacing.md, paddingBottom: spacing.sm },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  filterButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 6,
+    paddingHorizontal: spacing.sm, minHeight: minTouchTarget,
+  },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
 });
