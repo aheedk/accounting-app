@@ -215,35 +215,93 @@ flagged before writing any screen:
   against every device camera setting — worth a real device check during
   item 6's Android/iOS pass.
 
-### 6. Android testing
-- Every screen on an Android emulator (Pixel 6 or similar), plus one small
-  screen size.
-- Fix platform-specific issues: navigation, keyboard handling, status bar,
-  safe areas.
-- Verify the `expo-dev-client` build on both platforms.
+### 6. Android testing — code-side prep done 2026-10-20, device pass still needed
+- Grepped every `Platform.OS` branch and iOS-specific import/module across
+  `app/`, `components/`, `hooks/`, `services/`, `lib/`: all 5 hits
+  (`settings.tsx`'s label, `login.tsx`'s `KeyboardAvoidingView` behavior,
+  `DateField.tsx`'s native-picker branch, `pushNotifications.ts`'s channel
+  setup + platform value) already branch correctly for Android — none are
+  iOS-only code with no fallback. No `ActionSheetIOS`/`PushNotificationIOS`/
+  `.ios.`-suffixed files, no unguarded `shadowColor`/`shadowOffset`-only
+  styling (Paper's own `Card` elevation is already cross-platform).
+  `useSafeAreaInsets()` is safe without an explicit `SafeAreaProvider` —
+  confirmed Expo Router wraps the root with its own.
+- **Still needed, requires a device/emulator (left for you, per
+  instruction):** an actual Android pass — navigation, keyboard handling,
+  status bar, safe areas, two screen sizes, and verifying the
+  `expo-dev-client` build on both platforms. Nothing here is a known
+  blocker; it just hasn't been run yet.
 
-### 7. Push notifications, settings, app icon
-- **Push:** Expo Notifications (covers APNs + FCM). Register device token on
-  login, `push_tokens` table (`id, user_id, token, platform, created_at,
-  last_used_at`). v1 notification types: "New documents ready for review"
-  (AI inbox) and "Invoice paid" (once Stripe exists). Tapping a notification
-  opens the relevant screen. Backend sends via Expo's push HTTP API.
-- **Settings (More tab):** account info (name/email/role), biometric login
-  toggle, push-notifications toggle, theme toggle (light/dark/system), about
-  (version/build), sign out.
-- **App icon & splash:** real brand mark through Expo's icon config (all iOS
-  + Android sizes); splash = brand background + centered logo + brief
-  fade-out. If no finalized logo yet, a clean text-based mark in brand
-  colors/font is the fallback.
+### 7. Settings screen and push notification scaffolding — done 2026-10-20
+- **Settings** (`app/settings.tsx`, linked from More): account info (name,
+  email, role), a biometric-login toggle (reflects whether a password is
+  actually stored for it — turning it on when none is stored explains you
+  need to sign out and back in with "Remember password" checked, since
+  there's no plaintext password sitting in memory post-login to save),
+  push-notifications toggle, a light/dark/system theme toggle, version/
+  platform under About, and sign out (moved here from the More tab's
+  top-level list).
+- **Theme preference**: new `useThemePreference` context (SecureStore-backed,
+  `system | light | dark`) now drives which Paper theme `_layout.tsx`
+  renders, replacing the previous raw `useColorScheme()` — Settings' toggle
+  is wired straight into it.
+- **Push notification infra**: migration `0107` adds `push_tokens` (`id,
+  user_id, token, platform, created_at, last_used_at`, unique on `token` —
+  a reinstalled app or a second user on the same device upserts/reassigns
+  rather than duplicating). `POST /me/push-tokens` and `DELETE
+  /me/push-tokens` (both just `requireAuth`, since a push token is the
+  device's own, not a business record — every role including `client` can
+  manage its own; `roleMatrix.test.ts`'s 4 role-partition assertions
+  updated accordingly, 9/9 still pass). 4 new integration tests cover
+  upsert, device-reassignment-on-reinstall, delete-scoped-to-caller, and
+  bad-platform rejection; full 488-test API suite green.
+- Mobile side: `services/pushNotifications.ts` wraps `expo-notifications` —
+  requests permission, gets an Expo push token (fails quietly rather than
+  crashing when there's no EAS `projectId` configured yet or running in a
+  simulator, both expected ahead of a real device test), registers it.
+  `usePushPreference` context backs the Settings toggle and persists the
+  token for later deregistration. `useAuth.tsx`'s `login()` silently
+  re-registers on every login **only if the user already opted in once
+  before** — it doesn't cold-prompt for permission on every sign-in.
+- **Notification tap routing scaffolded**: `_layout.tsx` listens for a
+  notification response and routes by the payload's `type` —
+  `inbox_new_documents` → that statement's review screen (or the inbox
+  list if no id), `invoice_paid` → that invoice (not wired to anything
+  real yet, since Stripe doesn't exist — scaffolded for when it does).
+- **Not yet verified**: actual push delivery needs a real device and an
+  EAS project id, neither available here — this is registration/UI
+  scaffolding only, as scoped.
 
-### 8. Polish: error handling and empty states
-Sweep every screen:
-- Network errors → "Something went wrong · Try again" with a retry button,
-  never a crash or blank screen.
-- Empty lists → friendly empty state (icon + message, e.g. "No transactions
-  yet").
-- Form validation → inline under the field, never an alert box.
-- No raw error messages or stack traces ever reach the user.
+### 8. App icon — placeholder shipped, real logo still needed
+- No image-generation library available in this environment, so
+  `scripts/generate-placeholder-icons.mjs` hand-rolls PNGs via Node's
+  built-in `zlib` (navy `#151d33` background, white block-letter "AC"
+  mark) at the exact sizes/alpha the existing asset files already use —
+  `icon.png`, `splash-icon.png`, `favicon.png`, and the three Android
+  adaptive-icon layers (foreground/monochrome transparent, background
+  solid). Verified both visually and by checking the alpha channel
+  directly (the foreground layer's transparent-vs-opaque pixel counts).
+  Swap the same filenames for the real logo when design delivers it —
+  nothing in `app.json` needs to change.
+
+### 9. Polish pass — done 2026-10-20
+- New shared `EmptyState` (icon + message, a `compact` variant for
+  inline/embedded spots) replaced every bare "No X yet"/"No X match" text
+  line across the app: General Ledger, Invoices, AI Inbox, Transactions,
+  Clients (customers/vendors), Dashboard's recent-transactions card,
+  vendor detail's transactions tab, customer detail's invoices list.
+  `ErrorState` (retry button, no crash/blank screen) was already in place
+  on every data-fetching screen from earlier chunks — confirmed, not
+  newly added here.
+- **Inline field validation** on the expense/deposit create-edit forms and
+  the AI inbox review screen: these previously collapsed every client-side
+  check into one combined string shown below the Save button. Split into
+  per-field errors now shown under the actual field — Payee, Payment
+  account, the Lines section, the inbox's statement-account picker, and
+  per-line "pick an offset account" on the specific line that's missing
+  one. Server-side errors (from a failed save) still render as inline text
+  near the button, not an alert box — that was already true, just confirmed
+  it stays true after the split.
 
 ---
 
