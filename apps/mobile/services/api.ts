@@ -120,6 +120,18 @@ export async function getVendor(businessId: string, id: string) {
   return r.data;
 }
 
+export type VendorNote = { id: string; note_text: string; created_at: string; user_id: string; author_name: string };
+
+export async function listVendorNotes(businessId: string, vendorId: string) {
+  const r = await api.get<{ notes: VendorNote[] }>(`/businesses/${businessId}/vendors/${vendorId}/notes`);
+  return r.data.notes;
+}
+
+export async function addVendorNote(businessId: string, vendorId: string, noteText: string) {
+  const r = await api.post<VendorNote>(`/businesses/${businessId}/vendors/${vendorId}/notes`, { note_text: noteText });
+  return r.data;
+}
+
 // --- AI Document Inbox (batch item 4) — the real backend for this is
 // email-imports.ts, NOT integration-inbox.ts (that's an unrelated
 // CSV-reconciliation inbox for Stripe/PayPal/Shopify matching). Shapes
@@ -203,7 +215,7 @@ export async function createVendor(businessId: string, name: string) {
 export type DepositDetail = {
   id: string; bank_account_id: string; deposit_date: string; deposit_number: string | null; memo: string | null;
   total_amount: string; bank_account_name: string; editable: boolean; imported: boolean;
-  is_reconciled: boolean; voided_at: string | null;
+  is_reconciled: boolean; voided_at: string | null; journal_entry_id: string | null;
   cash_back_account_id: string | null; cash_back_memo: string | null; cash_back_amount: string | null;
   lines: Array<{
     id: string; line_type: 'other_funds' | 'undeposited_funds'; payment_id: string | null;
@@ -243,6 +255,15 @@ export async function updateDeposit(businessId: string, id: string, body: Deposi
   return r.data;
 }
 
+export async function voidDeposit(businessId: string, id: string) {
+  const r = await api.post(`/businesses/${businessId}/bank-deposits/${id}/void`);
+  return r.data;
+}
+
+export async function deleteDeposit(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/bank-deposits/${id}`);
+}
+
 export type ExpenseDetail = {
   id: string; transaction_date: string; payee_text: string | null; payee_name: string | null;
   vendor_id: string | null; customer_id: string | null;
@@ -250,6 +271,7 @@ export type ExpenseDetail = {
   payment_account_id: string; payment_account_name: string;
   payment_method: string; reference: string | null; memo: string | null; total_amount: string;
   status: string; editable: boolean; imported: boolean; is_reconciled: boolean;
+  journal_entry_id: string | null;
   lines: Array<{
     id: string; category_account_id: string; category_name: string; category_code: string;
     description: string | null; amount: string;
@@ -284,6 +306,15 @@ export async function createExpense(businessId: string, body: ExpenseInput) {
 export async function updateExpense(businessId: string, id: string, body: ExpenseInput) {
   const r = await api.patch<{ id: string }>(`/businesses/${businessId}/expense-transactions/${id}`, body);
   return r.data;
+}
+
+export async function voidExpense(businessId: string, id: string) {
+  const r = await api.post(`/businesses/${businessId}/expense-transactions/${id}/void`);
+  return r.data;
+}
+
+export async function deleteExpense(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/expense-transactions/${id}`);
 }
 
 export type CheckDetail = {

@@ -410,9 +410,8 @@ all render correctly together, not just in isolation.
 request's items 3 and parts of 5/6 are a page-layout-by-page-layout effort
 too large for one pass):
 - Exact web page layout mirroring beyond what shipped: General Ledger's
-  exact column set, vendor/customer detail's 3-tab layout + summary
-  sidebar, the expense/deposit form's Cancel/Make recurring/More/Save
-  bottom bar, AI inbox's exact table-column parity.
+  exact column set, customer detail's 3-tab layout + summary sidebar,
+  AI inbox's exact table-column parity.
 - Swapping Paper's Chip/SegmentedButtons/TextInput for wrapper primitives
   (Option B applied to buttons/cards/badges only so far).
 - Drawer's role-based filtering (web's `useCanOpen`) — mobile's drawer
@@ -422,3 +421,67 @@ too large for one pass):
   verified (no UI-automation tooling in this environment, per the
   session's standing note) — confirmed via the static screenshot and code
   review only.
+
+### Redesign chunk 2 (2026-10-21) — forms bottom bar + vendor Notes tab
+
+**Expense/Deposit forms now have web's exact bottom bar** (`ExpensePage.tsx`'s
+own layout, read directly before building): Cancel · Make recurring · More ·
+Save, not stripped down to just Save. New shared
+`components/forms/TransactionFormFooter.tsx` backs both forms:
+- **Cancel** — `router.back()`.
+- **Make recurring** — shown (not hidden) but recurring templates are a
+  whole subsystem not built on mobile; tapping says so plainly ("not
+  available on mobile yet — use the web app") rather than faking the flow.
+- **More** (existing records only, matching web's own `!isNew` gating) —
+  **Copy** (toggles the form into "new" mode in place, keeping every
+  current field value — Save then creates a fresh record instead of
+  updating), **Void** and **Delete** (real `POST .../void` / `DELETE`
+  calls — both already existed on the API from the earlier create/edit
+  chunk, just not wired to any UI yet), **Transaction journal** (routes to
+  the existing `/transaction/[id]?type=journal` screen using the record's
+  own `journal_entry_id` — reuses rather than rebuilds). Void/Delete are
+  gated client-side by the same roles the API enforces (`accountant` for
+  void, `firm_admin` for delete, via `hasMinRole` against the effective
+  per-business role — `role_override` on the active business, falling back
+  to the firm-wide role) so a staff login doesn't see options the server
+  would 403 anyway.
+
+**Vendor detail now has web's real 3-tab layout** (`VendorDetailPage.tsx`'s
+own tab order confirmed before changing anything: Transactions, Details,
+Notes — not assumed): added the Notes tab, backed by the real
+`GET/POST /vendors/:id/notes` endpoints (already existed, unused by mobile
+until now) — list of existing notes (author + date) plus an add-note input.
+Customer detail has no equivalent notes-thread endpoint on the API (only a
+single flat `notes` text field on the row) — carried to the backlog rather
+than faked.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, and a live screenshot from the user's own
+already-running simulator session (mid-session, unprompted) showed the app
+healthy in dark mode on an unrelated screen — confirms the redesign isn't
+just working in isolation.
+
+**Still open**: General Ledger exact columns, customer detail's 3-tab +
+summary sidebar layout, AI inbox exact table columns, Paper component
+shape swap-out beyond buttons/cards/badges, drawer role filtering.
+
+### Redesign chunk 3 (not started) — Transactions list filter/sort redesign
+
+User feedback 2026-10-21: the current horizontal row of type chips (All/
+Deposits/Expenses/Checks/JEs/Bills/Invoices) above the transaction list
+feels cluttered — "suffocated." Replace with a single Filter button that
+opens a panel (match web's theme — our surface/border/radius tokens, not a
+native action sheet) holding the same filters web's own
+`/accounting/transactions` page has (`apps/web/src/pages/accounting/
+TransactionsPage.tsx`, confirmed real/backed controls per
+`docs/backlog.md`'s "Unified Transactions page" entry): date range,
+transaction type, reference number, contact, and amount (with the
+operator/amount-type options web's `AmountFilter` component has — eq/
+between/lt/lte/gt/gte, and line/total/line-or-total). The unified
+transactions endpoint (`listTransactions` in `services/api.ts`) already
+accepts `type`/`contact_id` — extending it to the rest (`date_start`/
+`date_end`/`ref_no`/`amount_op`/`amount_value`/`amount_value2`) is
+mechanical, since `transactionsService.ts` on the API already supports all
+of them (confirmed in the research behind the original mobile build-out).
+Sort (currently fixed to date desc) should also become user-controlled,
+matching web's sortable columns.

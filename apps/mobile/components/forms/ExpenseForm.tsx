@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import { Text, TextInput, Button, Menu, IconButton, useTheme } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import {
   listChartOfAccounts, listBankAccounts, listVendors, listCustomers,
-  createExpense, updateExpense,
+  createExpense, updateExpense, voidExpense, deleteExpense,
   type ExpenseDetail, type ExpenseInput, type ExpenseLineInput,
 } from '../../services/api';
 import { pickErr } from '../../services/apiClient';
@@ -16,7 +15,7 @@ import { PickerField } from '../PickerField';
 import { DateField } from '../DateField';
 import { SearchablePicker, type PickerOption } from '../SearchablePicker';
 import { LoadingIndicator } from '../LoadingIndicator';
-import { AppButton } from '../ui/AppButton';
+import { TransactionFormFooter } from './TransactionFormFooter';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
 const PAYMENT_METHODS: Array<{ value: ExpenseInput['payment_method']; label: string }> = [
@@ -33,7 +32,6 @@ type PayeeKind = 'vendor' | 'customer' | 'text';
 
 export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail; existingId?: string }) {
   const theme = useTheme<AppTheme>();
-  const insets = useSafeAreaInsets();
   const { activeBusinessId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -82,6 +80,10 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
   const [fieldErrors, setFieldErrors] = useState<{ payee?: string; paymentAccount?: string; lines?: string }>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // "Copy" (web's More menu) keeps every field as-is but targets a new
+  // record on the next Save — same bottom-bar pattern as web's editor.
+  const [copied, setCopied] = useState(false);
+  const effectiveExistingId = copied ? undefined : existingId;
 
   const bankingAccountIds = useMemo(
     () => new Set((bankAccountsQuery.data ?? []).map(b => b.cash_account_id)),
@@ -141,7 +143,7 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
           .map((l, i) => ({ category_account_id: l.category_account_id, description: l.description || null, amount: l.amount, sort_order: i })),
         ...(payeeKind === 'vendor' ? { vendor_id: payeeId } : payeeKind === 'customer' ? { customer_id: payeeId } : { payee_text: payeeText }),
       };
-      if (existingId) await updateExpense(activeBusinessId!, existingId, body);
+      if (effectiveExistingId) await updateExpense(activeBusinessId!, effectiveExistingId, body);
       else await createExpense(activeBusinessId!, body);
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['transaction-detail'] });
@@ -153,10 +155,50 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
     }
   }
 
+  async function handleVoid() {
+    if (!existingId) return;
+    Alert.alert('Void this expense?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Void', style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await voidExpense(activeBusinessId!, existingId);
+              await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+              await queryClient.invalidateQueries({ queryKey: ['transaction-detail'] });
+              router.back();
+            } catch (e) { setServerError(pickErr(e)); }
+          })();
+        },
+      },
+    ]);
+  }
+
+  async function handleDelete() {
+    if (!existingId) return;
+    Alert.alert('Delete this expense?', 'This permanently removes it. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await deleteExpense(activeBusinessId!, existingId);
+              await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+              router.back();
+            } catch (e) { setServerError(pickErr(e)); }
+          })();
+        },
+      },
+    ]);
+  }
+
   if (loadingLookups) return <LoadingIndicator />;
 
   return (
-    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <DateField label="Date" value={date} onChange={setDate} />
 
       <PickerField label="Payee" value={payeeLabel} onPress={() => setPayeePickerOpen(true)} error={fieldErrors.payee} />
@@ -281,11 +323,18 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
       </View>
 
       {serverError ? <Text style={{ color: theme.app.destructive, marginBottom: spacing.sm }}>{serverError}</Text> : null}
-
-      <AppButton onPress={() => void save()} loading={saving} fullWidth>
-        {existingId ? 'Save changes' : 'Save expense'}
-      </AppButton>
     </ScrollView>
+      <TransactionFormFooter
+        existingId={effectiveExistingId}
+        journalEntryId={existing?.journal_entry_id}
+        saving={saving}
+        saveLabel={effectiveExistingId ? 'Save changes' : 'Save expense'}
+        onSave={() => void save()}
+        onCopy={existingId ? () => setCopied(true) : undefined}
+        onVoid={existingId ? () => void handleVoid() : undefined}
+        onDelete={existingId ? () => void handleDelete() : undefined}
+      />
+    </View>
   );
 }
 
