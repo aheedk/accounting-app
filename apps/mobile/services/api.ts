@@ -19,10 +19,18 @@ export type TransactionRow = {
   path: string;
 };
 
-export async function listTransactions(businessId: string, params: { limit?: number; type?: string } = {}) {
+export async function listTransactions(
+  businessId: string, params: { limit?: number; type?: string; contact_id?: string } = {},
+) {
   const r = await api.get<{ transactions: TransactionRow[]; total: number }>(
     `/businesses/${businessId}/transactions`,
-    { params: { page_size: params.limit ?? 50, sort_key: 'date', sort_dir: 'desc', ...(params.type ? { type: params.type } : {}) } },
+    {
+      params: {
+        page_size: params.limit ?? 50, sort_key: 'date', sort_dir: 'desc',
+        ...(params.type ? { type: params.type } : {}),
+        ...(params.contact_id ? { contact_id: params.contact_id } : {}),
+      },
+    },
   );
   return r.data;
 }
@@ -63,11 +71,19 @@ export async function getInvoice(businessId: string, id: string) {
 }
 
 // customers.ts's list route returns every CustomersTable column plus two
-// computed fields (open_balance, has_transactions) — only the subset the
-// mobile screens use is declared here, same pattern as InvoiceRow above.
+// computed fields (open_balance, has_transactions); the detail route returns
+// the plain row WITHOUT those two — they're list-only. Two separate types so
+// a screen can't accidentally read open_balance off the detail response (it
+// would just be undefined, not a type error) the way the detail screen
+// originally did.
 export type CustomerRow = {
   id: string; name: string; company_name: string | null; email: string | null;
   phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
+};
+
+export type CustomerDetail = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; is_active: boolean;
 };
 
 export async function listCustomers(businessId: string) {
@@ -76,7 +92,30 @@ export async function listCustomers(businessId: string) {
 }
 
 export async function getCustomer(businessId: string, id: string) {
-  const r = await api.get<CustomerRow>(`/businesses/${businessId}/customers/${id}`);
+  const r = await api.get<CustomerDetail>(`/businesses/${businessId}/customers/${id}`);
+  return r.data;
+}
+
+// vendors.ts mirrors customers.ts exactly: list adds open_balance +
+// has_transactions, detail returns the plain row without them.
+export type VendorRow = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
+};
+
+export type VendorDetail = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; website: string | null; notes: string | null;
+  account_number: string | null; is_active: boolean; is_1099: boolean;
+};
+
+export async function listVendors(businessId: string) {
+  const r = await api.get<{ vendors: VendorRow[] }>(`/businesses/${businessId}/vendors`);
+  return r.data.vendors;
+}
+
+export async function getVendor(businessId: string, id: string) {
+  const r = await api.get<VendorDetail>(`/businesses/${businessId}/vendors/${id}`);
   return r.data;
 }
 

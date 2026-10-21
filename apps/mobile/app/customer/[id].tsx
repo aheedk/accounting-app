@@ -1,10 +1,10 @@
-import { View, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Linking, RefreshControl } from 'react-native';
 import { Text, Appbar, Card, useTheme } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { getCustomer, listInvoices } from '../../services/api';
+import { getCustomer, listCustomers, listInvoices } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
@@ -21,6 +21,16 @@ export default function CustomerDetailScreen() {
     queryFn: () => getCustomer(activeBusinessId!, id),
     enabled: !!activeBusinessId,
   });
+  // GET /customers/:id doesn't return open_balance (list-only, computed
+  // field) — pull it from the list query instead, which the Clients tab has
+  // usually already cached.
+  const customersListQuery = useQuery({
+    queryKey: ['customers', activeBusinessId],
+    queryFn: () => listCustomers(activeBusinessId!),
+    enabled: !!activeBusinessId,
+    staleTime: 5 * 60_000,
+  });
+  const openBalance = customersListQuery.data?.find(c => c.id === id)?.open_balance;
   const invoicesQuery = useQuery({
     queryKey: ['invoices', activeBusinessId, { customer_id: id }],
     queryFn: () => listInvoices(activeBusinessId!, { customer_id: id }),
@@ -29,6 +39,12 @@ export default function CustomerDetailScreen() {
 
   const loading = customerQuery.isLoading;
   const customer = customerQuery.data;
+  const refreshing = customerQuery.isFetching || customersListQuery.isFetching || invoicesQuery.isFetching;
+  function refresh() {
+    void customerQuery.refetch();
+    void customersListQuery.refetch();
+    void invoicesQuery.refetch();
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -42,11 +58,14 @@ export default function CustomerDetailScreen() {
       ) : customerQuery.error || !customer ? (
         <ErrorState onRetry={() => void customerQuery.refetch()} />
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+          refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
+        >
           <View style={styles.amountBlock}>
             <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground }}>Open balance</Text>
             <Text style={{ fontSize: 32, fontWeight: '700', color: theme.app.foreground, marginTop: 2 }}>
-              ${fmtMoney(customer.open_balance)}
+              ${fmtMoney(openBalance)}
             </Text>
           </View>
 

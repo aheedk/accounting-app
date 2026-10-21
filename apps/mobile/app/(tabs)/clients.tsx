@@ -1,34 +1,44 @@
 import { useMemo, useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, List, TextInput, Menu, Divider, useTheme } from 'react-native-paper';
+import { View, StyleSheet, Pressable, RefreshControl } from 'react-native';
+import { Text, List, TextInput, Menu, Divider, SegmentedButtons, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { listCustomers, type CustomerRow } from '../../services/api';
+import { listCustomers, listVendors, type CustomerRow, type VendorRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { fmtMoney } from '../../lib/money';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
+
+type Tab = 'customers' | 'vendors';
 
 export default function ClientsScreen() {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
   const { businesses, activeBusinessId, setActiveBusinessId } = useAuth();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>('customers');
   const [search, setSearch] = useState('');
   const activeBusiness = businesses.find(b => b.id === activeBusinessId);
 
-  const query = useQuery({
+  const customersQuery = useQuery({
     queryKey: ['customers', activeBusinessId],
     queryFn: () => listCustomers(activeBusinessId!),
-    enabled: !!activeBusinessId,
-    staleTime: 5 * 60_000, // item 7: customer list doesn't need feed-level freshness
+    enabled: !!activeBusinessId && tab === 'customers',
+    staleTime: 5 * 60_000, // item 7: these lists don't need feed-level freshness
   });
+  const vendorsQuery = useQuery({
+    queryKey: ['vendors', activeBusinessId],
+    queryFn: () => listVendors(activeBusinessId!),
+    enabled: !!activeBusinessId && tab === 'vendors',
+    staleTime: 5 * 60_000,
+  });
+  const query = tab === 'customers' ? customersQuery : vendorsQuery;
 
   const rows = useMemo(() => {
-    const items = query.data ?? [];
+    const items: Array<CustomerRow | VendorRow> = query.data ?? [];
     const q = search.trim().toLowerCase();
     if (!q) return items;
     return items.filter(c => c.name.toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q));
@@ -73,11 +83,18 @@ export default function ClientsScreen() {
       />
       <Divider style={{ marginBottom: spacing.sm }} />
 
-      <View style={styles.customersHeader}>
-        <Text style={{ fontSize: typeScale.h2, fontWeight: '700', color: theme.app.foreground }}>Customers</Text>
+      <View style={styles.listHeader}>
+        <SegmentedButtons
+          value={tab}
+          onValueChange={v => setTab(v as Tab)}
+          buttons={[
+            { value: 'customers', label: 'Customers' },
+            { value: 'vendors', label: 'Vendors' },
+          ]}
+        />
         <TextInput
           mode="outlined"
-          placeholder="Search customers"
+          placeholder={`Search ${tab}`}
           value={search}
           onChangeText={setSearch}
           dense
@@ -95,16 +112,21 @@ export default function ClientsScreen() {
           data={rows}
           keyExtractor={c => c.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
+          refreshControl={<RefreshControl refreshing={query.isFetching && !query.isLoading} onRefresh={() => void query.refetch()} tintColor={theme.app.primary} />}
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.app.border }} />}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No customers match.</Text>
+              <Text style={{ color: theme.app.mutedForeground }}>No {tab} match.</Text>
             </View>
           }
-          renderItem={({ item }: { item: CustomerRow }) => (
+          renderItem={({ item }: { item: CustomerRow | VendorRow }) => (
             <Pressable
               style={({ pressed }) => [styles.row, { minHeight: minTouchTarget + 16, opacity: pressed ? 0.6 : 1 }]}
-              onPress={() => router.push({ pathname: '/customer/[id]', params: { id: item.id } })}
+              onPress={() => router.push(
+                tab === 'customers'
+                  ? { pathname: '/customer/[id]', params: { id: item.id } }
+                  : { pathname: '/vendor/[id]', params: { id: item.id } },
+              )}
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.app.foreground, fontWeight: '600' }} numberOfLines={1}>{item.name}</Text>
@@ -123,7 +145,7 @@ export default function ClientsScreen() {
 
 const styles = StyleSheet.create({
   header: { padding: spacing.md, paddingBottom: 0 },
-  customersHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
+  listHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   empty: { alignItems: 'center', paddingTop: spacing.xxl },
 });
