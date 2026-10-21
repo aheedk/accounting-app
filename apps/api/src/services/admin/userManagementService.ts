@@ -5,6 +5,7 @@ import type { DB, UserRole } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { hashPassword } from '../auth/passwordHasher.js';
 import { endSessions } from '../auth/accountService.js';
+import { firmSignInSettings } from '../auth/authService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
@@ -85,12 +86,14 @@ export async function createUser(
   const plaintext = generateTempPassword();
   const password_hash = await hashPassword(plaintext);
 
+  // The firm admin sees this password, so the person replaces it before the app opens.
   const row = await trx.insertInto('users').values({
     firm_id: input.firm_id,
     email: input.email,
     password_hash,
     full_name: input.full_name,
     role: input.role,
+    must_change_password: true,
   }).returning(['id', 'email', 'full_name', 'role', 'firm_id', 'created_at'])
     .executeTakeFirstOrThrow();
 
@@ -260,14 +263,15 @@ export async function reactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, inpu
 
 /**
  * Gives a login a new one-time password, shown once to the firm admin to pass
- * on. Lifts a hold from wrong tries and ends the person's sessions. There is no
- * emailed reset link because the app has no mail service.
+ * on; the person must choose their own at their next sign-in, before the app
+ * opens. Lifts a hold from wrong tries and ends the person's sessions. There is
+ * no emailed reset link because the app has no mail service.
  */
 export async function resetUserPassword(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
   const user = await userInFirm(trx, ctx, input.user_id);
   const plaintext = generateTempPassword();
   await trx.updateTable('users')
-    .set({ password_hash: await hashPassword(plaintext), failed_login_count: 0, locked_until: null })
+    .set({ password_hash: await hashPassword(plaintext), failed_login_count: 0, locked_until: null, must_change_password: true })
     .where('id', '=', user.id).execute();
   await endSessions(trx, { user_id: user.id });
   await auditRecord(trx, ctx, {
@@ -289,7 +293,7 @@ export async function signOutUser(trx: Transaction<DB>, ctx: ServiceCtx, input: 
 /** Turns the second step off for someone who has lost the phone it was on. */
 export async function resetUserTwoStep(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
   const user = await userInFirm(trx, ctx, input.user_id);
-  await trx.updateTable('users').set({ totp_secret: null, totp_enabled_at: null }).where('id', '=', user.id).execute();
+  await trx.updateTable('users').set({ totp_secret: null, totp_enabled_at: null, totp_last_step: null }).where('id', '=', user.id).execute();
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_TWO_STEP_RESET, entity_type: 'user', entity_id: user.id, before: null, after: { email: user.email },
   });
@@ -309,4 +313,40 @@ export async function setPayrollAccess(trx: Transaction<DB>, ctx: ServiceCtx, in
     before: { payroll_access: before.payroll_access }, after: { payroll_access: input.allowed },
   });
   return { payroll_access: input.allowed };
+}
+
+// ── The firm's sign-in settings ──────────────────────────────────────────────
+// Set by a firm admin for every login of the firm (security review 2026-10-21):
+// whether everyone must set up the second step, and how long a browser may be
+// left alone before it is signed out. Spec:
+// docs/specs/2026-10-08-accounts-and-roles-design.md, "Firm security settings".
+
+export async function getFirmSecurity(db: Kysely<DB>, firm_id: string) {
+  return firmSignInSettings(db, firm_id);
+}
+
+export async function updateFirmSecurity(
+  trx: Transaction<DB>,
+  ctx: ServiceCtx,
+  input: { require_two_step?: boolean | undefined; idle_sign_out_minutes?: number | undefined },
+) {
+  const before = await firmSignInSettings(trx, ctx.firm_id);
+  if (input.require_two_step && !before.require_two_step) {
+    const me = await trx.selectFrom('users').select('totp_enabled_at').where('id', '=', ctx.user_id).executeTakeFirstOrThrow();
+    if (!me.totp_enabled_at) {
+      throw new BusinessRuleError(ERR.PRECONDITION_FAILED,
+        'Turn on your own second step first (My account), so requiring it cannot lock you out.');
+    }
+  }
+  const patch = {
+    ...(input.require_two_step !== undefined ? { require_two_step: input.require_two_step } : {}),
+    ...(input.idle_sign_out_minutes !== undefined ? { idle_sign_out_minutes: input.idle_sign_out_minutes } : {}),
+  };
+  if (Object.keys(patch).length === 0) return before;
+  await trx.updateTable('firms').set(patch).where('id', '=', ctx.firm_id).execute();
+  const after = await firmSignInSettings(trx, ctx.firm_id);
+  await auditRecord(trx, ctx, {
+    action: AUDIT.FIRM_SECURITY_UPDATE, entity_type: 'firm', entity_id: ctx.firm_id, before, after,
+  });
+  return after;
 }

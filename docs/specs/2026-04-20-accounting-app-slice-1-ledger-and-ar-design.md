@@ -17,7 +17,7 @@
 | Frontend stack | Vite + React + TypeScript + Tailwind + shadcn/ui (Radix-based). |
 | Testing posture | Full pyramid: unit + Postgres-backed integration (Testcontainers) + a small set of Playwright E2E. TDD discipline mandatory for `core/ledgerService`. |
 | Architecture | Monorepo (`apps/api`, `apps/web`, `packages/shared`). Express + Kysely (typed query builder, no ORM). **Belt-and-suspenders invariants: enforced at both service and database layers.** |
-| Auth | JWT access (15-min TTL) + refresh token (180-day rolling, hashed in DB), pattern matching the existing Workout-app. |
+| Auth | JWT access (15-min TTL) + refresh token (rolling, hashed in DB; since 2026-10-21 it ends after the firm's idle limit or 12 hours, see the accounts-and-roles spec), pattern matching the existing Workout-app. |
 
 ---
 
@@ -58,7 +58,7 @@ Netlify (frontend) and Railway (API) are on different origins. Refresh-token coo
 
 ### IN (Slice 1)
 
-- Auth: JWT access + refresh (180-day rolling), login/logout/protected routes
+- Auth: JWT access + refresh (rolling; idle and 12-hour limits since 2026-10-21), login/logout/protected routes
 - RBAC: 4 roles (firm_admin, accountant, staff, client), enforced server-side
 - Multi-tenant scaffolding: `firms`, `businesses`, `users`, `user_business_access` (one firm seeded)
 - Audit log: every state-changing action captured atomically with the mutation
@@ -404,7 +404,7 @@ The contract for the implementation. Every business action that affects books ha
 
 **JWT pattern (matches existing Workout-app):**
 - Access token: HS256-signed, 15-min TTL, contains `user_id`, `firm_id`, `role`, `iat`, `exp`. Sent as `Authorization: Bearer …`.
-- Refresh token: opaque random string, hashed (bcrypt) and stored in `refresh_tokens`. 180-day rolling expiry, rotated on every `/auth/refresh`. Stored client-side in an `httpOnly + Secure + SameSite=None` cookie (cross-origin, with strict CORS allowlist).
+- Refresh token: opaque random string, hashed (bcrypt) and stored in `refresh_tokens`. Rolling expiry (since 2026-10-21: the firm's idle limit, at most 12 hours from signing in), rotated on every `/auth/refresh`; a replaced token used again ends its session. Stored client-side in an `httpOnly + Secure + SameSite=None` cookie (cross-origin, with strict CORS allowlist).
 - Endpoints: `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` (revokes refresh).
 - No password reset in Slice 1 (admin resets `password_hash` directly).
 

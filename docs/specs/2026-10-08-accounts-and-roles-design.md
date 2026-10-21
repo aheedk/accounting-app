@@ -3,6 +3,8 @@
 **Status:** Implemented 2026-10-08 (migrations `0091`–`0095`). It is the "features there
 should be" list from the role audit (`docs/qa/2026-10-08-role-audit.md`), built. Three
 items on that list need something from outside and are not built; they are at the end.
+Signing in was tightened on 2026-10-21 (migration `0107`, "Firm security settings"
+below; the reasons are in `docs/qa/2026-10-20-security-review.md`).
 
 Everything here is off, or unchanged, until someone turns it on: no login is switched
 off, nobody has two-step sign-in, payroll is open as before, and no company asks for
@@ -16,21 +18,56 @@ approval.
   firm admin.
 - **Passwords.** Anyone changes their own under My account; every other browser is
   signed out. A firm admin can give a login a new one-time password, shown once. There
-  is no emailed reset link because the app has no mail service.
+  is no emailed reset link because the app has no mail service. A password a firm admin
+  made (a new login, or a reset) must be replaced by the person's own at their first
+  sign-in with it, before the app opens. A new password needs 10 characters at least
+  and is refused when it is a run (`1234567890`), is built on a word attackers try first
+  (`Password2026!`, `Summer123`), or holds the person's own email or name
+  (`packages/shared/src/passwords.ts`).
 - **Wrong passwords.** Five in a row hold a login for fifteen minutes. A new password
-  from a firm admin lifts the hold.
+  from a firm admin lifts the hold. A wrong current password given from inside a session
+  (changing the password, turning the second step off) counts too, and the fifth also
+  ends every session of the login.
 - **Two-step sign-in.** A 6-digit code from any authenticator app (RFC 6238), after the
   password. Each person turns it on for themselves; it counts only once confirmed with
   a code, so an abandoned set-up locks nobody out. A firm admin can turn it off for
   someone who has lost their phone. The secret is encrypted with the same key as social
-  security numbers. *Not built:* a QR code (the key is typed in), and requiring it for
-  a role.
+  security numbers. A code is good once: the 30-second step of the last code accepted is
+  kept, and a code from that step or before is refused. A firm can require it of every
+  login (below). *Not built:* a QR code (the key is typed in), and requiring it of one
+  role only.
 - **Sessions.** Each sign-in is a session, and the access token names it. My account
   lists where a person is signed in, with Sign out for one or for all the others.
   Signing out stops the access token at once, not when it expires.
   *How:* which sessions have ended is kept in memory in the API and reloaded from the
   database on start. One API instance runs today. With more than one, the others would
   catch up within the token's fifteen minutes, not at once.
+- **How long a session lasts.** The browser renews its session while the person uses the
+  app. Left alone for the firm's idle limit (an hour unless changed), it is signed out:
+  the app warns two minutes before ("Still there?") and the sign-in page then says why;
+  the API also refuses to renew a session not renewed within the limit, so a closed or
+  frozen tab cannot be picked up later. Whatever the limit, a session ends 12 hours after
+  signing in. The refresh cookie lasts no longer than the session may.
+- **A copied sign-in key.** The refresh token is replaced each time it is used. If one
+  that was replaced more than a minute ago comes back, someone kept a copy: the whole
+  session is ended and the Activity Log says so. Within the minute it is only refused,
+  as two tabs renewing together do that.
+
+## Firm security settings
+
+Setup → Users, "Sign-in security", firm admins only (`GET`/`PATCH /me/firm/security`):
+
+| Setting | Default | What it does |
+|---|---|---|
+| Require the second step for every login | Off | Anyone without it set up is asked to set it up at their next sign-in, before anything else. A firm admin can turn it on only with their own second step on, so it cannot lock them out. While it is on, a person cannot turn theirs off; a lost phone is a firm admin's reset, then a new set-up at sign-in. |
+| Sign out a browser left alone for | 1 hour | 15 minutes, 30 minutes, 1, 2 or 3 hours, as QuickBooks offers. |
+
+**The set-up gate.** A login with steps left (its own password, the second step) signs
+in, but its access token says so, and the API answers only `/me` and `/auth/*` for it
+(`ACCOUNT_SETUP_REQUIRED`, 403, from `middleware/auth.ts`). The web app shows only the
+set-up page; each step renews the session, which then carries what is left. A firm
+turning the second step on reaches people already signed in at their next renewal,
+within fifteen minutes.
 
 ## Roles
 

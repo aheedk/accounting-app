@@ -62,12 +62,23 @@ export function totpCode(secret: string, atMs: number = Date.now()): string {
  * for a phone whose clock is a little off and for the seconds spent typing.
  */
 export function verifyTotp(secret: string, code: string, atMs: number = Date.now()): boolean {
+  return totpStep(secret, code, atMs) !== null;
+}
+
+/**
+ * The 30-second step `code` belongs to, or null when it is not right. Saving
+ * the step of each code accepted and refusing any step not after it makes a
+ * code good once (security review 2026-10-21).
+ */
+export function totpStep(secret: string, code: string, atMs: number = Date.now()): number | null {
   const given = Buffer.from(code.replace(/\s/g, ''));
-  if (given.length !== DIGITS) return false;
-  return [-1, 0, 1].some(step => {
-    const expected = Buffer.from(totpCode(secret, atMs + step * STEP_SECONDS * 1000));
-    return timingSafeEqual(given, expected);
-  });
+  if (given.length !== DIGITS) return null;
+  const now = Math.floor(atMs / 1000 / STEP_SECONDS);
+  for (const offset of [-1, 0, 1]) {
+    const expected = Buffer.from(totpCode(secret, atMs + offset * STEP_SECONDS * 1000));
+    if (timingSafeEqual(given, expected)) return now + offset;
+  }
+  return null;
 }
 
 /** What an authenticator app reads to add the account (as a link or a QR code). */

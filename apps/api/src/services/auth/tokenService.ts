@@ -3,12 +3,17 @@ import jwt from 'jsonwebtoken';
 import { config } from '../../config.js';
 import type { UserRole } from '../../db/types.js';
 
+/** What a login must do before the app opens: choose its own password, set up the second step. */
+export type SetupStep = 'password' | 'two_step';
+
 type AccessClaims = {
   user_id: string;
   firm_id: string;
   role: UserRole;
   /** The session (sign-in) this token belongs to, so one session can be ended without the others. */
   sid?: string;
+  /** Present while the login has steps left (SetupStep): the token then opens only its own account. */
+  setup?: SetupStep[];
 };
 
 export function signAccessToken(claims: AccessClaims): string {

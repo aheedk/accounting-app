@@ -256,6 +256,10 @@ export const AUDIT = {
   ESTIMATE_STATUS: 'estimate.status',
   ESTIMATE_CONVERT: 'estimate.convert',
   ESTIMATE_DELETE: 'estimate.delete',
+
+  // Signing in, second pass (security review 2026-10-21)
+  AUTH_REFRESH_REUSE: 'auth.refresh_reuse',
+  FIRM_SECURITY_UPDATE: 'firm.security_update',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

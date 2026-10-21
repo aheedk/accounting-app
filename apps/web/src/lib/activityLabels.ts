@@ -19,6 +19,8 @@ const VERBS: Record<string, string> = {
   two_step_enable: 'Turned on the second step',
   two_step_disable: 'Turned off the second step',
   two_step_reset: 'Second step turned off',
+  refresh_reuse: 'Session ended: an old sign-in key was used again',
+  security_update: 'Changed the sign-in settings',
   deactivate: 'Switched off',
   reactivate: 'Switched back on',
   grant: 'Access given',

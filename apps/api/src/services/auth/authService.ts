@@ -3,12 +3,11 @@ import { sql } from 'kysely';
 import { AUDIT, ERR } from '@accounting/shared';
 import type { DB, UserRole } from '../../db/types.js';
 import { AuthError } from '../../lib/errors.js';
-import { config } from '../../config.js';
 import { hashPassword, verifyPassword } from './passwordHasher.js';
 import { decryptField } from '../../lib/fieldCrypto.js';
-import { verifyTotp } from './totp.js';
+import { totpStep } from './totp.js';
 import { revokeSession } from './sessionRevocation.js';
-import { generateRefreshToken, hashRefreshToken, signAccessToken } from './tokenService.js';
+import { generateRefreshToken, hashRefreshToken, signAccessToken, type SetupStep } from './tokenService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
@@ -16,7 +15,7 @@ export type LoginInput = { email: string; password: string; code?: string | unde
 
 // Five wrong tries in a row hold the login for fifteen minutes. A firm admin
 // resetting the password lifts the hold.
-const MAX_FAILED_LOGINS = 5;
+export const MAX_FAILED_LOGINS = 5;
 
 // Checked against when the email is unknown, so a wrong email takes as long to
 // answer as a wrong password and the timing does not tell which emails have logins.
@@ -25,13 +24,55 @@ function unknownEmailHash(): Promise<string> {
   stubHash ??= hashPassword(`no login has this password ${Math.random()}`);
   return stubHash;
 }
-const LOCK_MINUTES = 15;
+export const LOCK_MINUTES = 15;
 export type ReqMeta = { request_id: string; ip_address: string; user_agent: string };
+
+// How long a session lasts (security review 2026-10-21). It is renewed while
+// the person uses the app, and ends after the firm's idle limit with nothing
+// done (idle_sign_out_minutes, an hour unless changed), or 12 hours after
+// signing in, whichever comes first; then the password (and code) again.
+export const MAX_SESSION_HOURS = 12;
+// A sign-in key (refresh token) replaced more than this long ago and then used
+// again was copied: the session it belongs to is ended. Two tabs renewing at
+// the same moment fall inside it, and are only refused.
+const REUSE_GRACE_MS = 60 * 1000;
+
+/** When a refresh token issued now stops working: the idle limit or the session limit, the sooner. */
+function refreshExpiry(sessionStartedAt: Date, idleMinutes: number, now = Date.now()): Date {
+  return new Date(Math.min(now + idleMinutes * 60_000, sessionStartedAt.getTime() + MAX_SESSION_HOURS * 3600_000));
+}
+
+/** The firm's sign-in settings (migration 0107). */
+export async function firmSignInSettings(
+  db: Kysely<DB>, firm_id: string,
+): Promise<{ require_two_step: boolean; idle_sign_out_minutes: number }> {
+  return db.selectFrom('firms').select(['require_two_step', 'idle_sign_out_minutes'])
+    .where('id', '=', firm_id).executeTakeFirstOrThrow();
+}
+
+/** What the login must do before the app opens to it. */
+export function setupSteps(
+  user: { must_change_password: boolean; totp_enabled_at: unknown },
+  firm: { require_two_step: boolean },
+): SetupStep[] {
+  const steps: SetupStep[] = [];
+  if (user.must_change_password) steps.push('password');
+  if (firm.require_two_step && !user.totp_enabled_at) steps.push('two_step');
+  return steps;
+}
 
 export type LoginResult = {
   access_token: string;
   refresh_token: string; // raw; API caller is responsible for cookie-setting
-  user: { id: string; email: string; full_name: string; role: UserRole; firm_id: string; payroll_access: boolean };
+  /** When the refresh token stops working, for the cookie's lifetime. */
+  refresh_expires_at: Date;
+  user: {
+    id: string; email: string; full_name: string; role: UserRole; firm_id: string; payroll_access: boolean;
+    /** Steps left before the app opens; empty when there are none. */
+    setup_required: SetupStep[];
+    /** The browser signs out after this long with nothing done. */
+    idle_sign_out_minutes: number;
+  };
   /** `fiscal_year_start_month` (1 to 12) is what "This year" means for that company. */
   businesses: Array<{ id: string; name: string; role_override: UserRole | null; fiscal_year_start_month: number }>;
 };
@@ -135,18 +176,29 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
     if (!input.code) {
       throw new AuthError(ERR.TWO_STEP_REQUIRED, 'Enter the 6-digit code from your authenticator app.');
     }
-    if (!verifyTotp(decryptField(preUser.totp_secret), input.code)) {
+    const step = totpStep(decryptField(preUser.totp_secret), input.code);
+    // A code is good once: its step must come after the last one accepted. The
+    // check and the save are one statement, so two sign-ins with one code cannot both pass.
+    const taken = step === null ? undefined : await db.updateTable('users').set({ totp_last_step: step })
+      .where('id', '=', preUser.id)
+      .where(eb => eb.or([eb('totp_last_step', 'is', null), eb('totp_last_step', '<', String(step))]))
+      .returning('id').executeTakeFirst();
+    if (!taken) {
       await failed(preUser, 'code');
-      throw new AuthError(ERR.INVALID_CREDENTIALS, 'That code is not right. Check the app and try again.');
+      throw new AuthError(ERR.INVALID_CREDENTIALS, step === null
+        ? 'That code is not right. Check the app and try again.'
+        : 'That code was already used. Wait for the next one.');
     }
   }
+
+  const firm = await firmSignInSettings(db, preUser.firm_id);
 
   return db.transaction().execute(async (trx) => {
     const user = preUser;
 
     const raw = generateRefreshToken();
     const token_hash = await hashRefreshToken(raw);
-    const expires_at = new Date(Date.now() + config.JWT_REFRESH_TTL_DAYS * 24 * 3600 * 1000);
+    const expires_at = refreshExpiry(new Date(), firm.idle_sign_out_minutes);
     const session = await trx.insertInto('refresh_tokens').values({
       user_id: user.id, token_hash, expires_at: expires_at.toISOString() as unknown as string,
       user_agent: meta.user_agent || null, ip_address: meta.ip_address || null,
@@ -165,22 +217,60 @@ export async function login(db: Kysely<DB>, input: LoginInput, meta: ReqMeta): P
       after: { email: user.email },
     });
 
+    const setup = setupSteps(user, firm);
     return {
-      access_token: signAccessToken({ user_id: user.id, firm_id: user.firm_id, role: user.role, sid: session.session_id }),
+      access_token: signAccessToken({
+        user_id: user.id, firm_id: user.firm_id, role: user.role, sid: session.session_id, ...(setup.length ? { setup } : {}),
+      }),
       refresh_token: raw,
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id, payroll_access: mayOpenPayroll(user) },
+      refresh_expires_at: expires_at,
+      user: {
+        id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id,
+        payroll_access: mayOpenPayroll(user), setup_required: setup, idle_sign_out_minutes: firm.idle_sign_out_minutes,
+      },
       businesses,
     };
   });
 }
 
+/**
+ * A sign-in key that was replaced a while ago has come back: someone kept a
+ * copy. The session it belongs to is ended, so neither the copy nor the
+ * browser it was taken from can carry on; the person signs in again.
+ * Committed on its own, as the refusal that follows rolls back.
+ */
+async function endCopiedSession(db: Kysely<DB>, row: { user_id: string; session_id: string }, meta: ReqMeta): Promise<void> {
+  await db.transaction().execute(async (trx) => {
+    const ended = await trx.updateTable('refresh_tokens').set({ revoked_at: sql`now()` })
+      .where('session_id', '=', row.session_id).where('revoked_at', 'is', null)
+      .returning('id').execute();
+    if (ended.length === 0) return; // already signed out: nothing left to end
+    revokeSession(row.session_id);
+    const user = await trx.selectFrom('users').selectAll().where('id', '=', row.user_id).executeTakeFirst();
+    if (user) {
+      await auditRecord(trx, ctxFromLogin(user, meta), {
+        action: AUDIT.AUTH_REFRESH_REUSE, entity_type: 'user', entity_id: user.id, before: null,
+        after: { session_id: row.session_id },
+      });
+    }
+  });
+}
+
 export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: ReqMeta): Promise<LoginResult> {
+  const token_hash = await hashRefreshToken(rawRefreshToken);
+  const replaced = await db.selectFrom('refresh_tokens').select(['user_id', 'session_id', 'revoked_at'])
+    .where('token_hash', '=', token_hash).executeTakeFirst();
+  if (replaced?.revoked_at && Date.now() - new Date(replaced.revoked_at).getTime() > REUSE_GRACE_MS) {
+    await endCopiedSession(db, replaced, meta);
+  }
+
   return db.transaction().execute(async (trx) => {
-    const token_hash = await hashRefreshToken(rawRefreshToken);
+    // Locked, so two renewals with one key cannot both pass: the second waits, then finds it replaced.
     const row = await trx
       .selectFrom('refresh_tokens')
       .selectAll()
       .where('token_hash', '=', token_hash)
+      .forUpdate()
       .executeTakeFirst();
     if (!row || row.revoked_at !== null || new Date(row.expires_at).getTime() < Date.now()) {
       throw new AuthError(ERR.TOKEN_EXPIRED, 'Refresh token invalid or expired');
@@ -189,11 +279,20 @@ export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: Req
     if (!user) throw new AuthError(ERR.UNAUTHORIZED, 'User no longer exists');
     if (user.deactivated_at) throw new AuthError(ERR.UNAUTHORIZED, 'This login has been switched off');
 
+    // Left alone past the firm's limit, or signed in too long ago: the session is over.
+    // Checked here as well as by expires_at, which a token from before these limits does not carry.
+    const firm = await firmSignInSettings(trx, user.firm_id);
+    const startedAt = new Date(row.session_started_at);
+    const idleMs = Date.now() - new Date(row.created_at as unknown as string).getTime();
+    if (idleMs > firm.idle_sign_out_minutes * 60_000 || Date.now() - startedAt.getTime() > MAX_SESSION_HOURS * 3600_000) {
+      throw new AuthError(ERR.TOKEN_EXPIRED, 'The session has ended. Sign in again.');
+    }
+
     // rotate: the new token is the same session, so it keeps when the person signed in.
     await trx.updateTable('refresh_tokens').set({ revoked_at: sql`now()` }).where('id', '=', row.id).execute();
     const newRaw = generateRefreshToken();
     const newHash = await hashRefreshToken(newRaw);
-    const expires_at = new Date(Date.now() + config.JWT_REFRESH_TTL_DAYS * 24 * 3600 * 1000);
+    const expires_at = refreshExpiry(startedAt, firm.idle_sign_out_minutes);
     await trx.insertInto('refresh_tokens').values({
       user_id: user.id, token_hash: newHash, expires_at: expires_at.toISOString() as unknown as string,
       session_id: row.session_id,
@@ -211,10 +310,18 @@ export async function refresh(db: Kysely<DB>, rawRefreshToken: string, meta: Req
       after: null,
     });
 
+    // Worked out afresh, so a renewal after a step is done opens the app.
+    const setup = setupSteps(user, firm);
     return {
-      access_token: signAccessToken({ user_id: user.id, firm_id: user.firm_id, role: user.role, sid: row.session_id }),
+      access_token: signAccessToken({
+        user_id: user.id, firm_id: user.firm_id, role: user.role, sid: row.session_id, ...(setup.length ? { setup } : {}),
+      }),
       refresh_token: newRaw,
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id, payroll_access: mayOpenPayroll(user) },
+      refresh_expires_at: expires_at,
+      user: {
+        id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id,
+        payroll_access: mayOpenPayroll(user), setup_required: setup, idle_sign_out_minutes: firm.idle_sign_out_minutes,
+      },
       businesses,
     };
   });

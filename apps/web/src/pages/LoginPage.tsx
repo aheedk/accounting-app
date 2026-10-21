@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/auth/useAuth';
+import { clearSignedOutIdle, readSignedOutIdle } from '@/lib/idleSession';
 
 type ApiError = { response?: { data?: { error?: { code?: string; message?: string } } } };
 
@@ -20,6 +21,9 @@ export default function LoginPage() {
   const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The browser was signed out for being left alone this many minutes: said once.
+  const [idleMinutes] = useState(readSignedOutIdle);
+  useEffect(clearSignedOutIdle, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +50,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader><CardTitle>Sign in</CardTitle></CardHeader>
         <CardContent>
+          {idleMinutes !== null && (
+            <p className="mb-4 rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              You were signed out after {idleMinutes >= 60 ? `${idleMinutes / 60} hour${idleMinutes === 60 ? '' : 's'}` : `${idleMinutes} minutes`} with nothing done.
+            </p>
+          )}
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

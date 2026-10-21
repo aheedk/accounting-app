@@ -26,6 +26,20 @@ function ctxFromReq(req: Request): ServiceCtx {
 
 // Firm-scoped user management. No business resolution — firm_admin only.
 router.use('/me/firm/users', requireAuth, requireMinRole('firm_admin'));
+router.use('/me/firm/security', requireAuth, requireMinRole('firm_admin'));
+
+// The firm's sign-in settings: the second step for everyone, and the idle sign-out.
+router.get('/me/firm/security', async (req, res, next) => {
+  try { res.json(await userSvc.getFirmSecurity(db, req.auth!.firm_id)); }
+  catch (e) { next(e); }
+});
+
+router.patch('/me/firm/security', async (req, res, next) => {
+  try {
+    const body = schemas.firmSecuritySchema.parse(req.body);
+    res.json(await db.transaction().execute(trx => userSvc.updateFirmSecurity(trx, ctxFromReq(req), body)));
+  } catch (e) { next(e); }
+});
 
 router.get('/me/firm/users', async (req, res, next) => {
   try {

@@ -10,9 +10,11 @@ import { fmtDateTime } from '@/lib/dates';
 import { flashMessage } from '@/lib/flash';
 import { roleLabel } from '@/lib/roleAccess';
 import { describeBrowser } from '@/lib/browserName';
+import { ChangePasswordForm } from '@/components/account/ChangePasswordForm';
+import { TwoStepSetupForm } from '@/components/account/TwoStepSetupForm';
 
 type Session = { id: string; started_at: string; last_active_at: string; user_agent: string | null; ip_address: string | null; current: boolean };
-type Account = { email: string; two_step_enabled: boolean; sessions: Session[] };
+type Account = { email: string; two_step_enabled: boolean; two_step_required: boolean; sessions: Session[] };
 
 // The signed-in person's own login: password, the second step of signing in,
 // and where they are signed in. Every role has this page.
@@ -27,28 +29,7 @@ export default function AccountPage() {
   }, []);
   useEffect(() => { void reload(); }, [reload]);
 
-  // ── Password
-  const [password, setPassword] = useState({ current: '', next: '', again: '' });
-  const [passwordErr, setPasswordErr] = useState<string | null>(null);
-  const [passwordBusy, setPasswordBusy] = useState(false);
-
-  async function changePassword(e: React.FormEvent) {
-    e.preventDefault();
-    setPasswordErr(null);
-    if (password.next !== password.again) { setPasswordErr('The two new passwords are not the same.'); return; }
-    setPasswordBusy(true);
-    try {
-      await api.post('/auth/password', { current_password: password.current, new_password: password.next });
-      setPassword({ current: '', next: '', again: '' });
-      flashMessage('Password changed. Other browsers were signed out.', 4000);
-      await reload();
-    } catch (e: unknown) { setPasswordErr(pickErr(e)); }
-    finally { setPasswordBusy(false); }
-  }
-
   // ── Second step
-  const [setup, setSetup] = useState<{ secret: string; otpauth_uri: string } | null>(null);
-  const [code, setCode] = useState('');
   const [offPassword, setOffPassword] = useState('');
   const [turningOff, setTurningOff] = useState(false);
   const [stepErr, setStepErr] = useState<string | null>(null);
@@ -60,18 +41,6 @@ export default function AccountPage() {
     catch (e: unknown) { setStepErr(pickErr(e)); }
     finally { setStepBusy(false); }
   }
-  const beginSetup = () => stepAction(async () => {
-    setSetup((await api.post<{ secret: string; otpauth_uri: string }>('/auth/two-step/setup')).data);
-    setCode('');
-  });
-  const confirmSetup = (e: React.FormEvent) => {
-    e.preventDefault();
-    return stepAction(async () => {
-      await api.post('/auth/two-step/confirm', { code });
-      setSetup(null);
-      flashMessage('The second step is on.');
-    });
-  };
   const turnOff = (e: React.FormEvent) => {
     e.preventDefault();
     return stepAction(async () => {
@@ -112,23 +81,13 @@ export default function AccountPage() {
       <Card>
         <CardHeader><CardTitle>Password</CardTitle></CardHeader>
         <CardContent>
-          <form className="grid gap-3 sm:grid-cols-3" onSubmit={changePassword}>
-            <div>
-              <Label htmlFor="current-password">Current password</Label>
-              <Input id="current-password" type="password" autoComplete="current-password" value={password.current} onChange={e => setPassword(p => ({ ...p, current: e.target.value }))} required />
-            </div>
-            <div>
-              <Label htmlFor="new-password">New password</Label>
-              <Input id="new-password" type="password" autoComplete="new-password" minLength={10} value={password.next} onChange={e => setPassword(p => ({ ...p, next: e.target.value }))} required />
-            </div>
-            <div>
-              <Label htmlFor="new-password-again">New password again</Label>
-              <Input id="new-password-again" type="password" autoComplete="new-password" minLength={10} value={password.again} onChange={e => setPassword(p => ({ ...p, again: e.target.value }))} required />
-            </div>
-            <p className="text-xs text-muted-foreground sm:col-span-3">At least 10 characters. Changing it signs you out of every other browser.</p>
-            {passwordErr && <p className="text-sm text-destructive sm:col-span-3">{passwordErr}</p>}
-            <div className="sm:col-span-3"><Button type="submit" disabled={passwordBusy}>{passwordBusy ? 'Saving…' : 'Change password'}</Button></div>
-          </form>
+          <ChangePasswordForm
+            note="Changing it signs you out of every other browser."
+            onChanged={async () => {
+              flashMessage('Password changed. Other browsers were signed out.', 4000);
+              await reload();
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -143,7 +102,10 @@ export default function AccountPage() {
           {account?.two_step_enabled ? (
             <>
               <p><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">On</span></p>
-              {turningOff ? (
+              {account.two_step_required ? (
+                // Moving it to a new phone: a firm admin resets it, then it is set up again at sign-in.
+                <p className="text-muted-foreground">Your firm requires the second step. New phone? Ask a firm admin to reset it, then set it up again when you sign in.</p>
+              ) : turningOff ? (
                 <form className="flex flex-wrap items-end gap-2" onSubmit={turnOff}>
                   <div>
                     <Label htmlFor="off-password">Your password</Label>
@@ -156,28 +118,9 @@ export default function AccountPage() {
                 <Button variant="outline" onClick={() => setTurningOff(true)}>Turn off</Button>
               )}
             </>
-          ) : setup ? (
-            <form className="space-y-3" onSubmit={confirmSetup}>
-              <ol className="list-decimal space-y-2 pl-5">
-                <li>In your authenticator app, add an account and choose to enter a setup key.</li>
-                <li>
-                  Type this key (the account name can be anything, such as your email):
-                  <div className="mt-1 select-all break-all rounded-md bg-muted p-3 font-mono text-sm tracking-wider">{setup.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
-                  <a className="mt-1 inline-block text-xs text-link hover:underline" href={setup.otpauth_uri}>On this phone? Open it in the app.</a>
-                </li>
-                <li>
-                  <Label htmlFor="setup-code">Enter the 6-digit code the app shows</Label>
-                  <Input id="setup-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="mt-1 w-40 font-mono tracking-widest" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} required />
-                </li>
-              </ol>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={stepBusy || code.length !== 6}>Turn on</Button>
-                <Button type="button" variant="ghost" onClick={() => { setSetup(null); setStepErr(null); }}>Cancel</Button>
-              </div>
-            </form>
-          ) : (
-            <Button onClick={() => void beginSetup()} disabled={stepBusy || !account}>Set it up</Button>
-          )}
+          ) : account ? (
+            <TwoStepSetupForm onEnabled={async () => { flashMessage('The second step is on.'); await reload(); }} />
+          ) : null}
           {stepErr && <p className="text-sm text-destructive">{stepErr}</p>}
         </CardContent>
       </Card>

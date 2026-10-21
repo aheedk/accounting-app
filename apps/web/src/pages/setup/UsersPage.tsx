@@ -10,6 +10,7 @@ import { downloadAsExcel } from '@/lib/download';
 import { AppSelect } from '../../components/ui/select';
 import { printReport } from '@/lib/reportExport';
 import { ROLE_LABELS } from '@accounting/shared';
+import { FirmSignInSettings } from '@/components/account/FirmSignInSettings';
 
 type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
 const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'viewer', 'client'];
@@ -250,7 +251,8 @@ export default function UsersPage() {
           <CardContent className="space-y-3 text-sm">
             <p>
               <strong>{createdUser.user.email}</strong> was created. Share the temporary
-              password below now — it will not be shown again.
+              password below now — it will not be shown again. They choose their own the
+              first time they sign in.
             </p>
             <div className="rounded-md bg-muted p-3 font-mono text-sm break-all">
               {createdUser.plaintext_password}
@@ -270,7 +272,7 @@ export default function UsersPage() {
           <CardContent className="space-y-3 text-sm">
             <p>
               <strong>{resetResult.email}</strong> has a new password and was signed out everywhere.
-              Pass it on now — it will not be shown again. They can change it under My account.
+              Pass it on now — it will not be shown again. They choose their own the next time they sign in.
             </p>
             <div className="rounded-md bg-muted p-3 font-mono text-sm break-all">{resetResult.password}</div>
             <div>
@@ -451,6 +453,8 @@ export default function UsersPage() {
           </table>
         </CardContent>
       </Card>
+
+      <FirmSignInSettings withoutTwoStep={users.filter(u => !u.deactivated_at && !u.two_step_enabled).length} />
     </div>
   );
 }

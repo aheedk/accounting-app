@@ -9,6 +9,10 @@ export interface FirmsTable {
   name: string;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
+  // Firm security settings (migration 0107): every login sets up the second
+  // step; a browser left alone this many minutes is signed out.
+  require_two_step: Generated<boolean>;
+  idle_sign_out_minutes: Generated<number>;
 }
 
 export interface BusinessAddress {
@@ -69,6 +73,10 @@ export interface UsersTable {
   totp_enabled_at: Timestamp | null;
   // Whether this login may open payroll (migration 0093). A firm admin always may.
   payroll_access: Generated<boolean>;
+  // Migration 0107: the password was made by a firm admin and must be replaced
+  // before the app opens; the 30-second step of the last code accepted (bigint).
+  must_change_password: Generated<boolean>;
+  totp_last_step: ColumnType<string | null, string | number | null | undefined, string | number | null>;
 }
 
 export interface UserBusinessAccessTable {

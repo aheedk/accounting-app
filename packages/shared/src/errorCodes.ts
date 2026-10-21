@@ -11,6 +11,9 @@ export const ERR = {
   ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
   // The password was right and the login asks for a code from an authenticator app.
   TWO_STEP_REQUIRED: 'TWO_STEP_REQUIRED',
+  // Signed in, but the login must first choose its own password or set up the
+  // second step; nothing else opens until it has.
+  ACCOUNT_SETUP_REQUIRED: 'ACCOUNT_SETUP_REQUIRED',
 
   // Resource
   NOT_FOUND: 'NOT_FOUND',

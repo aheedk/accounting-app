@@ -139,7 +139,8 @@ describe('accounts and signing in', () => {
     expect(noCode.token).toBeUndefined();
     const offByOne = totpCode(secret) === '000000' ? '000001' : '000000';
     expect((await signIn('pat@x.com', PASSWORD, offByOne)).status).toBe(401);
-    expect((await signIn('pat@x.com', PASSWORD, totpCode(secret))).status).toBe(200);
+    // The code that turned it on is used up; the app's next one signs in.
+    expect((await signIn('pat@x.com', PASSWORD, totpCode(secret, Date.now() + 30_000))).status).toBe(200);
 
     const admin = await signIn('admin@x.com');
     expect((await as(admin).post(`/me/firm/users/${await userId('pat@x.com')}/reset-two-step`)).status).toBe(200);

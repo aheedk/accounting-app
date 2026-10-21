@@ -6,4 +6,5 @@ export * from './errorCodes.js';
 export * from './roles.js';
 export * from './accountGroups.js';
 export * from './statementBalance.js';
+export * from './passwords.js';
 export * as schemas from './schemas/index.js';

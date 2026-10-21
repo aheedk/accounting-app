@@ -22,13 +22,14 @@ function reqMeta(req: Request) {
 
 const REFRESH_COOKIE = 'acct_rt';
 
-function setRefreshCookie(res: Response, raw: string) {
-  const maxAge = config.JWT_REFRESH_TTL_DAYS * 24 * 3600 * 1000;
+// The cookie lasts as long as the session may (the idle limit or the session
+// limit, see authService), so the browser drops it when the API would refuse it.
+function setRefreshCookie(res: Response, raw: string, expiresAt: Date) {
   res.cookie(REFRESH_COOKIE, raw, {
     httpOnly: true,
     secure: config.NODE_ENV !== 'development',
     sameSite: config.NODE_ENV === 'development' ? 'lax' : 'none',
-    maxAge,
+    maxAge: Math.max(0, expiresAt.getTime() - Date.now()),
     path: '/auth',
   });
 }
@@ -48,9 +49,9 @@ router.post('/auth/login', async (req, res, next) => {
       throw e;
     }
     clearSignInFailures(address);
-    setRefreshCookie(res, out.refresh_token);
-    const { refresh_token: _rt, ...publicOut } = out;
-    void _rt;
+    setRefreshCookie(res, out.refresh_token, out.refresh_expires_at);
+    const { refresh_token: _rt, refresh_expires_at: _exp, ...publicOut } = out;
+    void _rt; void _exp;
     res.json(publicOut);
   } catch (e) { next(e); }
 });
@@ -60,9 +61,9 @@ router.post('/auth/refresh', async (req, res, next) => {
     const raw = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     if (!raw) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'No refresh cookie' } });
     const out = await refresh(db, raw, reqMeta(req));
-    setRefreshCookie(res, out.refresh_token);
-    const { refresh_token: _rt, ...publicOut } = out;
-    void _rt;
+    setRefreshCookie(res, out.refresh_token, out.refresh_expires_at);
+    const { refresh_token: _rt, refresh_expires_at: _exp, ...publicOut } = out;
+    void _rt; void _exp;
     res.json(publicOut);
   } catch (e) { next(e); }
 });
@@ -102,13 +103,22 @@ router.get('/auth/account', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// A wrong current password counts toward the same hold as a wrong sign-in, so a
+// session in the wrong hands cannot be used to guess the password. Counted once
+// the request's own transaction has rolled back.
+async function countIfWrongPassword(req: Request, e: unknown): Promise<void> {
+  if (!(e instanceof account.WrongPasswordError)) return;
+  try { await account.countWrongPassword(db, ctxFromReq(req)); }
+  catch (countErr: unknown) { console.error(`[${req.request_id}] counting a wrong password failed`, countErr); }
+}
+
 router.post('/auth/password', requireAuth, async (req, res, next) => {
   try {
     const body = schemas.passwordChangeSchema.parse(req.body);
     const keep = await currentTokenHash(req);
     await db.transaction().execute(trx => account.changePassword(trx, ctxFromReq(req), { ...body, keep_token_hash: keep }));
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) { await countIfWrongPassword(req, e); next(e); }
 });
 
 // Sign out everywhere else, keeping this browser.
@@ -145,7 +155,7 @@ router.post('/auth/two-step/off', requireAuth, async (req, res, next) => {
     const body = schemas.twoStepOffSchema.parse(req.body);
     await db.transaction().execute(trx => account.turnOffTwoStep(trx, ctxFromReq(req), body));
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) { await countIfWrongPassword(req, e); next(e); }
 });
 
 export default router;

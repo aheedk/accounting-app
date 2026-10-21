@@ -141,6 +141,41 @@ text, never formulas.
   `Permissions-Policy` refusing the camera, microphone, location and payment
   prompts, none of which the app uses.
 
+### Signing in
+
+What a session could do, and how long it lasted, was the weakest part left. All
+of it is in the accounts-and-roles spec
+(`../specs/2026-10-08-accounts-and-roles-design.md`); migration `0107`; tests in
+`signInSecurity.test.ts`.
+
+- **Sessions lasted 180 days.** A refresh cookie renewed itself for half a year,
+  so a laptop left open, or a cookie copied once, stayed signed in. **Now:** a
+  browser left alone for the firm's limit (an hour unless a firm admin changes
+  it, as in QuickBooks) is signed out, with a warning two minutes before, and the
+  API refuses to renew a session past that limit itself. Every session ends 12
+  hours after signing in.
+- **A copied sign-in key went unnoticed.** Each renewal replaces the key; an old
+  one just failed. **Now:** a key replaced more than a minute ago coming back ends
+  the whole session (the thief's copy and the real browser both), and the
+  Activity Log records it.
+- **A code from the authenticator app worked twice** within its minute (read
+  over a shoulder, or replayed). **Now:** each code is good once.
+- **The one-time password from a firm admin stayed in use.** The admin knows it.
+  **Now:** the person chooses their own at the first sign-in, before anything
+  else opens.
+- **The firm could not require the second step.** **Now** it can (Setup → Users,
+  "Sign-in security"); anyone without it sets it up at their next sign-in.
+- **Weak passwords were accepted** if they had 10 characters (`Password2026`).
+  **Now** passwords built on the words attackers try first, runs like
+  `1234567890`, and the person's own name or email are refused.
+- **A session could be used to guess its own password** (change password, turn
+  the second step off) without limit. **Now** those count toward the five-try
+  hold, and the fifth ends every session of the login.
+
+**The mobile app** signs in with the same API. It keeps only the access token, so
+it was already signed out within fifteen minutes; a login with a set-up step left
+gets the same 403 there, and sets up in the web app.
+
 ## Still open
 
 - **Enforce the Content-Security-Policy** once the report-only one shows no
@@ -148,6 +183,10 @@ text, never formulas.
 - **The access token is kept in the browser's local storage**, the usual
   trade-off for a single-page app: any script that runs in the app can read it.
   The protection is not letting outside script run; the policy above is the
-  second line.
+  second line. Keeping it in memory only would need the refresh cookie to reach
+  the API on every page load, which browsers that block third-party cookies
+  (Safari) refuse while the API is on a different site from the web app. Serving
+  the API under the web app's own domain (a Netlify proxy or a custom domain)
+  would allow it, and a `SameSite=Strict` cookie with it.
 - **Uploaded files are not backed up** (`../guides/backups.md`, step 4).
 - **A standby copy of the database** (item 28) is not set up.
