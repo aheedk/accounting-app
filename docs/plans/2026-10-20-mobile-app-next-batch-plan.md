@@ -644,3 +644,34 @@ real dev API (not just read from source) — the actual JSON response
 matched the hand-written mobile types field-for-field, including the
 `group` values on balance sheet lines and the negative-amount convention
 on liability lines.
+
+### Redesign chunk 7 (2026-10-21) — Trial Balance report — done
+
+Third and last of the core financial reports previously marked "Desktop
+only" (Reports > Trial Balance). Route+service code read directly first:
+`packages/shared`'s `trialBalanceResponseSchema` turned out to be stale/
+incomplete (missing fields the real route returns), so the mobile type
+was written from the actual route/service return shape, not the shared
+schema — confirmed live against the dev API before shipping.
+
+- **`app/trial-balance.tsx`**: single as-of date picker, a flat table
+  (Account | Debit | Credit, account type shown as a caption under the
+  name) in `account_type` order exactly as the API returns it — no
+  grouping, since web's own `TrialBalancePage.tsx` doesn't group either
+  (unlike Balance Sheet, there's no `lib/*Layout.ts` for this report on
+  web to port). Totals row + a "Debits equal credits"/"do not match"
+  line below, computed from `totals.total_debit === totals.total_credit`.
+  Zero-value debit/credit cells render blank instead of "$0.00", matching
+  how a real trial balance reads.
+- `services/api.ts`: added `TbRow`/`TrialBalanceReport` types +
+  `getTrialBalance()`, same "no shared report type, redeclare locally"
+  convention as Pnl/BalanceSheet.
+- Wired into the drawer's Reports group and the More tab, next to the
+  other two reports.
+
+**Verified**: `tsc --noEmit` clean, `expo export --platform ios` bundle
+clean, `npm run typecheck -w @accounting/api` clean (no backend changes),
+and the endpoint hit directly against the real dev API — response matched
+the hand-written type field-for-field (`rows[].{account_id,code,name,
+account_type,total_debit,total_credit,net}`, `totals.{total_debit,
+total_credit}`, `fiscal_year_start`, `retained_earnings_prior_years`).

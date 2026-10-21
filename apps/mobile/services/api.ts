@@ -475,3 +475,26 @@ export async function getBalanceSheet(businessId: string, params: { as_of?: stri
   const r = await api.get<BalanceSheetReport>(`/businesses/${businessId}/reports/balance-sheet`, { params });
   return r.data;
 }
+
+// --- Trial Balance — shape copied from trialBalanceService.ts / the
+// trialBalance route directly (packages/shared's trialBalanceResponseSchema
+// is stale/incomplete, confirmed by reading the route+service code; same
+// "no shared report type" pattern as Pnl/BalanceSheet above).
+
+export type TbRow = {
+  account_id: string; code: string; name: string;
+  account_type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  total_debit: string; total_credit: string; net: string;
+};
+export type TrialBalanceReport = {
+  as_of: string;
+  rows: TbRow[];
+  totals: { total_debit: string; total_credit: string };
+  fiscal_year_start: string;
+  retained_earnings_prior_years: string;
+};
+
+export async function getTrialBalance(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<TrialBalanceReport>(`/businesses/${businessId}/reports/trial-balance`, { params });
+  return r.data;
+}
