@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Modal, Portal, Text, TextInput, Menu, useTheme } from 'react-native-paper';
+import { Modal, Portal, Text, Menu, useTheme } from 'react-native-paper';
+import { AppTextInput } from './ui/AppTextInput';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
 import { listVendors, listCustomers } from '../services/api';
@@ -108,27 +109,25 @@ export function TransactionFilterPanel({
           {draft.datePreset === 'custom' ? (
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
-                <TextInput
-                  mode="outlined" label="From (YYYY-MM-DD)" dense value={draft.dateStart}
+                <AppTextInput
+                  label="From (YYYY-MM-DD)" value={draft.dateStart}
                   onChangeText={v => setDraft(d => ({ ...d, dateStart: v }))}
-                  style={{ backgroundColor: theme.app.surface }}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <TextInput
-                  mode="outlined" label="To (YYYY-MM-DD)" dense value={draft.dateEnd}
+                <AppTextInput
+                  label="To (YYYY-MM-DD)" value={draft.dateEnd}
                   onChangeText={v => setDraft(d => ({ ...d, dateEnd: v }))}
-                  style={{ backgroundColor: theme.app.surface }}
                 />
               </View>
             </View>
           ) : null}
 
-          <TextInput
-            mode="outlined" label="Reference number" dense value={draft.refNo}
+          <AppTextInput
+            label="Reference number" value={draft.refNo}
             onChangeText={v => setDraft(d => ({ ...d, refNo: v }))}
             placeholder="e.g. 1042"
-            style={{ backgroundColor: theme.app.surface, marginBottom: spacing.md }}
+            containerStyle={{ marginBottom: spacing.md }}
           />
 
           <PickerField
@@ -176,23 +175,22 @@ export function TransactionFilterPanel({
             </View>
             {draft.amountOp ? (
               <View style={{ flex: 1 }}>
-                <TextInput
-                  mode="outlined" dense placeholder="0.00" keyboardType="decimal-pad"
+                <AppTextInput
+                  placeholder="0.00" keyboardType="decimal-pad"
                   value={draft.amountValue}
                   onChangeText={v => setDraft(d => ({ ...d, amountValue: v.replace(/[^0-9.]/g, '') }))}
-                  left={<TextInput.Affix text="$" />}
-                  style={{ backgroundColor: theme.app.surface }}
+                  left={<Text style={{ color: theme.app.mutedForeground }}>$</Text>}
                 />
               </View>
             ) : null}
           </View>
           {draft.amountOp === 'between' ? (
-            <TextInput
-              mode="outlined" dense placeholder="and… 0.00" keyboardType="decimal-pad"
+            <AppTextInput
+              placeholder="and… 0.00" keyboardType="decimal-pad"
               value={draft.amountValue2}
               onChangeText={v => setDraft(d => ({ ...d, amountValue2: v.replace(/[^0-9.]/g, '') }))}
-              left={<TextInput.Affix text="$" />}
-              style={{ backgroundColor: theme.app.surface, marginBottom: spacing.md }}
+              left={<Text style={{ color: theme.app.mutedForeground }}>$</Text>}
+              containerStyle={{ marginBottom: spacing.md }}
             />
           ) : null}
         </ScrollView>

@@ -711,3 +711,51 @@ bundle built with no errors. Not re-tested against every role live (no
 device test this chunk) — the logic is a direct, narrowly-adapted port of
 web's already-shipped `canOpenPage`, which is covered by its own existing
 tests on the web side.
+
+### Redesign chunk 9 (2026-10-21) — swapped remaining Paper defaults for brand primitives — done
+
+Last piece of the "Option B thin wrappers" visual-parity work flagged as
+deferred back in chunk 1: Paper's default-styled `TextInput`, `Chip`, and
+`SegmentedButtons` were still showing Material shapes/colors in the
+highest-visibility screens. Added three new primitives in
+`components/ui/` alongside the existing `AppButton`/`AppCard`/
+`StatusBadge`, matching web's exact specs read from
+`apps/web/src/components/ui/input.tsx` and the filter-pill/tab-switcher
+treatment on `TransactionsPage.tsx`/`BankTransactionsInboxPage.tsx`:
+
+- **`AppTextInput`**: 40px-tall field, 6px radius, our border color, a
+  2px focus ring (web's `focus-visible:border-ring` glow, not Paper's
+  Material underline). `label` sits above the field as plain text (web's
+  `<Label>` pattern) instead of Paper's floating label. Takes `left`/
+  `right` nodes for affixes (a `$` sign, a tappable check/search icon)
+  instead of Paper's `<TextInput.Affix>`/`<TextInput.Icon>`, and a
+  separate `containerStyle` prop for outer layout (margin) so `style`
+  keeps meaning what it means on RN's own `TextInput` (the field itself).
+- **`AppChip`**: fully pill-shaped (web's filter pills are `rounded-full`,
+  not Paper's rounded-rect Chip), optional trailing icon only when it's
+  a dropdown trigger (omitted for a plain toggle chip).
+- **`AppSegmentedControl`**: a `bg-muted` track with the active segment
+  lifted to the surface color — web's "track with sliding pill" tab-
+  switcher look, not Paper's outlined segmented buttons.
+
+Swapped into every high-visibility usage found by searching the whole
+app: `ExpenseForm.tsx`/`DepositForm.tsx` (the core transaction-entry
+forms — the amount field's `$` affix carried over unchanged), the
+Transactions tab's search field, `clients.tsx`'s search field + the
+Customers/Vendors segmented toggle, `SearchablePicker.tsx` (the shared
+searchable dropdown every create/edit form uses — swap is style-only,
+the in-memory filtering stayed untouched so it's still snappy),
+`invoices.tsx`'s status filter chips, and `general-ledger.tsx`'s date-
+preset chips + account-filter dropdown chip (its "Voided" chip was really
+a status pill, so that one became a `StatusBadge` instead, consolidating
+with the badge already used everywhere else rather than keeping a
+one-off red chip). Left `settings.tsx`'s `SegmentedButtons` and
+`inbox/[id].tsx`'s plain note field as Paper defaults — both low-traffic
+screens, lowest priority per the earlier visibility triage.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, grepped every touched file afterward to
+confirm no stray `Chip`/`TextInput`/`SegmentedButtons` import from
+`react-native-paper` was left behind. No live device interaction this
+chunk (no way to drive simulator taps from here) — static verification
+only, same caveat as chunk 8.

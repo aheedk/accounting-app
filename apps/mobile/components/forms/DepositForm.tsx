@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, TextInput, Button, IconButton, useTheme } from 'react-native-paper';
+import { Text, Button, IconButton, useTheme } from 'react-native-paper';
+import { AppTextInput } from '../ui/AppTextInput';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -222,23 +223,18 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
               options={(coaQuery.data ?? []).map(a => ({ id: a.id, label: `${a.code} — ${a.name}` }))}
               onSelect={(id) => updateLine(line.key, { account_id: id })}
             />
-            <TextInput
-              mode="outlined"
+            <AppTextInput
               placeholder="Description (optional)"
               value={line.description ?? ''}
               onChangeText={(v) => updateLine(line.key, { description: v })}
-              dense
-              style={{ marginBottom: spacing.sm, backgroundColor: theme.app.surface }}
+              containerStyle={{ marginBottom: spacing.sm }}
             />
-            <TextInput
-              mode="outlined"
+            <AppTextInput
               placeholder="0.00"
               value={line.amount}
               onChangeText={(v) => updateLine(line.key, { amount: v.replace(/[^0-9.]/g, '') })}
               keyboardType="decimal-pad"
-              dense
-              left={<TextInput.Affix text="$" />}
-              style={{ backgroundColor: theme.app.surface }}
+              left={<Text style={{ color: theme.app.mutedForeground }}>$</Text>}
             />
           </View>
         );
@@ -247,13 +243,13 @@ export function DepositForm({ existing, existingId }: { existing?: DepositDetail
         Add line
       </Button>
 
-      <TextInput
-        mode="outlined"
+      <AppTextInput
         label="Memo"
         value={memo}
         onChangeText={setMemo}
         multiline
-        style={{ marginBottom: spacing.lg, backgroundColor: theme.app.surface }}
+        style={{ minHeight: 64, textAlignVertical: 'top' }}
+        containerStyle={{ marginBottom: spacing.lg }}
       />
 
       <View style={[styles.totalRow, { borderColor: theme.app.border }]}>

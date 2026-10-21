@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, Chip, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
+import { AppChip } from '../components/ui/AppChip';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -69,15 +70,13 @@ export default function InvoicesScreen() {
 
       <View style={styles.filterBar}>
         {FILTERS.map(f => (
-          <Chip
+          <AppChip
             key={f.value}
-            selected={filter === f.value}
+            label={f.label}
+            active={filter === f.value}
             onPress={() => setFilter(f.value)}
             style={{ marginRight: spacing.xs }}
-            selectedColor={theme.app.primary}
-          >
-            {f.label}
-          </Chip>
+          />
         ))}
       </View>
 

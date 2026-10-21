@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, RefreshControl } from 'react-native';
-import { Text, TextInput, SegmentedButtons, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppTextInput } from '../components/ui/AppTextInput';
+import { AppSegmentedControl } from '../components/ui/AppSegmentedControl';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -52,22 +55,20 @@ export default function ClientsScreen() {
       <AppHeader title={tab === 'customers' ? 'Customers' : 'Vendors'} />
 
       <View style={styles.listHeader}>
-        <SegmentedButtons
+        <AppSegmentedControl
           value={tab}
-          onValueChange={v => setTab(v as Tab)}
-          buttons={[
+          onChange={setTab}
+          options={[
             { value: 'customers', label: 'Customers' },
             { value: 'vendors', label: 'Vendors' },
           ]}
         />
-        <TextInput
-          mode="outlined"
+        <AppTextInput
           placeholder={`Search ${tab}`}
           value={search}
           onChangeText={setSearch}
-          dense
-          style={{ marginTop: spacing.sm, backgroundColor: theme.app.surface }}
-          left={<TextInput.Icon icon="magnify" />}
+          containerStyle={{ marginTop: spacing.sm }}
+          left={<MaterialCommunityIcons name="magnify" size={18} color={theme.app.mutedForeground} />}
         />
       </View>
 

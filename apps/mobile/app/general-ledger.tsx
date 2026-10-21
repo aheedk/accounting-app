@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { Text, List, Chip, Menu, useTheme } from 'react-native-paper';
+import { Text, List, Menu, useTheme } from 'react-native-paper';
+import { AppChip } from '../components/ui/AppChip';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -73,17 +75,17 @@ export default function GeneralLedgerScreen() {
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
           {(Object.keys(PRESET_LABELS) as Preset[]).map(p => (
-            <Chip key={p} selected={preset === p} onPress={() => setPreset(p)} selectedColor={theme.app.primary}>
-              {PRESET_LABELS[p]}
-            </Chip>
+            <AppChip key={p} label={PRESET_LABELS[p]} active={preset === p} onPress={() => setPreset(p)} />
           ))}
           <Menu
             visible={accountMenuOpen}
             onDismiss={() => setAccountMenuOpen(false)}
             anchor={
-              <Chip icon="chevron-down" onPress={() => setAccountMenuOpen(true)} selectedColor={theme.app.primary}>
-                {selectedAccount ? `${selectedAccount.code} — ${selectedAccount.name}` : 'All accounts'}
-              </Chip>
+              <AppChip
+                icon="chevron-down"
+                label={selectedAccount ? `${selectedAccount.code} — ${selectedAccount.name}` : 'All accounts'}
+                onPress={() => setAccountMenuOpen(true)}
+              />
             }
           >
             <Menu.Item title="All accounts" onPress={() => { setAccountId(undefined); setAccountMenuOpen(false); }} />
@@ -172,7 +174,7 @@ function GlLineRow({ line, theme }: { line: GeneralLedgerLine; theme: AppTheme }
       {secondaryText ? (
         <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }} numberOfLines={2}>{secondaryText}</Text>
       ) : null}
-      {voided && <Chip compact style={{ alignSelf: 'flex-start', marginTop: 2, backgroundColor: theme.app.statusRedBg }} textStyle={{ color: theme.app.statusRedFg, fontSize: 10 }}>Voided</Chip>}
+      {voided && <View style={{ marginTop: 2 }}><StatusBadge status="red" label="Voided" /></View>}
       <View style={styles.lineBottom}>
         <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }} numberOfLines={1}>
           {line.split_account ?? '–Split–'}{line.is_reconciled ? ' · Reconciled' : ''}

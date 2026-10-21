@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, RefreshControl, Pressable } from 'react-native';
-import { Text, TextInput, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
+import { AppTextInput } from '../../components/ui/AppTextInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
@@ -62,14 +63,12 @@ export default function TransactionsScreen() {
       <AppHeader title="Transactions" />
       <View style={styles.header}>
         <View style={styles.searchRow}>
-          <TextInput
-            mode="outlined"
+          <AppTextInput
             placeholder="Search payee or memo"
             value={search}
             onChangeText={setSearch}
-            dense
-            style={{ flex: 1, backgroundColor: theme.app.surface }}
-            left={<TextInput.Icon icon="magnify" />}
+            containerStyle={{ flex: 1 }}
+            left={<MaterialCommunityIcons name="magnify" size={18} color={theme.app.mutedForeground} />}
           />
           <Pressable
             onPress={() => setFilterPanelOpen(true)}
