@@ -5,14 +5,14 @@ import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../../hooks/useAuth';
-import { AppHeader } from '../../components/AppHeader';
-import { listCustomers, listVendors, type CustomerRow, type VendorRow } from '../../services/api';
-import { LoadingIndicator } from '../../components/LoadingIndicator';
-import { ErrorState } from '../../components/ErrorState';
-import { EmptyState } from '../../components/EmptyState';
-import { fmtMoney } from '../../lib/money';
-import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
+import { useAuth } from '../hooks/useAuth';
+import { AppHeader } from '../components/AppHeader';
+import { listCustomers, listVendors, type CustomerRow, type VendorRow } from '../services/api';
+import { LoadingIndicator } from '../components/LoadingIndicator';
+import { ErrorState } from '../components/ErrorState';
+import { EmptyState } from '../components/EmptyState';
+import { fmtMoney } from '../lib/money';
+import { spacing, typeScale, minTouchTarget, type AppTheme } from '../theme';
 
 type Tab = 'customers' | 'vendors';
 

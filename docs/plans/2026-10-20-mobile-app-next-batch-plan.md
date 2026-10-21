@@ -568,3 +568,42 @@ for a custom dev-client build.
 
 **Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
 bundle built with no errors.
+
+### Bug fixes (2026-10-21) — from live testing
+
+- **Camera/Library crashed the app on launch, Choose from Files didn't.**
+  Root cause confirmed by inspecting the installed `.app` bundle's actual
+  `Info.plist` on the simulator directly: `NSCameraUsageDescription` and
+  `NSPhotoLibraryUsageDescription` were missing entirely — the running
+  native binary predated the `expo-image-picker` config-plugin entry in
+  `app.json` that declares them (its last build timestamp was hours before
+  that config existed). iOS hard-kills a process that touches the camera/
+  photo-library APIs without those Info.plist keys present — that's the
+  exact "quits unexpectedly" symptom, and exactly why Document Picker (no
+  privacy-sensitive keys required) was unaffected. Not a code bug. Fixed
+  by regenerating the native project (`expo prebuild`) and rebuilding
+  (`expo run:ios`) so the keys actually land in the compiled Info.plist —
+  confirmed present in the regenerated project before installing.
+- **Tapping "Customers" (or "Vendors") in the nav drawer silently landed on
+  Dashboard instead.** `clients.tsx` lived inside the `(tabs)` group as a
+  tab hidden via `options={{ href: null }}`, and routing to a hidden tab's
+  screen from outside the tab navigator doesn't reliably focus it — it
+  falls back to the group's default route (Dashboard). Moved `clients.tsx`
+  out to a top-level route (`app/clients.tsx`, same pattern already working
+  for Invoices/General Ledger/Inbox), dropped the now-unnecessary hidden
+  tab entry, and updated the drawer's two links to the new path.
+- **AI Inbox's Payee/Offset account fields looked static once filled in,
+  even though they were already fully tappable.** Both were plain text
+  with no visual affordance — "Tap to set" placeholder text only showed
+  while empty, so a filled-in field looked exactly like a read-only label.
+  New shared `EditableField` in the inbox review screen gives both a
+  bordered box + chevron (the same tappable-field language as
+  `PickerField` elsewhere in the app), so they read as editable controls
+  whether or not they already have a value — nothing about the actual
+  edit behavior changed, since it was already working.
+
+Diagnosis method worth noting: the camera-crash root cause came from
+reading the actual compiled `.app`'s `Info.plist` via `PlistBuddy` on the
+installed bundle, not from guessing off the source `app.json` — confirms
+the standing practice of verifying against real artifacts before asserting
+a root cause.

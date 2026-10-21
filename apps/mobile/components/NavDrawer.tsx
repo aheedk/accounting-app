@@ -26,7 +26,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'ar', label: 'Accounts Receivable', icon: 'account-group-outline',
     children: [
-      { label: 'Customers', path: '/(tabs)/clients', params: { tab: 'customers' } },
+      { label: 'Customers', path: '/clients', params: { tab: 'customers' } },
       { label: 'Invoices', path: '/invoices' },
       { label: 'Payments' },
       { label: 'Credit Memos' },
@@ -40,7 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Overview' },
       { label: 'Expense Transactions' },
       { label: 'Checks' },
-      { label: 'Vendors', path: '/(tabs)/clients', params: { tab: 'vendors' } },
+      { label: 'Vendors', path: '/clients', params: { tab: 'vendors' } },
       { label: 'Bills' },
       { label: 'Pay Bills' },
       { label: 'Bill Payments' },
