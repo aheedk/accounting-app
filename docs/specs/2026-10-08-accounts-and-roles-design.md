@@ -48,6 +48,13 @@ approval.
   the API also refuses to renew a session not renewed within the limit, so a closed or
   frozen tab cannot be picked up later. Whatever the limit, a session ends 12 hours after
   signing in. The refresh cookie lasts no longer than the session may.
+- **A session that ends while the app is open** (12 hours up, a new password set
+  elsewhere, signed out by a firm admin) takes the browser to the sign-in page,
+  which says so.
+- **A role changed** takes effect on the person's next request, in a browser
+  already open: the firm-wide role is carried in the access token, so changing
+  it makes their tokens stop counting and the browser renews (without signing
+  out) into one that carries the new role.
 - **A copied sign-in key.** The refresh token is replaced each time it is used. If one
   that was replaced more than a minute ago comes back, someone kept a copy: the whole
   session is ended and the Activity Log says so. Within the minute it is only refused,

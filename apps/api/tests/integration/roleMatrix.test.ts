@@ -176,8 +176,8 @@ describe('role matrix', () => {
       tokens[role] = login.body.access_token as string;
     }
 
-    // Signing in and out, the health check and the Gmail hand-off have no role.
-    const routes = listRoutes(app).filter(r => !r.path.startsWith('/auth/') && r.path !== '/health');
+    // Signing in and out, the health check, the browser's policy reports and the Gmail hand-off have no role.
+    const routes = listRoutes(app).filter(r => !r.path.startsWith('/auth/') && r.path !== '/health' && r.path !== '/csp-report');
     for (const route of routes) {
       const url = route.path.replace(':businessId', biz.id).replace(/:[A-Za-z]+/g, ZERO);
       const row = { ...route } as Row;

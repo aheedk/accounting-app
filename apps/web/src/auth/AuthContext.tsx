@@ -1,5 +1,6 @@
-import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, renewSession, setAccessToken, SETUP_REQUIRED_EVENT } from '@/lib/apiClient';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { api, renewSession, setAccessToken, SESSION_ENDED_EVENT, SETUP_REQUIRED_EVENT } from '@/lib/apiClient';
+import { markSignedOut } from '@/lib/idleSession';
 
 export type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
 
@@ -97,6 +98,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener(SETUP_REQUIRED_EVENT, onSetup);
     return () => window.removeEventListener(SETUP_REQUIRED_EVENT, onSetup);
   }, [refresh]);
+
+  // The session ended while the app was open (12 hours were up, a new password
+  // elsewhere, a firm admin signed it out): to the sign-in page, saying why,
+  // instead of every page failing. Not on a first visit, when there was none.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  useEffect(() => {
+    const onEnded = () => {
+      if (statusRef.current !== 'authenticated') return;
+      markSignedOut('Your session ended. Sign in again to carry on.');
+      setUser(null);
+      setBusinesses([]);
+      setStatus('anonymous');
+    };
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
+  }, []);
 
   const value = useMemo<AuthState>(() => ({ status, user, businesses, login, logout, refresh, renew }), [status, user, businesses, login, logout, refresh, renew]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

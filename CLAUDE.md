@@ -30,6 +30,7 @@ Production-grade accounting system for an accounting firm.
   - A `client` is refused everything not listed in `apps/api/src/lib/clientAccess.ts`.
   - Anything under the paths in `middleware/payrollAccess.ts` is payroll, and closed to a login it was switched off for.
   - A staff-level route that posts to the ledger as it saves belongs in `HELD_ACTIONS` in `services/core/approvalService.ts`, or it will skip the approval step.
+  - The firm-wide role and the set-up steps travel in the access token. A change to anything the token carries must call `reissueAccessTokens` (`services/auth/accountService.ts`), or it lasts until the token expires (15 minutes).
 - Docs are indexed in `docs/README.md`. Design specs live in `docs/specs/`, implementation plans in `docs/plans/` (use these instead of the superpowers default `docs/superpowers/...`; delete a plan once its work ships). Open work: `docs/backlog.md` and `docs/meetings/`; known bugs: `docs/qa/`.
 - New features beyond the 23 tabs: write a fresh spec → plan → impl following the same pattern documented here.
 

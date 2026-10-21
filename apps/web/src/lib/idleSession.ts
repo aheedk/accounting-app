@@ -45,24 +45,26 @@ export function idleStep(input: { now: number; lastActivity: number; lastRenewed
   };
 }
 
-const SIGNED_OUT_KEY = 'acct_signed_out_idle';
+const SIGNED_OUT_KEY = 'acct_signed_out_notice';
 
-/** Remembers, for the sign-in page, that this browser was signed out for being left alone. */
-export function markSignedOutIdle(minutes: number): void {
-  try { sessionStorage.setItem(SIGNED_OUT_KEY, String(minutes)); } catch { /* the notice is a nicety */ }
+/** How long the idle limit is, in words: "15 minutes", "1 hour", "2 hours". */
+export function idleLimitWords(minutes: number): string {
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = minutes / 60;
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
-/** The idle limit the browser was signed out after, or null. */
-export function readSignedOutIdle(): number | null {
-  try {
-    const value = sessionStorage.getItem(SIGNED_OUT_KEY);
-    return value ? Number(value) : null;
-  } catch {
-    return null;
-  }
+/** Remembers, for the sign-in page, why this browser was signed out. */
+export function markSignedOut(notice: string): void {
+  try { sessionStorage.setItem(SIGNED_OUT_KEY, notice); } catch { /* the notice is a nicety */ }
+}
+
+/** Why the browser was signed out, or null. */
+export function readSignedOutNotice(): string | null {
+  try { return sessionStorage.getItem(SIGNED_OUT_KEY); } catch { return null; }
 }
 
 /** Once the sign-in page has said it. */
-export function clearSignedOutIdle(): void {
+export function clearSignedOutNotice(): void {
   try { sessionStorage.removeItem(SIGNED_OUT_KEY); } catch { /* nothing to clear */ }
 }

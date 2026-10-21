@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idleStep } from './idleSession';
+import { idleLimitWords, idleStep } from './idleSession';
 
 const MIN = 60_000;
 const at = (idleMinutes: number, renewedMinutesAgo = 0, limitMinutes = 60) =>
@@ -19,5 +19,9 @@ describe('idleStep', () => {
     expect(at(5, 30).renew).toBe(false);
     // A short limit renews more often: a third of it.
     expect(at(0.5, 6, 15).renew).toBe(true);
+  });
+
+  it('says the limit in words', () => {
+    expect([15, 30, 60, 120, 180].map(idleLimitWords)).toEqual(['15 minutes', '30 minutes', '1 hour', '2 hours', '3 hours']);
   });
 });

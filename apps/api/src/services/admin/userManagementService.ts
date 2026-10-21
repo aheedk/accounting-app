@@ -4,7 +4,7 @@ import { AUDIT, ERR } from '@accounting/shared';
 import type { DB, UserRole } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { hashPassword } from '../auth/passwordHasher.js';
-import { endSessions } from '../auth/accountService.js';
+import { endSessions, reissueAccessTokens } from '../auth/accountService.js';
 import { firmSignInSettings } from '../auth/authService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
@@ -126,6 +126,9 @@ export async function updateUserRole(
     .where('id', '=', input.user_id)
     .returning(['id', 'email', 'full_name', 'role', 'firm_id'])
     .executeTakeFirstOrThrow();
+  // The role travels in the access token: without this, a firm admin made staff
+  // kept firm-admin powers (and every client of the firm) until it expired.
+  if (before.role !== updated.role) await reissueAccessTokens(trx, input.user_id);
 
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_UPDATE,

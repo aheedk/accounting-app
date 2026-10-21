@@ -14,6 +14,8 @@ export const ERR = {
   // Signed in, but the login must first choose its own password or set up the
   // second step; nothing else opens until it has.
   ACCOUNT_SETUP_REQUIRED: 'ACCOUNT_SETUP_REQUIRED',
+  // Too many of something that costs per call (documents read by the AI) in a while.
+  RATE_LIMITED: 'RATE_LIMITED',
 
   // Resource
   NOT_FOUND: 'NOT_FOUND',

@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/error.js';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import healthRoutes from './routes/health.js';
+import cspReportRoutes from './routes/cspReport.js';
 import coaRoutes from './routes/chartOfAccounts.js';
 import periodRoutes from './routes/fiscalPeriods.js';
 import journalEntryRoutes from './routes/journalEntries.js';
@@ -81,6 +82,8 @@ import { holdStaffEntries } from './middleware/approvalHold.js';
 
 export function makeApp(): Express {
   const app = express();
+  // Not saying what the API runs on saves an attacker a step.
+  app.disable('x-powered-by');
   // Railway's proxy is the one hop in front of the API: req.ip is then the
   // visitor's address, for the sign-in limit and the Activity Log, instead of
   // the proxy's. Express takes the last X-Forwarded-For entry, which the proxy
@@ -112,6 +115,7 @@ export function makeApp(): Express {
   app.use(cookieParser());
   app.use(express.json({ limit: '1mb' }));
   app.use(healthRoutes);
+  app.use(cspReportRoutes);
   app.use(authRoutes);
   app.use(gmailAuthRouter);
   app.use(meRoutes);

@@ -60,6 +60,21 @@ export async function endSessions(
 }
 
 /**
+ * Makes every access token the user holds stop counting, without signing them
+ * out: the browser renews at once (the refresh cookie still works) and the new
+ * token carries what the database says now. For a change the token itself
+ * carries, such as the firm-wide role, which would otherwise last until the
+ * token expires (security review 2026-10-21). A token issued in this same
+ * second still counts, so the renewal that follows at once is not refused too.
+ */
+export async function reissueAccessTokens(trx: Transaction<DB>, user_id: string): Promise<void> {
+  const moment = Math.floor(Date.now() / 1000);
+  await trx.updateTable('users').set({ sessions_revoked_at: new Date(moment * 1000).toISOString() })
+    .where('id', '=', user_id).execute();
+  revokeAccessTokensBefore(user_id, moment);
+}
+
+/**
  * Counts a wrong current password (changing the password, turning the second
  * step off) toward the same hold as a wrong sign-in. Someone who holds a
  * session and keeps guessing its password is probably not its owner, so at the

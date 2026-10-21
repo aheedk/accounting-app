@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './useAuth';
 import { lastRenewedAt, renewSession } from '@/lib/apiClient';
-import { idleStep, lastActivity, markSignedOutIdle, noteActivity } from '@/lib/idleSession';
+import { idleLimitWords, idleStep, lastActivity, markSignedOut, noteActivity } from '@/lib/idleSession';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog';
 
@@ -34,7 +34,7 @@ export function IdleSignOut() {
       const step = idleStep({ now: Date.now(), lastActivity: lastActivity(), lastRenewed: lastRenewedAt(), limitMinutes });
       if (step.signOut) {
         signingOut.current = true;
-        markSignedOutIdle(limitMinutes);
+        markSignedOut(`You were signed out after ${idleLimitWords(limitMinutes)} with nothing done.`);
         void logout();
         return;
       }

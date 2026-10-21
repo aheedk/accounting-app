@@ -3,7 +3,7 @@
 // a code is good once, a copied sign-in key ends its session, a session ends
 // when left alone or after 12 hours, and guessing the current password from
 // inside a session ends it.
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { sql } from 'kysely';
@@ -13,6 +13,7 @@ import { makeApp } from '../../src/app.js';
 import { destroyDbSingleton } from '../../src/db/index.js';
 import { clearAccessTokenRevocations } from '../../src/services/auth/sessionRevocation.js';
 import { totpCode } from '../../src/services/auth/totp.js';
+import { DOCUMENTS_PER_HOUR, documentUploads } from '../../src/routes/ai.js';
 
 const PASSWORD = 'first-password-1';
 
@@ -196,10 +197,48 @@ describe('signing in, second pass', () => {
     expect((await signIn('pat@x.com')).status).toBe(429);
   });
 
-  it('marks every API response as not to be cached or framed', async () => {
+  it('marks every API response as not to be cached or framed, and does not say what it runs on', async () => {
     const res = await request(app).get('/health');
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.headers['x-frame-options']).toBe('DENY');
     expect(res.headers['content-security-policy']).toBe("default-src 'none'; frame-ancestors 'none'");
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('a firm role taken away stops at once in a browser already open, not when its token runs out', async () => {
+    const admin = await signIn('admin@x.com');
+    await makeUser(t.db, firmId, { email: 'sam@x.com', password: PASSWORD, role: 'firm_admin' });
+    const sam = await signIn('sam@x.com');
+    expect((await as(sam).get('/me/firm/users')).status).toBe(200);
+
+    expect((await as(admin).patch(`/me/firm/users/${await userId('sam@x.com')}`, { role: 'staff' })).status).toBe(200);
+    // The old token, which says firm admin, no longer counts; renewing gives one that says staff.
+    expect((await as(sam).get('/me/firm/users')).status).toBe(401);
+    const renewed = await renew(sam.cookie);
+    expect(renewed.status).toBe(200);
+    expect((await as(renewed).get('/me/firm/users')).status).toBe(403);
+  });
+
+  it('caps the documents one login sends to the AI in an hour', async () => {
+    const admin = await signIn('admin@x.com');
+    const adminId = await userId('admin@x.com');
+    documentUploads.reset();
+    for (let i = 0; i < DOCUMENTS_PER_HOUR; i++) documentUploads.take(adminId);
+    const res = await request(app).post(`/businesses/${businessId}/ai/documents`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .attach('file', Buffer.from('%PDF-1.4 %%EOF'), { filename: 'receipt.pdf', contentType: 'application/pdf' });
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('RATE_LIMITED');
+    documentUploads.reset();
+  });
+
+  it("writes what the web app's script policy would have blocked to the log, without the query string", async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const res = await request(app).post('/csp-report').set('Content-Type', 'application/csp-report').send(JSON.stringify({
+      'csp-report': { 'document-uri': 'https://app.example/invoices?customer=Pat', 'effective-directive': 'script-src-elem', 'blocked-uri': 'https://evil.example/x.js' },
+    }));
+    expect(res.status).toBe(204);
+    expect(warn).toHaveBeenCalledWith('[csp] script-src-elem blocked https://evil.example/x.js on https://app.example/invoices');
+    warn.mockRestore();
   });
 });

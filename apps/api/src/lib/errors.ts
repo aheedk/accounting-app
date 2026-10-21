@@ -32,7 +32,8 @@ export function codeToHttpStatus(code: ErrorCode): number {
     case ERR.TOKEN_EXPIRED:
     case ERR.TWO_STEP_REQUIRED:
     case ERR.INVALID_CREDENTIALS: return 401;
-    case ERR.ACCOUNT_LOCKED: return 429;
+    case ERR.ACCOUNT_LOCKED:
+    case ERR.RATE_LIMITED: return 429;
     case ERR.FORBIDDEN:
     case ERR.ACCOUNT_SETUP_REQUIRED: return 403;
     case ERR.NOT_FOUND: return 404;

@@ -5,10 +5,12 @@ import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { refuseViewOnly, requireMinRole } from '../middleware/rbac.js';
-import { schemas } from '@accounting/shared';
+import { ERR, schemas } from '@accounting/shared';
 import { ingestUploadedPdf } from '../services/ai/documentIngestService.js';
 import { updateLearnedRule } from '../services/ai/autoCodingService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
+import { BusinessRuleError } from '../lib/errors.js';
+import { RateLimit } from '../lib/rateLimit.js';
 
 const router = Router({ mergeParams: true });
 
@@ -34,6 +36,12 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
  */
 const UPLOAD_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] as const;
 
+// Each document is read by the AI, which is paid per call. A firm sends in tens
+// a day; this stops a login in the wrong hands, or a script, from sending
+// thousands (security review 2026-10-21).
+export const DOCUMENTS_PER_HOUR = 200;
+export const documentUploads = new RateLimit(DOCUMENTS_PER_HOUR, 60 * 60_000);
+
 router.post(
   '/businesses/:businessId/ai/documents',
   // Anyone but a view-only login, the client included: what is sent in only
@@ -55,6 +63,11 @@ router.post(
           error: { code: 'VALIDATION_FAILED', message: 'Upload a PDF or an image (PNG, JPEG, WebP).' },
         });
         return;
+      }
+      const wait = documentUploads.take(req.auth!.user_id);
+      if (wait !== null) {
+        throw new BusinessRuleError(ERR.RATE_LIMITED,
+          `${DOCUMENTS_PER_HOUR} documents have been sent in from this login in the last hour. Try again in ${wait} minute${wait === 1 ? '' : 's'}.`);
       }
       const result = await ingestUploadedPdf(db, ctxFromReq(req), {
         buffer: req.file.buffer,

@@ -172,6 +172,43 @@ of it is in the accounts-and-roles spec
   the second step off) without limit. **Now** those count toward the five-try
   hold, and the fifth ends every session of the login.
 
+### A role taken away lasted up to fifteen minutes
+
+The firm-wide role travels inside the access token. A firm admin made staff (or
+a client) kept firm-admin powers, and every client of the firm, in a browser
+already open until that token ran out. **Fixed:** changing a login's role makes
+its access tokens stop counting at once; the browser renews without signing
+out, and the new token carries the new role (`reissueAccessTokens` in
+`services/auth/accountService.ts`). Anything else carried in the token must do
+the same. Access to one client, the role for one client and payroll are read
+from the database on every request, so they already took effect at once.
+
+### An ended session left every page failing
+
+When a session could not be renewed (12 hours up, a new password set in another
+browser, signed out by a firm admin), the app dropped its token but stayed on
+the page, and every call failed with "Invalid or expired token". **Fixed:** the
+app goes to the sign-in page, which says the session ended.
+
+### Smaller hardening
+
+- **Documents read by the AI** are capped at 200 an hour per login. Each is a
+  paid call; a login in the wrong hands, or a script, could otherwise send
+  thousands (`lib/rateLimit.ts`, `routes/ai.ts`).
+- **The API no longer says it runs on Express** (`X-Powered-By`).
+- **Production refuses to start on the example secrets** from `.env.example`,
+  which are public (anyone could sign their own access tokens with them), and
+  warns about secrets under 32 characters or the same secret used twice.
+- **Where the script policy reports.** The web app's Content-Security-Policy,
+  still report-only, now sends what it would have blocked to the API
+  (`POST /csp-report`), which writes each as a `[csp]` line in its Railway log,
+  without the page's query string. Enforcing it no longer waits on someone
+  watching a browser console: a few days of normal use with no `[csp]` lines
+  says it is safe. The app's own code and libraries run nothing from text
+  (`eval`, `new Function`), and the page has no inline script; the one thing
+  to watch for is the PDF preview frame, which Chrome may treat as a plugin
+  (`object-src`).
+
 ### Packages with known holes
 
 `npm audit --omit=dev` (10-21) lists 50 advisories. Sorted by whether they reach
@@ -199,8 +236,8 @@ gets the same 403 there, and sets up in the web app.
 
 ## Still open
 
-- **Enforce the Content-Security-Policy** once the report-only one shows no
-  reports on the live site (above).
+- **Enforce the Content-Security-Policy** once the Railway log shows no `[csp]`
+  lines after a few days of use (above): rename the key in `apps/web/netlify.toml`.
 - **The access token is kept in the browser's local storage**, the usual
   trade-off for a single-page app: any script that runs in the app can read it.
   The protection is not letting outside script run; the policy above is the

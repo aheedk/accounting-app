@@ -46,7 +46,10 @@ export function renewSession(opts: { keepTokenOnFailure?: boolean } = {}): Promi
         setAccessToken(r.data.access_token);
         return r.data;
       } catch {
-        if (!opts.keepTokenOnFailure) setAccessToken(null);
+        if (!opts.keepTokenOnFailure) {
+          setAccessToken(null);
+          window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+        }
         return null;
       } finally { setTimeout(() => { refreshing = null; }, 0); }
     })();
@@ -56,6 +59,8 @@ export function renewSession(opts: { keepTokenOnFailure?: boolean } = {}): Promi
 
 /** Fired when the API says the login has steps left (a firm admin's password, the second step). */
 export const SETUP_REQUIRED_EVENT = 'acct:setup-required';
+/** Fired when the session could not be renewed: it ended (12 hours, signed out elsewhere, a new password). */
+export const SESSION_ENDED_EVENT = 'acct:session-ended';
 
 export function makeClient(): AxiosInstance {
   const client = axios.create({ baseURL: API_URL, withCredentials: true });

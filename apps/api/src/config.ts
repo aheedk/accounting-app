@@ -15,4 +15,20 @@ const schema = z.object({
 });
 
 export const config = schema.parse(process.env);
+
+// The example secrets in .env.example are public: with them anyone could sign
+// their own access tokens. Production refuses to start on them (security
+// review 2026-10-21), and says so in the deploy log.
+const EXAMPLE_SECRETS = new Set(['dev-access-secret-change-me', 'dev-refresh-secret-change-me']);
+if (config.NODE_ENV === 'production') {
+  for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const) {
+    if (EXAMPLE_SECRETS.has(config[key])) {
+      throw new Error(`${key} is the example value from .env.example. Set a long random one in the host's settings (node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))").`);
+    }
+    if (config[key].length < 32) console.warn(`[config] ${key} is shorter than 32 characters; a longer random one is safer.`);
+  }
+  if (config.JWT_ACCESS_SECRET === config.JWT_REFRESH_SECRET) {
+    console.warn('[config] JWT_ACCESS_SECRET and JWT_REFRESH_SECRET are the same; give each its own.');
+  }
+}
 export const corsOrigins = config.CORS_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
