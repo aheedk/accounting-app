@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { View, StyleSheet, Pressable, Alert } from 'react-native';
-import { Text, Menu, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hasMinRole, type Role } from '@accounting/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { AppButton } from '../ui/AppButton';
+import { AppMenu, AppMenuItem } from '../ui/AppMenu';
 import { fontFamily, typeScale, spacing, type AppTheme } from '../../theme';
 
 /**
@@ -53,7 +54,7 @@ export function TransactionFormFooter({
         {existingId ? (
           <>
             <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>·</Text>
-            <Menu
+            <AppMenu
               visible={moreOpen}
               onDismiss={() => setMoreOpen(false)}
               anchor={
@@ -62,9 +63,9 @@ export function TransactionFormFooter({
                 </Pressable>
               }
             >
-              {onCopy ? <Menu.Item leadingIcon="content-copy" title="Copy" onPress={() => { setMoreOpen(false); onCopy(); }} /> : null}
-              {onVoid && canVoid ? <Menu.Item leadingIcon="close-circle-outline" title="Void" onPress={() => { setMoreOpen(false); onVoid(); }} /> : null}
-              <Menu.Item
+              {onCopy ? <AppMenuItem leadingIcon="content-copy" title="Copy" onPress={() => { setMoreOpen(false); onCopy(); }} /> : null}
+              {onVoid && canVoid ? <AppMenuItem leadingIcon="close-circle-outline" title="Void" onPress={() => { setMoreOpen(false); onVoid(); }} /> : null}
+              <AppMenuItem
                 leadingIcon="book-open-outline"
                 title="Transaction journal"
                 disabled={!journalEntryId}
@@ -74,9 +75,9 @@ export function TransactionFormFooter({
                 }}
               />
               {onDelete && canDelete ? (
-                <Menu.Item leadingIcon="trash-can-outline" title="Delete" titleStyle={{ color: theme.app.destructive }} onPress={() => { setMoreOpen(false); onDelete(); }} />
+                <AppMenuItem leadingIcon="trash-can-outline" title="Delete" destructive onPress={() => { setMoreOpen(false); onDelete(); }} />
               ) : null}
-            </Menu>
+            </AppMenu>
           </>
         ) : null}
       </View>

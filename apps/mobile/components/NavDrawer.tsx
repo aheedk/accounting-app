@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
-import { Text, Menu, Divider } from 'react-native-paper';
+import { Text, Divider } from 'react-native-paper';
+import { AppMenu, AppMenuItem } from './ui/AppMenu';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -139,7 +140,7 @@ export function NavDrawer() {
           <Text style={{ color: '#fff', fontFamily: fontFamily.display, fontSize: 17 }}>Accounting</Text>
         </View>
 
-        <Menu
+        <AppMenu
           visible={switcherOpen}
           onDismiss={() => setSwitcherOpen(false)}
           anchor={
@@ -151,9 +152,9 @@ export function NavDrawer() {
           }
         >
           {businesses.map(b => (
-            <Menu.Item key={b.id} title={b.name} onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }} trailingIcon={b.id === activeBusinessId ? 'check' : undefined} />
+            <AppMenuItem key={b.id} title={b.name} onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }} trailingIcon={b.id === activeBusinessId ? 'check' : undefined} />
           ))}
-        </Menu>
+        </AppMenu>
 
         {canOpen('/expense/new') && (
           <Pressable style={styles.createButton} onPress={() => { close(); router.push('/(tabs)/create'); }}>

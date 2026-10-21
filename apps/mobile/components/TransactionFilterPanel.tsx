@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Modal, Portal, Text, Menu, useTheme } from 'react-native-paper';
+import { Modal, Portal, Text, useTheme } from 'react-native-paper';
 import { AppTextInput } from './ui/AppTextInput';
+import { AppMenu, AppMenuItem } from './ui/AppMenu';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
 import { listVendors, listCustomers } from '../services/api';
@@ -74,7 +75,7 @@ export function TransactionFilterPanel({
           Filter transactions
         </Text>
         <ScrollView keyboardShouldPersistTaps="handled">
-          <Menu
+          <AppMenu
             visible={typeMenuOpen}
             onDismiss={() => setTypeMenuOpen(false)}
             anchor={
@@ -86,11 +87,11 @@ export function TransactionFilterPanel({
             }
           >
             {TYPE_OPTIONS.map(t => (
-              <Menu.Item key={t.value} title={t.label} onPress={() => { setDraft(d => ({ ...d, type: t.value })); setTypeMenuOpen(false); }} />
+              <AppMenuItem key={t.value} title={t.label} onPress={() => { setDraft(d => ({ ...d, type: t.value })); setTypeMenuOpen(false); }} />
             ))}
-          </Menu>
+          </AppMenu>
 
-          <Menu
+          <AppMenu
             visible={datePresetMenuOpen}
             onDismiss={() => setDatePresetMenuOpen(false)}
             anchor={
@@ -101,11 +102,11 @@ export function TransactionFilterPanel({
               />
             }
           >
-            <Menu.Item title="All dates" onPress={() => { setDraft(d => ({ ...d, datePreset: 'unset' })); setDatePresetMenuOpen(false); }} />
+            <AppMenuItem title="All dates" onPress={() => { setDraft(d => ({ ...d, datePreset: 'unset' })); setDatePresetMenuOpen(false); }} />
             {DATE_PRESETS.map(p => (
-              <Menu.Item key={p.value} title={p.label} onPress={() => { setDraft(d => ({ ...d, datePreset: p.value as DatePreset })); setDatePresetMenuOpen(false); }} />
+              <AppMenuItem key={p.value} title={p.label} onPress={() => { setDraft(d => ({ ...d, datePreset: p.value as DatePreset })); setDatePresetMenuOpen(false); }} />
             ))}
-          </Menu>
+          </AppMenu>
           {draft.datePreset === 'custom' ? (
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
@@ -155,7 +156,7 @@ export function TransactionFilterPanel({
           <FilterLabel theme={theme} text="Amount" />
           <View style={styles.row}>
             <View style={{ flex: 1.2 }}>
-              <Menu
+              <AppMenu
                 visible={amountOpMenuOpen}
                 onDismiss={() => setAmountOpMenuOpen(false)}
                 anchor={
@@ -167,11 +168,11 @@ export function TransactionFilterPanel({
                   />
                 }
               >
-                <Menu.Item title="Any amount" onPress={() => { setDraft(d => ({ ...d, amountOp: null })); setAmountOpMenuOpen(false); }} />
+                <AppMenuItem title="Any amount" onPress={() => { setDraft(d => ({ ...d, amountOp: null })); setAmountOpMenuOpen(false); }} />
                 {AMOUNT_OPS.map(o => (
-                  <Menu.Item key={o.value} title={o.label} onPress={() => { setDraft(d => ({ ...d, amountOp: o.value as AmountOp })); setAmountOpMenuOpen(false); }} />
+                  <AppMenuItem key={o.value} title={o.label} onPress={() => { setDraft(d => ({ ...d, amountOp: o.value as AmountOp })); setAmountOpMenuOpen(false); }} />
                 ))}
-              </Menu>
+              </AppMenu>
             </View>
             {draft.amountOp ? (
               <View style={{ flex: 1 }}>

@@ -759,3 +759,40 @@ confirm no stray `Chip`/`TextInput`/`SegmentedButtons` import from
 `react-native-paper` was left behind. No live device interaction this
 chunk (no way to drive simulator taps from here) — static verification
 only, same caveat as chunk 8.
+
+### Redesign chunk 10 (2026-10-21) — brand-matched dropdown menu — done
+
+Last Paper component still showing Material styling anywhere in the app:
+the plain `Menu`/`Menu.Item` dropdown (header business switcher, drawer
+business switcher, the transaction form's "More" actions, every filter
+dropdown, the GL account filter, the expense payment-method picker).
+
+Deliberately **not** a full Option-B rebuild this time — Paper's `Menu`
+already gets anchor measurement, screen-edge handling, and open/close
+positioning right, and re-deriving that in plain RN is real risk for
+zero visual gain. Instead, new `components/ui/AppMenu.tsx` exports
+`AppMenu`/`AppMenuItem` as a thin restyle layer on top of Paper's own
+`Menu`/`Menu.Item`: `contentStyle` gives the panel web's shadcn
+`dropdown-menu.tsx` look (bordered, rounded, our surface color, instead
+of Paper's Material elevation), and `AppMenuItem` pulls text color from
+our theme tokens with a `destructive` boolean prop (red text) replacing
+the one-off `titleStyle={{color: theme.app.destructive}}` that
+`TransactionFormFooter`'s Delete item had been doing inline — now the
+same pattern as every other destructive action in the app.
+
+Swapped every call site found by grepping the whole app for `<Menu`:
+`AppHeader.tsx` and `NavDrawer.tsx` (both business switchers),
+`TransactionFormFooter.tsx` ("More" — Copy/Void/Transaction journal/
+Delete), `TransactionFilterPanel.tsx` (type/date-preset/amount-operator
+dropdowns), `general-ledger.tsx` (account filter), `ExpenseForm.tsx`
+(payment method). No other `<Menu` usages existed anywhere else in
+`apps/mobile`, so this fully retires Paper's default Menu styling from
+the app — every Paper component still in use now goes through the MD3
+role-mapping fix from chunk 1, and every one that showed a Material
+shape/pill/panel has a brand-matched wrapper.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, grepped the whole app afterward to confirm
+the only remaining `from 'react-native-paper'` import of `Menu` is
+inside `AppMenu.tsx` itself (the wrapper, as intended). No live device
+interaction this chunk, same caveat as the last two.

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { Text, List, Menu, useTheme } from 'react-native-paper';
+import { Text, List, useTheme } from 'react-native-paper';
 import { AppChip } from '../components/ui/AppChip';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { AppMenu, AppMenuItem } from '../components/ui/AppMenu';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -77,7 +78,7 @@ export default function GeneralLedgerScreen() {
           {(Object.keys(PRESET_LABELS) as Preset[]).map(p => (
             <AppChip key={p} label={PRESET_LABELS[p]} active={preset === p} onPress={() => setPreset(p)} />
           ))}
-          <Menu
+          <AppMenu
             visible={accountMenuOpen}
             onDismiss={() => setAccountMenuOpen(false)}
             anchor={
@@ -88,15 +89,15 @@ export default function GeneralLedgerScreen() {
               />
             }
           >
-            <Menu.Item title="All accounts" onPress={() => { setAccountId(undefined); setAccountMenuOpen(false); }} />
+            <AppMenuItem title="All accounts" onPress={() => { setAccountId(undefined); setAccountMenuOpen(false); }} />
             {accountsQuery.data?.map(a => (
-              <Menu.Item
+              <AppMenuItem
                 key={a.id}
                 title={`${a.code} — ${a.name}`}
                 onPress={() => { setAccountId(a.id); setAccountMenuOpen(false); }}
               />
             ))}
-          </Menu>
+          </AppMenu>
         </ScrollView>
       </View>
 

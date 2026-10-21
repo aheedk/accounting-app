@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
-import { Text, Button, Menu, IconButton, useTheme } from 'react-native-paper';
+import { Text, Button, IconButton, useTheme } from 'react-native-paper';
 import { AppTextInput } from '../ui/AppTextInput';
+import { AppMenu, AppMenuItem } from '../ui/AppMenu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -232,7 +233,7 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
 
       <View style={{ marginBottom: spacing.md }}>
         <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground, marginBottom: 4 }}>Payment method</Text>
-        <Menu
+        <AppMenu
           visible={methodMenuOpen}
           onDismiss={() => setMethodMenuOpen(false)}
           anchor={
@@ -247,9 +248,9 @@ export function ExpenseForm({ existing, existingId }: { existing?: ExpenseDetail
           }
         >
           {PAYMENT_METHODS.map(m => (
-            <Menu.Item key={m.value} title={m.label} onPress={() => { setPaymentMethod(m.value); setMethodMenuOpen(false); }} />
+            <AppMenuItem key={m.value} title={m.label} onPress={() => { setPaymentMethod(m.value); setMethodMenuOpen(false); }} />
           ))}
-        </Menu>
+        </AppMenu>
       </View>
 
       <Text style={[styles.sectionTitle, { color: theme.app.foreground }]}>Lines</Text>

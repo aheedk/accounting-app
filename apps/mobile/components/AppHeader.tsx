@@ -1,10 +1,11 @@
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, IconButton, Menu, useTheme } from 'react-native-paper';
+import { Text, IconButton, useTheme } from 'react-native-paper';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useNavDrawer } from '../hooks/useNavDrawer';
+import { AppMenu, AppMenuItem } from './ui/AppMenu';
 import { fontFamily, typeScale, spacing, type AppTheme } from '../theme';
 
 /**
@@ -39,7 +40,7 @@ export function AppHeader({ title, leading = 'menu' }: { title: string; leading?
         {leading === 'menu' ? (
           <>
             <IconButton icon="menu" size={20} onPress={openDrawer} iconColor={theme.app.mutedForeground} style={styles.menuBtn} />
-            <Menu
+            <AppMenu
               visible={switcherOpen}
               onDismiss={() => setSwitcherOpen(false)}
               anchor={
@@ -55,14 +56,14 @@ export function AppHeader({ title, leading = 'menu' }: { title: string; leading?
               }
             >
               {businesses.map(b => (
-                <Menu.Item
+                <AppMenuItem
                   key={b.id}
                   title={b.name}
                   onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }}
                   trailingIcon={b.id === activeBusinessId ? 'check' : undefined}
                 />
               ))}
-            </Menu>
+            </AppMenu>
           </>
         ) : (
           <Text style={{ color: theme.app.mutedForeground, fontFamily: fontFamily.semibold, fontSize: typeScale.caption, textTransform: 'uppercase', letterSpacing: 0.3, paddingLeft: spacing.md }} numberOfLines={1}>
