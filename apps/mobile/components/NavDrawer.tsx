@@ -70,7 +70,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'reports', label: 'Reports', icon: 'chart-bar',
     children: [
-      { label: 'Standard Reports' }, { label: 'Profit & Loss' }, { label: 'Balance Sheet' },
+      { label: 'Standard Reports' },
+      { label: 'Profit & Loss', path: '/pnl' },
+      { label: 'Balance Sheet', path: '/balance-sheet' },
       { label: 'General Ledger', path: '/general-ledger' },
       { label: 'Cash Flows' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
       { label: 'Management Reports' }, { label: 'Performance Center' }, { label: 'Financial Planning' },

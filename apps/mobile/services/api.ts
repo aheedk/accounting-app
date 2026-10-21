@@ -1,5 +1,5 @@
 import { api } from './apiClient';
-import type { ConfidenceBand, CodingLayerId } from '@accounting/shared';
+import type { ConfidenceBand, CodingLayerId, AccountGroup } from '@accounting/shared';
 
 // Thin, typed wrappers over the same REST endpoints the web app calls —
 // no parallel backend, no mobile-specific routes. Response shapes mirror
@@ -436,5 +436,42 @@ export async function uploadDocument(
   const r = await api.post<DocumentUploadResult>(`/businesses/${businessId}/ai/documents`, form, {
     timeout: 45_000,
   });
+  return r.data;
+}
+
+// --- Profit & Loss and Balance Sheet — shapes copied from
+// profitLossService.ts's PnlReport and balanceSheetService.ts's
+// BalanceSheetReport (confirmed by reading both service files directly;
+// neither has a shared zod/TS type in packages/shared — even the web pages
+// each redeclare their own local copy of these shapes, so this is the same
+// pattern, not a shortcut).
+
+export type PnlLine = { account_id: string; account_code: string; account_name: string; amount: string };
+export type PnlReport = {
+  period_start: string; period_end: string;
+  revenue_lines: PnlLine[]; revenue_total: string;
+  expense_lines: PnlLine[]; expense_total: string;
+  gross_profit: string; operating_expenses_total: string; operating_income: string;
+  other_expenses_total: string; net_income: string;
+};
+
+export async function getPnl(businessId: string, params: { period_start: string; period_end: string }) {
+  const r = await api.get<PnlReport>(`/businesses/${businessId}/reports/pnl`, { params });
+  return r.data;
+}
+
+export type BsLine = { account_id: string; account_code: string; account_name: string; amount: string; group: AccountGroup };
+export type BalanceSheetReport = {
+  as_of: string;
+  asset_lines: BsLine[]; assets_total: string;
+  liability_lines: BsLine[]; liabilities_total: string;
+  equity_lines: BsLine[]; equity_total: string;
+  net_income_ytd: string; fiscal_year_start: string;
+  retained_earnings_prior_years: string;
+  liabilities_equity_total: string; in_balance: boolean;
+};
+
+export async function getBalanceSheet(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<BalanceSheetReport>(`/businesses/${businessId}/reports/balance-sheet`, { params });
   return r.data;
 }

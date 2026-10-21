@@ -7,7 +7,6 @@ import type { AppTheme } from '../../theme';
 import { spacing, fontFamily } from '../../theme';
 
 const STUB_ITEMS = [
-  { icon: 'chart-box-outline', label: 'Reports' },
   { icon: 'book-open-variant', label: 'Chart of Accounts' },
   { icon: 'bank-check', label: 'Reconciliation' },
 ] as const;
@@ -28,6 +27,18 @@ export default function MoreScreen() {
       )}
       <Divider />
 
+      <List.Item
+        title="Profit & Loss"
+        onPress={() => router.push('/pnl')}
+        left={props => <List.Icon {...props} icon="chart-line" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Balance Sheet"
+        onPress={() => router.push('/balance-sheet')}
+        left={props => <List.Icon {...props} icon="scale-balance" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
       <List.Item
         title="General Ledger"
         onPress={() => router.push('/general-ledger')}

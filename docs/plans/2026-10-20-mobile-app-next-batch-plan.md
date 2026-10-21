@@ -607,3 +607,40 @@ reading the actual compiled `.app`'s `Info.plist` via `PlistBuddy` on the
 installed bundle, not from guessing off the source `app.json` — confirms
 the standing practice of verifying against real artifacts before asserting
 a root cause.
+
+### Redesign chunk 6 (2026-10-21) — Profit & Loss and Balance Sheet reports — done
+
+Built the two most integral financial reports the drawer had marked
+"Desktop only" (Reports > Profit & Loss, Reports > Balance Sheet), matching
+the real endpoints read directly first (neither has a shared zod/TS type in
+`packages/shared` — even the web pages each redeclare their own local copy
+of these shapes, so the mobile types follow the same established pattern,
+not a shortcut).
+
+- **`app/pnl.tsx`**: period-start/period-end date pickers (defaulting to
+  fiscal-year-start → today, using the business's real
+  `fiscal_year_start_month`), 3 summary cards (Revenue/Expenses/Net
+  income), then Income lines → Total Income → Gross Profit → Expenses
+  lines → Total Expenses → Net Operating Income → (Other Expenses, only
+  shown if non-zero) → Net Income — same order as web's
+  `ProfitLossPage.tsx`, no collapse/expand on either (web doesn't have it
+  either).
+- **`app/balance-sheet.tsx`**: a single as-of date picker, an in-balance/
+  out-of-balance banner (`report.in_balance`, straight from the API), then
+  Assets grouped into Current/Fixed/Other Assets blocks → Total Assets,
+  Liabilities grouped into Current/Long-Term blocks → Total Liabilities,
+  Equity (flat lines + Net Income YTD, italic like web) → Total Equity →
+  Total Liabilities and Equity. New `lib/balanceSheetLayout.ts` ports
+  web's `assetBlocks`/`liabilityBlocks` grouping logic (keyed off each
+  line's own `group` field, not re-derived) since it's web-local code, not
+  in the shared package either.
+- Wired into the drawer's Reports group (previously both disabled) and
+  added as quick links in the More tab, replacing the generic disabled
+  "Reports" stub now that two real reports exist there.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, and both endpoints hit directly against the
+real dev API (not just read from source) — the actual JSON response
+matched the hand-written mobile types field-for-field, including the
+`group` values on balance sheet lines and the negative-amount convention
+on liability lines.
