@@ -36,7 +36,22 @@
           "backgroundColor": "#151d33"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lets you pick a receipt or statement photo from your library to upload for AI review.",
+          "cameraPermission": "Lets you photograph a receipt or statement to upload for AI review."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2755b9"
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

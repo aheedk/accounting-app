@@ -8,6 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 const ACCESS_TOKEN_KEY = 'acct_access_token';
+const REFRESH_TOKEN_KEY = 'acct_refresh_token';
 
 // expo-secure-store is synchronous-feeling but its API is async (it's backed
 // by iOS Keychain / Android Keystore, not AsyncStorage — this is the one the
@@ -21,11 +22,50 @@ export async function getAccessToken(): Promise<string | null> {
   return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
 }
 
-/** Called once, on a 401 that isn't login itself — see the note on refresh
- * tokens in AuthProvider. There is no silent-refresh path yet. */
+export async function setRefreshToken(token: string | null): Promise<void> {
+  if (token === null) await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  else await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token);
+}
+
+export async function getRefreshToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+}
+
+/** Called once, after a refresh attempt also failed — see useAuth.tsx. */
 let onUnauthorized: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: (() => void) | null): void {
   onUnauthorized = fn;
+}
+
+// POST /auth/refresh-mobile is the mobile counterpart of the web's
+// cookie-based /auth/refresh: the API has no httpOnly cookie to read from a
+// native client, so the refresh token travels in the body instead, and the
+// mobile app is responsible for storing the rotated one it gets back.
+// A bare axios call (no interceptors) so this never recurses into itself.
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) return null;
+  try {
+    const res = await axios.post<{ access_token: string; refresh_token: string }>(
+      `${API_URL}/auth/refresh-mobile`,
+      { refresh_token: refreshToken },
+    );
+    await setAccessToken(res.data.access_token);
+    await setRefreshToken(res.data.refresh_token);
+    return res.data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+// Concurrent 401s during the same tick share one in-flight refresh instead of
+// each kicking off their own rotation (which would race: only the first
+// rotated token stays valid, and the rest would be refreshing an
+// already-revoked token).
+let refreshInFlight: Promise<string | null> | null = null;
+function refreshOnce(): Promise<string | null> {
+  refreshInFlight ??= refreshAccessToken().finally(() => { refreshInFlight = null; });
+  return refreshInFlight;
 }
 
 export function makeClient(): AxiosInstance {
@@ -40,10 +80,20 @@ export function makeClient(): AxiosInstance {
   client.interceptors.response.use(
     r => r,
     async (error: unknown) => {
-      const status = (error as { response?: { status?: number }; config?: { url?: string } })?.response?.status;
-      const url = (error as { config?: { url?: string } })?.config?.url ?? '';
-      if (status === 401 && !url.includes('/auth/login')) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      const config = (error as { config?: InternalAxiosRequestConfig & { _retried?: boolean } })?.config;
+      const url = config?.url ?? '';
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh-mobile');
+
+      if (status === 401 && !isAuthEndpoint && config && !config._retried) {
+        config._retried = true;
+        const newAccessToken = await refreshOnce();
+        if (newAccessToken) {
+          config.headers.Authorization = `Bearer ${newAccessToken}`;
+          return client(config);
+        }
         await setAccessToken(null);
+        await setRefreshToken(null);
         onUnauthorized?.();
       }
       throw error;

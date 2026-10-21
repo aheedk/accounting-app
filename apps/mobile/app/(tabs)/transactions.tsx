@@ -6,11 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { AppHeader } from '../../components/AppHeader';
+import { StatusBadge, statusToBadge } from '../../components/ui/StatusBadge';
 import { listTransactions, type TransactionRow } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { EmptyState } from '../../components/EmptyState';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
-import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
+import { spacing, typeScale, fontFamily, minTouchTarget, type AppTheme } from '../../theme';
 
 const TYPE_FILTERS = [
   { value: '', label: 'All' },
@@ -43,9 +46,9 @@ export default function TransactionsScreen() {
   }, [query.data, search]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader title="Transactions" />
       <View style={styles.header}>
-        <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>Transactions</Text>
         <TextInput
           mode="outlined"
           placeholder="Search payee or memo"
@@ -87,11 +90,7 @@ export default function TransactionsScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
           refreshControl={<RefreshControl refreshing={query.isFetching && !query.isLoading} onRefresh={() => void query.refetch()} tintColor={theme.app.primary} />}
           ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.app.border }} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ color: theme.app.mutedForeground }}>No transactions match.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState icon="format-list-bulleted" message="No transactions match." />}
           renderItem={({ item }: { item: TransactionRow }) => (
             // item.path is the WEB app's route (e.g. /accounting/expenses/:id),
             // not a mobile screen — navigate by type+id to our own detail route
@@ -115,38 +114,22 @@ function TransactionRowItem({ row, theme, onPress }: { row: TransactionRow; them
       onPress={onPress}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ color: theme.app.foreground, fontWeight: '600' }} numberOfLines={1}>
+        <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }} numberOfLines={1}>
           {row.contact_name ?? row.memo ?? row.type}
         </Text>
         <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }} numberOfLines={1}>
           {fmtShortDate(row.date)}{row.ref_no ? ` · #${row.ref_no}` : ''}{row.category ? ` · ${row.category}` : ''}
         </Text>
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={{ color: theme.app.foreground, fontWeight: '700' }}>${fmtMoney(row.total_amount)}</Text>
-        <StatusPill status={row.status} theme={theme} />
+      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+        <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }}>${fmtMoney(row.total_amount)}</Text>
+        <StatusBadge status={statusToBadge(row.status)} label={row.status} />
       </View>
     </Pressable>
-  );
-}
-
-function StatusPill({ status, theme }: { status: string; theme: AppTheme }) {
-  const map: Record<string, { bg: string; fg: string }> = {
-    posted: { bg: theme.app.statusGreenBg, fg: theme.app.statusGreenFg },
-    paid: { bg: theme.app.statusGreenBg, fg: theme.app.statusGreenFg },
-    draft: { bg: theme.app.statusGrayBg, fg: theme.app.statusGrayFg },
-    voided: { bg: theme.app.statusRedBg, fg: theme.app.statusRedFg },
-  };
-  const c = map[status] ?? { bg: theme.app.statusGrayBg, fg: theme.app.statusGrayFg };
-  return (
-    <View style={{ backgroundColor: c.bg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, marginTop: 2 }}>
-      <Text style={{ color: c.fg, fontSize: 10, fontWeight: '600', textTransform: 'capitalize' }}>{status}</Text>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: { padding: spacing.md, paddingBottom: 0 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  empty: { alignItems: 'center', paddingTop: spacing.xxl },
 });

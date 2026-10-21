@@ -12,13 +12,10 @@ export const spacing = {
 
 export const minTouchTarget = 44;
 
-/** Same relative ratios as the web app's h1/h2/h3/body/caption (24/18/15/14/12),
- * just resized for a phone screen where 24px reads as oversized relative to
- * the viewport. Ratios preserved: h1:body = 1.71, h2:body = 1.29, h3:body = 1.07. */
-export const typeScale = {
-  h1: 22,
-  h2: 17,
-  h3: 14,
-  body: 13,
-  caption: 11,
-} as const;
+/** Web-exact type scale now lives in theme/typography.ts (24/18/15/14/12/11,
+ * same pixel sizes as web — no longer rescaled for the phone viewport). */
+export { typeScale, fontFamily } from './typography';
+
+/** Web's border radius (rounded-md = 6px) — used directly by component
+ * primitives rather than Paper's roundness multiplier, for exact control. */
+export const radius = 6;

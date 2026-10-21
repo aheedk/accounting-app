@@ -12,12 +12,12 @@ import type { DB } from '../../db/types.js';
 // others would catch up when the token expires (minutes), not at once. A
 // restart reloads it from the database (loadRecentRevocations).
 
-/** user id → epoch seconds. A token issued before this is refused. */
+/** user id → epoch milliseconds. A token issued before this is refused. */
 const revokedBefore = new Map<string, number>();
 
-export function revokeAccessTokensBefore(userId: string, epochSeconds: number): void {
+export function revokeAccessTokensBefore(userId: string, epochMs: number): void {
   const current = revokedBefore.get(userId) ?? 0;
-  if (epochSeconds > current) revokedBefore.set(userId, epochSeconds);
+  if (epochMs > current) revokedBefore.set(userId, epochMs);
 }
 
 /** session id → when to forget it (epoch ms): once every token it could have issued has expired. */
@@ -30,11 +30,15 @@ export function revokeSession(sessionId: string): void {
   endedSessions.set(sessionId, now + FORGET_AFTER_MS);
 }
 
-/** `iat` is the token's issued-at, in epoch seconds; `sid` its session, when it names one. */
-export function accessTokenRevoked(userId: string, iat: number, sid?: string): boolean {
+/**
+ * `issuedAtMs` is when the token was issued, in epoch milliseconds (a token from
+ * before `iat_ms` was added gives its `iat` seconds times 1000); `sid` its
+ * session, when it names one.
+ */
+export function accessTokenRevoked(userId: string, issuedAtMs: number, sid?: string): boolean {
   if (sid !== undefined && endedSessions.has(sid)) return true;
   const moment = revokedBefore.get(userId);
-  return moment !== undefined && iat < moment;
+  return moment !== undefined && issuedAtMs < moment;
 }
 
 /** For tests. */
@@ -50,7 +54,7 @@ export async function loadRecentRevocations(db: Kysely<DB>, accessTtlMinutes: nu
     .where('sessions_revoked_at', '>', sql<Date>`now() - make_interval(mins => ${accessTtlMinutes + 1})`)
     .execute();
   for (const row of rows) {
-    if (row.sessions_revoked_at) revokeAccessTokensBefore(row.id, Math.ceil(new Date(row.sessions_revoked_at).getTime() / 1000));
+    if (row.sessions_revoked_at) revokeAccessTokensBefore(row.id, new Date(row.sessions_revoked_at).getTime());
   }
   // Sessions ended recently: every token of theirs is revoked. (A session that was
   // only renewed has a live token, so it is not one of these.)

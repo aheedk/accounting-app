@@ -14,10 +14,15 @@ type AccessClaims = {
   sid?: string;
   /** Present while the login has steps left (SetupStep): the token then opens only its own account. */
   setup?: SetupStep[];
+  /**
+   * When it was issued, in milliseconds. `iat` counts whole seconds, which let a
+   * token issued in the same second as a role change outlive it (sessionRevocation).
+   */
+  iat_ms?: number;
 };
 
 export function signAccessToken(claims: AccessClaims): string {
-  return jwt.sign(claims, config.JWT_ACCESS_SECRET, {
+  return jwt.sign({ ...claims, iat_ms: Date.now() }, config.JWT_ACCESS_SECRET, {
     algorithm: 'HS256',
     expiresIn: `${config.JWT_ACCESS_TTL_MINUTES}m`,
   });
@@ -32,6 +37,9 @@ export function verifyAccessToken(token: string): AccessClaims & { iat: number; 
 export function generateRefreshToken(): string {
   return crypto.randomBytes(32).toString('base64url');
 }
+
+/** A browser's sign-in key (in a cookie) or the mobile app's (in its secure store); each lasts differently (authService). */
+export type RefreshTokenType = 'web' | 'mobile';
 
 // Deterministic so we can look up rows by hash. HMAC with refresh secret.
 export async function hashRefreshToken(raw: string): Promise<string> {

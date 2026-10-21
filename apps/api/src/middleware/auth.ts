@@ -24,7 +24,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     if (!auth?.startsWith('Bearer ')) throw new AuthError(ERR.UNAUTHORIZED, 'Missing Bearer token');
     const claims = verifyAccessToken(auth.slice('Bearer '.length));
     // The session was signed out or ended, or the login was switched off, since this token was issued.
-    if (accessTokenRevoked(claims.user_id, claims.iat, claims.sid)) throw new AuthError(ERR.UNAUTHORIZED, 'This session has ended');
+    if (accessTokenRevoked(claims.user_id, claims.iat_ms ?? claims.iat * 1000, claims.sid)) throw new AuthError(ERR.UNAUTHORIZED, 'This session has ended');
     if (claims.setup?.length && !openWhileSettingUp(req)) {
       throw new AuthError(ERR.ACCOUNT_SETUP_REQUIRED, 'Finish setting up your login first.', { setup_required: claims.setup });
     }

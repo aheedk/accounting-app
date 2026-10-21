@@ -3,7 +3,7 @@
 **Status:** Implemented 2026-10-08 (migrations `0091`–`0095`). It is the "features there
 should be" list from the role audit (`docs/qa/2026-10-08-role-audit.md`), built. Three
 items on that list need something from outside and are not built; they are at the end.
-Signing in was tightened on 2026-10-21 (migration `0107`, "Firm security settings"
+Signing in was tightened on 2026-10-21 (migration `0109`, "Firm security settings"
 below; the reasons are in `docs/qa/2026-10-20-security-review.md`).
 
 Everything here is off, or unchanged, until someone turns it on: no login is switched
@@ -47,7 +47,10 @@ approval.
   the app warns two minutes before ("Still there?") and the sign-in page then says why;
   the API also refuses to renew a session not renewed within the limit, so a closed or
   frozen tab cannot be picked up later. Whatever the limit, a session ends 12 hours after
-  signing in. The refresh cookie lasts no longer than the session may.
+  signing in. The refresh cookie lasts no longer than the session may. The mobile app's
+  sessions (its key is kept in the phone's secure store, `POST /auth/refresh-mobile`)
+  last 30 days without use instead (`JWT_MOBILE_REFRESH_TTL_DAYS`): the phone's own lock
+  guards it in between. Everything else here applies to the phone as well.
 - **A session that ends while the app is open** (12 hours up, a new password set
   elsewhere, signed out by a firm admin) takes the browser to the sign-in page,
   which says so.

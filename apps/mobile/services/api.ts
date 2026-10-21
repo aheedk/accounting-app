@@ -1,4 +1,5 @@
 import { api } from './apiClient';
+import type { ConfidenceBand, CodingLayerId } from '@accounting/shared';
 
 // Thin, typed wrappers over the same REST endpoints the web app calls —
 // no parallel backend, no mobile-specific routes. Response shapes mirror
@@ -19,10 +20,18 @@ export type TransactionRow = {
   path: string;
 };
 
-export async function listTransactions(businessId: string, params: { limit?: number; type?: string } = {}) {
+export async function listTransactions(
+  businessId: string, params: { limit?: number; type?: string; contact_id?: string } = {},
+) {
   const r = await api.get<{ transactions: TransactionRow[]; total: number }>(
     `/businesses/${businessId}/transactions`,
-    { params: { page_size: params.limit ?? 50, sort_key: 'date', sort_dir: 'desc', ...(params.type ? { type: params.type } : {}) } },
+    {
+      params: {
+        page_size: params.limit ?? 50, sort_key: 'date', sort_dir: 'desc',
+        ...(params.type ? { type: params.type } : {}),
+        ...(params.contact_id ? { contact_id: params.contact_id } : {}),
+      },
+    },
   );
   return r.data;
 }
@@ -63,11 +72,19 @@ export async function getInvoice(businessId: string, id: string) {
 }
 
 // customers.ts's list route returns every CustomersTable column plus two
-// computed fields (open_balance, has_transactions) — only the subset the
-// mobile screens use is declared here, same pattern as InvoiceRow above.
+// computed fields (open_balance, has_transactions); the detail route returns
+// the plain row WITHOUT those two — they're list-only. Two separate types so
+// a screen can't accidentally read open_balance off the detail response (it
+// would just be undefined, not a type error) the way the detail screen
+// originally did.
 export type CustomerRow = {
   id: string; name: string; company_name: string | null; email: string | null;
   phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
+};
+
+export type CustomerDetail = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; is_active: boolean;
 };
 
 export async function listCustomers(businessId: string) {
@@ -76,15 +93,106 @@ export async function listCustomers(businessId: string) {
 }
 
 export async function getCustomer(businessId: string, id: string) {
-  const r = await api.get<CustomerRow>(`/businesses/${businessId}/customers/${id}`);
+  const r = await api.get<CustomerDetail>(`/businesses/${businessId}/customers/${id}`);
   return r.data;
 }
 
-export type InboxRow = { id: string; status: string; source: string; created_at: string };
+// vendors.ts mirrors customers.ts exactly: list adds open_balance +
+// has_transactions, detail returns the plain row without them.
+export type VendorRow = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
+};
 
-export async function listPendingInbox(businessId: string) {
-  const r = await api.get<{ integration_inbox: InboxRow[] }>(`/businesses/${businessId}/integration-inbox`, { params: { status: 'pending' } });
-  return r.data.integration_inbox;
+export type VendorDetail = {
+  id: string; name: string; company_name: string | null; email: string | null;
+  phone: string | null; mobile: string | null; website: string | null; notes: string | null;
+  account_number: string | null; is_active: boolean; is_1099: boolean;
+};
+
+export async function listVendors(businessId: string) {
+  const r = await api.get<{ vendors: VendorRow[] }>(`/businesses/${businessId}/vendors`);
+  return r.data.vendors;
+}
+
+export async function getVendor(businessId: string, id: string) {
+  const r = await api.get<VendorDetail>(`/businesses/${businessId}/vendors/${id}`);
+  return r.data;
+}
+
+// --- AI Document Inbox (batch item 4) — the real backend for this is
+// email-imports.ts, NOT integration-inbox.ts (that's an unrelated
+// CSV-reconciliation inbox for Stripe/PayPal/Shopify matching). Shapes
+// copied from emailImports.ts's StagedTransaction/StagedImportRow and
+// statementImportService.ts's StatementLine — confirmed by reading both,
+// not guessed. Known backend gaps, carried into how the mobile screens
+// work (documented again at point of use below):
+//  - No per-line PATCH — every edit (offset account, payee override,
+//    "remember") is bundled into one whole-statement approve call.
+//  - No real "partially reviewed" status — only pending/approved/rejected;
+//    a partial auto-post is inferred from each line's auto_posted flag.
+//  - No vendor_id on a line — vendor "detection" is just a free-text
+//    payee_name string, fuzzy-matched client-side against the vendor list.
+//  - Reject is whole-statement only — dropping one bad line is
+//    include: false on that line at approve time, not a separate action.
+
+export type StagedTransaction = {
+  date: string; // "MM/DD/YYYY" as extracted, not ISO
+  payee_name?: string;
+  description: string;
+  amount: string; // always unsigned — direction comes from `type`
+  type: 'deposit' | 'check' | 'expense' | 'debit' | 'credit';
+  balance?: string;
+  check_number?: string;
+  card_type?: 'charge' | 'payment' | 'refund';
+  suggested_offset?: string;
+  suggested_account_id?: string;
+  suggestion?: { confidence: number; band: ConfidenceBand; source_layer: CodingLayerId } | null;
+  auto_posted?: boolean;
+  check_stub?: { id: string; check_number: string | null; payee_name: string | null; memo: string | null; amount: string; check_date: string | null; suggested_account_id: string | null } | null;
+};
+
+export type StagedImportRow = {
+  id: string;
+  email_from: string | null;
+  email_subject: string | null;
+  received_at: string;
+  extracted_transactions: StagedTransaction[];
+  status: 'pending' | 'approved' | 'rejected';
+  source: 'email' | 'upload';
+  statement_kind: 'bank' | 'credit_card';
+  account_hint: string | null;
+  account_id: string | null;
+  suggested_statement_account_id: string | null;
+};
+
+export async function listEmailImports(businessId: string) {
+  const r = await api.get<{ imports: StagedImportRow[] }>(`/businesses/${businessId}/email-imports`);
+  return r.data.imports;
+}
+
+export type ApproveTransactionInput = {
+  index: number; offset_account_id: string; include?: boolean; remember?: boolean;
+  payee_name?: string; check_stub_id?: string | null;
+};
+
+export async function approveEmailImport(
+  businessId: string, importId: string, body: { bank_account_id: string; transactions: ApproveTransactionInput[] },
+) {
+  const r = await api.post<{ ok: boolean; posted: number; learned: number }>(
+    `/businesses/${businessId}/email-imports/${importId}/approve`, body,
+  );
+  return r.data;
+}
+
+export async function rejectEmailImport(businessId: string, importId: string) {
+  const r = await api.post<{ ok: boolean }>(`/businesses/${businessId}/email-imports/${importId}/reject`, {});
+  return r.data;
+}
+
+export async function createVendor(businessId: string, name: string) {
+  const r = await api.post<{ id: string; name: string }>(`/businesses/${businessId}/vendors`, { name });
+  return r.data;
 }
 
 // --- Transaction detail — the 4 types Phase 1 scopes for mobile viewing.
@@ -93,11 +201,13 @@ export async function listPendingInbox(businessId: string) {
 // field names copied from the route handlers, not guessed.
 
 export type DepositDetail = {
-  id: string; deposit_date: string; deposit_number: string | null; memo: string | null;
+  id: string; bank_account_id: string; deposit_date: string; deposit_number: string | null; memo: string | null;
   total_amount: string; bank_account_name: string; editable: boolean; imported: boolean;
   is_reconciled: boolean; voided_at: string | null;
+  cash_back_account_id: string | null; cash_back_memo: string | null; cash_back_amount: string | null;
   lines: Array<{
-    id: string; line_type: string; received_from: string | null; description: string | null;
+    id: string; line_type: 'other_funds' | 'undeposited_funds'; payment_id: string | null;
+    received_from: string | null; account_id: string | null; description: string | null;
     payment_method: string | null; ref_no: string | null; amount: string;
     account_name: string | null; account_code: string | null;
   }>;
@@ -107,15 +217,72 @@ export async function getDeposit(businessId: string, id: string) {
   return r.data;
 }
 
+// bankDepositCreateSchema/-UpdateSchema shape. On update, 'undeposited_funds'
+// lines already on the deposit are kept server-side regardless of what's
+// sent — only 'other_funds' lines are caller-controlled (see getDeposit's
+// own lines, which the mobile edit screen only re-sends the other_funds
+// subset of).
+export type DepositLineInput = {
+  line_type?: 'other_funds' | 'undeposited_funds'; payment_id?: string | null;
+  received_from?: string | null; account_id?: string | null; description?: string | null;
+  payment_method?: string | null; ref_no?: string | null; amount: string; sort_order?: number;
+};
+export type DepositInput = {
+  bank_account_id: string; deposit_date: string; memo?: string | null;
+  lines: DepositLineInput[];
+  cash_back_account_id?: string | null; cash_back_memo?: string | null; cash_back_amount?: string | null;
+};
+
+export async function createDeposit(businessId: string, body: DepositInput) {
+  const r = await api.post<{ id: string }>(`/businesses/${businessId}/bank-deposits`, body);
+  return r.data;
+}
+
+export async function updateDeposit(businessId: string, id: string, body: DepositInput) {
+  const r = await api.patch<{ id: string }>(`/businesses/${businessId}/bank-deposits/${id}`, body);
+  return r.data;
+}
+
 export type ExpenseDetail = {
   id: string; transaction_date: string; payee_text: string | null; payee_name: string | null;
-  vendor_name: string | null; customer_name: string | null; payment_account_name: string;
+  vendor_id: string | null; customer_id: string | null;
+  vendor_name: string | null; customer_name: string | null;
+  payment_account_id: string; payment_account_name: string;
   payment_method: string; reference: string | null; memo: string | null; total_amount: string;
   status: string; editable: boolean; imported: boolean; is_reconciled: boolean;
-  lines: Array<{ id: string; category_name: string; category_code: string; description: string | null; amount: string }>;
+  lines: Array<{
+    id: string; category_account_id: string; category_name: string; category_code: string;
+    description: string | null; amount: string;
+  }>;
 };
 export async function getExpense(businessId: string, id: string) {
   const r = await api.get<ExpenseDetail>(`/businesses/${businessId}/expense-transactions/${id}`);
+  return r.data;
+}
+
+// Create/update bodies match expenseTransactionCreateSchema/-UpdateSchema in
+// packages/shared/src/schemas/expenseTransaction.ts exactly (same shape for
+// both — update is a full resend, not a partial patch; the API always
+// derives total_amount from the lines, there's no top-level total field).
+export type ExpenseLineInput = {
+  category_account_id: string; description?: string | null; amount: string; sort_order?: number;
+};
+export type ExpenseInput = {
+  transaction_date: string;
+  payee_text?: string | null; vendor_id?: string | null; customer_id?: string | null;
+  payment_account_id: string;
+  payment_method: 'cash' | 'check' | 'credit_card' | 'debit_card' | 'ach' | 'other';
+  reference?: string | null; memo?: string | null;
+  lines: ExpenseLineInput[];
+};
+
+export async function createExpense(businessId: string, body: ExpenseInput) {
+  const r = await api.post<{ id: string }>(`/businesses/${businessId}/expense-transactions`, body);
+  return r.data;
+}
+
+export async function updateExpense(businessId: string, id: string, body: ExpenseInput) {
+  const r = await api.patch<{ id: string }>(`/businesses/${businessId}/expense-transactions/${id}`, body);
   return r.data;
 }
 
@@ -150,11 +317,20 @@ export async function getJournalEntry(businessId: string, id: string) {
 // generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
 // chartOfAccounts.ts's /coa route, not guessed.
 
-export type CoaAccount = { id: string; code: string; name: string; account_type: string };
+export type CoaAccount = {
+  id: string; code: string; name: string; account_type: string; detail_type: string | null;
+};
 
 export async function listChartOfAccounts(businessId: string) {
   const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`);
   return r.data.accounts;
+}
+
+export type BankAccountRow = { id: string; name: string; cash_account_id: string };
+
+export async function listBankAccounts(businessId: string) {
+  const r = await api.get<{ bank_accounts: BankAccountRow[] }>(`/businesses/${businessId}/bank-accounts`);
+  return r.data.bank_accounts;
 }
 
 export type GeneralLedgerLine = {
@@ -180,5 +356,30 @@ export async function getGeneralLedger(
   params: { period_start: string; period_end: string; account_id?: string },
 ) {
   const r = await api.get<GeneralLedgerReport>(`/businesses/${businessId}/reports/general-ledger`, { params });
+  return r.data;
+}
+
+// --- Camera capture → AI Inbox (batch item 5). One endpoint handles both a
+// multi-page bank/card statement PDF and a single photographed receipt —
+// the same model call classifies either, so there's no separate "receipt
+// mode" to call (confirmed by reading documentIngestService.ts /
+// gmailWorker.ts's classifier prompt, not guessed). Synchronous: the model
+// call happens inline, so this can take 15-30s and the result — which
+// queue the upload landed in — comes back in the same response, no polling.
+export type DocumentUploadResult =
+  | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
+  | { kind: 'invoice'; staging_id: string; invoice_type: 'ap' | 'ar' }
+  | { kind: 'check_stubs'; check_count: number };
+
+export async function uploadDocument(
+  businessId: string, file: { uri: string; name: string; type: string },
+) {
+  const form = new FormData();
+  // React Native's FormData file part — Expo's ImagePicker asset uri/mimeType
+  // map straight onto this shape.
+  form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  const r = await api.post<DocumentUploadResult>(`/businesses/${businessId}/ai/documents`, form, {
+    timeout: 45_000,
+  });
   return r.data;
 }

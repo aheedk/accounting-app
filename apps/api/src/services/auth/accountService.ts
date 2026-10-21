@@ -51,8 +51,10 @@ export async function endSessions(
   // Ending every session also refuses anything issued up to now, whichever
   // session it names (a token from before sessions were named has none).
   if (!input.session_id && !input.keep_token_hash) {
-    const moment = Math.floor(Date.now() / 1000) + 1;
-    await trx.updateTable('users').set({ sessions_revoked_at: new Date(moment * 1000).toISOString() })
+    // Counted to the millisecond (`iat_ms`); a token from before it gives its whole
+    // second, which is never later than when it was issued, so it is caught too.
+    const moment = Date.now() + 1;
+    await trx.updateTable('users').set({ sessions_revoked_at: new Date(moment).toISOString() })
       .where('id', '=', input.user_id).execute();
     revokeAccessTokensBefore(input.user_id, moment);
   }
@@ -64,12 +66,12 @@ export async function endSessions(
  * out: the browser renews at once (the refresh cookie still works) and the new
  * token carries what the database says now. For a change the token itself
  * carries, such as the firm-wide role, which would otherwise last until the
- * token expires (security review 2026-10-21). A token issued in this same
- * second still counts, so the renewal that follows at once is not refused too.
+ * token expires (security review 2026-10-21). Counted to the millisecond
+ * (`iat_ms`), so the renewal that follows is not refused too.
  */
 export async function reissueAccessTokens(trx: Transaction<DB>, user_id: string): Promise<void> {
-  const moment = Math.floor(Date.now() / 1000);
-  await trx.updateTable('users').set({ sessions_revoked_at: new Date(moment * 1000).toISOString() })
+  const moment = Date.now() + 1;
+  await trx.updateTable('users').set({ sessions_revoked_at: new Date(moment).toISOString() })
     .where('id', '=', user_id).execute();
   revokeAccessTokensBefore(user_id, moment);
 }

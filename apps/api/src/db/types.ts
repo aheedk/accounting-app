@@ -9,7 +9,7 @@ export interface FirmsTable {
   name: string;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
-  // Firm security settings (migration 0107): every login sets up the second
+  // Firm security settings (migration 0109): every login sets up the second
   // step; a browser left alone this many minutes is signed out.
   require_two_step: Generated<boolean>;
   idle_sign_out_minutes: Generated<number>;
@@ -73,7 +73,7 @@ export interface UsersTable {
   totp_enabled_at: Timestamp | null;
   // Whether this login may open payroll (migration 0093). A firm admin always may.
   payroll_access: Generated<boolean>;
-  // Migration 0107: the password was made by a firm admin and must be replaced
+  // Migration 0109: the password was made by a firm admin and must be replaced
   // before the app opens; the 30-second step of the last code accepted (bigint).
   must_change_password: Generated<boolean>;
   totp_last_step: ColumnType<string | null, string | number | null | undefined, string | number | null>;
@@ -101,6 +101,18 @@ export interface RefreshTokensTable {
   session_started_at: ColumnType<Date, string | Date | undefined, string | Date>;
   user_agent: string | null;
   ip_address: string | null;
+  // 'web' sessions refresh via the httpOnly cookie route; 'mobile' ones via
+  // /auth/refresh-mobile's body-based route (migration 0106).
+  token_type: Generated<'web' | 'mobile'>;
+}
+
+export interface PushTokensTable {
+  id: Generated<string>;
+  user_id: string;
+  token: string;
+  platform: 'ios' | 'android';
+  created_at: Generated<Timestamp>;
+  last_used_at: Generated<Timestamp>;
 }
 
 export interface AuditLogsTable {
@@ -1175,6 +1187,7 @@ export interface DB {
   users: UsersTable;
   user_business_access: UserBusinessAccessTable;
   refresh_tokens: RefreshTokensTable;
+  push_tokens: PushTokensTable;
   audit_logs: AuditLogsTable;
   chart_of_accounts: ChartOfAccountsTable;
   fiscal_periods: FiscalPeriodsTable;

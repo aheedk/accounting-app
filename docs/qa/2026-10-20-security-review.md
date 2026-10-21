@@ -145,7 +145,7 @@ text, never formulas.
 
 What a session could do, and how long it lasted, was the weakest part left. All
 of it is in the accounts-and-roles spec
-(`../specs/2026-10-08-accounts-and-roles-design.md`); migration `0107`; tests in
+(`../specs/2026-10-08-accounts-and-roles-design.md`); migration `0109`; tests in
 `signInSecurity.test.ts`.
 
 - **Sessions lasted 180 days.** A refresh cookie renewed itself for half a year,
@@ -230,9 +230,13 @@ the running app:
   the file, and npm has no fixed version: SheetJS publishes 0.20.3 only from its
   own site. Moving to it is a dependency change to decide on.
 
-**The mobile app** signs in with the same API. It keeps only the access token, so
-it was already signed out within fifteen minutes; a login with a set-up step left
-gets the same 403 there, and sets up in the web app.
+**The mobile app** signs in with the same API and, since Riham's change of 10-20
+(`POST /auth/refresh-mobile`, migration `0106`), keeps its own sign-in key in the
+phone's secure store. Merged with this pass: that key lasts 30 days without use
+(`JWT_MOBILE_REFRESH_TTL_DAYS`), not the browser's hour and 12 hours, as the
+phone's own lock guards it in between; a copied key coming back ends the
+session there too; codes are good once; and a login with a set-up step left gets
+the same 403 on the phone, and sets up in the web app.
 
 ## Still open
 
