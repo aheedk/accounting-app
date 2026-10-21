@@ -7,7 +7,6 @@ import type { AppTheme } from '../../theme';
 import { spacing, fontFamily } from '../../theme';
 
 const STUB_ITEMS = [
-  { icon: 'book-open-variant', label: 'Chart of Accounts' },
   { icon: 'bank-check', label: 'Reconciliation' },
 ] as const;
 
@@ -61,6 +60,12 @@ export default function MoreScreen() {
         title="AI Document Inbox"
         onPress={() => router.push('/inbox')}
         left={props => <List.Icon {...props} icon="inbox-arrow-down-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Chart of Accounts"
+        onPress={() => router.push('/chart-of-accounts')}
+        left={props => <List.Icon {...props} icon="book-open-variant" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
       <Divider />

@@ -65,7 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Client Overview' }, { label: 'Books Review' }, { label: 'Approvals' },
       { label: 'Bank Accounts' }, { label: 'Bank Transactions' }, { label: 'Integration Transactions' },
-      { label: 'Receipts' }, { label: 'Reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts' },
+      { label: 'Receipts' }, { label: 'Reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
       { label: 'Recurring Transactions' }, { label: 'Fixed Assets' }, { label: 'Journal' },
     ],
   },
@@ -91,7 +91,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'setup', label: 'Setup', icon: 'cog-outline',
     children: [
-      { label: 'Entity' }, { label: 'Company Settings' }, { label: 'Chart of Accounts' },
+      { label: 'Entity' }, { label: 'Company Settings' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
       { label: 'Cost Centers' }, { label: 'Users' }, { label: 'Activity Log' },
       { label: 'Tax Codes' }, { label: 'Fiscal Periods' },
     ],

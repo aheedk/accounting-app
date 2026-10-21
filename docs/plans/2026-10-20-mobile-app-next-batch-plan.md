@@ -836,3 +836,55 @@ real dev API — response matched the hand-written type field-for-field,
 including the negative-amount convention on operating-activity
 adjustment lines (payroll liability accruals shown as negative cash
 adjustments, as expected for an increase in a liability).
+
+### Redesign chunk 12 (2026-10-21) — Chart of Accounts (list + detail) — done
+
+First screen built out of the drawer's remaining fully-disabled groups
+(Accounting/Inventory/Setup/rest of AR-AP) — picked Chart of Accounts
+specifically per the user's own choice among four options offered,
+deliberately scoped **read-only**: no create/edit form. The API's create/
+edit routes require `accountant`+ and the detail-balance math has real
+edge cases (locked system accounts, subaccount parents) — a lookup/
+reference screen carries none of that risk, matching the "no ledger-
+posting risk" framing the option was picked under.
+
+- `services/api.ts`: widened the existing `CoaAccount` type (previously a
+  narrow `{id,code,name,account_type,detail_type}` picker-only shape used
+  by ExpenseForm/DepositForm/general-ledger.tsx's category pickers) to
+  the full `chart_of_accounts` row — `parent_id, description, is_system,
+  is_active, is_locked, system_key, created_at, updated_at` added.
+  Purely additive, so every existing picker call site (which only reads
+  `code`/`name`) keeps working unchanged — confirmed by grepping for
+  every `CoaAccount` reference first. Added `listChartOfAccounts`'s new
+  optional `include_inactive` param, `getAccount()` (single-account +
+  computed `balance`), and `getAccountRegister()` (the QBO-style register
+  endpoint: running balance per line) — none had a `packages/shared` zod
+  schema to check against except the create/edit schemas (accurate, not
+  used here since this build has no write path).
+- **`app/chart-of-accounts.tsx`**: flat list sorted by code (web's own
+  `CoaListPage.tsx` doesn't group this list either, unlike Balance
+  Sheet) — search by name/code, a type filter chip row (Assets/
+  Liabilities/Equity/Revenue/Expenses), a "Show inactive" toggle chip
+  (API's `include_inactive` param), `StatusBadge` for Active/Inactive, a
+  lock icon on locked accounts.
+- **`app/account/[id].tsx`**: balance card (code/type/detail type/
+  description/status) + a "Recent activity" register list reusing
+  `general-ledger.tsx`'s `GlLineRow` visual pattern (date/source row,
+  memo, voided badge, signed amount, running balance) — tapping a row
+  opens the underlying journal entry, same as GL.
+- Wired into both of the drawer's two "Chart of Accounts" entries
+  (Accounting group and Setup group both link to it on web too — kept
+  the duplication the drawer's structural port already carried from
+  `Sidebar.tsx` rather than collapsing it) and the More tab (previously
+  a disabled stub there).
+- No role-access change needed: `lib/roleAccess.ts`'s existing
+  `client`-role allow-list already excludes any path not explicitly
+  listed, so Chart of Accounts stays hidden for a client login with no
+  new code; `viewer` can open it since nothing about it is a `/new` form.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, and all three endpoints (list, single-
+account, register) hit directly against the real dev API — response
+shapes matched the hand-written types field-for-field, including the
+register's running-`balance` and `counter_account` fields on a real
+account with transaction history (18 rows on the Sales revenue account).

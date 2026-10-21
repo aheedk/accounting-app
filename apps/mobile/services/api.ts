@@ -372,13 +372,44 @@ export async function getJournalEntry(businessId: string, id: string) {
 // generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
 // chartOfAccounts.ts's /coa route, not guessed.
 
+// Full row shape from ChartOfAccountsTable (apps/api/src/db/types.ts),
+// widened from the original picker-only {id,code,name,account_type,
+// detail_type} now that a full Chart of Accounts list/detail screen needs
+// is_active/is_locked/description/parent_id too — additive, so every
+// existing picker call site (ExpenseForm/DepositForm/general-ledger.tsx,
+// which only read code/name) keeps working unchanged.
 export type CoaAccount = {
-  id: string; code: string; name: string; account_type: string; detail_type: string | null;
+  id: string; code: string; name: string;
+  account_type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  parent_id: string | null; detail_type: string | null; description: string | null;
+  is_system: boolean; is_active: boolean; is_locked: boolean; system_key: string | null;
+  created_at: string; updated_at: string;
 };
 
-export async function listChartOfAccounts(businessId: string) {
-  const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`);
+export async function listChartOfAccounts(businessId: string, params: { include_inactive?: boolean } = {}) {
+  const r = await api.get<{ accounts: CoaAccount[] }>(`/businesses/${businessId}/coa`, {
+    params: params.include_inactive ? { include_inactive: 'true' } : undefined,
+  });
   return r.data.accounts;
+}
+
+export type CoaAccountDetail = CoaAccount & { balance: string };
+
+export async function getAccount(businessId: string, accountId: string) {
+  const r = await api.get<CoaAccountDetail>(`/businesses/${businessId}/coa/${accountId}`);
+  return r.data;
+}
+
+export type AccountRegisterRow = {
+  journal_entry_id: string; line_id: string; entry_date: string; reference: string | null;
+  source_type: string; memo: string | null; debit: string; credit: string; balance: string;
+  is_voided: boolean; counter_account: string | null;
+};
+export type AccountRegister = { account: CoaAccount; rows: AccountRegisterRow[]; ending_balance: string };
+
+export async function getAccountRegister(businessId: string, accountId: string) {
+  const r = await api.get<AccountRegister>(`/businesses/${businessId}/coa/${accountId}/register`);
+  return r.data;
 }
 
 export type BankAccountRow = { id: string; name: string; cash_account_id: string };
