@@ -532,3 +532,39 @@ with no way to tap through to the underlying transaction.
 screenshots taken mid-session (business switcher mid-use, different
 company selected) confirm the new header hierarchy renders correctly with
 real data, in dark mode, including the bold centered title.
+
+### Redesign chunk 5 (2026-10-21) — Customer detail parity, Files source for capture — done
+
+**Customer detail** was the thinnest major page relative to web (no tabs,
+one card, a bare open-balance number) while Vendor detail already got the
+full treatment in chunk 2. Rebuilt against the real
+`apps/web/src/pages/customers/CustomerDetailPage.tsx` (read directly, not
+assumed — it turns out web's customer page has no tab structure at all,
+unlike vendor's 3-tab layout, so this mirrors its actual single-scroll
+shape instead of forcing tabs that don't exist on web either):
+- Open/Overdue/Paid metric row (same client-side breakdown web computes
+  from the same invoice list — no separate stats endpoint exists).
+- Full Contact card: company, terms, email, phone, website, opening
+  balance (+ as-of date), billing address, shipping address, notes — all
+  real fields that existed on the API already but weren't declared in the
+  mobile `CustomerDetail` type until now (extended it, plus a shared
+  `Address` type).
+- Activity card: created, last updated, invoice count.
+- Invoices list now shows issue + due date and a real status badge
+  (matching Invoices screen's own blue/green/gray/red mapping), not just
+  due date and amount.
+
+**Camera capture gets a third source**: "Choose from Files" alongside Take
+Photo / Choose from Library, via `expo-document-picker` — lets a user pick
+anything already on the device (iCloud Drive, a downloaded statement PDF)
+instead of only the camera roll. Shares the same `uploadAndHandle()` path
+as the other two sources; `guessMimeType()` gained PDF detection (it only
+checked png/webp/else-jpeg before, which would have mislabeled a PDF
+picked this way). **Caveat**: `expo-document-picker` is a new native
+module — if the simulator/device's dev-client build predates this change,
+it needs a native rebuild (not just a JS reload) before "Choose from
+Files" will work; Expo Go itself bundles it already, so this only matters
+for a custom dev-client build.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors.

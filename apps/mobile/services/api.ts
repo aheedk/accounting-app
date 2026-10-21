@@ -97,9 +97,18 @@ export type CustomerRow = {
   phone: string | null; mobile: string | null; open_balance: string; is_active: boolean;
 };
 
+export type Address = {
+  line1?: string | null; line2?: string | null; city?: string | null;
+  state?: string | null; postal_code?: string | null; country?: string | null;
+} | null;
+
 export type CustomerDetail = {
   id: string; name: string; company_name: string | null; email: string | null;
   phone: string | null; mobile: string | null; is_active: boolean;
+  website: string | null; default_terms_days: number;
+  opening_balance: string | null; opening_balance_as_of: string | null;
+  billing_address: Address; shipping_address: Address; notes: string | null;
+  created_at: string; updated_at: string;
 };
 
 export async function listCustomers(businessId: string) {
