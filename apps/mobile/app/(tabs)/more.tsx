@@ -15,7 +15,7 @@ const STUB_ITEMS = [
 export default function MoreScreen() {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background, paddingTop: insets.top }}>
@@ -53,10 +53,12 @@ export default function MoreScreen() {
       <Divider style={{ marginVertical: spacing.md }} />
 
       <List.Item
-        title="Sign out"
-        onPress={() => { void logout(); }}
-        left={props => <List.Icon {...props} icon="logout" color={theme.app.destructive} />}
-        titleStyle={{ color: theme.app.destructive, fontWeight: '600' }}
+        title="Settings"
+        description="Account, security, notifications, appearance"
+        onPress={() => router.push('/settings')}
+        left={props => <List.Icon {...props} icon="cog-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+        descriptionStyle={{ color: theme.app.mutedForeground }}
       />
     </View>
   );

@@ -98,6 +98,15 @@ export interface RefreshTokensTable {
   token_type: Generated<'web' | 'mobile'>;
 }
 
+export interface PushTokensTable {
+  id: Generated<string>;
+  user_id: string;
+  token: string;
+  platform: 'ios' | 'android';
+  created_at: Generated<Timestamp>;
+  last_used_at: Generated<Timestamp>;
+}
+
 export interface AuditLogsTable {
   id: Generated<string>;
   firm_id: string;
@@ -1131,6 +1140,7 @@ export interface DB {
   users: UsersTable;
   user_business_access: UserBusinessAccessTable;
   refresh_tokens: RefreshTokensTable;
+  push_tokens: PushTokensTable;
   audit_logs: AuditLogsTable;
   chart_of_accounts: ChartOfAccountsTable;
   fiscal_periods: FiscalPeriodsTable;

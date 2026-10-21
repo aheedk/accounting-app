@@ -51,6 +51,11 @@ const name = (r: RouteDef) => `${r.method} ${r.path.replace(BIZ, '~')}`;
 // checks, deposits, bank lines) that post as they are saved. Posting an invoice
 // or a bill, voiding, payroll, periods and settings are not here.
 const STAFF_MAY_WRITE = [
+  // A push token is the device's own, not a business record — every
+  // signed-in role (through firm_admin; the client/viewer case is its own
+  // assertion below) may register or drop its own.
+  'DELETE /me/push-tokens',
+  'POST /me/push-tokens',
   'PATCH ~/bank-deposits/:id',
   'PATCH ~/bank-rules/:id',
   'POST ~/ai/documents',
@@ -226,24 +231,28 @@ describe('role matrix', () => {
     ]);
   });
 
-  it('a client changes nothing in the books: it can only send a document in and write a message', () => {
+  it('a client changes nothing in the books: it can only send a document in, write a message, and manage its own push token', () => {
     // A document sent in waits in the inbox until an accountant approves it.
     expect(rows.filter(r => r.method !== 'GET' && r.client !== 403).map(name).sort()).toEqual([
+      'DELETE /me/push-tokens',
+      'POST /me/push-tokens',
       'POST ~/ai/documents',
       'POST ~/messages',
       'POST ~/messages/read',
     ]);
   });
 
-  it('outside a business, a client sees only its own login', () => {
+  it('outside a business, a client sees only its own login and can manage its own push token', () => {
     const firmLevel = rows.filter(r => !r.path.startsWith(BIZ) && r.client !== 403).map(name);
-    expect(firmLevel).toEqual(['GET /me']);
+    expect(firmLevel).toEqual(['GET /me', 'POST /me/push-tokens', 'DELETE /me/push-tokens']);
   });
 
-  it('a view-only login reads what staff read, and changes nothing', () => {
+  it('a view-only login reads what staff read, and changes nothing but its own push token', () => {
     expect(rows.filter(r => r.method === 'GET' && r.viewer === 403 && r.staff !== 403).map(name)).toEqual([]);
-    // The only non-GET calls it is let into are lookups and report runs, which save nothing.
+    // The only non-GET calls it is let into are lookups, report runs, and its own push token — none of which save anything in the books.
     expect(rows.filter(r => r.method !== 'GET' && r.viewer !== 403).map(name).sort()).toEqual([
+      'DELETE /me/push-tokens',
+      'POST /me/push-tokens',
       'POST ~/custom-reports/:id/run',
       'POST ~/custom-reports/run',
       'POST ~/email-imports/:importId/already-recorded',

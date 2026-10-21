@@ -3,6 +3,10 @@ import * as SecureStore from 'expo-secure-store';
 import {
   api, setAccessToken, getRefreshToken, setRefreshToken, setUnauthorizedHandler, pickErr,
 } from '../services/apiClient';
+import { registerForPushNotifications } from '../services/pushNotifications';
+
+const PUSH_ENABLED_KEY = 'acct_push_enabled';
+const PUSH_TOKEN_KEY = 'acct_push_token';
 
 export type Business = { id: string; name: string; role_override: string | null; fiscal_year_start_month: number };
 export type AuthUser = { id: string; email: string; full_name: string; role: string; firm_id: string };
@@ -100,6 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBusinesses(r.data.businesses);
       const first = r.data.businesses[0]?.id ?? null;
       if (first) setActiveBusinessId(first);
+
+      // Re-register on every login per the brief — a push token can rotate,
+      // and this is a no-op (not a fresh permission prompt) when the user
+      // never opted in via Settings, since registerForPushNotifications
+      // itself still asks for permission; only do it silently here when
+      // they've already said yes once before.
+      const pushPreviouslyEnabled = await SecureStore.getItemAsync(PUSH_ENABLED_KEY);
+      if (pushPreviouslyEnabled === 'true') {
+        void registerForPushNotifications().then(token => {
+          if (token) void SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+        });
+      }
     } catch (e: unknown) {
       setError(pickErr(e));
       throw e;
