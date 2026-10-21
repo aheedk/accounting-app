@@ -796,3 +796,43 @@ bundle built with no errors, grepped the whole app afterward to confirm
 the only remaining `from 'react-native-paper'` import of `Menu` is
 inside `AppMenu.tsx` itself (the wrapper, as intended). No live device
 interaction this chunk, same caveat as the last two.
+
+### Redesign chunk 11 (2026-10-21) — Statement of Cash Flows report — done
+
+Fourth and last of the core financial reports previously marked "Desktop
+only" (Reports > Cash Flows). Route is `statementOfCashFlowsService.ts`
+behind `GET /reports/statement-of-cash-flows` — confirmed via the real
+route/service code that `packages/shared` has **no** zod schema for this
+response at all (its `cashFlowQuerySchema` belongs to a different,
+unrelated `/reports/cash-flow` "Cash Activity by Account" register report
+that mobile has not built and did not touch — the drawer's separate "Cash
+Activity" entry stays disabled, deliberately not conflated with this one).
+
+- **`app/cash-flow.tsx`**: period-start/period-end date pickers (same
+  fiscal-year-start default as P&L), 3 summary cards (Beginning cash/Net
+  change/Ending cash), then Operating activities (Net Income + adjustment
+  lines → subtotal) → Investing activities (lines or "No investing
+  activity" placeholder → subtotal) → Financing activities (same pattern)
+  → Net cash increase for period → Cash at beginning of period → Cash at
+  end of period — same order and section names as web's
+  `StatementOfCashFlowsPage.tsx`. Amounts render through the existing
+  `fmtMoney` (which already prints a leading minus for negative values
+  via `toLocaleString`), matching web's signed-amount display without
+  needing a separate formatter.
+- `services/api.ts`: added `CfLine`/`StatementOfCashFlowsReport` types +
+  `getStatementOfCashFlows()`, same "no shared report type, redeclare
+  locally" convention as the other three reports.
+- Wired into the drawer's Reports group (its path added to the existing
+  "Cash Flows" entry, left "Cash Activity" disabled) and the More tab.
+- `lib/roleAccess.ts`'s `CLIENT_PAGES` allow-list extended with
+  `/cash-flow` — web's own `CLIENT_PAGES` includes the cash-flow
+  statement for a client login, so the mobile allow-list now matches it
+  for all four reports a client can open (pnl/balance-sheet/
+  trial-balance/cash-flow).
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, and the endpoint hit directly against the
+real dev API — response matched the hand-written type field-for-field,
+including the negative-amount convention on operating-activity
+adjustment lines (payroll liability accruals shown as negative cash
+adjustments, as expected for an increase in a liability).

@@ -498,3 +498,26 @@ export async function getTrialBalance(businessId: string, params: { as_of?: stri
   const r = await api.get<TrialBalanceReport>(`/businesses/${businessId}/reports/trial-balance`, { params });
   return r.data;
 }
+
+// --- Statement of Cash Flows — shape copied from
+// statementOfCashFlowsService.ts directly (packages/shared has no zod
+// schema for this response at all — its cashFlowQuerySchema belongs to the
+// separate, unrelated /reports/cash-flow "Cash Activity by Account"
+// register report, not this one; don't confuse the two routes).
+
+export type CfLine = { account_id: string; account_code: string; account_name: string; amount: string };
+export type StatementOfCashFlowsReport = {
+  period_start: string; period_end: string;
+  net_income: string;
+  operating_adjustments: CfLine[]; operating_total: string;
+  investing: CfLine[]; investing_total: string;
+  financing: CfLine[]; financing_total: string;
+  net_change_in_cash: string;
+  cash_beginning: string;
+  cash_ending: string;
+};
+
+export async function getStatementOfCashFlows(businessId: string, params: { period_start: string; period_end: string }) {
+  const r = await api.get<StatementOfCashFlowsReport>(`/businesses/${businessId}/reports/statement-of-cash-flows`, { params });
+  return r.data;
+}

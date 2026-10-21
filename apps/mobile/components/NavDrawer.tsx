@@ -76,7 +76,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Profit & Loss', path: '/pnl' },
       { label: 'Balance Sheet', path: '/balance-sheet' },
       { label: 'General Ledger', path: '/general-ledger' },
-      { label: 'Cash Flows' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
+      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
       { label: 'Management Reports' }, { label: 'Performance Center' }, { label: 'Financial Planning' },
       { label: 'Spreadsheet Sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
