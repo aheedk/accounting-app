@@ -10,8 +10,15 @@ function filledRows(rows: string[][]): string[][] {
   return rows.filter(row => row.some(cell => cell.trim() !== ''));
 }
 
-function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+/**
+ * A cell Excel would read as a formula (it starts with =, +, -, @, a tab or a
+ * return) gets a leading apostrophe, so a payee or memo that came from a bank
+ * file or an emailed document cannot run as a formula when the CSV is opened.
+ * Numbers, negative amounts included, are left as they are.
+ */
+export function csvCell(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) && !/^[+-]?\d[\d,]*(\.\d+)?$/.test(value) ? `'${value}` : value;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 /**

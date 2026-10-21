@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amountInWords, buildChecksPdf, type CheckDocInput } from './download';
+import { amountInWords, buildChecksPdf, csvCell, type CheckDocInput } from './download';
 
 describe('amountInWords', () => {
   it('matches the check-writing convention from the spec', () => {
@@ -44,5 +44,23 @@ describe('buildChecksPdf', () => {
   it('keeps a check with many bills on one page of check stock', () => {
     // The stub is 3.5 inches; the bills that do not fit are counted, not run over the next stub.
     expect(buildChecksPdf([check('5519', 30)], 'stock').getNumberOfPages()).toBe(1);
+  });
+});
+
+// Security review 2026-10-21: text from a bank file or an emailed document must not run as a formula in Excel.
+describe('csvCell', () => {
+  it('writes text that starts like a formula with a leading apostrophe', () => {
+    expect(csvCell('=HYPERLINK("http://x","Pay")')).toBe(`"'=HYPERLINK(""http://x"",""Pay"")"`);
+    expect(csvCell('+1+cmd')).toBe("'+1+cmd");
+    expect(csvCell('-2+3')).toBe("'-2+3");
+    expect(csvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(csvCell('\tTab')).toBe("'\tTab");
+  });
+
+  it('leaves amounts, dates and ordinary text as they are', () => {
+    expect(csvCell('-1,234.50')).toBe('"-1,234.50"');
+    expect(csvCell('-250.5')).toBe('-250.5');
+    expect(csvCell('2026-10-21')).toBe('2026-10-21');
+    expect(csvCell('Office Depot')).toBe('Office Depot');
   });
 });

@@ -10,8 +10,11 @@ export function rowsToCsv(
   columns: string[],
 ): string {
   const escape = (v: string | number | null): string => {
-    const s = v == null ? '' : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    const raw = v == null ? '' : String(v);
+    // Text a spreadsheet would run as a formula (=, +, -, @, tab or return
+    // first) gets a leading apostrophe; numbers, negative ones included, do not.
+    const s = /^[=+\-@\t\r]/.test(raw) && !/^[+-]?\d[\d,]*(\.\d+)?$/.test(raw) ? `'${raw}` : raw;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header = columns.join(',');
   const body = rows.map(r => columns.map(c => escape(r[c] ?? null)).join(',')).join('\n');

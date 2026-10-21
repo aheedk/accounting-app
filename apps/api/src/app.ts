@@ -2,7 +2,7 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { corsOrigins } from './config.js';
+import { config, corsOrigins } from './config.js';
 import { requestId } from './middleware/requestId.js';
 import { requestTiming } from './middleware/requestTiming.js';
 import { errorHandler } from './middleware/error.js';
@@ -88,9 +88,16 @@ export function makeApp(): Express {
   app.set('trust proxy', 1);
   app.use(requestId);
   // Browsers take the declared type of everything the API sends, never a guess.
+  // Nothing it sends is kept in a browser's or a proxy's cache (it is clients'
+  // books), shown inside another site's frame, or allowed to load anything.
+  // Over HTTPS only, once a browser has seen it (production).
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    if (config.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
   });
   app.use(requestTiming);

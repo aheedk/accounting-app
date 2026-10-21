@@ -103,6 +103,44 @@ host's settings.
   encrypted with `FIELD_ENCRYPTION_KEY`. Keeping that key safe and separate is
   in [`../guides/recovery-plan.md`](../guides/recovery-plan.md).
 
+## Second pass — 2026-10-21
+
+### Print windows ran whatever a name contained
+
+Bank deposits, Checks, Expenses and the Transactions search each built their
+own Print page by pasting the rows' text into HTML, unescaped, in a window that
+shares the app's origin. A payee or memo holding markup (a vendor name read from
+an emailed invoice, a description from a bank file) would have run as script
+there, with the sign-in token in reach. **Fixed:** the four pages print through
+`printReport` (`lib/reportExport.ts`), which escapes every cell, like every
+other list and report already did.
+
+`printReport`'s own page carried a small inline script (the Portrait /
+Landscape choice and the Print button). It is now wired from the app instead,
+so the page runs no script of its own and the Content-Security-Policy, which
+allows no inline script, can be enforced without breaking printing.
+
+### CSV cells that Excel would run as formulas
+
+A CSV cell starting with `=`, `+`, `-` or `@` is a formula to Excel, so a payee
+named `=HYPERLINK(...)` in a bank file would have become a live link (or worse)
+in the firm's exported CSV. **Fixed:** such text gets a leading apostrophe in
+both CSV writers (`csvCell` in `apps/web/src/lib/download.ts`, `rowsToCsv` in
+the API's `csvExportService.ts`); numbers, negative amounts included, are left
+alone. Excel downloads (`.xlsx`) were already safe: their cells are typed as
+text, never formulas.
+
+### Headers
+
+- **API:** every response now also says `Cache-Control: no-store` (clients'
+  books are not kept in a browser's or a proxy's cache), `X-Frame-Options:
+  DENY`, a `Content-Security-Policy` of `default-src 'none'` (the API sends data,
+  never pages that load things), and, in production,
+  `Strict-Transport-Security`.
+- **Web (`netlify.toml`):** `Strict-Transport-Security`, and a
+  `Permissions-Policy` refusing the camera, microphone, location and payment
+  prompts, none of which the app uses.
+
 ## Still open
 
 - **Enforce the Content-Security-Policy** once the report-only one shows no

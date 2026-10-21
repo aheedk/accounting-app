@@ -164,16 +164,23 @@ footer { margin-top: 12px; font-size: 8.5px; color: #666; }
 <table><thead><tr><th class="report-head" colspan="${input.headers.length}">${reportHead}</th></tr><tr>${head}</tr></thead><tbody>${body}</tbody></table>
 <footer>${escapeHtml(generatedLine(now))}</footer>
 </div>
-<script>
-document.querySelectorAll('input[name="orientation"]').forEach(function (radio) {
-  radio.addEventListener('change', function () {
-    document.getElementById('page-size').textContent = '@page { size: letter ' + radio.value + '; }';
-    document.body.setAttribute('data-orientation', radio.value);
-  });
-});
-document.getElementById('print').addEventListener('click', function () { window.print(); });
-</script>
 </body></html>`;
+}
+
+/**
+ * The preview's Portrait / Landscape choice and Print button, wired from here
+ * rather than by a script inside the page: the page then runs no script of its
+ * own, so the Content-Security-Policy (no inline script) can be enforced.
+ */
+function wirePrintControls(doc: Document, print: () => void): void {
+  doc.querySelectorAll<HTMLInputElement>('input[name="orientation"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const size = doc.getElementById('page-size');
+      if (size) size.textContent = `@page { size: letter ${radio.value}; }`;
+      doc.body.setAttribute('data-orientation', radio.value);
+    });
+  });
+  doc.getElementById('print')?.addEventListener('click', print);
 }
 
 /** Open the print preview for a report: pick portrait or landscape, then Print (or "Save as PDF"). */
@@ -182,4 +189,5 @@ export function printReport(input: PrintReportInput): void {
   if (!win) return;
   win.document.write(buildPrintHtml(input));
   win.document.close();
+  wirePrintControls(win.document, () => win.print());
 }
