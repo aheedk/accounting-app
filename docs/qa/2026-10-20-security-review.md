@@ -172,6 +172,27 @@ of it is in the accounts-and-roles spec
   the second step off) without limit. **Now** those count toward the five-try
   hold, and the fifth ends every session of the login.
 
+### Packages with known holes
+
+`npm audit --omit=dev` (10-21) lists 50 advisories. Sorted by whether they reach
+the running app:
+
+- **Fixed:** `proxy-addr` 2.0.8 (Express's reading of the proxy's address, which
+  the sign-in limit and the Activity Log rely on) and `follow-redirects` 1.16.1,
+  both inside the versions already allowed. Only those two lines of the lockfile
+  changed.
+- **Do not apply here:** Kysely's three (MySQL escaping, and JSON-path builders
+  the app never uses; every `sql.lit` is the constant `'0'`). The fix is Kysely
+  0.28, a breaking upgrade to do on its own some time.
+- **Build tools, not the running app:** `tar` (through bcrypt's installer),
+  `shell-quote` (the `npm run dev` runner), `braces`/`micromatch`/`chokidar`
+  (Tailwind's file watcher), and the Expo and React Native tooling in the mobile
+  app (Riham's; an Expo upgrade).
+- **Open: `xlsx`** (SheetJS 0.18). Reading a crafted spreadsheet can pollute
+  prototypes or hang the tab. It runs in the browser of the person who uploads
+  the file, and npm has no fixed version: SheetJS publishes 0.20.3 only from its
+  own site. Moving to it is a dependency change to decide on.
+
 **The mobile app** signs in with the same API. It keeps only the access token, so
 it was already signed out within fifteen minutes; a login with a set-up step left
 gets the same 403 there, and sets up in the web app.
@@ -188,5 +209,6 @@ gets the same 403 there, and sets up in the web app.
   (Safari) refuse while the API is on a different site from the web app. Serving
   the API under the web app's own domain (a Netlify proxy or a custom domain)
   would allow it, and a `SameSite=Strict` cookie with it.
+- **`xlsx` 0.18** (above): move to SheetJS 0.20.3 from SheetJS's own site.
 - **Uploaded files are not backed up** (`../guides/backups.md`, step 4).
 - **A standby copy of the database** (item 28) is not set up.
