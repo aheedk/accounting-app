@@ -358,3 +358,28 @@ export async function getGeneralLedger(
   const r = await api.get<GeneralLedgerReport>(`/businesses/${businessId}/reports/general-ledger`, { params });
   return r.data;
 }
+
+// --- Camera capture → AI Inbox (batch item 5). One endpoint handles both a
+// multi-page bank/card statement PDF and a single photographed receipt —
+// the same model call classifies either, so there's no separate "receipt
+// mode" to call (confirmed by reading documentIngestService.ts /
+// gmailWorker.ts's classifier prompt, not guessed). Synchronous: the model
+// call happens inline, so this can take 15-30s and the result — which
+// queue the upload landed in — comes back in the same response, no polling.
+export type DocumentUploadResult =
+  | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
+  | { kind: 'invoice'; staging_id: string; invoice_type: 'ap' | 'ar' }
+  | { kind: 'check_stubs'; check_count: number };
+
+export async function uploadDocument(
+  businessId: string, file: { uri: string; name: string; type: string },
+) {
+  const form = new FormData();
+  // React Native's FormData file part — Expo's ImagePicker asset uri/mimeType
+  // map straight onto this shape.
+  form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  const r = await api.post<DocumentUploadResult>(`/businesses/${businessId}/ai/documents`, form, {
+    timeout: 45_000,
+  });
+  return r.data;
+}

@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { listTransactions, listInvoices, listEmailImports } from '../../services/api';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { CameraCaptureButton } from '../../components/CameraCaptureButton';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { isInflowType } from '../../lib/transactions';
 import { spacing, typeScale, type AppTheme } from '../../theme';
@@ -83,9 +84,12 @@ export default function DashboardScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.md }]}
       refreshControl={<RefreshControl refreshing={!loading && refreshing} onRefresh={refresh} tintColor={theme.app.primary} />}
     >
-      <View style={styles.header}>
-        <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground }}>VIEWING</Text>
-        <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>{activeBusiness?.name ?? '—'}</Text>
+      <View style={[styles.header, styles.headerRow]}>
+        <View>
+          <Text style={{ fontSize: typeScale.caption, color: theme.app.mutedForeground }}>VIEWING</Text>
+          <Text style={{ fontSize: typeScale.h1, fontWeight: '700', color: theme.app.foreground }}>{activeBusiness?.name ?? '—'}</Text>
+        </View>
+        <CameraCaptureButton />
       </View>
 
       {loading ? (
@@ -176,6 +180,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { marginBottom: spacing.lg },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   summaryCard: { flex: 1 },
   sectionTitle: { fontSize: typeScale.h2, fontWeight: '700', marginBottom: spacing.sm },

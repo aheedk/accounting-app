@@ -9,6 +9,7 @@ import { listEmailImports, type StagedImportRow } from '../../services/api';
 import { deriveImportTitle, deriveImportSubtitle, deriveImportStatus } from '../../lib/emailImportLabel';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
+import { CameraCaptureButton } from '../../components/CameraCaptureButton';
 import { spacing, typeScale, minTouchTarget, type AppTheme } from '../../theme';
 
 const STATUS_LABELS: Record<ReturnType<typeof deriveImportStatus>, string> = {
@@ -32,6 +33,7 @@ export default function InboxScreen() {
       <Appbar.Header statusBarHeight={insets.top} style={{ backgroundColor: theme.app.surface }}>
         <Appbar.BackAction onPress={() => router.back()} color={theme.app.foreground} />
         <Appbar.Content title="AI Document Inbox" titleStyle={{ color: theme.app.foreground }} />
+        <CameraCaptureButton />
       </Appbar.Header>
 
       {query.isLoading ? (

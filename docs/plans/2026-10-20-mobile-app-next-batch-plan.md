@@ -190,13 +190,30 @@ flagged before writing any screen:
   seed/demo content, not a throwaway row — unlike the expense/GL check,
   this one stops at "the contract matches," not "and it posted correctly."
 
-### 5. Camera capture → AI Inbox
-- Camera button on the dashboard and in the AI Inbox screen (`expo-camera`
-  or `expo-image-picker`; photo or gallery pick).
-- Upload through the existing document-upload endpoint; show a
-  "Processing…" state during AI extraction.
-- Extracted data lands in the AI Inbox for review — replaces "email a PDF to
-  Gmail" for one-off receipts.
+### 5. Camera capture → AI Inbox — done 2026-10-20
+- `expo-image-picker` (camera or library, photo only — kept simple per
+  instruction, no cropping/retake UI, one photo at a time).
+- Found the real endpoint by research first: `POST /businesses/:businessId/
+  ai/documents` (multipart, field name `file`) — the same one-call pipeline
+  handles a multi-page bank-statement PDF and a single photographed
+  receipt alike (confirmed by reading the classifier prompt, not assumed);
+  no separate "receipt mode" exists or was needed. It's synchronous — the
+  model call happens inline (can take 15-30s, so the request uses a 45s
+  timeout) and the response itself says which queue the upload landed in,
+  no polling.
+- `CameraCaptureButton` (dashboard header + AI Inbox Appbar) shows a spinner
+  while uploading, then routes based on the response: a bank/card
+  statement invalidates the inbox query and jumps straight into that
+  statement's review screen (`/inbox/[id]`); an invoice or check-stub
+  result — which have no mobile review screen yet, out of this batch's
+  scope — gets a plain alert saying where it landed instead of a fake
+  tap-through.
+- Gap worth knowing: the server's mime allowlist is PDF/PNG/JPEG/WEBP —
+  **no HEIC**, which is what iPhones capture natively in some settings.
+  The mobile upload always sends `image/jpeg` as the declared type (common
+  camera-roll default on both platforms), but this hasn't been confirmed
+  against every device camera setting — worth a real device check during
+  item 6's Android/iOS pass.
 
 ### 6. Android testing
 - Every screen on an Android emulator (Pixel 6 or similar), plus one small

@@ -37,7 +37,14 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lets you pick a receipt or statement photo from your library to upload for AI review.",
+          "cameraPermission": "Lets you photograph a receipt or statement to upload for AI review."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
