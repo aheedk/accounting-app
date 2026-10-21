@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text, List, Chip, Menu, useTheme } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
 import { AppHeader } from '../components/AppHeader';
 import { listChartOfAccounts, getGeneralLedger, type GeneralLedgerLine } from '../services/api';
@@ -143,28 +144,37 @@ export default function GeneralLedgerScreen() {
   );
 }
 
-// Read-only, same as the transaction list/dashboard rows — tapping a line
-// would ideally jump to its source document, but GL lines expose a WEB route
-// (transaction_path) not a mobile one, and don't carry a type tag our
-// /transaction/[id] screen could use either. Left as a view-only row.
+// Tapping a line opens the underlying journal entry — GL lines don't carry
+// the original entity id (expense/deposit/check), only journal_entry_id,
+// so this always opens the journal view rather than the type-specific one
+// (a reasonable "view this transaction," not the exact same screen web's
+// transaction_path would open).
 function GlLineRow({ line, theme }: { line: GeneralLedgerLine; theme: AppTheme }) {
   const voided = line.status === 'voided';
   const amount = parseFloat(line.amount);
+  // name and memo are often the same descriptive string duplicated by the
+  // source data — only show memo as a second line when it actually adds
+  // something name doesn't already say.
+  const primaryText = line.name ?? line.memo ?? '—';
+  const secondaryText = line.memo && line.memo !== line.name ? line.memo : null;
   return (
-    <View style={[styles.lineRow, { borderColor: theme.app.border, opacity: voided ? 0.5 : 1 }]}>
+    <Pressable
+      style={({ pressed }) => [styles.lineRow, { borderColor: theme.app.border, opacity: voided ? 0.5 : pressed ? 0.6 : 1 }]}
+      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: line.journal_entry_id, type: 'journal' } })}
+    >
       <View style={styles.lineTop}>
         <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>{fmtShortDate(line.entry_date)}</Text>
         <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>{line.transaction_label}{line.num ? ` #${line.num}` : ''}</Text>
       </View>
-      <Text style={{ color: theme.app.foreground, fontWeight: '600' }} numberOfLines={1}>
-        {line.name ?? line.memo ?? '—'}
+      <Text style={{ color: theme.app.foreground, fontWeight: '600' }} numberOfLines={2}>
+        {primaryText}
       </Text>
-      {line.memo && line.name ? (
-        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }} numberOfLines={1}>{line.memo}</Text>
+      {secondaryText ? (
+        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }} numberOfLines={2}>{secondaryText}</Text>
       ) : null}
       {voided && <Chip compact style={{ alignSelf: 'flex-start', marginTop: 2, backgroundColor: theme.app.statusRedBg }} textStyle={{ color: theme.app.statusRedFg, fontSize: 10 }}>Voided</Chip>}
       <View style={styles.lineBottom}>
-        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>
+        <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }} numberOfLines={1}>
           {line.split_account ?? '–Split–'}{line.is_reconciled ? ' · Reconciled' : ''}
         </Text>
         <View style={{ alignItems: 'flex-end' }}>
@@ -174,7 +184,7 @@ function GlLineRow({ line, theme }: { line: GeneralLedgerLine; theme: AppTheme }
           <Text style={{ color: theme.app.mutedForeground, fontSize: typeScale.caption }}>Bal ${fmtMoney(line.running_balance)}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

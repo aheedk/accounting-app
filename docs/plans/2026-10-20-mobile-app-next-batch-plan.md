@@ -502,3 +502,33 @@ already documented for the equivalent web feature in `docs/backlog.md`.
 
 **Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
 bundle built with no errors.
+
+### Redesign chunk 4 (2026-10-21) — header hierarchy, GL cleanup — done
+
+Live feedback while testing chunk 3: the app "looks amazing" but busy —
+specifically the header crammed business name and page title into one row
+("Green Gadget..General Ledger"), and General Ledger lines showed a
+truncated bold description immediately duplicated in full right below it,
+with no way to tap through to the underlying transaction.
+
+- **`AppHeader` is now two rows**, not one: a slim top row (hamburger ·
+  business name, small uppercase caption, own breathing room · bell ·
+  avatar), then the page title on its own row below — bumped to `h1` size,
+  bold, and centered after a follow-up round of feedback ("still want the
+  page to be more distinct"). Business name and title no longer compete
+  for the same horizontal space or blur together.
+- **General Ledger line rows**: dropped the redundant second text line
+  when `memo` and `name` are the same string (common in the data — most
+  lines had both set to an identical description), and let the one
+  remaining line wrap to 2 lines instead of truncating with `…`. Rows are
+  now tappable — opens the line's journal entry via the existing
+  `/transaction/[id]?type=journal` screen (GL lines only carry
+  `journal_entry_id`, not the original expense/deposit/check id, so this
+  is "view the transaction's journal entry," not the exact type-specific
+  screen — a reasonable scope given what the API returns).
+
+**Verified live**, not just via bundle export: the user had their own
+`expo start` running against a booted simulator throughout, and two
+screenshots taken mid-session (business switcher mid-use, different
+company selected) confirm the new header hierarchy renders correctly with
+real data, in dark mode, including the bold centered title.
