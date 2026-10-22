@@ -142,6 +142,24 @@ export default function MoreScreen() {
         left={props => <List.Icon {...props} icon="creation" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
+      <List.Item
+        title="AP Overview"
+        onPress={() => router.push('/ap-overview')}
+        left={props => <List.Icon {...props} icon="view-dashboard-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="Contractors"
+        onPress={() => router.push('/contractors')}
+        left={props => <List.Icon {...props} icon="account-hard-hat-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="1099s"
+        onPress={() => router.push('/1099s')}
+        left={props => <List.Icon {...props} icon="file-document-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
 
       <Divider style={{ marginVertical: spacing.md }} />
 

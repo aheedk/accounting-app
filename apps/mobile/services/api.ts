@@ -1089,3 +1089,50 @@ export async function updateCodingRule(businessId: string, ruleId: string, accou
 export async function deleteCodingRule(businessId: string, ruleId: string) {
   await api.delete(`/businesses/${businessId}/ai/coding-rules/${ruleId}`);
 }
+
+// --- AP Overview — a single-call dashboard, shape read directly from
+// apOverviewService.ts's getOverview return statement. No aging buckets
+// despite the name — just 4 KPI tiles + a top-5-vendors table, confirmed
+// from the real implementation rather than assumed from "AP Overview"
+// sounding like it should mirror the Aging report.
+
+export type ApOverview = {
+  outstanding_bills_total: string; unused_credits_total: string; net_payable_total: string;
+  overdue_bills_count: number; upcoming_payments_7d: string; upcoming_payments_30d: string;
+  top_vendors: Array<{ vendor_id: string; vendor_name: string; outstanding: string }>;
+};
+
+export async function getApOverview(businessId: string) {
+  const r = await api.get<ApOverview>(`/businesses/${businessId}/ap-overview`);
+  return r.data;
+}
+
+// --- Contractors — vendors with is_1099=true, via the dedicated
+// /contractors route (richer than listVendors: adds tax_id_last_four/
+// tax_id_type, confirmed from listContractors' selectAll() on vendors).
+
+export type Contractor = {
+  id: string; name: string; email: string | null; phone: string | null;
+  is_1099: boolean; tax_id_last_four: string | null; tax_id_type: 'SSN' | 'EIN' | null;
+};
+
+export async function listContractors(businessId: string) {
+  const r = await api.get<{ vendors: Contractor[] }>(`/businesses/${businessId}/contractors`);
+  return r.data.vendors;
+}
+
+// --- 1099 report — shape read directly from tenNinetyNineReportService.ts.
+// Note: web's own page declares a local `tax_id` field that doesn't match
+// what the service actually returns (tax_id_last_four + tax_id_type) — a
+// pre-existing bug on web (that column always renders blank there). Mobile
+// uses the real field names, not web's stale local type.
+
+export type TenNinetyNineRow = {
+  vendor_id: string; vendor_name: string;
+  tax_id_last_four: string | null; tax_id_type: 'SSN' | 'EIN' | null; total_paid: string;
+};
+
+export async function getTenNinetyNineReport(businessId: string, year: number) {
+  const r = await api.get<{ year: number; rows: TenNinetyNineRow[] }>(`/businesses/${businessId}/reports/1099`, { params: { year } });
+  return r.data;
+}

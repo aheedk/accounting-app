@@ -1532,3 +1532,68 @@ expected `times_corrected`/`updated_at` bump from calling the endpoint
 at all). Did **not** call `DELETE` live — removing a real learned rule
 with no create endpoint to restore it would be a one-way action, same
 caution as skipping `finish` in the Reconciliation chunk.
+
+### Survey (2026-10-22) — scoping the rest of the drawer's disabled items
+
+User asked to keep going "until there are none." Surveyed every
+remaining disabled item (grep for a backend route + a registered web
+page per item, not full reads) before committing to build anything,
+since several drawer labels could plausibly have been aspirational.
+Result: **almost everything is real** — routes and web pages exist for
+nearly every remaining item. Two exceptions:
+
+- **Payroll is deliberately excluded from web's own sidebar** — a
+  comment in `Sidebar.tsx` says so explicitly ("the firm is not
+  offering payroll", per a 2026-10-10 meeting). The backend routes and
+  web pages still exist in code but are unlinked from web's nav. Mobile
+  never had Payroll in its drawer either — confirmed this isn't a
+  missed port, so it stays out, matching web's current product
+  decision rather than reviving a deprecated area.
+- Financial Planning and Spreadsheet Sync have registered web pages but
+  no obviously dedicated backend route file — flagged to check their
+  real backing before scoping, not built this round.
+
+### Redesign chunk 26 (2026-10-22) — AP Overview, Contractors, 1099s — done
+
+First batch off the survey. Research confirmed one item was redundant
+before building anything: **Expense Transactions** is the same
+underlying data mobile's unified Transactions tab already shows filtered
+to `type=expense` (confirmed by diffing `ExpenseListPage.tsx`'s columns
+against mobile's existing `TransactionRow` — only `payment_account_name`
+is missing, not worth a whole separate screen for). The drawer's
+"Expense Transactions" item now links straight to the Transactions tab
+rather than a redundant new build.
+
+- **`app/ap-overview.tsx`**: 4 KPI tiles (outstanding bills + net
+  payable, overdue count, due-7d, due-30d) + top-5-vendors-by-balance,
+  tapping a vendor opens the existing vendor detail screen. Confirmed
+  live there's no aging-bucket breakdown despite the name — just these
+  single numbers, matching the real `apOverviewService.ts` rather than
+  the AR Aging report's shape.
+- **`app/contractors.tsx`**: vendors with `is_1099=true`, via the
+  dedicated `/contractors` route (richer than `listVendors` — adds
+  masked tax ID display, `***-**-1234` for SSN / `**-***1234` for EIN).
+  Read-only: web's firm_admin-only tax-ID-reveal and inline W-9 edit
+  aren't built this chunk — low-frequency, higher-sensitivity actions
+  not worth rushing.
+- **`app/1099s.tsx`**: per-vendor YTD 1099-eligible total paid, a year
+  picker (current year back to 3 years prior). Caught a **real bug on
+  web** while researching: web's own `TenNinetyNineReportPage.tsx`
+  declares a local `tax_id` field that doesn't match what the service
+  actually returns (`tax_id_last_four`/`tax_id_type`) — that column
+  silently always renders blank on web. Mobile uses the real field
+  names. No $600 threshold logic exists server-side (every nonzero
+  total is returned); mobile flags the IRS reporting threshold
+  client-side as display-only, not duplicated business logic the API
+  doesn't have.
+- `services/api.ts`: added `ApOverview`/`Contractor`/`TenNinetyNineRow`
+  types + `getApOverview`/`listContractors`/`getTenNinetyNineReport`.
+- Wired into the drawer's AP group (Overview/Expense Transactions/
+  Contractors/1099s) and the More tab — which is getting long (20
+  items); worth a reorganization pass once the remaining survey items
+  are done, not now.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, all three endpoints hit live and confirmed
+wrapper shapes — empty data for all three (no bills, no 1099 vendors on
+this demo business), consistent with every AR/AP chunk's data gap.

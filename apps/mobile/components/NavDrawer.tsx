@@ -39,17 +39,17 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'ap', label: 'Accounts Payable', icon: 'wallet-outline',
     children: [
-      { label: 'Overview' },
-      { label: 'Expense Transactions' },
+      { label: 'Overview', path: '/ap-overview' },
+      { label: 'Expense Transactions', path: '/(tabs)/transactions' },
       { label: 'Checks', path: '/checks' },
       { label: 'Vendors', path: '/clients', params: { tab: 'vendors' } },
       { label: 'Bills', path: '/bills' },
       { label: 'Pay Bills', path: '/bill-payment/new' },
       { label: 'Bill Payments', path: '/bill-payments' },
       { label: 'Vendor Credits', path: '/vendor-credits' },
-      { label: 'Contractors' },
+      { label: 'Contractors', path: '/contractors' },
       { label: 'Aging', path: '/ap-aging' },
-      { label: '1099s' },
+      { label: '1099s', path: '/1099s' },
     ],
   },
   {
