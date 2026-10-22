@@ -653,3 +653,40 @@ export async function voidPayment(businessId: string, id: string, void_reason: s
   const r = await api.post<PaymentRow>(`/businesses/${businessId}/payments/${id}/void`, { void_reason });
   return r.data;
 }
+
+// --- Bills (AP) — read-only this chunk, mirroring InvoiceRow/InvoiceDetail's
+// local-type convention exactly (bills.ts has no list/detail zod schema to
+// check against either — only write-side schemas exist, same as bills'
+// AR counterpart). Note the list endpoint's computed balance field is named
+// `open_balance`, while the detail endpoint's is `amount_due` — different
+// names for the same idea, confirmed by reading both route handlers
+// directly, not assumed to match.
+
+export type BillRow = {
+  id: string; bill_number: string | null; vendor_id: string; bill_date: string;
+  due_date: string; status: 'draft' | 'posted' | 'paid' | 'voided'; total: string;
+  open_balance: string;
+};
+
+export async function listBills(businessId: string, params: { status?: string; vendor_id?: string } = {}) {
+  const r = await api.get<{ bills: BillRow[] }>(`/businesses/${businessId}/bills`, {
+    params: { limit: 500, ...params },
+  });
+  return r.data.bills;
+}
+
+export type BillLine = {
+  id: string; line_number: number; description: string; quantity: string;
+  unit_price: string; line_subtotal: string;
+};
+
+export type BillDetail = {
+  bill: BillRow & { subtotal: string; memo: string | null; terms: string | null };
+  lines: BillLine[];
+  amount_due: string;
+};
+
+export async function getBill(businessId: string, id: string) {
+  const r = await api.get<BillDetail>(`/businesses/${businessId}/bills/${id}`);
+  return r.data;
+}

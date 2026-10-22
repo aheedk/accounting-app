@@ -1049,3 +1049,47 @@ request/response shapes are taken directly from the route handlers'
 actual `res.json(...)` calls and the zod schema (not guessed), but this
 is the first write-path chunk without an end-to-end live exercise — worth
 testing for real once there's a customer with an open invoice to pay.
+
+### Redesign chunk 16 (2026-10-22) — Bills (AP, read-only) — done
+
+Mirrors `invoices.tsx`/`app/invoice/[id].tsx` field-for-field for the AP
+side — same filter chips (All/Open/Overdue/Paid), same vendor-name-join
+pattern (via the already-existing `listVendors`, same as invoices.tsx
+joins `listCustomers`), same amount-due header treatment. Read-only this
+chunk, same reasoning as Chart of Accounts: create/post require
+`staff`/`accountant` and aren't needed for a first browse-and-view screen.
+
+- Caught my own mistake before shipping: initially guessed the bill
+  line-item fields as `unit_cost`/`line_total` (copying invoice line
+  naming by assumption) — checked `BillLinesTable` in `db/types.ts`
+  directly and the real columns are `unit_price`/`line_subtotal`, fixed
+  before any typecheck. A reminder to read the actual table definition
+  for every new entity rather than pattern-matching off a sibling type,
+  even when the sibling is extremely similar.
+- `services/api.ts`: added `BillRow`/`BillLine`/`BillDetail` local types
+  (no shared zod schema exists for bill reads either — only
+  `billDraftCreateSchema` etc. for the write side, same non-issue as
+  invoices) + `listBills()`/`getBill()`. Noted the list endpoint's
+  computed balance field is named `open_balance` while the detail
+  endpoint's is `amount_due` — different names for the same idea,
+  confirmed by reading both route handlers rather than assumed to match.
+- **`app/bills.tsx`**: list screen, exact invoices.tsx pattern.
+- **`app/bill/[id].tsx`**: detail screen — built against the newer
+  `AppHeader`/`AppCard` primitives (unlike `app/invoice/[id].tsx`, which
+  predates the redesign and still uses Paper's `Appbar`/`Card` directly);
+  did not retrofit the older invoice detail screen in this chunk since
+  that wasn't asked.
+- `lib/roleAccess.ts`: added the same client-role carve-out invoices has
+  (`/bills` and `/bill/:id` open to a client login, `/bill/new` still
+  blocked) — mirrors web's `canOpenPage`, which special-cases
+  `/ap/bills`/`/ap/bills/:id` the same way for a client viewing their own
+  bills.
+- Wired into the drawer's AP > Bills item and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /bills` hit live and confirmed the
+`{ bills: [] }` wrapper shape. This demo business has 43 vendors but zero
+bills (expenses were entered directly instead, a common QBO-style
+pattern), so the per-row and per-line field names are confirmed from
+`db/types.ts` directly rather than a populated live response — worth a
+real check once this business (or another) has an actual bill.

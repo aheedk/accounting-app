@@ -26,6 +26,7 @@ export function canOpenPage(role: Role | null, pathname: string): boolean {
   if (role === 'client') {
     if (pathname === '/(tabs)') return true;
     if (pathname === '/invoices' || (pathname.startsWith('/invoices/') && pathname !== '/invoices/new')) return true;
+    if (pathname === '/bills' || (pathname.startsWith('/bill/') && pathname !== '/bill/new')) return true;
     return CLIENT_PAGES.some(page => under(pathname, page));
   }
   // A view-only login opens every page staff can, except the forms that add something.
