@@ -130,6 +130,12 @@ export default function MoreScreen() {
         left={props => <List.Icon {...props} icon="checkbook" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
+      <List.Item
+        title="Suspense"
+        onPress={() => router.push('/suspense')}
+        left={props => <List.Icon {...props} icon="help-circle-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
 
       <Divider style={{ marginVertical: spacing.md }} />
 

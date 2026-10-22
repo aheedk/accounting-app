@@ -1454,3 +1454,47 @@ version, asking to match. Replaced:
 simulator screenshot (the user's own Metro session was already running,
 Fast Refresh picked up the change) — matches the two-dropdown layout
 from the user's screenshot exactly.
+
+### Redesign chunk 24 (2026-10-22) — AI Suspense — done
+
+What CLAUDE.md's own AI auto-coding rules call out by name: "Unknowns go
+to Suspense, never a guess... blocks period close." A line no coding
+layer could place lands here with confidence 0, pre-posted to the
+client's Suspense system account — this screen is how it gets moved to
+where it actually belongs.
+
+- Flat list with inline recode per row (tap to expand an account picker
+  + "Remember for this payee" checkbox + Reclassify button), not a
+  separate detail screen — same reason as Credit Memos/Vendor Credits:
+  there's no `GET` detail route, only list + the one action, matching
+  web's own `SuspensePage.tsx` (an inline `AccountSelect` + button, no
+  modal). Used a plain `ScrollView.map()` rather than `FlashList` for
+  the same reason `payment/new.tsx`'s outstanding-invoices picker did —
+  a bounded list of expandable action cards, not a long virtualized
+  feed.
+- **Deliberately no `ConfidenceBadge`** on this screen, even though it's
+  reused everywhere else AI suggestions show up (bank transactions, the
+  AI inbox) — confirmed the list payload itself (`SuspenseItem`) carries
+  no confidence/band field at all, because every item here is
+  confidence-0 by definition. Showing the badge would imply a signal
+  that doesn't exist for this data.
+- Header stats card (waiting count / total Suspense balance / oldest
+  age in days, red-tinted past 30 days) computed client-side from the
+  list, matching web's own header strip.
+- Recode (`reclassify`) is `accountant`+ server-side — the expanded
+  recode form is swapped for a plain permission message when the
+  signed-in role doesn't qualify, same pattern as every other role-
+  gated action this session, rather than hiding the row's expand
+  affordance entirely (viewing what's stuck in Suspense is still useful
+  context for a staff login, even if they can't fix it).
+- `services/api.ts`: added `SuspenseItem` type + `listSuspenseItems()`/
+  `reclassifySuspenseItem()`, shapes read directly from
+  `suspenseService.ts`'s actual type definitions and return statements.
+- Wired into the drawer's AI > Suspense item and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /suspense` hit live and confirmed the
+`{ account_id, items }` wrapper shape — this business's Suspense account
+exists (`account_id` populated) but currently has zero parked items, so
+the per-item fields and the reclassify flow are unverified against a
+populated response; worth a check once something real lands in Suspense.

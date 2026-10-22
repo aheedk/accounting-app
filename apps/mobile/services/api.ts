@@ -1032,3 +1032,31 @@ export async function listChecks(businessId: string) {
   const r = await api.get<{ checks: CheckListRow[] }>(`/businesses/${businessId}/checks`);
   return r.data.checks;
 }
+
+// --- AI Suspense — unclassified amounts the AI coding engine couldn't
+// place anywhere real, parked in the client's Suspense account and
+// blocking period close (see CLAUDE.md). Shapes read directly from
+// suspenseService.ts's actual types/return statements — no confidence/
+// band field here (unlike the AI inbox), since these are confidence-0
+// items by definition; ConfidenceBadge isn't used on this screen for
+// the same reason web's SuspensePage.tsx doesn't show it either.
+
+export type SuspenseItem = {
+  journal_entry_id: string; entry_date: string; label: string; num: string | null;
+  payee: string | null; description: string | null; amount: string; direction: 'out' | 'in';
+  bank_account_name: string | null; path: string; age_days: number;
+};
+
+export async function listSuspenseItems(businessId: string) {
+  const r = await api.get<{ account_id: string | null; items: SuspenseItem[] }>(`/businesses/${businessId}/suspense`);
+  return r.data;
+}
+
+export async function reclassifySuspenseItem(
+  businessId: string, journalEntryId: string, body: { account_id: string; remember?: boolean },
+) {
+  const r = await api.post<{ method: 'edited' | 'journal_entry'; journal_entry_id: string }>(
+    `/businesses/${businessId}/suspense/${journalEntryId}/reclassify`, body,
+  );
+  return r.data;
+}

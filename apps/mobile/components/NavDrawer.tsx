@@ -57,7 +57,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Document Inbox', path: '/inbox' },
       { label: 'Coding Rules' },
-      { label: 'Suspense' },
+      { label: 'Suspense', path: '/suspense' },
     ],
   },
   {
