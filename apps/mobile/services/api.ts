@@ -601,3 +601,55 @@ export async function getApAging(businessId: string, params: { as_of?: string } 
   const r = await api.get<AgingReport>(`/businesses/${businessId}/reports/ap-aging`, { params });
   return r.data;
 }
+
+// --- Payments (AR) — shapes copied from paymentService.ts /
+// db/types.ts's PaymentsTable directly (read the actual route/service
+// return statements, not guessed). Scoped to create-and-post + void only
+// — no per-invoice add/remove-application-after-creation endpoints wired
+// up (those exist server-side but aren't needed for a first mobile entry
+// flow: initial_applications at creation covers the normal case).
+
+export type PaymentMethod = 'cash' | 'check' | 'ach' | 'wire' | 'card' | 'other';
+export type PaymentStatus = 'draft' | 'posted' | 'voided';
+export type PaymentRow = {
+  id: string; business_id: string; customer_id: string; payment_date: string;
+  payment_method: PaymentMethod; reference: string | null;
+  amount: string; unapplied_amount: string; cash_account_id: string;
+  status: PaymentStatus; posted_journal_entry_id: string | null;
+  memo: string | null; is_deposited: boolean;
+  posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type PaymentApplication = { id: string; invoice_id: string; invoice_number: string; applied_amount: string; applied_at: string };
+export type PaymentDetail = { payment: PaymentRow; applications: PaymentApplication[] };
+export type PaymentInput = {
+  customer_id: string; payment_date: string; payment_method: PaymentMethod;
+  reference?: string | null; amount: string; cash_account_id: string; memo?: string | null;
+  initial_applications?: Array<{ invoice_id: string; applied_amount: string }>;
+};
+
+export async function listPayments(businessId: string, params: { customer_id?: string; status?: PaymentStatus } = {}) {
+  const r = await api.get<{ payments: PaymentRow[] }>(`/businesses/${businessId}/payments`, { params });
+  return r.data.payments;
+}
+
+export async function getPayment(businessId: string, id: string) {
+  const r = await api.get<PaymentDetail>(`/businesses/${businessId}/payments/${id}`);
+  return r.data;
+}
+
+export async function createPayment(businessId: string, input: PaymentInput) {
+  const r = await api.post<{ payment: PaymentRow }>(`/businesses/${businessId}/payments`, input);
+  return r.data.payment;
+}
+
+export async function postPayment(businessId: string, id: string) {
+  const r = await api.post<PaymentRow>(`/businesses/${businessId}/payments/${id}/post`);
+  return r.data;
+}
+
+export async function voidPayment(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<PaymentRow>(`/businesses/${businessId}/payments/${id}/void`, { void_reason });
+  return r.data;
+}

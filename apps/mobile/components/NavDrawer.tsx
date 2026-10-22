@@ -30,7 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Customers', path: '/clients', params: { tab: 'customers' } },
       { label: 'Invoices', path: '/invoices' },
-      { label: 'Payments' },
+      { label: 'Payments', path: '/payments' },
       { label: 'Credit Memos' },
       { label: 'Aging', path: '/ar-aging' },
       { label: 'Statements' },

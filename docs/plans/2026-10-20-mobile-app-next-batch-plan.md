@@ -995,3 +995,57 @@ names (`days_1_30` etc.) are confirmed from the service source, not from
 a populated live response. Also used this chunk to retroactively confirm
 the prior chunk's Journal Entries list against live data — response
 matched the hand-written `JournalEntryListItem`/`JeLine` types exactly.
+
+### Redesign chunk 15 (2026-10-22) — Record Payment (AR write path) — done
+
+First write-path feature built out of the AR/AP groups (everything
+before this chunk was reports/lists). Read the route, service, and zod
+schema directly before building anything — `paymentDraftCreateSchema` in
+`packages/shared/src/schemas/payment.ts` is accurate (unlike the stale
+aging/trial-balance schemas), so client-side validation mirrors it
+exactly (money regex, uuid fields, 200/500-char limits).
+
+- **Scope deliberately bounded**: create-and-post in one step (mirroring
+  web's `useSaveAndPost`) plus void — no per-invoice add/remove-
+  application-after-creation UI, even though `POST .../applications` and
+  `DELETE .../applications/:appId` exist server-side. Editing an existing
+  payment's allocations isn't a mobile feature yet; the normal "record a
+  payment, apply it to invoices, post it" case is fully covered via
+  `initial_applications` at creation.
+- **`app/payments.tsx`**: status filter chips + list (same pattern as
+  every other list screen), a "Record payment" button gated by
+  `useCanOpen('/payment/new')` so a viewer/client login doesn't see it.
+- **`app/payment/new.tsx`**: customer picker, date, reference, payment
+  method, deposit-to account (reusing `statementBankAccounts` — the same
+  bank-account filter Expense/Deposit already use, not a new one),
+  outstanding-invoices checklist for the picked customer (checking an
+  invoice auto-fills its full `amount_due`, editable after — same UX as
+  web's allocation table), an optional "amount received" override that
+  defaults to the applied sum, an unapplied-amount readout. Open invoices
+  are fetched the same N+1 way web does (list posted invoices, then fetch
+  each detail for `amount_due`, filtered to balance > 0) since the list
+  endpoint doesn't carry a balance — not inventing a batch-balance
+  endpoint for this.
+- **`app/payment/[id].tsx`**: balance/status card, applications list
+  (invoice number + applied amount), a Void button gated to `accountant`+
+  AND `applications.length === 0` client-side (mirrors the server's own
+  hard guard — `PaymentHasApplicationsError` otherwise) using
+  `Alert.prompt` for the required void reason (iOS-only API, consistent
+  with this app's iOS-first scope so far).
+- `services/api.ts`: added `PaymentRow`/`PaymentApplication`/
+  `PaymentDetail`/`PaymentInput` types + `listPayments`/`getPayment`/
+  `createPayment`/`postPayment`/`voidPayment`, all shapes read directly
+  from `paymentService.ts`'s actual return statements and
+  `PaymentsTable`/`PaymentApplicationsTable` in `db/types.ts`.
+- Wired into the drawer's AR > Payments item, the Create tab (alongside
+  Expense/Deposit), and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /payments` hit live and confirmed the
+`{ payments: [] }` wrapper shape. **Could not exercise the full create→
+post→void round trip live** — this demo business (`mobile-demo@example.com`)
+has zero customers, so there's nothing to record a payment against. The
+request/response shapes are taken directly from the route handlers'
+actual `res.json(...)` calls and the zod schema (not guessed), but this
+is the first write-path chunk without an end-to-end live exercise — worth
+testing for real once there's a customer with an open invoice to pay.
