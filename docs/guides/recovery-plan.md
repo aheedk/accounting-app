@@ -13,6 +13,17 @@ one can fall behind the other: in October 2026 Netlify stopped picking up pushes
 for a week, then Railway did. To see what is live, compare the web bundle or the
 API's response headers with the newest commit.
 
+Railway's stall (found 10-22) was its watch paths: it only rebuilt when a push
+changed `apps/api/**`, and it judges a push by its last commit, so a push ending
+in a merge of mobile-only work was skipped ("No changes to watched files") with
+the API changes inside it. `railway.json` now lists every path the API is built
+from (`build.watchPatterns`: the API, `packages/shared`, `db`, `bin`, the root
+package files). It also has `healthcheckPath: /health` again: a new version only
+takes over once it answers, so one that fails to start (a bad secret, a failed
+migration) leaves the old one running instead of taking the API down. When a
+deploy is skipped that should not have been, Deployments → the skipped one → ⋮
+→ Deploy.
+
 ## Keep these somewhere other than Railway
 
 A database copy is not enough on its own. Keep these in a password manager the
