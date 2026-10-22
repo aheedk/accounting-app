@@ -1628,3 +1628,59 @@ correctly wired — a bogus `customer_id` reached the service layer and
 came back with a proper semantic 404 (`"customer not found: ..."`), not
 a routing failure, so the endpoint path and query-param parsing are
 confirmed even though the response body's field shape isn't.
+
+### Redesign chunk 28 (2026-10-22) — Bank Accounts, Fixed Assets, Receipts, Bank Rules — done
+
+Second batch off the survey, closing out most of the Accounting group.
+
+- **`app/bank-accounts.tsx`**: the existing `BankAccountRow` (used
+  app-wide for payment-account pickers) is a narrow 3-field subset — the
+  real `/bank-accounts` route returns a much richer row (institution,
+  last four, both `bank_balance` — imported feed total — and
+  `book_balance` — the ledger's own total), confirmed by reading
+  `bankAccountService.ts` directly. Added a separate `BankAccountFull`
+  type rather than widening the existing one, since every current picker
+  call site only reads the 3 original fields and widening in place would
+  have been unnecessary churn. Read-only — create/deactivate are
+  `firm_admin`-only, low-frequency setup actions not built this chunk.
+- **`app/fixed-assets.tsx`** + **`app/fixed-asset/[id].tsx`**: list +
+  detail, read-only (create/edit/depreciate exist server-side, same
+  reference-screen scoping as Chart of Accounts). List also shows the
+  `ledger_cost_total` figure the route returns alongside the rows — what
+  the ledger holds in the accounts the register's active assets sit in,
+  a cross-check figure, not derived client-side.
+- **`app/receipts.tsx`**: every file attachment across the business, no
+  entity filter (the full reference list). Confirmed genuinely separate
+  from the AI Document Inbox (staged email imports awaiting coding) by
+  reading both route files — Receipts are already-linked attachments on
+  7 different entity types. Deliberately no tap-through navigation: the
+  linked document could be any of those 7 types, several without a
+  mobile screen yet, so nothing is guessed.
+- **`app/bank-rules.tsx`**: manually-defined keyword/amount-match rules
+  on the bank feed (`bank_transaction_rules` table) — confirmed distinct
+  from AI Coding Rules (the engine's own learned rules, different table
+  entirely) before building anything. List + delete (`accountant`+) only
+  — create/edit forms and web's dry-run/apply-to-account actions aren't
+  built this chunk, same scope-tightening as Contractors' reveal/W-9.
+- **Also restructured `app/(tabs)/more.tsx`** while adding these: it had
+  grown to 25+ items in one flat, unsectioned list with **no
+  `ScrollView`** — items past the fold were being silently clipped on a
+  small screen, not just visually noisy. Rewrote it as a data-driven
+  array of sections (Reports/AR/AP/Accounting/AI, mirroring the drawer's
+  own grouping) rendered in a `ScrollView`, so every future addition is a
+  one-line array entry instead of a 5-line JSX block, and nothing clips.
+- `services/api.ts`: added `BankAccountFull`/`FixedAssetRow`/
+  `ReceiptRow`/`BankRule` types + `listBankAccountsFull`/
+  `listFixedAssets`/`getFixedAsset`/`listReceipts`/`listBankRules`/
+  `deleteBankRule`.
+- Wired all four into the drawer's Accounting group and the (now
+  sectioned) More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, all four endpoints hit live — Bank
+Accounts confirmed field-for-field against this business's 2 real
+accounts (bank_balance `0`/book_balance `7152.64` on one, a real
+divergence since nothing's been reconciled, not a bug); Fixed Assets/
+Receipts/Bank Rules all confirmed their wrapper shapes but came back
+empty — none of those three features have been used on this demo
+business yet.

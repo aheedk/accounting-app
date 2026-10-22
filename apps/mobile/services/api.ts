@@ -1158,3 +1158,92 @@ export async function getCustomerStatement(businessId: string, params: { custome
   const r = await api.get<CustomerStatement>(`/businesses/${businessId}/reports/customer-statement`, { params });
   return r.data;
 }
+
+// --- Bank Accounts (full) — the richer shape the real /bank-accounts
+// route returns, confirmed directly from bankAccountService.ts. The
+// existing BankAccountRow ({id,name,cash_account_id}) used for payment-
+// account pickers elsewhere is a narrower subset kept as-is (every
+// existing picker call site only reads those 3 fields) — this is a
+// separate, additive type for the full list screen, not a replacement.
+
+export type BankAccountFull = {
+  id: string; name: string; institution: string | null; account_last_four: string | null;
+  cash_account_id: string; is_active: boolean;
+  cash_account_code: string; cash_account_name: string;
+  bank_balance: string; book_balance: string;
+};
+
+export async function listBankAccountsFull(businessId: string) {
+  const r = await api.get<{ bank_accounts: BankAccountFull[] }>(`/businesses/${businessId}/bank-accounts`);
+  return r.data.bank_accounts;
+}
+
+// --- Fixed Assets — read-only list+detail, shapes read directly from
+// fixedAssetService.ts (selectAll() on fixed_assets + computed
+// accumulated_depreciation/book_value). Create/edit/depreciate exist
+// server-side but aren't built here — same "read-only reference screen"
+// scoping as Chart of Accounts/Bills.
+
+export type FixedAssetRow = {
+  id: string; business_id: string; name: string;
+  asset_account_id: string; depreciation_expense_account_id: string; accumulated_depreciation_account_id: string;
+  purchase_date: string; cost: string; salvage_value: string; useful_life_years: number;
+  depreciation_method: 'straight_line'; status: 'active' | 'disposed'; memo: string | null;
+  created_at: string; updated_at: string;
+  accumulated_depreciation: string; book_value: string;
+};
+
+export async function listFixedAssets(businessId: string) {
+  const r = await api.get<{ fixed_assets: FixedAssetRow[]; ledger_cost_total: string }>(`/businesses/${businessId}/fixed-assets`);
+  return r.data;
+}
+
+export async function getFixedAsset(businessId: string, id: string) {
+  const r = await api.get<FixedAssetRow>(`/businesses/${businessId}/fixed-assets/${id}`);
+  return r.data;
+}
+
+// --- Receipts — file attachments linked to a transaction/document
+// (bill, invoice, journal entry, check, bank_deposit, expense_transaction,
+// bank_transaction, or unlinked). Genuinely separate from the AI Document
+// Inbox (apps/mobile/app/inbox/ — email/staged-import review), confirmed
+// by reading both route files, not assumed from the similar-sounding name.
+
+export type ReceiptRow = {
+  id: string; business_id: string; file_id: string; uploaded_by_user_id: string | null;
+  linked_entity_type: string | null; linked_entity_id: string | null;
+  created_at: string; updated_at: string;
+  file_name: string; file_mime_type: string; file_byte_size: number;
+  linked_label: string | null;
+};
+
+export async function listReceipts(businessId: string) {
+  const r = await api.get<{ receipts: ReceiptRow[] }>(`/businesses/${businessId}/receipts`);
+  return r.data.receipts;
+}
+
+// --- Bank Transaction Rules — manually-defined keyword/amount-match
+// rules on the bank feed (table bank_transaction_rules), confirmed
+// distinct from AI Coding Rules (the engine's learned rules,
+// apps/mobile/app/coding-rules.tsx — different table, different
+// mechanism). Scoped to list + delete this chunk, same reasoning as
+// Contractors' reveal/W-9 edit: create/edit are real but lower-frequency
+// actions not rushed in.
+
+export type BankRuleSignFilter = 'any' | 'inflow_only' | 'outflow_only';
+export type BankRule = {
+  id: string; business_id: string; name: string; description_contains: string;
+  min_amount: string | null; max_amount: string | null; sign_filter: BankRuleSignFilter;
+  offset_account_id: string; priority: number; is_active: boolean; bank_account_id: string | null;
+  created_at: string; updated_at: string;
+  offset_account_code: string; offset_account_name: string; bank_account_name: string | null;
+};
+
+export async function listBankRules(businessId: string) {
+  const r = await api.get<{ bank_rules: BankRule[] }>(`/businesses/${businessId}/bank-rules`);
+  return r.data.bank_rules;
+}
+
+export async function deleteBankRule(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/bank-rules/${id}`);
+}
