@@ -577,3 +577,27 @@ export async function getStatementOfCashFlows(businessId: string, params: { peri
   const r = await api.get<StatementOfCashFlowsReport>(`/businesses/${businessId}/reports/statement-of-cash-flows`, { params });
   return r.data;
 }
+
+// --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
+// reports) directly. packages/shared's agingRowSchema is stale — its field
+// names (customer_id/customer_name/over_30/over_60/over_90) don't match
+// what either route actually returns, and it's unused by the routes
+// themselves (confirmed by reading both route handlers), same
+// "ignore the stale shared schema" pattern as TrialBalance/CashFlow above.
+
+export type AgingRow = {
+  id: string; name: string;
+  current: string; days_1_30: string; days_31_60: string; days_61_90: string; days_over_90: string;
+  total: string;
+};
+export type AgingReport = { as_of: string; rows: AgingRow[] };
+
+export async function getArAging(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<AgingReport>(`/businesses/${businessId}/reports/aging`, { params });
+  return r.data;
+}
+
+export async function getApAging(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<AgingReport>(`/businesses/${businessId}/reports/ap-aging`, { params });
+  return r.data;
+}

@@ -74,6 +74,18 @@ export default function MoreScreen() {
         left={props => <List.Icon {...props} icon="book-open-page-variant-outline" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
+      <List.Item
+        title="AR Aging"
+        onPress={() => router.push('/ar-aging')}
+        left={props => <List.Icon {...props} icon="calendar-clock-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
+        title="AP Aging"
+        onPress={() => router.push('/ap-aging')}
+        left={props => <List.Icon {...props} icon="calendar-clock-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
       <Divider />
 
       {STUB_ITEMS.map(item => (

@@ -16,7 +16,7 @@ export function useEffectiveRole(): Role | null {
 }
 
 // A client login sees its own invoices and the financial reports, nothing else.
-const CLIENT_PAGES = ['/pnl', '/balance-sheet', '/trial-balance', '/cash-flow'];
+const CLIENT_PAGES = ['/pnl', '/balance-sheet', '/trial-balance', '/cash-flow', '/ar-aging', '/ap-aging'];
 
 const under = (pathname: string, page: string) => pathname === page || pathname.startsWith(`${page}/`);
 

@@ -936,3 +936,62 @@ fields are already proven correct by the long-working `getJournalEntry`
 detail call on the same `journal-entries` resource — but this one line
 item type is unconfirmed against a real response. Worth a live check the
 next time the dev server is up before fully trusting this screen.
+
+### Dev environment fix (2026-10-22) — login was broken, unrelated to mobile
+
+User reported login failing with "Something went wrong" plus debugger
+errors. Root cause was two stale-local-environment issues, neither caused
+by mobile work:
+1. `packages/shared`'s compiled `dist/` predated the `passwords.ts` file
+   a recent upstream merge (the sign-in-security feature) added, so the
+   API crashed on boot with a missing-export error (`passwordProblem`).
+2. That same merge's migration (`db/migrations/0109_sign_in_security.sql`)
+   hadn't been applied locally, so even after fixing the boot crash,
+   login hit a Postgres "missing column" error (42703).
+
+Fixed by rebuilding `packages/shared` (`npm run build -w @accounting/shared`)
+and running `npm run db:migrate` (applied `0108_estimates.sql` and
+`0109_sign_in_security.sql`). Confirmed via a direct `curl` login that
+returned a valid token. Noting this here since it explains why the prior
+chunk (Journal Entries) couldn't be verified live — the dev server was
+down for that exact reason, now resolved and retroactively verified below.
+
+### Redesign chunk 14 (2026-10-22) — AR Aging / AP Aging reports — done
+
+Completes the Reports group alongside the other four financial reports.
+Both routes (`GET /reports/aging`, `GET /reports/ap-aging`) share one
+`AgingRow` shape from `agingBuckets.ts` — confirmed `packages/shared`'s
+`agingRowSchema` is stale (wrong field names: `customer_id`/`over_30`
+etc. instead of the real `id`/`days_1_30` etc.) and unused by either
+route, so typed from the service code directly, same as every other
+report so far.
+
+- Web's `AgingReportPage.tsx` renders one wide 7-column table (shared
+  for AR/AP via a `kind` prop) — doesn't fit phone width as a table, so
+  new shared `components/AgingReportView.tsx` adapts it to a card per
+  party (name + total, matching every other list row in this app) with
+  the 5 aging buckets as a small grid underneath, only showing non-zero
+  buckets (same "blank when zero" convention web uses) — same data and
+  bucket boundaries (current/1-30/31-60/61-90/91+, aged off days past
+  due date), different layout for the screen size.
+- Two thin screens, `app/ar-aging.tsx`/`app/ap-aging.tsx`, both just
+  wiring `AgingReportView` to `getArAging`/`getApAging` — the one
+  component that isn't near-duplicated across two files, unlike the
+  other reports which don't share enough to be worth factoring out.
+- `services/api.ts`: added `AgingRow`/`AgingReport` types +
+  `getArAging()`/`getApAging()`.
+- Wired into the drawer's AR > Aging and AP > Aging items (previously
+  both disabled) and the More tab.
+- `lib/roleAccess.ts`'s `CLIENT_PAGES` extended with `/ar-aging` and
+  `/ap-aging` — both are in web's own `CLIENT_PAGES` list for the same
+  reason as the other reports.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, both endpoints hit against the real dev API
+(now that the login fix above got it running again) — response wrapper
+shape (`as_of`/`rows`) matched for both, but this demo business had no
+overdue AR/AP balances, so `rows` came back empty and the per-row field
+names (`days_1_30` etc.) are confirmed from the service source, not from
+a populated live response. Also used this chunk to retroactively confirm
+the prior chunk's Journal Entries list against live data — response
+matched the hand-written `JournalEntryListItem`/`JeLine` types exactly.
