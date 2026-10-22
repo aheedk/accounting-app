@@ -1366,3 +1366,36 @@ since that would have permanently marked a real transaction reconciled
 and posted a real adjustment journal entry — tested everything finish
 depends on (save, the difference calculation) short of the one
 irreversible step.
+
+### Redesign chunk 22 (2026-10-22) — last Paper-default leftovers swapped — done
+
+Closes out the visual-parity component pass completely. The two items
+flagged as deliberately deprioritized back in chunk 10 (`settings.tsx`'s
+`SegmentedButtons`, the AI inbox's "+ Add new vendor" `TextInput`) plus
+two more found by re-running the same app-wide grep sweep that chunk 10
+used to confirm it was done (`login.tsx`'s email/password fields,
+`vendor/[id].tsx`'s tab switcher + "Add a note" field) — the sweep had
+only been run against files touched in that chunk, not the whole app, so
+these were missed at the time.
+
+- `app/settings.tsx`: `SegmentedButtons` → `AppSegmentedControl` for the
+  theme preference picker.
+- `app/inbox/[id].tsx`: the `AddVendorFooter`'s `TextInput` →
+  `AppTextInput`, `TextInput.Icon` → a plain `IconButton` in the `right`
+  slot (same substitution pattern used for every other Paper-affix swap
+  this session).
+- `app/(auth)/login.tsx`: email/password fields → `AppTextInput`,
+  `containerStyle` used for the existing `styles.input` margin (not
+  `style`, which only reaches the inner field).
+- `app/vendor/[id].tsx`: the 3-tab switcher → `AppSegmentedControl`, the
+  "Add a note" field → `AppTextInput` with `containerStyle={{flex:1}}`
+  to preserve its row layout next to the Add button (same
+  `containerStyle`-vs-`style` distinction as the login fields).
+- Re-ran the app-wide sweep afterward (`grep` across every file for a
+  Paper `TextInput`/`Chip`/`SegmentedButtons` import, excluding the
+  wrapper components themselves) and confirmed zero remaining hits —
+  this really is everything now, not just the two originally flagged.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors. No live device interaction this chunk
+(style-only changes, same low-risk category as chunk 9's original pass).
