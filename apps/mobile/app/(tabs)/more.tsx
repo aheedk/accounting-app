@@ -66,6 +66,17 @@ const SECTIONS: Section[] = [
       { title: 'Coding Rules', path: '/coding-rules', icon: 'creation' },
     ],
   },
+  {
+    label: 'Setup', items: [
+      { title: 'Entity', path: '/entity', icon: 'domain' },
+      { title: 'Company Settings', path: '/company-settings', icon: 'cog-outline' },
+      { title: 'Cost Centers', path: '/cost-centers', icon: 'tag-outline' },
+      { title: 'Users', path: '/users', icon: 'account-group-outline' },
+      { title: 'Activity Log', path: '/activity-log', icon: 'history' },
+      { title: 'Tax Codes', path: '/tax-codes', icon: 'percent-outline' },
+      { title: 'Fiscal Periods', path: '/fiscal-periods', icon: 'calendar-blank-outline' },
+    ],
+  },
 ];
 
 export default function MoreScreen() {

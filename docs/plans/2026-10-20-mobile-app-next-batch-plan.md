@@ -1744,3 +1744,68 @@ bundle built with no errors, all three endpoints hit live and confirmed
 wrapper shapes (`{requests, needs_approval}`, `{templates}`,
 `{integration_inbox}`) — empty data for all three, consistent with
 every chunk's data-sparsity pattern on this demo business.
+
+## Chunk: Setup group (2026-10-22)
+
+Built out all 7 disabled items under the drawer's Setup group. Scope
+split cleanly into read-only views (5) and one write-capable screen
+(Fiscal Periods), decided per-item after reading the actual routes:
+
+- **`app/entity.tsx`** + **`app/company-settings.tsx`**: both read
+  `GET /businesses/:businessId` (`businessService`'s `BUSINESS_COLUMNS`)
+  and split its fields into two screens matching web's own Entity vs.
+  Company Settings split — Entity shows identity/address fields, Company
+  Settings shows fiscal-year/invoicing/AI-automation fields. Both
+  deliberately read-only: the PATCH is `firm_admin`-gated server-side and
+  wasn't worth building without a real form-validation pass; revisit if
+  a user asks to actually edit these from mobile.
+- **`app/cost-centers.tsx`**: list + delete (`accountant`+). No
+  create/edit this chunk.
+- **`app/users.tsx`**: firm-wide roster (`GET /me/firm/users`, not
+  business-scoped — gated on the **raw** `user?.role === 'firm_admin'`,
+  not the effective per-business role). Deliberately read-only —
+  invite/deactivate/role-change/password-reset all exist server-side but
+  are high-blast-radius account-security actions that need a dedicated
+  security review before shipping on mobile, not a default-yes.
+- **`app/activity-log.tsx`**: read-only audit trail, `accountant`+,
+  cursor-paginated (`before: <created_at>`) with an explicit "Load more"
+  button rather than infinite scroll, matching this app's established
+  pagination pattern.
+- **`app/tax-codes.tsx`**: read-only list — rate history is append-only
+  server-side, no delete/edit route exists.
+- **`app/fiscal-periods.tsx`**: the one screen that needed write actions
+  to be useful. Close (`accountant`+, optional memo via `Alert.prompt`)
+  and reopen (`firm_admin`+, **required** reason via `Alert.prompt`,
+  blocked client-side if left blank) call
+  `POST /businesses/:businessId/periods/:id/close` and `/:id/reopen`
+  directly — confirmed against `periodCloseService.ts` that reopen has
+  no server-side memo/reason persistence beyond the audit record, so the
+  reason only needs to reach the audit log, not a column.
+- `services/api.ts`: added `BusinessAddress`/`BusinessSettings`,
+  `CostCenter`, `FirmUserRow`, `ActivityLogRow`, `TaxCode`,
+  `FiscalPeriodStatus`/`FiscalPeriod` types + matching list/action
+  functions. Verified every shape directly against
+  `apps/api/src/db/types.ts` (`FiscalPeriodsTable`, `BusinessesTable`)
+  and the route handlers, not guessed.
+- Wired into the drawer's Setup group (all 7 now have a `path`) and a
+  new Setup section in the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors (6.1MB bundle, no warnings), all endpoints
+hit live against the dev server as the `accountant`-role demo user —
+business settings, cost centers (`{cost_centers: []}`), tax codes
+(`{tax_codes: []}`), fiscal periods (`{periods: [...]}`, real rows),
+and activity log (`{has_more, rows}`, real rows) all returned and match
+the hand-written types field-for-field. `GET /me/firm/users` correctly
+403'd for the accountant-role demo user, confirming the Users screen's
+gate matches the server's.
+
+Setup group is now fully built. Remaining disabled items: Books Review
+(now unblocked — Fiscal Periods exists, needs a period-picker screen
+feeding `periodId` to `GET /fiscal-periods/:periodId/review-tasks`),
+the rest of Reports (Standard Reports, Cash Activity, Custom Reports,
+Management Reports, Performance Center, Financial Planning, Spreadsheet
+Sync — the last two still need their backend confirmed), Inventory (6
+items, unresearched), and two top-level items (Messages, Send
+documents). Payroll and Client Overview remain deliberately excluded
+(see the Survey chunk).

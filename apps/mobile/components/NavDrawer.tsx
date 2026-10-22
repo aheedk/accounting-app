@@ -91,9 +91,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'setup', label: 'Setup', icon: 'cog-outline',
     children: [
-      { label: 'Entity' }, { label: 'Company Settings' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
-      { label: 'Cost Centers' }, { label: 'Users' }, { label: 'Activity Log' },
-      { label: 'Tax Codes' }, { label: 'Fiscal Periods' },
+      { label: 'Entity', path: '/entity' }, { label: 'Company Settings', path: '/company-settings' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
+      { label: 'Cost Centers', path: '/cost-centers' }, { label: 'Users', path: '/users' }, { label: 'Activity Log', path: '/activity-log' },
+      { label: 'Tax Codes', path: '/tax-codes' }, { label: 'Fiscal Periods', path: '/fiscal-periods' },
     ],
   },
 ];

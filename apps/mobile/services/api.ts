@@ -1338,3 +1338,95 @@ export async function categorizeIntegrationRow(
 export async function excludeIntegrationRow(businessId: string, id: string, excluded_reason: string) {
   await api.post(`/businesses/${businessId}/integration-inbox/${id}/exclude`, { excluded_reason });
 }
+
+// --- Setup group — Entity, Company Settings, Cost Centers, Users,
+// Activity Log, Tax Codes, Fiscal Periods. Shapes read directly from
+// each route/service/table rather than guessed. Users is deliberately
+// read-only (list view only) — invite/deactivate/role-change/password-
+// reset/2FA-reset are real but security-sensitive, high-blast-radius
+// actions not built on mobile without a deliberate security review first.
+
+export type BusinessAddress = { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string };
+export type BusinessSettings = {
+  id: string; firm_id: string; name: string; legal_name: string | null; tax_id: string | null;
+  fiscal_year_start_month: number; address: BusinessAddress | null; phone: string | null; import_email: string | null;
+  ai_auto_post_enabled: boolean; staff_entries_need_approval: boolean; capitalization_threshold: string;
+  invoice_number_prefix: string; invoice_next_number: string | null;
+  default_invoice_terms_days: number; default_bill_terms_days: number;
+  default_sales_tax_code_id: string | null; default_expense_payment_method: string;
+  created_at: string; updated_at: string;
+};
+
+export async function getBusinessSettings(businessId: string) {
+  const r = await api.get<BusinessSettings>(`/businesses/${businessId}`);
+  return r.data;
+}
+
+export type CostCenter = { id: string; business_id: string; name: string; code: string | null; is_active: boolean; created_at: string; updated_at: string };
+
+export async function listCostCenters(businessId: string, params: { include_inactive?: boolean } = {}) {
+  const r = await api.get<{ cost_centers: CostCenter[] }>(`/businesses/${businessId}/cost-centers`, {
+    params: params.include_inactive ? { include_inactive: 'true' } : undefined,
+  });
+  return r.data.cost_centers;
+}
+
+export async function deleteCostCenter(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/cost-centers/${id}`);
+}
+
+export type FirmUserRow = {
+  id: string; email: string; full_name: string; role: string;
+  last_login_at: string | null; created_at: string; deactivated_at: string | null;
+  locked: boolean; two_step_enabled: boolean; payroll_access: boolean;
+  business_access: Array<{ business_id: string; business_name: string; role_override: string | null }>;
+};
+
+export async function listFirmUsers() {
+  const r = await api.get<{ users: FirmUserRow[] }>('/me/firm/users');
+  return r.data.users;
+}
+
+export type ActivityLogRow = {
+  id: string; created_at: string; action: string; entity_type: string; entity_id: string;
+  user_id: string | null; user_name: string | null; before: unknown; after: unknown;
+};
+
+export async function listActivityLog(businessId: string, params: { before?: string; user_id?: string; entity_type?: string } = {}) {
+  const r = await api.get<{ rows: ActivityLogRow[]; has_more: boolean; facets?: { users: Array<{ id: string; name: string }>; entity_types: string[] } }>(
+    `/businesses/${businessId}/activity-log`, { params },
+  );
+  return r.data;
+}
+
+export type TaxCode = {
+  id: string; business_id: string; code: string; name: string; tax_payable_account_id: string;
+  is_active: boolean; created_at: string; updated_at: string; current_rate: string | null;
+};
+
+export async function listTaxCodes(businessId: string) {
+  const r = await api.get<{ tax_codes: TaxCode[] }>(`/businesses/${businessId}/tax-codes`);
+  return r.data.tax_codes;
+}
+
+export type FiscalPeriodStatus = 'open' | 'closed';
+export type FiscalPeriod = {
+  id: string; business_id: string; starts_on: string; ends_on: string; status: FiscalPeriodStatus;
+  closed_at: string | null; closed_by_user_id: string | null; close_memo: string | null;
+  created_at: string; updated_at: string;
+};
+
+export async function listFiscalPeriods(businessId: string) {
+  const r = await api.get<{ periods: FiscalPeriod[] }>(`/businesses/${businessId}/periods`);
+  return r.data.periods;
+}
+
+export async function closeFiscalPeriod(businessId: string, id: string, memo?: string) {
+  const r = await api.post<FiscalPeriod>(`/businesses/${businessId}/periods/${id}/close`, { memo });
+  return r.data;
+}
+
+export async function reopenFiscalPeriod(businessId: string, id: string, reason: string) {
+  const r = await api.post<FiscalPeriod>(`/businesses/${businessId}/periods/${id}/reopen`, { reason });
+  return r.data;
+}
