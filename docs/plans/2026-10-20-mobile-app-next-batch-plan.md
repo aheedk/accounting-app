@@ -1185,3 +1185,44 @@ bundle built with no errors, `GET /credit-memos` hit live and confirmed
 the `{ credit_memos: [] }` wrapper shape. Same data gap as the last three
 chunks (no customers on this demo business at all, so credit memos are
 moot) — full create→post→apply→void flow unverified live.
+
+### Redesign chunk 19 (2026-10-22) — Vendor Credits (AP) — done
+
+Vendor-side mirror of chunk 18's Credit Memos, now fully rounding out
+AP alongside AR. Verified the field mapping directly against
+`VendorCreditsTable`/`vendorCreditService.ts`/`vendorCredits.ts` before
+writing code rather than assuming 1:1 symmetry — one real naming
+difference found: the AP side's offset field is generically named
+`offset_account_id` (not `expense_account_id`), while AR's equivalent is
+`revenue_account_id`. Everything else matches the Credit Memo pattern
+exactly: no `GET /vendor-credits/:id` route (list-and-find, same as
+`credit-memo/[id].tsx`), application is a separate `POST .../apply` call
+reusing `bill_payment_applications` (keyed by `vendor_credit_id` instead
+of `bill_payment_id`, confirmed by reading the table directly), and the
+same "zero active applications" void guard.
+
+- `services/api.ts`: added `VendorCreditRow`/`VendorCreditInput` types +
+  `listVendorCredits`/`createVendorCredit`/`postVendorCredit`/
+  `applyVendorCreditToBill`/`voidVendorCredit`.
+- **`app/vendor-credits.tsx`**, **`app/vendor-credit/new.tsx`**,
+  **`app/vendor-credit/[id].tsx`**: structural mirrors of the three
+  credit-memo screens, with the open-bills picker on the apply form
+  reusing `listBills`'s embedded `open_balance` (no N+1 fetch needed,
+  same simplification Bill Payments already got over Payments).
+- Also fixed the same role gap preemptively this time instead of after
+  the fact: vendor credit creation is `accountant`-gated both on the
+  list screen's "+ New" button and the Create tab (shared boolean with
+  Credit Memo, renamed `canCreateAtAccountantLevel` for clarity now that
+  it gates two items).
+- Wired into the drawer's AP > Vendor Credits item, the Create tab, and
+  the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /vendor-credits` hit live and
+confirmed the `{ vendor_credits: [] }` wrapper shape. Same data gap as
+the prior four write-path chunks — this demo business has no vendors
+with open bills, so the full create→post→apply→void flow is still
+unverified live across all of Payments/Bill Payments/Credit Memos/
+Vendor Credits. Recommended to the user that this whole family of
+screens gets a real test pass once real AR/AP data exists, before
+building anything further on top.

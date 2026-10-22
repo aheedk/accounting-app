@@ -798,3 +798,52 @@ export async function voidCreditMemo(businessId: string, id: string, void_reason
   const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos/${id}/void`, { void_reason });
   return r.data;
 }
+
+// --- Vendor Credits (AP) — the vendor-side mirror of Credit Memos above,
+// confirmed field-for-field against VendorCreditsTable / vendorCreditService.ts
+// rather than assumed symmetric. One naming difference worth noting: the
+// AP side's offset account field is generically named `offset_account_id`
+// (not `expense_account_id`), while AR's equivalent is `revenue_account_id`
+// — different names on each side, both read from the real schema, not
+// guessed to match. Same two structural quirks as Credit Memos: no GET
+// detail route (list-and-find, same as credit-memo/[id].tsx), and
+// application is always a separate POST .../apply call reusing the same
+// bill_payment_applications table BillPayments use (keyed by
+// vendor_credit_id instead of bill_payment_id).
+
+export type VendorCreditRow = {
+  id: string; business_id: string; vendor_id: string; vendor_credit_number: string | null;
+  credit_date: string; status: CreditMemoStatus; amount: string; remaining_amount: string;
+  ap_account_id: string; offset_account_id: string;
+  posted_journal_entry_id: string | null; memo: string | null;
+  posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type VendorCreditInput = {
+  vendor_id: string; credit_date: string; amount: string; offset_account_id: string; memo?: string | null;
+};
+
+export async function listVendorCredits(businessId: string, params: { vendor_id?: string } = {}) {
+  const r = await api.get<{ vendor_credits: VendorCreditRow[] }>(`/businesses/${businessId}/vendor-credits`, { params });
+  return r.data.vendor_credits;
+}
+
+export async function createVendorCredit(businessId: string, input: VendorCreditInput) {
+  const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits`, input);
+  return r.data;
+}
+
+export async function postVendorCredit(businessId: string, id: string) {
+  const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits/${id}/post`);
+  return r.data;
+}
+
+export async function applyVendorCreditToBill(businessId: string, id: string, body: { bill_id: string; applied_amount: string }) {
+  await api.post(`/businesses/${businessId}/vendor-credits/${id}/apply`, body);
+}
+
+export async function voidVendorCredit(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits/${id}/void`, { void_reason });
+  return r.data;
+}

@@ -22,11 +22,12 @@ export default function CreateScreen() {
   // same "no /new forms" rule as every other role-gated form in this app
   // (see lib/roleAccess.ts), not a desktop-only feature gap.
   const canCreate = canOpen('/expense/new');
-  // Credit memo creation is accountant+ server-side (stricter than the
-  // staff-level gate every other item on this screen needs) — checked
-  // client-side too so a staff login doesn't tap through to a 403.
+  // Credit memo / vendor credit creation is accountant+ server-side
+  // (stricter than the staff-level gate every other item on this screen
+  // needs) — checked client-side too so a staff login doesn't tap through
+  // to a 403.
   const effectiveRole = (businesses.find(b => b.id === activeBusinessId)?.role_override ?? user?.role ?? 'viewer') as Role;
-  const canCreateCreditMemo = hasMinRole(effectiveRole, 'accountant');
+  const canCreateAtAccountantLevel = hasMinRole(effectiveRole, 'accountant');
 
   if (!canCreate) {
     return (
@@ -77,15 +78,25 @@ export default function CreateScreen() {
         titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
         descriptionStyle={{ color: theme.app.mutedForeground }}
       />
-      {canCreateCreditMemo ? (
-        <List.Item
-          title="Credit Memo"
-          description="Issue a credit to a customer"
-          onPress={() => router.push('/credit-memo/new')}
-          left={props => <List.Icon {...props} icon="file-document-minus-outline" color={theme.app.primary} />}
-          titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
-          descriptionStyle={{ color: theme.app.mutedForeground }}
-        />
+      {canCreateAtAccountantLevel ? (
+        <>
+          <List.Item
+            title="Credit Memo"
+            description="Issue a credit to a customer"
+            onPress={() => router.push('/credit-memo/new')}
+            left={props => <List.Icon {...props} icon="file-document-minus-outline" color={theme.app.primary} />}
+            titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.app.mutedForeground }}
+          />
+          <List.Item
+            title="Vendor Credit"
+            description="Issue a credit from a vendor"
+            onPress={() => router.push('/vendor-credit/new')}
+            left={props => <List.Icon {...props} icon="file-document-minus-outline" color={theme.app.primary} />}
+            titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.app.mutedForeground }}
+          />
+        </>
       ) : null}
       <Divider style={{ marginVertical: spacing.sm }} />
 

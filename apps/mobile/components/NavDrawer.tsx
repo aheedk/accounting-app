@@ -46,7 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Bills', path: '/bills' },
       { label: 'Pay Bills', path: '/bill-payment/new' },
       { label: 'Bill Payments', path: '/bill-payments' },
-      { label: 'Vendor Credits' },
+      { label: 'Vendor Credits', path: '/vendor-credits' },
       { label: 'Contractors' },
       { label: 'Aging', path: '/ap-aging' },
       { label: '1099s' },
