@@ -1983,9 +1983,19 @@ check. The leftover test budget couldn't be cleaned up under this
 login (by design) and was left on the demo business — harmless test
 data, same as other chunks' demo artifacts.
 
-Reports group is now fully built except Spreadsheet Sync, which stays
-deliberately deferred (a thin CSV/PDF-export wrapper around the
-already-built Journal Entries data, not a distinct feature worth its
-own screen). Remaining disabled items overall: Spreadsheet Sync,
-Inventory (6 items, unresearched), and two top-level items (Messages,
-Send documents).
+**Scope exclusion: Spreadsheet Sync.** Confirmed it's a thin
+CSV-file-download wrapper (`GET .../csv-exports/{trial-balance,
+journal-entries, general-ledger}`, returning `Content-Disposition:
+attachment` raw CSV, not JSON) with no actual sync semantics — web just
+triggers a browser download. Mobile has no file-download/share
+mechanism anywhere in the app (`expo-sharing`/`expo-file-system` are
+not installed), and CLAUDE.md is explicit against adding a dependency
+"to make it nicer" when a simpler option exists. Since this is also the
+lowest-value, least-distinct item in the batch (confirmed by research
+before building anything), excluding it is the proportionate call —
+same category as Payroll/Client Overview, not a gap to come back to
+unless a user actually asks for on-device export.
+
+Reports group is now fully built except that one deliberate exclusion.
+Remaining disabled items overall: Inventory (6 items, unresearched),
+and two top-level items (Messages, Send documents).
