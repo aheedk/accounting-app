@@ -51,15 +51,8 @@ Production-grade accounting system for an accounting firm.
 - `no-explicit-any: error`. Use `catch (e: unknown)` with typed narrowing.
 - `exactOptionalPropertyTypes: true`. Build patch objects conditionally — never set a key to `undefined`.
 
-### DB / Kysely
-- Numeric/date columns: `ColumnType<string, string | number | undefined, string | number>`. **Never `Generated<ColumnType<>>`** — that double-wrap is a bug.
-- Generated columns (defaults, sequences): `Generated<T>`.
-- PL/pgSQL tenant filters: `COALESCE(current_setting('app.X', true), '')`.
-
-### Postgres
-- Migrations are sequentially numbered: `db/migrations/00NN_<name>.sql`.
-- Triggers `set_updated_at` and `protect_posted` patterns are reused — see existing migrations for examples.
-- Posted-period guard: services that mutate JE-bearing entities check the period is not closed before posting.
+### DB / Kysely conventions
+See `apps/api/CLAUDE.md` (Kysely column typing) and `db/CLAUDE.md` (migration/trigger conventions).
 
 ### RBAC
 - Roles in `packages/shared/src/roles.ts`: `firm_admin` (40) > `accountant` (30) > `staff` (20) > `viewer` (15) > `client` (10).
@@ -72,28 +65,12 @@ Production-grade accounting system for an accounting firm.
 - Zod schemas live in `packages/shared/src/schemas/`. Re-export from `index.ts`.
 - Test factories in `apps/api/tests/helpers/factories.ts`. `truncateAll` in `testDb.ts` lists tables in reverse-dependency order — append new tables to the front.
 
-### Web
-- Pages under `apps/web/src/pages/<group>/`. Use existing shadcn/ui patterns (see `pages/customers/`, `pages/banking/` for templates).
-- Routes registered in `apps/web/src/App.tsx`. Sidebar in `apps/web/src/components/layout/Sidebar.tsx`.
-- No `any`. Declare concrete types for API responses.
-- Match existing styling — don't introduce new design tokens or component libraries.
+### Web conventions
+See `apps/web/CLAUDE.md`.
 
 ## Working pattern (parallel agents)
 
-For multi-phase work:
-
-- **Each slice gets its own worktree under `.claude/worktrees/slice-N-<topic>/`** with branch `slice-N-<topic>` cut from `main`. Slices merge into `main` sequentially in the priority order from the spec.
-- **Within a slice**, parallelize sub-agents only by file ownership. Each sub-agent prompt MUST list:
-  - Files it owns (whitelist).
-  - Files it MUST NOT modify (blacklist of files owned by sibling agents in the same phase).
-- **Hot-spot files** (cross-slice merge magnets):
-  - `apps/web/src/App.tsx`
-  - `apps/web/src/components/layout/Sidebar.tsx`
-  - `apps/api/src/db/types.ts`
-  - `apps/api/src/app.ts`
-  - `packages/shared/src/auditActions.ts`
-  - `packages/shared/src/schemas/index.ts`
-  - On merge conflict in any of these: re-apply both slices' append blocks. Never delete the other slice's lines.
+For multi-phase work with parallel sub-agents and worktrees, see the `parallel-slice-setup` skill.
 
 ## Plan-impl sync
 

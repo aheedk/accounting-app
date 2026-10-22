@@ -368,6 +368,31 @@ export async function getJournalEntry(businessId: string, id: string) {
   return r.data;
 }
 
+// Journal entries list — the same GET /journal-entries route web's
+// RecentJournalEntries.tsx uses for its "last 10" popover (confirmed by
+// reading it; web has no standalone list PAGE, only that popover). Mobile
+// adapts it into a real screen rather than inventing a pattern web doesn't
+// have — same fields, same endpoint, just a status filter + a full list
+// instead of a 10-row dropdown.
+export type JeLine = {
+  id: string; account_id: string; account_code: string; account_name: string;
+  debit: string; credit: string; memo: string | null;
+};
+export type JournalEntryListItem = {
+  id: string; entry_date: string; journal_number: string | null; memo: string | null;
+  reference: string | null; status: 'draft' | 'posted' | 'voided'; lines: JeLine[];
+};
+
+export async function listJournalEntries(
+  businessId: string,
+  params: { limit?: number; offset?: number; status?: 'draft' | 'posted' | 'voided' } = {},
+) {
+  const r = await api.get<{ entries: JournalEntryListItem[]; limit: number; offset: number }>(
+    `/businesses/${businessId}/journal-entries`, { params: { limit: 100, ...params } },
+  );
+  return r.data.entries;
+}
+
 // --- General Ledger (Phase 1, item 6) — shapes copied from
 // generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
 // chartOfAccounts.ts's /coa route, not guessed.
@@ -551,4 +576,439 @@ export type StatementOfCashFlowsReport = {
 export async function getStatementOfCashFlows(businessId: string, params: { period_start: string; period_end: string }) {
   const r = await api.get<StatementOfCashFlowsReport>(`/businesses/${businessId}/reports/statement-of-cash-flows`, { params });
   return r.data;
+}
+
+// --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
+// reports) directly. packages/shared's agingRowSchema is stale — its field
+// names (customer_id/customer_name/over_30/over_60/over_90) don't match
+// what either route actually returns, and it's unused by the routes
+// themselves (confirmed by reading both route handlers), same
+// "ignore the stale shared schema" pattern as TrialBalance/CashFlow above.
+
+export type AgingRow = {
+  id: string; name: string;
+  current: string; days_1_30: string; days_31_60: string; days_61_90: string; days_over_90: string;
+  total: string;
+};
+export type AgingReport = { as_of: string; rows: AgingRow[] };
+
+export async function getArAging(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<AgingReport>(`/businesses/${businessId}/reports/aging`, { params });
+  return r.data;
+}
+
+export async function getApAging(businessId: string, params: { as_of?: string } = {}) {
+  const r = await api.get<AgingReport>(`/businesses/${businessId}/reports/ap-aging`, { params });
+  return r.data;
+}
+
+// --- Payments (AR) — shapes copied from paymentService.ts /
+// db/types.ts's PaymentsTable directly (read the actual route/service
+// return statements, not guessed). Scoped to create-and-post + void only
+// — no per-invoice add/remove-application-after-creation endpoints wired
+// up (those exist server-side but aren't needed for a first mobile entry
+// flow: initial_applications at creation covers the normal case).
+
+export type PaymentMethod = 'cash' | 'check' | 'ach' | 'wire' | 'card' | 'other';
+export type PaymentStatus = 'draft' | 'posted' | 'voided';
+export type PaymentRow = {
+  id: string; business_id: string; customer_id: string; payment_date: string;
+  payment_method: PaymentMethod; reference: string | null;
+  amount: string; unapplied_amount: string; cash_account_id: string;
+  status: PaymentStatus; posted_journal_entry_id: string | null;
+  memo: string | null; is_deposited: boolean;
+  posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type PaymentApplication = { id: string; invoice_id: string; invoice_number: string; applied_amount: string; applied_at: string };
+export type PaymentDetail = { payment: PaymentRow; applications: PaymentApplication[] };
+export type PaymentInput = {
+  customer_id: string; payment_date: string; payment_method: PaymentMethod;
+  reference?: string | null; amount: string; cash_account_id: string; memo?: string | null;
+  initial_applications?: Array<{ invoice_id: string; applied_amount: string }>;
+};
+
+export async function listPayments(businessId: string, params: { customer_id?: string; status?: PaymentStatus } = {}) {
+  const r = await api.get<{ payments: PaymentRow[] }>(`/businesses/${businessId}/payments`, { params });
+  return r.data.payments;
+}
+
+export async function getPayment(businessId: string, id: string) {
+  const r = await api.get<PaymentDetail>(`/businesses/${businessId}/payments/${id}`);
+  return r.data;
+}
+
+export async function createPayment(businessId: string, input: PaymentInput) {
+  const r = await api.post<{ payment: PaymentRow }>(`/businesses/${businessId}/payments`, input);
+  return r.data.payment;
+}
+
+export async function postPayment(businessId: string, id: string) {
+  const r = await api.post<PaymentRow>(`/businesses/${businessId}/payments/${id}/post`);
+  return r.data;
+}
+
+export async function voidPayment(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<PaymentRow>(`/businesses/${businessId}/payments/${id}/void`, { void_reason });
+  return r.data;
+}
+
+// --- Bills (AP) — read-only this chunk, mirroring InvoiceRow/InvoiceDetail's
+// local-type convention exactly (bills.ts has no list/detail zod schema to
+// check against either — only write-side schemas exist, same as bills'
+// AR counterpart). Note the list endpoint's computed balance field is named
+// `open_balance`, while the detail endpoint's is `amount_due` — different
+// names for the same idea, confirmed by reading both route handlers
+// directly, not assumed to match.
+
+export type BillRow = {
+  id: string; bill_number: string | null; vendor_id: string; bill_date: string;
+  due_date: string; status: 'draft' | 'posted' | 'paid' | 'voided'; total: string;
+  open_balance: string;
+};
+
+export async function listBills(businessId: string, params: { status?: string; vendor_id?: string } = {}) {
+  const r = await api.get<{ bills: BillRow[] }>(`/businesses/${businessId}/bills`, {
+    params: { limit: 500, ...params },
+  });
+  return r.data.bills;
+}
+
+export type BillLine = {
+  id: string; line_number: number; description: string; quantity: string;
+  unit_price: string; line_subtotal: string;
+};
+
+export type BillDetail = {
+  bill: BillRow & { subtotal: string; memo: string | null; terms: string | null };
+  lines: BillLine[];
+  amount_due: string;
+};
+
+export async function getBill(businessId: string, id: string) {
+  const r = await api.get<BillDetail>(`/businesses/${businessId}/bills/${id}`);
+  return r.data;
+}
+
+// --- Bill Payments (AP) — the vendor-side mirror of Payments (AR) above.
+// Shapes read directly from billPaymentService.ts / db/types.ts's
+// BillPaymentsTable/BillPaymentApplicationsTable: field names mirror the
+// AR side 1:1 (applied_amount/unapplied_amount are identical names, only
+// the FK differs — vendor_id/bill_id instead of customer_id/invoice_id),
+// confirmed rather than assumed. PaymentMethod/PaymentStatus are the same
+// enums on both sides, reused as-is.
+//
+// Web has TWO AP payment UIs: a single-vendor BillPaymentNewPage.tsx (the
+// true 1:1 analog of PaymentNewPage.tsx we mirrored for AR) and a
+// separate QuickBooks-style multi-vendor "Pay Bills" batch grid
+// (PayBillsPage.tsx, posting one bill_payment per vendor via a batch
+// endpoint). Mobile mirrors only the single-vendor flow, same reasoning
+// as scoping Payments to create-and-post-only — the batch grid is a
+// bigger, different UX not asked for here.
+
+export type BillPaymentRow = {
+  id: string; business_id: string; vendor_id: string; payment_date: string;
+  payment_method: PaymentMethod; reference: string | null;
+  amount: string; unapplied_amount: string; cash_account_id: string;
+  status: PaymentStatus; posted_journal_entry_id: string | null;
+  memo: string | null; posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type BillPaymentApplication = { id: string; bill_id: string; bill_number: string; applied_amount: string; applied_at: string };
+export type BillPaymentDetail = { bill_payment: BillPaymentRow; applications: BillPaymentApplication[] };
+export type BillPaymentInput = {
+  vendor_id: string; payment_date: string; payment_method: PaymentMethod;
+  reference?: string | null; amount: string; cash_account_id: string; memo?: string | null;
+  initial_applications?: Array<{ bill_id: string; applied_amount: string }>;
+};
+
+export async function listBillPayments(businessId: string, params: { vendor_id?: string; status?: PaymentStatus } = {}) {
+  const r = await api.get<{ bill_payments: BillPaymentRow[] }>(`/businesses/${businessId}/bill-payments`, { params });
+  return r.data.bill_payments;
+}
+
+export async function getBillPayment(businessId: string, id: string) {
+  const r = await api.get<BillPaymentDetail>(`/businesses/${businessId}/bill-payments/${id}`);
+  return r.data;
+}
+
+export async function createBillPayment(businessId: string, input: BillPaymentInput) {
+  const r = await api.post<{ bill_payment: BillPaymentRow }>(`/businesses/${businessId}/bill-payments`, input);
+  return r.data.bill_payment;
+}
+
+export async function postBillPayment(businessId: string, id: string) {
+  const r = await api.post<BillPaymentRow>(`/businesses/${businessId}/bill-payments/${id}/post`);
+  return r.data;
+}
+
+export async function voidBillPayment(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<BillPaymentRow>(`/businesses/${businessId}/bill-payments/${id}/void`, { void_reason });
+  return r.data;
+}
+
+// --- Credit Memos (AR) — shapes read directly from CreditMemosTable
+// (db/types.ts) and creditMemoService.ts's actual return statements.
+// Two real differences from Payments, both confirmed rather than assumed:
+// (1) no GET /credit-memos/:id detail route exists at all — only list,
+// create, post, apply, void — so there's no getCreditMemo()/CreditMemoDetail
+// here; the detail screen fetches the list and finds by id, same as web's
+// own CreditMemoDetailPage.tsx does. (2) applying to an invoice is always
+// a separate POST .../apply call (invoice_id + applied_amount), never an
+// initial_applications field at creation — credit memos reuse the exact
+// same payment_applications table as Payments (keyed by credit_memo_id
+// instead of payment_id), just through a different endpoint shape.
+
+export type CreditMemoStatus = 'draft' | 'posted' | 'applied' | 'voided';
+export type CreditMemoRow = {
+  id: string; business_id: string; customer_id: string; credit_memo_number: string | null;
+  memo_date: string; status: CreditMemoStatus; amount: string; remaining_amount: string;
+  source_payment_id: string | null; ar_account_id: string; revenue_account_id: string;
+  posted_journal_entry_id: string | null; memo: string | null;
+  posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type CreditMemoInput = {
+  customer_id: string; memo_date: string; amount: string; revenue_account_id: string; memo?: string | null;
+};
+
+export async function listCreditMemos(businessId: string, params: { customer_id?: string } = {}) {
+  const r = await api.get<{ credit_memos: CreditMemoRow[] }>(`/businesses/${businessId}/credit-memos`, { params });
+  return r.data.credit_memos;
+}
+
+export async function createCreditMemo(businessId: string, input: CreditMemoInput) {
+  const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos`, input);
+  return r.data;
+}
+
+export async function postCreditMemo(businessId: string, id: string) {
+  const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos/${id}/post`);
+  return r.data;
+}
+
+export async function applyCreditMemoToInvoice(businessId: string, id: string, body: { invoice_id: string; applied_amount: string }) {
+  await api.post(`/businesses/${businessId}/credit-memos/${id}/apply`, body);
+}
+
+export async function voidCreditMemo(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos/${id}/void`, { void_reason });
+  return r.data;
+}
+
+// --- Vendor Credits (AP) — the vendor-side mirror of Credit Memos above,
+// confirmed field-for-field against VendorCreditsTable / vendorCreditService.ts
+// rather than assumed symmetric. One naming difference worth noting: the
+// AP side's offset account field is generically named `offset_account_id`
+// (not `expense_account_id`), while AR's equivalent is `revenue_account_id`
+// — different names on each side, both read from the real schema, not
+// guessed to match. Same two structural quirks as Credit Memos: no GET
+// detail route (list-and-find, same as credit-memo/[id].tsx), and
+// application is always a separate POST .../apply call reusing the same
+// bill_payment_applications table BillPayments use (keyed by
+// vendor_credit_id instead of bill_payment_id).
+
+export type VendorCreditRow = {
+  id: string; business_id: string; vendor_id: string; vendor_credit_number: string | null;
+  credit_date: string; status: CreditMemoStatus; amount: string; remaining_amount: string;
+  ap_account_id: string; offset_account_id: string;
+  posted_journal_entry_id: string | null; memo: string | null;
+  posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type VendorCreditInput = {
+  vendor_id: string; credit_date: string; amount: string; offset_account_id: string; memo?: string | null;
+};
+
+export async function listVendorCredits(businessId: string, params: { vendor_id?: string } = {}) {
+  const r = await api.get<{ vendor_credits: VendorCreditRow[] }>(`/businesses/${businessId}/vendor-credits`, { params });
+  return r.data.vendor_credits;
+}
+
+export async function createVendorCredit(businessId: string, input: VendorCreditInput) {
+  const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits`, input);
+  return r.data;
+}
+
+export async function postVendorCredit(businessId: string, id: string) {
+  const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits/${id}/post`);
+  return r.data;
+}
+
+export async function applyVendorCreditToBill(businessId: string, id: string, body: { bill_id: string; applied_amount: string }) {
+  await api.post(`/businesses/${businessId}/vendor-credits/${id}/apply`, body);
+}
+
+export async function voidVendorCredit(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits/${id}/void`, { void_reason });
+  return r.data;
+}
+
+// --- Bank Transactions (Banking inbox) — shapes read directly from
+// BankTransactionsTable (db/types.ts) and bankTransactions.ts's route
+// handlers. This is the triage inbox for bank-feed rows BEFORE they
+// become journal entries — confirmed separate from the Cash Flow report
+// (which only reads already-posted journal_entries) and separate from
+// Reconciliation proper (ReconcileWorksheetPage.tsx — ticking cleared
+// transactions against a statement balance), which is NOT built this
+// chunk; this only covers the review/triage actions.
+//
+// Scoped to Categorize/Exclude/Unreview — deliberately NOT building
+// "Match to an existing journal entry" this chunk. Matching needs a
+// picker over existing JEs (search by date/amount, no simple
+// name-based list the way every other picker in this app has), a
+// materially different UI problem than the others, and Categorize (the
+// "Add" case) covers the common path. CSV import is desktop-only,
+// not attempted here either — review-only, same reasoning as every
+// other read-first chunk this session.
+
+export type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
+export type BankTransactionRow = {
+  id: string; business_id: string; bank_account_id: string; transaction_date: string;
+  description: string; amount: string; external_id: string | null;
+  status: BankTransactionStatus; matched_journal_entry_id: string | null;
+  excluded_reason: string | null; is_reconciled: boolean; reconciliation_id: string | null;
+  imported_at: string; reviewed_at: string | null; reviewed_by_user_id: string | null;
+  import_batch_id: string | null;
+};
+
+export async function listBankTransactions(
+  businessId: string,
+  params: { bank_account_id?: string; status?: BankTransactionStatus; is_reconciled?: boolean } = {},
+) {
+  const r = await api.get<{ bank_transactions: BankTransactionRow[] }>(`/businesses/${businessId}/bank-transactions`, { params });
+  return r.data.bank_transactions;
+}
+
+export async function getBankTransaction(businessId: string, id: string) {
+  const r = await api.get<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}`);
+  return r.data;
+}
+
+export type BankTransactionSuggestion = { account_id: string; confidence: number; band: ConfidenceBand; source_layer: CodingLayerId } | null;
+
+export async function getBankTransactionSuggestion(businessId: string, id: string) {
+  const r = await api.get<{ suggestion: BankTransactionSuggestion }>(`/businesses/${businessId}/bank-transactions/${id}/suggestion`);
+  return r.data.suggestion;
+}
+
+export async function categorizeBankTransaction(businessId: string, id: string, body: { offset_account_id: string; memo?: string | null }) {
+  const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/categorize`, body);
+  return r.data;
+}
+
+export async function excludeBankTransaction(businessId: string, id: string, excluded_reason: string) {
+  const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/exclude`, { excluded_reason });
+  return r.data;
+}
+
+export async function unreviewBankTransaction(businessId: string, id: string) {
+  const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/unreview`);
+  return r.data;
+}
+
+// --- Reconciliation — shapes read directly from
+// bankReconciliationWorksheetService.ts's actual return statements and
+// ReconciliationsTable/ReconciliationItemsTable in db/types.ts. Confirmed
+// there are TWO backend systems (an older, apparently web-unused
+// /reconciliations route, and this one, /bank-rec/*, which is what
+// web's Reconcile*Page.tsx components actually call) — built against
+// /bank-rec/* only, not the unused one.
+//
+// Scoped to Start/Resume → Worksheet (tick + save + finish) → History.
+// Deliberately NOT built: Undo (firm_admin-only, rare, can follow later),
+// Cancel (abandoning an in-progress session — same reasoning), and a
+// discrepancy-account picker on Finish (the server already defaults to
+// Opening Balance Equity when none is given, so "accept the difference"
+// needs no extra picker for the common case).
+
+export type ReconcilableCategory =
+  | 'Bank' | 'Credit Card' | 'Other Current Asset' | 'Fixed Asset' | 'Other Asset'
+  | 'Other Current Liability' | 'Long-Term Liability' | 'Equity';
+export type ReconcilableAccount = { id: string; code: string; name: string; category: ReconcilableCategory };
+
+export async function listReconcilableAccounts(businessId: string) {
+  const r = await api.get<{ accounts: ReconcilableAccount[] }>(`/businesses/${businessId}/bank-rec/accounts`);
+  return r.data.accounts;
+}
+
+export async function getReconciliationStatus(businessId: string, accountId: string) {
+  const r = await api.get<{ beginning_balance: string; in_progress_id: string | null }>(
+    `/businesses/${businessId}/bank-rec/status`, { params: { account_id: accountId } },
+  );
+  return r.data;
+}
+
+export type ReconciliationSessionStatus = 'in_progress' | 'completed' | 'cancelled';
+export type ReconciliationRow = {
+  id: string; business_id: string; account_id: string;
+  statement_beginning_balance: string; statement_ending_balance: string; statement_ending_date: string;
+  beginning_balance: string;
+  service_charge_amount: string; service_charge_date: string | null; service_charge_account_id: string | null;
+  interest_earned_amount: string; interest_earned_date: string | null; interest_earned_account_id: string | null;
+  status: ReconciliationSessionStatus; difference: string; adjustment_journal_entry_id: string | null;
+  completed_at: string | null; completed_by_user_id: string | null;
+  created_by_user_id: string | null; created_at: string; updated_at: string;
+};
+
+export type ReconciliationStartInput = {
+  account_id: string; statement_ending_balance: string; statement_ending_date: string;
+  service_charge_amount?: string | null; service_charge_date?: string | null; service_charge_account_id?: string | null;
+  interest_earned_amount?: string | null; interest_earned_date?: string | null; interest_earned_account_id?: string | null;
+};
+
+export async function startReconciliation(businessId: string, input: ReconciliationStartInput) {
+  const r = await api.post<ReconciliationRow>(`/businesses/${businessId}/bank-rec/start`, input);
+  return r.data;
+}
+
+export type ReconciliationItemType = 'deposit' | 'expense' | 'check' | 'journal_entry' | 'service_charge' | 'interest';
+export type WorksheetItem = {
+  transaction_type: ReconciliationItemType; transaction_id: string; transaction_date: string;
+  type_label: string; ref_no: string | null; name: string | null; description: string | null;
+  amount: string; is_cleared: boolean; auto_matched: boolean; transaction_path: string;
+};
+export type ReconciliationSummary = {
+  statement_beginning_balance: string; statement_ending_balance: string; cleared_balance: string;
+  difference: string; cleared_count: number; total_count: number; auto_matched_count: number;
+};
+export type Worksheet = {
+  reconciliation: ReconciliationRow; account: CoaAccount; category: ReconcilableCategory;
+  items: WorksheetItem[]; summary: ReconciliationSummary;
+};
+
+export async function getWorksheet(businessId: string, id: string) {
+  const r = await api.get<Worksheet>(`/businesses/${businessId}/bank-rec/${id}/worksheet`);
+  return r.data;
+}
+
+export async function saveReconciliationProgress(
+  businessId: string, id: string,
+  items: Array<{ transaction_type: ReconciliationItemType; transaction_id: string; is_cleared: boolean }>,
+) {
+  const r = await api.patch<{ reconciliation: ReconciliationRow; summary: ReconciliationSummary }>(
+    `/businesses/${businessId}/bank-rec/${id}/items`, { items },
+  );
+  return r.data;
+}
+
+export async function finishReconciliation(businessId: string, id: string, accept_difference?: boolean) {
+  const r = await api.post<ReconciliationRow>(`/businesses/${businessId}/bank-rec/${id}/finish`, { accept_difference });
+  return r.data;
+}
+
+export type ReconciliationHistoryRow = ReconciliationRow & {
+  account_code: string; account_name: string;
+  account_type: string; detail_type: string | null;
+  category: ReconcilableCategory; items_cleared: number; changes: number;
+  auto_adjustment: string | null; completed_by: string | null;
+};
+
+export async function listReconciliationHistory(businessId: string, params: { account_id?: string } = {}) {
+  const r = await api.get<{ reconciliations: ReconciliationHistoryRow[] }>(`/businesses/${businessId}/bank-rec/history`, { params });
+  return r.data.reconciliations;
 }

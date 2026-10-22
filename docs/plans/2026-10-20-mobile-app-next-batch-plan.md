@@ -888,3 +888,481 @@ account, register) hit directly against the real dev API — response
 shapes matched the hand-written types field-for-field, including the
 register's running-`balance` and `counter_account` fields on a real
 account with transaction history (18 rows on the Sales revenue account).
+
+### Redesign chunk 13 (2026-10-21) — Journal Entries list — done
+
+Second screen out of the drawer's remaining disabled groups (after Chart
+of Accounts). Journal entry *detail* viewing already worked
+(`app/transaction/[id].tsx?type=journal`, built in an earlier chunk) —
+the gap was a list to browse into it from, since the drawer's Accounting
+> Journal item had no path.
+
+Checked web first before building anything: **web has no standalone
+journal-entries list page at all** — `apps/web/src/App.tsx` registers
+only `/journal/new` and `/journal/:id`; the closest thing is
+`RecentJournalEntries.tsx`, a 10-row popover off `GET /journal-entries`
+(confirmed by reading it directly, not guessed) that users reach from a
+header icon. So there was no established "browse all journal entries"
+pattern to mirror — flagged that explicitly rather than inventing a
+filterable list screen beyond what the API/web pattern actually supports.
+Scoped the mobile screen to match what the popover already does (status
+filter + a flat list, same endpoint, same fields) adapted into a real
+screen instead of a 10-row dropdown — not a net-new feature, just web's
+existing "recent entries" concept given room to be a full screen the way
+mobile's screen real estate calls for.
+
+- `services/api.ts`: added `JeLine`/`JournalEntryListItem` types +
+  `listJournalEntries()` hitting the same `GET /journal-entries` route
+  `RecentJournalEntries.tsx` uses, with a generous `limit: 100` (no
+  incremental/infinite-scroll pagination — no other mobile list screen in
+  this app has that pattern yet, so a single generous fetch per filter
+  change matches the established convention instead of introducing a new
+  one).
+- **`app/journal-entries.tsx`**: status filter chips (All/Posted/Draft/
+  Voided, reusing `AppChip`/`StatusBadge` exactly as every other list
+  screen does), each row showing journal number, date, memo, total
+  (summed from the entry's own debit lines), and a status badge; tapping
+  a row opens the existing journal detail view.
+- Wired into the drawer's Accounting > Journal item and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors. **Not verified against the live dev API this
+chunk** — the local dev server (`localhost:4000`) wasn't running when
+this was built, unlike every prior report/CoA chunk. The response shape
+was read directly from `journalEntryQueryService.ts`'s `listJournalEntries`
+and `apps/web/src/pages/journal/journalEntryTypes.ts`'s
+`JournalEntryRecord`/`JournalEntryLine` (not guessed), and the exact same
+fields are already proven correct by the long-working `getJournalEntry`
+detail call on the same `journal-entries` resource — but this one line
+item type is unconfirmed against a real response. Worth a live check the
+next time the dev server is up before fully trusting this screen.
+
+### Dev environment fix (2026-10-22) — login was broken, unrelated to mobile
+
+User reported login failing with "Something went wrong" plus debugger
+errors. Root cause was two stale-local-environment issues, neither caused
+by mobile work:
+1. `packages/shared`'s compiled `dist/` predated the `passwords.ts` file
+   a recent upstream merge (the sign-in-security feature) added, so the
+   API crashed on boot with a missing-export error (`passwordProblem`).
+2. That same merge's migration (`db/migrations/0109_sign_in_security.sql`)
+   hadn't been applied locally, so even after fixing the boot crash,
+   login hit a Postgres "missing column" error (42703).
+
+Fixed by rebuilding `packages/shared` (`npm run build -w @accounting/shared`)
+and running `npm run db:migrate` (applied `0108_estimates.sql` and
+`0109_sign_in_security.sql`). Confirmed via a direct `curl` login that
+returned a valid token. Noting this here since it explains why the prior
+chunk (Journal Entries) couldn't be verified live — the dev server was
+down for that exact reason, now resolved and retroactively verified below.
+
+### Redesign chunk 14 (2026-10-22) — AR Aging / AP Aging reports — done
+
+Completes the Reports group alongside the other four financial reports.
+Both routes (`GET /reports/aging`, `GET /reports/ap-aging`) share one
+`AgingRow` shape from `agingBuckets.ts` — confirmed `packages/shared`'s
+`agingRowSchema` is stale (wrong field names: `customer_id`/`over_30`
+etc. instead of the real `id`/`days_1_30` etc.) and unused by either
+route, so typed from the service code directly, same as every other
+report so far.
+
+- Web's `AgingReportPage.tsx` renders one wide 7-column table (shared
+  for AR/AP via a `kind` prop) — doesn't fit phone width as a table, so
+  new shared `components/AgingReportView.tsx` adapts it to a card per
+  party (name + total, matching every other list row in this app) with
+  the 5 aging buckets as a small grid underneath, only showing non-zero
+  buckets (same "blank when zero" convention web uses) — same data and
+  bucket boundaries (current/1-30/31-60/61-90/91+, aged off days past
+  due date), different layout for the screen size.
+- Two thin screens, `app/ar-aging.tsx`/`app/ap-aging.tsx`, both just
+  wiring `AgingReportView` to `getArAging`/`getApAging` — the one
+  component that isn't near-duplicated across two files, unlike the
+  other reports which don't share enough to be worth factoring out.
+- `services/api.ts`: added `AgingRow`/`AgingReport` types +
+  `getArAging()`/`getApAging()`.
+- Wired into the drawer's AR > Aging and AP > Aging items (previously
+  both disabled) and the More tab.
+- `lib/roleAccess.ts`'s `CLIENT_PAGES` extended with `/ar-aging` and
+  `/ap-aging` — both are in web's own `CLIENT_PAGES` list for the same
+  reason as the other reports.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, both endpoints hit against the real dev API
+(now that the login fix above got it running again) — response wrapper
+shape (`as_of`/`rows`) matched for both, but this demo business had no
+overdue AR/AP balances, so `rows` came back empty and the per-row field
+names (`days_1_30` etc.) are confirmed from the service source, not from
+a populated live response. Also used this chunk to retroactively confirm
+the prior chunk's Journal Entries list against live data — response
+matched the hand-written `JournalEntryListItem`/`JeLine` types exactly.
+
+### Redesign chunk 15 (2026-10-22) — Record Payment (AR write path) — done
+
+First write-path feature built out of the AR/AP groups (everything
+before this chunk was reports/lists). Read the route, service, and zod
+schema directly before building anything — `paymentDraftCreateSchema` in
+`packages/shared/src/schemas/payment.ts` is accurate (unlike the stale
+aging/trial-balance schemas), so client-side validation mirrors it
+exactly (money regex, uuid fields, 200/500-char limits).
+
+- **Scope deliberately bounded**: create-and-post in one step (mirroring
+  web's `useSaveAndPost`) plus void — no per-invoice add/remove-
+  application-after-creation UI, even though `POST .../applications` and
+  `DELETE .../applications/:appId` exist server-side. Editing an existing
+  payment's allocations isn't a mobile feature yet; the normal "record a
+  payment, apply it to invoices, post it" case is fully covered via
+  `initial_applications` at creation.
+- **`app/payments.tsx`**: status filter chips + list (same pattern as
+  every other list screen), a "Record payment" button gated by
+  `useCanOpen('/payment/new')` so a viewer/client login doesn't see it.
+- **`app/payment/new.tsx`**: customer picker, date, reference, payment
+  method, deposit-to account (reusing `statementBankAccounts` — the same
+  bank-account filter Expense/Deposit already use, not a new one),
+  outstanding-invoices checklist for the picked customer (checking an
+  invoice auto-fills its full `amount_due`, editable after — same UX as
+  web's allocation table), an optional "amount received" override that
+  defaults to the applied sum, an unapplied-amount readout. Open invoices
+  are fetched the same N+1 way web does (list posted invoices, then fetch
+  each detail for `amount_due`, filtered to balance > 0) since the list
+  endpoint doesn't carry a balance — not inventing a batch-balance
+  endpoint for this.
+- **`app/payment/[id].tsx`**: balance/status card, applications list
+  (invoice number + applied amount), a Void button gated to `accountant`+
+  AND `applications.length === 0` client-side (mirrors the server's own
+  hard guard — `PaymentHasApplicationsError` otherwise) using
+  `Alert.prompt` for the required void reason (iOS-only API, consistent
+  with this app's iOS-first scope so far).
+- `services/api.ts`: added `PaymentRow`/`PaymentApplication`/
+  `PaymentDetail`/`PaymentInput` types + `listPayments`/`getPayment`/
+  `createPayment`/`postPayment`/`voidPayment`, all shapes read directly
+  from `paymentService.ts`'s actual return statements and
+  `PaymentsTable`/`PaymentApplicationsTable` in `db/types.ts`.
+- Wired into the drawer's AR > Payments item, the Create tab (alongside
+  Expense/Deposit), and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /payments` hit live and confirmed the
+`{ payments: [] }` wrapper shape. **Could not exercise the full create→
+post→void round trip live** — this demo business (`mobile-demo@example.com`)
+has zero customers, so there's nothing to record a payment against. The
+request/response shapes are taken directly from the route handlers'
+actual `res.json(...)` calls and the zod schema (not guessed), but this
+is the first write-path chunk without an end-to-end live exercise — worth
+testing for real once there's a customer with an open invoice to pay.
+
+### Redesign chunk 16 (2026-10-22) — Bills (AP, read-only) — done
+
+Mirrors `invoices.tsx`/`app/invoice/[id].tsx` field-for-field for the AP
+side — same filter chips (All/Open/Overdue/Paid), same vendor-name-join
+pattern (via the already-existing `listVendors`, same as invoices.tsx
+joins `listCustomers`), same amount-due header treatment. Read-only this
+chunk, same reasoning as Chart of Accounts: create/post require
+`staff`/`accountant` and aren't needed for a first browse-and-view screen.
+
+- Caught my own mistake before shipping: initially guessed the bill
+  line-item fields as `unit_cost`/`line_total` (copying invoice line
+  naming by assumption) — checked `BillLinesTable` in `db/types.ts`
+  directly and the real columns are `unit_price`/`line_subtotal`, fixed
+  before any typecheck. A reminder to read the actual table definition
+  for every new entity rather than pattern-matching off a sibling type,
+  even when the sibling is extremely similar.
+- `services/api.ts`: added `BillRow`/`BillLine`/`BillDetail` local types
+  (no shared zod schema exists for bill reads either — only
+  `billDraftCreateSchema` etc. for the write side, same non-issue as
+  invoices) + `listBills()`/`getBill()`. Noted the list endpoint's
+  computed balance field is named `open_balance` while the detail
+  endpoint's is `amount_due` — different names for the same idea,
+  confirmed by reading both route handlers rather than assumed to match.
+- **`app/bills.tsx`**: list screen, exact invoices.tsx pattern.
+- **`app/bill/[id].tsx`**: detail screen — built against the newer
+  `AppHeader`/`AppCard` primitives (unlike `app/invoice/[id].tsx`, which
+  predates the redesign and still uses Paper's `Appbar`/`Card` directly);
+  did not retrofit the older invoice detail screen in this chunk since
+  that wasn't asked.
+- `lib/roleAccess.ts`: added the same client-role carve-out invoices has
+  (`/bills` and `/bill/:id` open to a client login, `/bill/new` still
+  blocked) — mirrors web's `canOpenPage`, which special-cases
+  `/ap/bills`/`/ap/bills/:id` the same way for a client viewing their own
+  bills.
+- Wired into the drawer's AP > Bills item and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /bills` hit live and confirmed the
+`{ bills: [] }` wrapper shape. This demo business has 43 vendors but zero
+bills (expenses were entered directly instead, a common QBO-style
+pattern), so the per-row and per-line field names are confirmed from
+`db/types.ts` directly rather than a populated live response — worth a
+real check once this business (or another) has an actual bill.
+
+### Redesign chunk 17 (2026-10-22) — Bill Payments (AP write path) — done
+
+Vendor-side mirror of chunk 15's Record Payment, now that Bills exist to
+pay (chunk 16). Confirmed the field-name mapping before writing any code
+rather than assuming the AR shapes carry over 1:1: `vendor_id`/`bill_id`
+replace `customer_id`/`invoice_id`, but `applied_amount`/
+`unapplied_amount` are the exact same column names on both sides — a
+real difference and a real match, checked against
+`BillPaymentsTable`/`BillPaymentApplicationsTable` in `db/types.ts`
+rather than guessed either way.
+
+- **Scope note worth flagging**: web actually has *two* AP payment UIs —
+  a single-vendor `BillPaymentNewPage.tsx` (the true 1:1 analog of
+  `PaymentNewPage.tsx`, which is what this chunk mirrors) and a separate
+  QuickBooks-style multi-vendor "Pay Bills" batch grid
+  (`PayBillsPage.tsx`, one table of every unpaid bill across *all*
+  vendors, posting one payment per vendor via a batch endpoint). Mobile
+  only mirrors the single-vendor flow — the batch grid is a materially
+  bigger, different UX that wasn't asked for and would need its own
+  design pass, not a quick extension of this chunk.
+- `services/api.ts`: added `BillPaymentRow`/`BillPaymentApplication`/
+  `BillPaymentDetail`/`BillPaymentInput` types + `listBillPayments`/
+  `getBillPayment`/`createBillPayment`/`postBillPayment`/
+  `voidBillPayment`, reusing the existing `PaymentMethod`/`PaymentStatus`
+  enums since both sides use identical values.
+- **`app/bill-payment/new.tsx`**: vendor picker, date, reference, method,
+  payment account, outstanding-bills checklist, optional amount
+  override — same structure as `app/payment/new.tsx`, but simpler in one
+  way: `listBills` already returns `open_balance` per row, so no N+1
+  per-bill detail fetch was needed (unlike invoices, where `listInvoices`
+  doesn't carry a balance).
+- **`app/bill-payment/[id].tsx`**: same Void guard as the AR side (zero
+  applications required, mirroring the server's `BillPaymentHasApplicationsError`)
+  and the same `Alert.prompt` void-reason flow.
+- **`app/bill-payments.tsx`**: list screen, exact `payments.tsx` pattern.
+- Wired into the drawer's AP > Pay Bills / Bill Payments items, the
+  Create tab, and the More tab. No `lib/roleAccess.ts` change needed —
+  `/bill-payment/new` is already blocked for viewer/client by the
+  existing `/new` regex and the client default-deny.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /bill-payments` hit live and confirmed
+the `{ bill_payments: [] }` wrapper shape. Same data limitation as
+chunks 15/16 — this demo business has no bills, so the full create→
+post→void round trip and the per-row field names in a populated response
+are still unverified live; the shapes come from `db/types.ts` and the
+route handlers' actual `res.json(...)` calls, not guessed.
+
+### Redesign chunk 18 (2026-10-22) — Credit Memos (AR) — done
+
+Rounds out the AR side. Two real structural differences from Payments,
+both confirmed against the actual route/service/table code before
+writing anything (not assumed to follow the same shape as Payments just
+because it's a sibling AR entity):
+
+- **No `GET /credit-memos/:id` detail route exists at all** — only list/
+  create/post/apply/void. Web's own `CreditMemoDetailPage.tsx` fetches
+  the whole list and finds the row client-side; mobile's
+  `app/credit-memo/[id].tsx` does the exact same thing rather than
+  inventing a detail endpoint that isn't there.
+- **Applying to an invoice is always a separate `POST .../apply` call**
+  (`{invoice_id, applied_amount}`), never an `initial_applications` field
+  at creation the way Payments has — confirmed credit memos reuse the
+  *same* `payment_applications` table as Payments (keyed by
+  `credit_memo_id` instead of `payment_id`), just through a different
+  endpoint shape. The detail screen's "Apply to an invoice" section
+  (single invoice picker + amount, pre-filled to `min(invoice balance,
+  credit memo remaining)`) is a deliberate separate step after posting,
+  matching web exactly rather than trying to fold it into creation.
+- **Role gap caught and fixed before shipping**: credit memo creation
+  requires `accountant`, stricter than every other AR/AP write built so
+  far (`staff`). The generic `useCanOpen('/credit-memo/new')` check only
+  knows the viewer/client rules, so a staff login would have seen the
+  "+ New credit memo" button and the Create-tab entry, then hit a 403 on
+  save. Fixed by gating both directly with `hasMinRole(effectiveRole,
+  'accountant')`, same pattern already used for Void buttons elsewhere.
+- `services/api.ts`: added `CreditMemoRow`/`CreditMemoInput` types +
+  `listCreditMemos`/`createCreditMemo`/`postCreditMemo`/
+  `applyCreditMemoToInvoice`/`voidCreditMemo` (no `getCreditMemo` — see
+  above). Local `CM_BADGE` status-color map in both the list and detail
+  screens, same reasoning as invoices.tsx's `INVOICE_BADGE`: "posted"
+  here means an active unspent credit (blue/open), not a settled state —
+  "applied" (fully used up) gets the green/settled treatment instead.
+- Wired into the drawer's AR > Credit Memos item, the Create tab (gated
+  to accountant+), and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /credit-memos` hit live and confirmed
+the `{ credit_memos: [] }` wrapper shape. Same data gap as the last three
+chunks (no customers on this demo business at all, so credit memos are
+moot) — full create→post→apply→void flow unverified live.
+
+### Redesign chunk 19 (2026-10-22) — Vendor Credits (AP) — done
+
+Vendor-side mirror of chunk 18's Credit Memos, now fully rounding out
+AP alongside AR. Verified the field mapping directly against
+`VendorCreditsTable`/`vendorCreditService.ts`/`vendorCredits.ts` before
+writing code rather than assuming 1:1 symmetry — one real naming
+difference found: the AP side's offset field is generically named
+`offset_account_id` (not `expense_account_id`), while AR's equivalent is
+`revenue_account_id`. Everything else matches the Credit Memo pattern
+exactly: no `GET /vendor-credits/:id` route (list-and-find, same as
+`credit-memo/[id].tsx`), application is a separate `POST .../apply` call
+reusing `bill_payment_applications` (keyed by `vendor_credit_id` instead
+of `bill_payment_id`, confirmed by reading the table directly), and the
+same "zero active applications" void guard.
+
+- `services/api.ts`: added `VendorCreditRow`/`VendorCreditInput` types +
+  `listVendorCredits`/`createVendorCredit`/`postVendorCredit`/
+  `applyVendorCreditToBill`/`voidVendorCredit`.
+- **`app/vendor-credits.tsx`**, **`app/vendor-credit/new.tsx`**,
+  **`app/vendor-credit/[id].tsx`**: structural mirrors of the three
+  credit-memo screens, with the open-bills picker on the apply form
+  reusing `listBills`'s embedded `open_balance` (no N+1 fetch needed,
+  same simplification Bill Payments already got over Payments).
+- Also fixed the same role gap preemptively this time instead of after
+  the fact: vendor credit creation is `accountant`-gated both on the
+  list screen's "+ New" button and the Create tab (shared boolean with
+  Credit Memo, renamed `canCreateAtAccountantLevel` for clarity now that
+  it gates two items).
+- Wired into the drawer's AP > Vendor Credits item, the Create tab, and
+  the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /vendor-credits` hit live and
+confirmed the `{ vendor_credits: [] }` wrapper shape. Same data gap as
+the prior four write-path chunks — this demo business has no vendors
+with open bills, so the full create→post→apply→void flow is still
+unverified live across all of Payments/Bill Payments/Credit Memos/
+Vendor Credits. Recommended to the user that this whole family of
+screens gets a real test pass once real AR/AP data exists, before
+building anything further on top.
+
+### Redesign chunk 20 (2026-10-22) — Bank Transactions review inbox — done
+
+First piece of the Banking area, researched before anything was built to
+settle a scope question up front: is "Bank Transactions review" the same
+feature as Reconciliation? Confirmed **no** — `bank_transactions` is a
+staging/triage table for bank-feed rows before they become journal
+entries; Reconciliation (`ReconcileWorksheetPage.tsx`) is a separate
+workflow that ticks already-coded transactions against a statement
+balance, and only *consumes* `is_reconciled` on rows this inbox produces.
+Scoped this chunk to the triage inbox only — Reconciliation stays
+unbuilt, a distinct future chunk.
+
+- **Deliberately not built this chunk**: "Match to an existing journal
+  entry" (needs a date/amount-search picker over JEs, a materially
+  different UI problem than every name-based picker in this app) and CSV
+  import (desktop-only). Categorize (the QBO "Add" case) and Exclude
+  cover the common review path; Unreview (accountant+, blocked once
+  `is_reconciled`) undoes either.
+- `services/api.ts`: added `BankTransactionRow`/`BankTransactionStatus`/
+  `BankTransactionSuggestion` types + `listBankTransactions`/
+  `getBankTransaction`/`getBankTransactionSuggestion`/
+  `categorizeBankTransaction`/`excludeBankTransaction`/
+  `unreviewBankTransaction`, all read directly from
+  `BankTransactionsTable` and the route handlers' actual `res.json(...)`
+  calls (the shared `bankTransaction.ts` zod schema checked out as
+  accurate, unlike several stale ones found earlier this session).
+- **`app/bank-transactions.tsx`**: one-bank-account-at-a-time (same as
+  web's per-account card selector — a transaction's running context only
+  makes sense within one account), status filter chips (For review/
+  Categorized/Matched/Excluded).
+- **`app/bank-transaction/[id].tsx`**: reuses the existing
+  `ConfidenceBadge` component built for the AI document inbox (same
+  `{confidence, band, source_layer}` shape the auto-coding engine
+  returns everywhere) to show the AI's suggested category with a
+  one-tap "Use X" shortcut, plus the Categorize form (account picker +
+  memo) and a separate Exclude form (reason required) when
+  `status === 'unreviewed'`; otherwise shows the outcome and an Unreview
+  button gated to accountant+.
+- Wired into the drawer's Accounting > Bank Transactions item and the
+  More tab.
+
+**Verified**: `tsc --noEmit` clean (one real type error caught and fixed
+— `AppButton`'s `children` prop is typed `string`, not `string[]`, so a
+JSX-interpolated multi-part label needed a single template literal
+instead), a fresh `expo export --platform ios` bundle built with no
+errors, `GET /bank-transactions` hit live (both bank accounts, no status
+filter, every combination) and confirmed the `{ bank_transactions: [] }`
+wrapper shape — but this demo business has genuinely zero bank
+transactions ever imported, so none of the per-row fields or the
+Categorize/Exclude/Unreview actions have been exercised against real
+data. Continuing the pattern flagged in the last several chunks: this is
+now six write/action-capable screens in a row without a live round trip.
+
+### Redesign chunk 21 (2026-10-22) — Reconciliation (Start/Worksheet/History) — done
+
+The last big distinct feature area from the original scope. Read the
+route file and service code directly end-to-end before writing anything,
+which immediately surfaced something worth flagging: **two separate
+backend systems exist** — an older `/reconciliations` route
+(`reconciliationService.ts`) that appears unused by web at all, and the
+real one, `/bank-rec/*` (`bankReconciliationWorksheetService.ts`), which
+is what every `Reconcile*Page.tsx` on web actually calls. Built against
+`/bank-rec/*` only; the older route was left untouched.
+
+- **Scoped to Start/Resume → tick/save → Finish, plus a flat History
+  list.** Deliberately not built: Undo (`firm_admin`-only, rare — "I
+  finished a reconciliation by mistake" is not a common mobile moment),
+  Cancel wired into the UI (exists server-side, used only for this
+  chunk's own live-API cleanup, see below), and a discrepancy-account
+  picker on Finish (the server already defaults to Opening Balance
+  Equity when `accept_difference: true` is sent with no account —
+  covers the common case without an extra picker).
+- **Beginning balance is never user-entered** — confirmed the server
+  always computes it from the prior completed reconciliation's ending
+  balance (0.00 if none), so the Start form only asks for the statement
+  ending balance and date, matching the real constraint rather than
+  adding a field the API would ignore.
+- **Clearing is kept client-local** (a `Record<string, boolean>` built
+  from the worksheet's `items[].is_cleared` on load), recomputing the
+  running summary (cleared balance, difference, checked count) in JS on
+  every tap rather than a network round trip per toggle — same approach
+  web's own worksheet takes. An explicit Save button sends the full
+  current state in one `PATCH .../items` call (the endpoint's own
+  contract: idempotent upsert keyed on `transaction_type`+
+  `transaction_id`), and Finish auto-saves once more right before
+  calling finish, so a forgotten Save tap can't lose ticks.
+- **Finish handles the non-zero-difference case explicitly**: confirmed
+  the server does *not* require an exact match — a nonzero difference
+  without `accept_difference: true` throws a precondition error naming
+  the amount, so the mobile Finish button checks the local difference
+  first and, if nonzero, shows an alert ("$X difference... Finish
+  anyway posts an adjusting entry") before calling finish with
+  `accept_difference: true`.
+- `services/api.ts`: added `ReconcilableAccount`/`ReconciliationRow`/
+  `WorksheetItem`/`ReconciliationSummary`/`Worksheet`/
+  `ReconciliationHistoryRow` types + `listReconcilableAccounts`/
+  `getReconciliationStatus`/`startReconciliation`/`getWorksheet`/
+  `saveReconciliationProgress`/`finishReconciliation`/
+  `listReconciliationHistory` — the worksheet's `account` field reuses
+  the existing `CoaAccount` type from the Chart of Accounts chunk rather
+  than redeclaring it, since `resolveAccount`'s `selectAll()` returns
+  the exact same `chart_of_accounts` row shape.
+- **`app/reconcile.tsx`**: account picker (any reconcilable asset/
+  liability/equity account, not just registered bank accounts) +
+  beginning-balance display + Resume/Start.
+- **`app/reconcile/start.tsx`**: ending balance + date only (service
+  charge/interest fields exist server-side but were left off the mobile
+  form — skippable, and keeps the form short for the common case).
+- **`app/reconcile/[id].tsx`**: the worksheet itself — summary card,
+  Deposits/Payments filter chips, tap-to-tick rows (no separate detail
+  navigation — ticking *is* the primary interaction, matching every real
+  reconciliation tool), Save/Finish footer.
+- **`app/reconcile-history.tsx`**: flat list across every account (no
+  expandable QBO-style report view — that's a `getReconciliationDetail`
+  call not wired up this chunk).
+- Retired the long-standing "Reconciliation" disabled stub in the More
+  tab (present since the earliest redesign chunks) now that it's real —
+  the `STUB_ITEMS` array it was the last entry in is now gone entirely.
+- Wired into the drawer's Accounting > Reconcile item and the More tab.
+
+**Verified** — by far the most thorough live check this session, because
+this account (1120 — Cash in Bank) actually has real transaction
+history, unlike every AR/AP/bank-transactions chunk before it: `tsc
+--noEmit` clean, a fresh `expo export --platform ios` bundle built with
+no errors, and then a full live round trip via direct API calls (not
+through the unfinished mobile UI, to keep it safely reversible) —
+`listReconcilableAccounts` (59 real accounts), `getReconciliationStatus`,
+`startReconciliation` (confirmed every `ReconciliationRow` field),
+`getWorksheet` (64 real items, confirmed `WorksheetItem` and `summary`
+field-for-field, confirmed the `account` sub-object matches `CoaAccount`
+exactly), `saveReconciliationProgress` (ticked one real item, confirmed
+the returned `{reconciliation, summary}` and the recomputed difference
+math), then `cancel` to discard the test session cleanly — confirmed via
+a final `getReconciliationStatus` call that `in_progress_id` went back
+to `null`, leaving no trace. Deliberately did **not** call `finish` live,
+since that would have permanently marked a real transaction reconciled
+and posted a real adjustment journal entry — tested everything finish
+depends on (save, the difference calculation) short of the one
+irreversible step.
