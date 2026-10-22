@@ -89,6 +89,12 @@ export default function MoreScreen() {
         titleStyle={{ color: theme.app.foreground }}
       />
       <List.Item
+        title="Customer Statement"
+        onPress={() => router.push('/customer-statement')}
+        left={props => <List.Icon {...props} icon="file-account-outline" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
+      <List.Item
         title="Bills"
         onPress={() => router.push('/bills')}
         left={props => <List.Icon {...props} icon="file-document-outline" color={theme.app.foreground} />}

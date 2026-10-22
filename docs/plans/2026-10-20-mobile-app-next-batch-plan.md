@@ -1597,3 +1597,34 @@ rather than a redundant new build.
 bundle built with no errors, all three endpoints hit live and confirmed
 wrapper shapes — empty data for all three (no bills, no 1099 vendors on
 this demo business), consistent with every AR/AP chunk's data gap.
+
+### Redesign chunk 27 (2026-10-22) — Customer Statement — done
+
+Closes out the AR group entirely. A date-range (not point-in-time)
+statement for one customer — `customer_id` is a required query param,
+confirmed there's no bulk/all-customers variant by reading the route
+directly, so this is always a one-customer-at-a-time lookup, same as
+web's own `CustomerStatementPage.tsx`.
+
+- Single screen (not a reusable wrapper like Aging's `AgingReportView` —
+  there's only one party type here, no AR/AP duality to share code
+  between): customer picker, From/To date range (defaulting to fiscal-
+  year-to-date via the existing `fiscalYearRange` helper), "Balance
+  forward" opening row, one row per invoice/payment/credit-memo line
+  with a running balance, "Amount due as of {date}" closing row. View-
+  only — web's Export-to-Excel/Print buttons aren't built on mobile.
+- `services/api.ts`: added `StatementLine`/`CustomerStatement` types +
+  `getCustomerStatement()`.
+- Added `/customer-statement` to `lib/roleAccess.ts`'s `CLIENT_PAGES` —
+  it's in web's own client allow-list (a client can see their own
+  statement), matching the other reports already extended the same way.
+- Wired into the drawer's AR > Statements item and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors. Couldn't do a full live shape check (no
+customers exist on this demo business, the same gap that's blocked
+every AR/AP chunk), but confirmed the route itself is reachable and
+correctly wired — a bogus `customer_id` reached the service layer and
+came back with a proper semantic 404 (`"customer not found: ..."`), not
+a routing failure, so the endpoint path and query-param parsing are
+confirmed even though the response body's field shape isn't.

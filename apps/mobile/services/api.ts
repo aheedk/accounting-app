@@ -1136,3 +1136,25 @@ export async function getTenNinetyNineReport(businessId: string, year: number) {
   const r = await api.get<{ year: number; rows: TenNinetyNineRow[] }>(`/businesses/${businessId}/reports/1099`, { params: { year } });
   return r.data;
 }
+
+// --- Customer Statement — shape read directly from
+// customerStatementService.ts. Per-customer only (customer_id is a
+// required query param) — no bulk/all-customers variant exists, confirmed
+// by reading the route rather than assumed. Lines before period_start are
+// already folded into opening_balance server-side, not returned
+// individually.
+
+export type StatementLine = {
+  date: string; type: 'invoice' | 'payment' | 'credit_memo'; number: string | null;
+  charge: string; credit: string; balance: string;
+};
+export type CustomerStatement = {
+  customer: { id: string; name: string };
+  period_start: string; period_end: string;
+  opening_balance: string; lines: StatementLine[]; closing_balance: string;
+};
+
+export async function getCustomerStatement(businessId: string, params: { customer_id: string; period_start: string; period_end: string }) {
+  const r = await api.get<CustomerStatement>(`/businesses/${businessId}/reports/customer-statement`, { params });
+  return r.data;
+}
