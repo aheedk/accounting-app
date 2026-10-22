@@ -888,3 +888,51 @@ account, register) hit directly against the real dev API — response
 shapes matched the hand-written types field-for-field, including the
 register's running-`balance` and `counter_account` fields on a real
 account with transaction history (18 rows on the Sales revenue account).
+
+### Redesign chunk 13 (2026-10-21) — Journal Entries list — done
+
+Second screen out of the drawer's remaining disabled groups (after Chart
+of Accounts). Journal entry *detail* viewing already worked
+(`app/transaction/[id].tsx?type=journal`, built in an earlier chunk) —
+the gap was a list to browse into it from, since the drawer's Accounting
+> Journal item had no path.
+
+Checked web first before building anything: **web has no standalone
+journal-entries list page at all** — `apps/web/src/App.tsx` registers
+only `/journal/new` and `/journal/:id`; the closest thing is
+`RecentJournalEntries.tsx`, a 10-row popover off `GET /journal-entries`
+(confirmed by reading it directly, not guessed) that users reach from a
+header icon. So there was no established "browse all journal entries"
+pattern to mirror — flagged that explicitly rather than inventing a
+filterable list screen beyond what the API/web pattern actually supports.
+Scoped the mobile screen to match what the popover already does (status
+filter + a flat list, same endpoint, same fields) adapted into a real
+screen instead of a 10-row dropdown — not a net-new feature, just web's
+existing "recent entries" concept given room to be a full screen the way
+mobile's screen real estate calls for.
+
+- `services/api.ts`: added `JeLine`/`JournalEntryListItem` types +
+  `listJournalEntries()` hitting the same `GET /journal-entries` route
+  `RecentJournalEntries.tsx` uses, with a generous `limit: 100` (no
+  incremental/infinite-scroll pagination — no other mobile list screen in
+  this app has that pattern yet, so a single generous fetch per filter
+  change matches the established convention instead of introducing a new
+  one).
+- **`app/journal-entries.tsx`**: status filter chips (All/Posted/Draft/
+  Voided, reusing `AppChip`/`StatusBadge` exactly as every other list
+  screen does), each row showing journal number, date, memo, total
+  (summed from the entry's own debit lines), and a status badge; tapping
+  a row opens the existing journal detail view.
+- Wired into the drawer's Accounting > Journal item and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors. **Not verified against the live dev API this
+chunk** — the local dev server (`localhost:4000`) wasn't running when
+this was built, unlike every prior report/CoA chunk. The response shape
+was read directly from `journalEntryQueryService.ts`'s `listJournalEntries`
+and `apps/web/src/pages/journal/journalEntryTypes.ts`'s
+`JournalEntryRecord`/`JournalEntryLine` (not guessed), and the exact same
+fields are already proven correct by the long-working `getJournalEntry`
+detail call on the same `journal-entries` resource — but this one line
+item type is unconfirmed against a real response. Worth a live check the
+next time the dev server is up before fully trusting this screen.

@@ -368,6 +368,31 @@ export async function getJournalEntry(businessId: string, id: string) {
   return r.data;
 }
 
+// Journal entries list — the same GET /journal-entries route web's
+// RecentJournalEntries.tsx uses for its "last 10" popover (confirmed by
+// reading it; web has no standalone list PAGE, only that popover). Mobile
+// adapts it into a real screen rather than inventing a pattern web doesn't
+// have — same fields, same endpoint, just a status filter + a full list
+// instead of a 10-row dropdown.
+export type JeLine = {
+  id: string; account_id: string; account_code: string; account_name: string;
+  debit: string; credit: string; memo: string | null;
+};
+export type JournalEntryListItem = {
+  id: string; entry_date: string; journal_number: string | null; memo: string | null;
+  reference: string | null; status: 'draft' | 'posted' | 'voided'; lines: JeLine[];
+};
+
+export async function listJournalEntries(
+  businessId: string,
+  params: { limit?: number; offset?: number; status?: 'draft' | 'posted' | 'voided' } = {},
+) {
+  const r = await api.get<{ entries: JournalEntryListItem[]; limit: number; offset: number }>(
+    `/businesses/${businessId}/journal-entries`, { params: { limit: 100, ...params } },
+  );
+  return r.data.entries;
+}
+
 // --- General Ledger (Phase 1, item 6) — shapes copied from
 // generalLedgerService.ts's GeneralLedgerReport/-Account/-Line types and
 // chartOfAccounts.ts's /coa route, not guessed.

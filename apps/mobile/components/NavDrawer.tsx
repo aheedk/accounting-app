@@ -66,7 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Client Overview' }, { label: 'Books Review' }, { label: 'Approvals' },
       { label: 'Bank Accounts' }, { label: 'Bank Transactions' }, { label: 'Integration Transactions' },
       { label: 'Receipts' }, { label: 'Reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
-      { label: 'Recurring Transactions' }, { label: 'Fixed Assets' }, { label: 'Journal' },
+      { label: 'Recurring Transactions' }, { label: 'Fixed Assets' }, { label: 'Journal', path: '/journal-entries' },
     ],
   },
   {
