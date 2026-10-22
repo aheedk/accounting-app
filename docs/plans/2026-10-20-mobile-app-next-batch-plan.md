@@ -1399,3 +1399,37 @@ these were missed at the time.
 **Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
 bundle built with no errors. No live device interaction this chunk
 (style-only changes, same low-risk category as chunk 9's original pass).
+
+### Redesign chunk 23 (2026-10-22) — Checks list — done
+
+Picked for speed (user is about to test on-device): the check *detail*
+view already worked (`app/transaction/[id].tsx?type=check`, from an
+earlier chunk), so this only needed the missing list screen — no new
+detail screen, no new write path.
+
+- Read `checkService.ts`'s `listChecks` directly rather than assume a
+  simple table scan — it actually **unions two sources**: the real
+  `checks` table, and "legacy" checks (an `expense_transactions` row
+  with `payment_method: 'check'`, predating this feature's own table —
+  otherwise invisible here even though GL already shows them). Each
+  merged row carries a real `legacy: boolean`, which decides whether a
+  tap should open `type=check` or `type=expense` on the existing detail
+  screen — confirmed via live data that this demo business's 23 checks
+  are *all* legacy rows, so the `type=check` branch (routing to the
+  real `getCheck`) is still unverified against a populated response,
+  while `type=expense` is fully proven (both by this chunk and prior
+  ones).
+- `services/api.ts`: added `CheckListRow` type + `listChecks()`.
+- **`app/checks.tsx`**: exact `bills.tsx`/`invoices.tsx` pattern — status
+  filter chips (All/Posted/Draft/Void — check statuses use `'void'`, not
+  `'voided'`, a local `CHECK_BADGE` map same reasoning as every other
+  entity's own status vocabulary), tap-through routes by `legacy`.
+- Wired into the drawer's AP > Checks item and the More tab. Deliberately
+  did not touch the Create tab's "Check" stub (still "Available on
+  desktop") — writing a new check is a separate, bigger feature not
+  attempted this chunk.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /checks` hit live — 23 real rows,
+confirmed `CheckListRow` field-for-field including the `legacy`/`path`
+fields that drove the routing decision above.

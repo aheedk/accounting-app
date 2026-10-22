@@ -1012,3 +1012,23 @@ export async function listReconciliationHistory(businessId: string, params: { ac
   const r = await api.get<{ reconciliations: ReconciliationHistoryRow[] }>(`/businesses/${businessId}/bank-rec/history`, { params });
   return r.data.reconciliations;
 }
+
+// --- Checks (AP) — read-only list, mirroring listChecks' actual merge
+// logic read directly from checkService.ts: it unions the real `checks`
+// table with "legacy" checks (an expense_transactions row with
+// payment_method='check', which predates this feature's own table —
+// otherwise invisible here even though GL already shows them). `legacy`
+// is what the row actually is, not a cosmetic flag — it decides which
+// detail screen a tap should open (type=check vs type=expense on the
+// existing app/transaction/[id].tsx, since a legacy row has no `checks`
+// table record to fetch via getCheck).
+
+export type CheckListRow = {
+  id: string; check_number: string | null; payment_date: string; payee_name: string | null;
+  total_amount: string; status: 'draft' | 'posted' | 'void'; bank_account_name: string | null; legacy: boolean;
+};
+
+export async function listChecks(businessId: string) {
+  const r = await api.get<{ checks: CheckListRow[] }>(`/businesses/${businessId}/checks`);
+  return r.data.checks;
+}

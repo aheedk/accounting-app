@@ -41,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Overview' },
       { label: 'Expense Transactions' },
-      { label: 'Checks' },
+      { label: 'Checks', path: '/checks' },
       { label: 'Vendors', path: '/clients', params: { tab: 'vendors' } },
       { label: 'Bills', path: '/bills' },
       { label: 'Pay Bills', path: '/bill-payment/new' },
