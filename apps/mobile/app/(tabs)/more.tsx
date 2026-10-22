@@ -16,6 +16,12 @@ type Section = { label: string; items: Item[] };
 // were clipped on a small screen, not just visually noisy).
 const SECTIONS: Section[] = [
   {
+    label: 'General', items: [
+      { title: 'Messages', path: '/messages', icon: 'message-outline' },
+      { title: 'Send Documents', path: '/send-documents', icon: 'upload-outline' },
+    ],
+  },
+  {
     label: 'Reports', items: [
       { title: 'Profit & Loss', path: '/pnl', icon: 'chart-line' },
       { title: 'Balance Sheet', path: '/balance-sheet', icon: 'scale-balance' },
@@ -26,6 +32,12 @@ const SECTIONS: Section[] = [
       { title: 'AP Aging', path: '/ap-aging', icon: 'calendar-clock-outline' },
       { title: 'Customer Statement', path: '/customer-statement', icon: 'file-account-outline' },
       { title: '1099s', path: '/1099s', icon: 'file-document-outline' },
+      { title: 'Standard Reports', path: '/standard-reports', icon: 'view-list-outline' },
+      { title: 'Cash Activity by Account', path: '/cash-activity', icon: 'bank-transfer' },
+      { title: 'Custom Reports', path: '/custom-reports', icon: 'file-chart-outline' },
+      { title: 'Financial Planning', path: '/financial-planning', icon: 'chart-box-outline' },
+      { title: 'Management Reports', path: '/management-reports', icon: 'finance' },
+      { title: 'Performance Center', path: '/performance-center', icon: 'trending-up' },
     ],
   },
   {

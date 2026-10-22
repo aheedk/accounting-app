@@ -1847,3 +1847,195 @@ Note: `periodReview.ts`'s two routes are absent from
 `apps/api/tests/integration/roleMatrix.test.ts` — a pre-existing gap on
 the backend, not something this mobile port introduced or is in scope
 to fix.
+
+## Chunk: Reports group, part 1 (2026-10-22)
+
+Researched all 7 remaining disabled Reports items before building
+anything. Per-item verdict: Standard Reports is a pure index page (no
+API of its own) — ALIAS-FIX, just needs a drawer link to a menu screen.
+Cash Activity, Management Reports, and Performance Center are real,
+distinct, already-fully-built-on-web features — BUILD. Custom Reports
+and Financial Planning are real but substantially larger (full CRUD) —
+deferred to their own chunk. Spreadsheet Sync is real but a thin
+CSV/PDF-export wrapper, not an actual sync — lowest priority, deferred.
+
+What shipped this chunk:
+
+- **`app/standard-reports.tsx`**: grouped list of links to the 10
+  already-built reports, mirroring web's own grouping
+  (`StandardReportsPage.tsx`) exactly — no new API integration.
+- **`app/cash-activity.tsx`**: a single bank account's register with a
+  running balance — confirmed genuinely distinct from the already-built
+  Statement of Cash Flows (`cash-flow.tsx`, hitting
+  `/reports/statement-of-cash-flows`) by reading both route handlers
+  directly; this one hits `/reports/cash-flow` and defaults to the
+  Operating Bank Account when no account is picked. Bank-account picker
+  (reusing the existing `listBankAccounts`), date range, 3 summary
+  tiles, tap-through to the underlying journal entry — same drilldown
+  pattern as General Ledger.
+- **`app/management-reports.tsx`**: trailing-12-month revenue-by-month
+  (rendered as simple proportional bars, no new chart dependency — the
+  mobile app has no chart library yet and this doesn't justify adding
+  one) + top-10 expense accounts. Entirely read-only, no filters —
+  matches the backend's fixed trailing-12-month window exactly.
+- **`app/performance-center.tsx`**: revenue/expense/net-income trends
+  with a 3M/6M/12M range toggle and period-over-period delta %, both
+  computed client-side from the always-12-month API response (same as
+  web — there's no server-side range param).
+- `services/api.ts`: added `CashActivityReport`/`CashActivityLine`,
+  `ManagementReport`, `PerformanceReport`/`MonthAmount` types + 3 new
+  fetch functions, all confirmed against the actual route/service files
+  (`financialReports.ts`, `managementReportService.ts`,
+  `performanceReportService.ts`), not guessed.
+- Wired all 4 into the drawer's Reports group and the More tab's
+  Reports section.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. The dev API server had stopped
+running since the start of this session and was restarted
+(`npm -w @accounting/api run dev`) to live-verify; all 4 endpoints hit
+and confirmed field-for-field against the hand-written types —
+`/bank-accounts`, `/reports/cash-flow` (real zero-balance data on this
+demo business's default account), `/management-report` and
+`/performance-report` (both returning real non-zero months from
+March–June 2026).
+
+Remaining in the Reports group: Custom Reports and Financial Planning
+(both full-CRUD, next chunk), Spreadsheet Sync (deferred, low
+priority).
+
+## Chunk: Custom Reports (2026-10-22)
+
+The first full-CRUD report builder in the mobile app. One screen,
+two modes (list / builder) rather than a separate route, since the
+builder is really just an inline editor over the list:
+
+- **`app/custom-reports.tsx`**: list mode shows saved reports (name +
+  group-by + date range), tap to run-and-open in builder mode;
+  `accountant`+ gets a delete icon per row (matches the DELETE route's
+  own `requireMinRole('accountant')`, confirmed by reading
+  `customReports.ts` directly — create/update are `staff`+, delete is
+  stricter). Builder mode: name field, date-range pickers, a group-by
+  dropdown (account/month/cost_center/customer/vendor), column toggles
+  (debit/credit/net, `AppChip`s), and a collapsible account multi-select
+  (checkbox list over the existing CoA — empty selection means "all
+  accounts," matching the backend's own `account_ids: []` semantics).
+  "Run" calls the ad-hoc `POST .../custom-reports/run` without saving;
+  "Save & Run" creates it, then runs the saved version. Results render
+  as a simple group-key + column table.
+- `services/api.ts`: added `CustomReportDefinition`/`CustomReport`/
+  `CustomReportRow` types + list/get/create/update/delete/run functions,
+  confirmed against `customReportService.ts` and
+  `CustomReportDefinitionsTable` directly — particularly the result row
+  shape (`{group_key, debit, credit, net}`), which isn't obvious from
+  the route file alone.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Ran a full live CRUD round-trip
+against the dev server: ad-hoc run (grouped by month, real non-zero
+data), create, run-the-saved-version (identical rows), then delete
+(204) — the demo record was cleaned up after, not left in the
+business's data.
+
+Remaining in the Reports group: Financial Planning (full-CRUD budgets,
+next chunk), Spreadsheet Sync (deferred, low priority — a thin
+CSV/PDF-export wrapper, not a real sync feature).
+
+## Chunk: Financial Planning / Budgets (2026-10-22)
+
+"Financial Planning" is plain budgets + variance, not a distinct
+planning module — confirmed no spec exists for it and the backend
+(`budgets.ts`) is literally a budget CRUD + variance API. Mirrors web's
+`FinancialPlanningPage.tsx` functionally, but adapted for a phone
+screen: web renders a full account × 12-month grid for every active
+account at once, which doesn't fit mobile — rebuilt as an account
+picker + a 12-row vertical list for whichever account is selected, same
+underlying per-cell PATCH, no functionality lost.
+
+- **`app/financial-planning.tsx`**: list mode (budgets + status badge +
+  `firm_admin`-only delete, matching the DELETE route's
+  `requireMinRole('firm_admin')` — stricter than every other write on
+  this route, confirmed by reading `budgets.ts` directly) + a "New
+  Budget" form (`accountant`+, name + fiscal year). Detail mode: a
+  status segmented control (draft/active/archived, `accountant`+) and
+  an Edit/Variance mode toggle. Edit mode shows the selected account's
+  12 months as editable amount fields, saved on blur via
+  `PATCH .../lines` (one cell at a time, same as web). Variance mode
+  shows budget/actual/variance per month for that account, colored by
+  sign.
+- `services/api.ts`: added `Budget`/`BudgetLine`/`BudgetWithLines`/
+  `BudgetVarianceRow` types + list/get/create/update/delete/
+  setBudgetLine/getVariance functions, confirmed against
+  `budgetService.ts` and `BudgetsTable`/`BudgetLinesTable` directly —
+  particularly the variance row shape, which isn't derivable from the
+  route file alone.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Live round-trip against the dev
+server: create → get-with-lines → set one line (`PATCH .../lines`,
+amount persisted and normalized to `"500.0000"`) → variance (real rows
+against actual posted activity) → status update (`draft` → `active`) →
+delete attempt correctly 403'd for the accountant-role demo login,
+confirming the firm_admin-only gate matches the mobile screen's own
+check. The leftover test budget couldn't be cleaned up under this
+login (by design) and was left on the demo business — harmless test
+data, same as other chunks' demo artifacts.
+
+**Scope exclusion: Spreadsheet Sync.** Confirmed it's a thin
+CSV-file-download wrapper (`GET .../csv-exports/{trial-balance,
+journal-entries, general-ledger}`, returning `Content-Disposition:
+attachment` raw CSV, not JSON) with no actual sync semantics — web just
+triggers a browser download. Mobile has no file-download/share
+mechanism anywhere in the app (`expo-sharing`/`expo-file-system` are
+not installed), and CLAUDE.md is explicit against adding a dependency
+"to make it nicer" when a simpler option exists. Since this is also the
+lowest-value, least-distinct item in the batch (confirmed by research
+before building anything), excluding it is the proportionate call —
+same category as Payroll/Client Overview, not a gap to come back to
+unless a user actually asks for on-device export.
+
+Reports group is now fully built except that one deliberate exclusion.
+Remaining disabled items overall: Inventory (6 items, unresearched),
+and two top-level items (Messages, Send documents).
+
+## Chunk: Messages and Send Documents (2026-10-22)
+
+Researched both before building — unlike Spreadsheet Sync, neither
+needed anything mobile doesn't already have.
+
+- **`app/messages.tsx`**: one thread per company (not per-conversation —
+  matches web's `MessagesPage.tsx`, a single client-to-firm channel),
+  polled every 30s (no websocket infra exists to do better). Chat-
+  bubble list, composer hidden behind a "view-only can't send" notice
+  for the `viewer` role (matches the backend's own `refuseViewOnly`
+  gate on the POST route), marks read on load.
+- **`app/send-documents.tsx`**: turned out to need no new upload
+  plumbing at all — `uploadDocument()` (services/api.ts) and the full
+  camera/library/Files picker flow already existed as
+  `components/CameraCaptureButton.tsx`, built earlier for a header
+  icon. This screen is just a proper landing page wrapping that same
+  component, open to the same roles the backend actually allows
+  (`refuseViewOnly` — any non-viewer, client included), not gated
+  client-only the way web's UI choice to route staff to the AI inbox
+  instead implies.
+- `services/api.ts`: added `MessageRow` + list/unread-count/post/
+  mark-read functions, confirmed against `messageService.ts` directly
+  — including that the POST route returns the raw inserted row, not
+  the joined list shape, which isn't obvious from the route file alone.
+- `lib/roleAccess.ts`'s `CLIENT_PAGES`: added `/messages` and
+  `/send-documents` — confirmed against web's own `roleAccess.ts`
+  client allow-list and `apps/api/src/lib/clientAccess.ts`, both of
+  which already permit a client login on these two pages. Without this
+  the drawer would have hidden both from client logins even though the
+  backend fully allows them.
+- Wired into the drawer (both are top-level items, not inside a group)
+  and a new "General" section at the top of the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Hit all 4 message endpoints live:
+list (empty thread), unread-count, post (real row persisted), mark-read
+— all matching the hand-written types.
+
+Remaining disabled items overall: Inventory (6 items).

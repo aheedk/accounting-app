@@ -22,8 +22,8 @@ type NavGroup = { id: string; label: string; icon: keyof typeof MaterialCommunit
 
 const NAV_GROUPS: NavGroup[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'view-dashboard-outline', path: '/(tabs)' },
-  { id: 'messages', label: 'Messages', icon: 'message-outline' },
-  { id: 'send-documents', label: 'Send documents', icon: 'upload-outline' },
+  { id: 'messages', label: 'Messages', icon: 'message-outline', path: '/messages' },
+  { id: 'send-documents', label: 'Send documents', icon: 'upload-outline', path: '/send-documents' },
   { id: 'transactions', label: 'Transactions', icon: 'format-list-checks', path: '/(tabs)/transactions' },
   {
     id: 'ar', label: 'Accounts Receivable', icon: 'account-group-outline',
@@ -72,12 +72,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'reports', label: 'Reports', icon: 'chart-bar',
     children: [
-      { label: 'Standard Reports' },
+      { label: 'Standard Reports', path: '/standard-reports' },
       { label: 'Profit & Loss', path: '/pnl' },
       { label: 'Balance Sheet', path: '/balance-sheet' },
       { label: 'General Ledger', path: '/general-ledger' },
-      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
-      { label: 'Management Reports' }, { label: 'Performance Center' }, { label: 'Financial Planning' },
+      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity', path: '/cash-activity' }, { label: 'Custom Reports', path: '/custom-reports' },
+      { label: 'Management Reports', path: '/management-reports' }, { label: 'Performance Center', path: '/performance-center' }, { label: 'Financial Planning', path: '/financial-planning' },
       { label: 'Spreadsheet Sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },

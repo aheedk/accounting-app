@@ -578,6 +578,174 @@ export async function getStatementOfCashFlows(businessId: string, params: { peri
   return r.data;
 }
 
+// --- Cash Activity by Account — a single bank account's register with a
+// running balance, distinct from the Statement of Cash Flows above
+// (operating/investing/financing categorization). Defaults to the
+// business's Operating Bank Account when cash_account_id is omitted.
+
+export type CashActivityLine = {
+  entry_date: string; journal_entry_id: string; source_type: string; status: 'posted' | 'voided';
+  memo: string | null; debit: string; credit: string; net_amount: string; running_balance: string;
+};
+export type CashActivityReport = {
+  period_start: string; period_end: string;
+  cash_account_id: string; cash_account_code: string; cash_account_name: string;
+  beginning_balance: string; ending_balance: string; net_change: string;
+  lines: CashActivityLine[];
+};
+
+export async function getCashActivity(
+  businessId: string, params: { period_start: string; period_end: string; cash_account_id?: string },
+) {
+  const r = await api.get<CashActivityReport>(`/businesses/${businessId}/reports/cash-flow`, { params });
+  return r.data;
+}
+
+export type MonthAmount = { month: string; amount: string };
+export type ManagementReport = {
+  revenue_by_month: MonthAmount[];
+  expense_breakdown: Array<{ account_code: string; account_name: string; amount: string }>;
+  total_revenue_last_12: string; total_expense_last_12: string;
+};
+
+export async function getManagementReport(businessId: string) {
+  const r = await api.get<ManagementReport>(`/businesses/${businessId}/management-report`);
+  return r.data;
+}
+
+export type PerformanceReport = {
+  revenue_trend: MonthAmount[]; expense_trend: MonthAmount[]; net_income_trend: MonthAmount[];
+};
+
+export async function getPerformanceReport(businessId: string) {
+  const r = await api.get<PerformanceReport>(`/businesses/${businessId}/performance-report`);
+  return r.data;
+}
+
+export type CustomReportGroupBy = 'account' | 'month' | 'cost_center' | 'customer' | 'vendor';
+export type CustomReportColumn = 'debit' | 'credit' | 'net';
+export type CustomReportDefinition = {
+  account_ids: string[];
+  date_range: { from: string; to: string };
+  group_by: CustomReportGroupBy;
+  columns: CustomReportColumn[];
+};
+export type CustomReport = {
+  id: string; business_id: string; name: string; owner_user_id: string;
+  definition: CustomReportDefinition; created_at: string; updated_at: string;
+};
+export type CustomReportRow = { group_key: string; debit: string; credit: string; net: string };
+
+export async function listCustomReports(businessId: string) {
+  const r = await api.get<{ reports: CustomReport[] }>(`/businesses/${businessId}/custom-reports`);
+  return r.data.reports;
+}
+
+export async function getCustomReport(businessId: string, id: string) {
+  const r = await api.get<CustomReport>(`/businesses/${businessId}/custom-reports/${id}`);
+  return r.data;
+}
+
+export async function createCustomReport(businessId: string, name: string, definition: CustomReportDefinition) {
+  const r = await api.post<CustomReport>(`/businesses/${businessId}/custom-reports`, { name, definition });
+  return r.data;
+}
+
+export async function updateCustomReport(
+  businessId: string, id: string, patch: { name?: string; definition?: CustomReportDefinition },
+) {
+  const r = await api.patch<CustomReport>(`/businesses/${businessId}/custom-reports/${id}`, patch);
+  return r.data;
+}
+
+export async function deleteCustomReport(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/custom-reports/${id}`);
+}
+
+export async function runSavedCustomReport(businessId: string, id: string) {
+  const r = await api.post<{ rows: CustomReportRow[] }>(`/businesses/${businessId}/custom-reports/${id}/run`);
+  return r.data.rows;
+}
+
+export async function runCustomReport(businessId: string, definition: CustomReportDefinition) {
+  const r = await api.post<{ rows: CustomReportRow[] }>(`/businesses/${businessId}/custom-reports/run`, { definition });
+  return r.data.rows;
+}
+
+export type BudgetStatus = 'draft' | 'active' | 'archived';
+export type Budget = {
+  id: string; business_id: string; name: string; fiscal_year: number; status: BudgetStatus;
+  created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+export type BudgetLine = { id: string; budget_id: string; account_id: string; month_offset: number; amount: string };
+export type BudgetWithLines = Budget & { lines: BudgetLine[] };
+export type BudgetVarianceRow = {
+  account_id: string; account_code: string; account_name: string; month_offset: number;
+  budget: string; actual: string; variance: string;
+};
+
+export async function listBudgets(businessId: string) {
+  const r = await api.get<{ budgets: Budget[] }>(`/businesses/${businessId}/budgets`);
+  return r.data.budgets;
+}
+
+export async function getBudget(businessId: string, id: string) {
+  const r = await api.get<BudgetWithLines>(`/businesses/${businessId}/budgets/${id}`);
+  return r.data;
+}
+
+export async function createBudget(businessId: string, name: string, fiscal_year: number) {
+  const r = await api.post<Budget>(`/businesses/${businessId}/budgets`, { name, fiscal_year });
+  return r.data;
+}
+
+export async function updateBudget(businessId: string, id: string, patch: { name?: string; status?: BudgetStatus }) {
+  const r = await api.patch<Budget>(`/businesses/${businessId}/budgets/${id}`, patch);
+  return r.data;
+}
+
+export async function deleteBudget(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/budgets/${id}`);
+}
+
+export async function setBudgetLine(businessId: string, id: string, account_id: string, month_offset: number, amount: string) {
+  const r = await api.patch<BudgetLine>(`/businesses/${businessId}/budgets/${id}/lines`, { account_id, month_offset, amount });
+  return r.data;
+}
+
+export async function getBudgetVariance(businessId: string, id: string) {
+  const r = await api.get<{ rows: BudgetVarianceRow[] }>(`/businesses/${businessId}/budgets/${id}/variance`);
+  return r.data.rows;
+}
+
+export type MessageRow = {
+  id: string; body: string; created_at: string; author_name: string; author_role: string; mine: boolean;
+};
+
+export async function listMessages(businessId: string, params: { limit?: number; before?: string } = {}) {
+  const r = await api.get<{ messages: MessageRow[]; has_more: boolean }>(`/businesses/${businessId}/messages`, { params });
+  return r.data;
+}
+
+export async function getUnreadMessageCount(businessId: string) {
+  const r = await api.get<{ count: number }>(`/businesses/${businessId}/messages/unread-count`);
+  return r.data.count;
+}
+
+export async function postMessage(businessId: string, body: string) {
+  // The raw inserted row — id/business_id/author_user_id/body/created_at,
+  // not the joined MessageRow shape listMessages returns. Callers should
+  // invalidate and refetch the list rather than rely on this response.
+  const r = await api.post<{ id: string; business_id: string; author_user_id: string; body: string; created_at: string }>(
+    `/businesses/${businessId}/messages`, { body },
+  );
+  return r.data;
+}
+
+export async function markMessagesRead(businessId: string) {
+  await api.post(`/businesses/${businessId}/messages/read`);
+}
+
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
 // reports) directly. packages/shared's agingRowSchema is stale — its field
 // names (customer_id/customer_name/over_30/over_60/over_90) don't match
