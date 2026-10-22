@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { AppHeader } from '../components/AppHeader';
 import { AppTextInput } from '../components/ui/AppTextInput';
 import { AppChip } from '../components/ui/AppChip';
+import { AppMenu, AppMenuItem } from '../components/ui/AppMenu';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { listChartOfAccounts, type CoaAccount } from '../services/api';
 import { LoadingIndicator } from '../components/LoadingIndicator';
@@ -19,8 +20,13 @@ import { spacing, typeScale, fontFamily, minTouchTarget, type AppTheme } from '.
 
 type TypeFilter = 'all' | 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 const TYPE_FILTERS: Array<{ value: TypeFilter; label: string }> = [
-  { value: 'all', label: 'All' }, { value: 'asset', label: 'Assets' }, { value: 'liability', label: 'Liabilities' },
-  { value: 'equity', label: 'Equity' }, { value: 'revenue', label: 'Revenue' }, { value: 'expense', label: 'Expenses' },
+  { value: 'all', label: 'All' }, { value: 'asset', label: 'Asset' }, { value: 'liability', label: 'Liability' },
+  { value: 'equity', label: 'Equity' }, { value: 'revenue', label: 'Revenue' }, { value: 'expense', label: 'Expense' },
+];
+
+type StatusFilter = 'active' | 'inactive' | 'all';
+const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }, { value: 'all', label: 'All' },
 ];
 
 /**
@@ -35,11 +41,13 @@ export default function ChartOfAccountsScreen() {
   const { activeBusinessId } = useAuth();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [showInactive, setShowInactive] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
 
   const query = useQuery({
-    queryKey: ['coa-full', activeBusinessId, showInactive],
-    queryFn: () => listChartOfAccounts(activeBusinessId!, { include_inactive: showInactive }),
+    queryKey: ['coa-full', activeBusinessId, statusFilter],
+    queryFn: () => listChartOfAccounts(activeBusinessId!, { include_inactive: statusFilter !== 'active' }),
     enabled: !!activeBusinessId,
   });
 
@@ -47,10 +55,15 @@ export default function ChartOfAccountsScreen() {
     const q = search.trim().toLowerCase();
     return (query.data ?? []).filter(a => {
       if (typeFilter !== 'all' && a.account_type !== typeFilter) return false;
+      if (statusFilter === 'active' && !a.is_active) return false;
+      if (statusFilter === 'inactive' && a.is_active) return false;
       if (q && !a.name.toLowerCase().includes(q) && !a.code.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [query.data, search, typeFilter]);
+  }, [query.data, search, typeFilter, statusFilter]);
+
+  const typeLabel = TYPE_FILTERS.find(f => f.value === typeFilter)?.label ?? 'All';
+  const statusLabel = STATUS_FILTERS.find(f => f.value === statusFilter)?.label ?? 'Active';
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -58,22 +71,39 @@ export default function ChartOfAccountsScreen() {
 
       <View style={styles.filterBar}>
         <AppTextInput
-          placeholder="Search by name or code"
+          placeholder="Filter by name or number"
           value={search}
           onChangeText={setSearch}
           containerStyle={{ marginBottom: spacing.sm }}
           left={<MaterialCommunityIcons name="magnify" size={18} color={theme.app.mutedForeground} />}
         />
         <View style={styles.chipRow}>
-          {TYPE_FILTERS.map(f => (
-            <AppChip key={f.value} label={f.label} active={typeFilter === f.value} onPress={() => setTypeFilter(f.value)} style={{ marginRight: spacing.xs, marginBottom: spacing.xs }} />
-          ))}
-          <AppChip
-            label={showInactive ? 'Hide inactive' : 'Show inactive'}
-            active={showInactive}
-            onPress={() => setShowInactive(v => !v)}
-            style={{ marginBottom: spacing.xs }}
-          />
+          <AppMenu
+            visible={typeMenuOpen}
+            onDismiss={() => setTypeMenuOpen(false)}
+            anchor={<AppChip icon="chevron-down" label={typeLabel} onPress={() => setTypeMenuOpen(true)} style={{ marginRight: spacing.xs }} />}
+          >
+            {TYPE_FILTERS.map(f => (
+              <AppMenuItem
+                key={f.value} title={f.label}
+                trailingIcon={typeFilter === f.value ? 'check' : undefined}
+                onPress={() => { setTypeFilter(f.value); setTypeMenuOpen(false); }}
+              />
+            ))}
+          </AppMenu>
+          <AppMenu
+            visible={statusMenuOpen}
+            onDismiss={() => setStatusMenuOpen(false)}
+            anchor={<AppChip icon="chevron-down" label={statusLabel} onPress={() => setStatusMenuOpen(true)} />}
+          >
+            {STATUS_FILTERS.map(f => (
+              <AppMenuItem
+                key={f.value} title={f.label}
+                trailingIcon={statusFilter === f.value ? 'check' : undefined}
+                onPress={() => { setStatusFilter(f.value); setStatusMenuOpen(false); }}
+              />
+            ))}
+          </AppMenu>
         </View>
       </View>
 

@@ -1433,3 +1433,24 @@ detail screen, no new write path.
 bundle built with no errors, `GET /checks` hit live — 23 real rows,
 confirmed `CheckListRow` field-for-field including the `legacy`/`path`
 fields that drove the routing decision above.
+
+### Polish (2026-10-22) — Chart of Accounts filter cleanup — done
+
+User screenshot of web's own CoA filters (a search box + two dropdown
+buttons — type and Active/Inactive/All) alongside mobile's chip-row
+version, asking to match. Replaced:
+
+- The 6-chip type-filter row → a single `AppChip` dropdown trigger
+  (`AppMenu`/`AppMenuItem`, checkmark on the selected option), same
+  pattern already used for the GL account filter.
+- The binary "Show/Hide inactive" toggle chip → a proper 3-way Active/
+  Inactive/All dropdown, matching web exactly (mobile's API only
+  distinguishes active-only vs include-all, so `Inactive` filters
+  client-side after fetching with `include_inactive: true`).
+- Default status stayed `Active` (unchanged behavior, just a cleaner
+  control for the same default web also uses).
+
+**Verified**: `tsc --noEmit` clean, confirmed visually via a live
+simulator screenshot (the user's own Metro session was already running,
+Fast Refresh picked up the change) — matches the two-dropdown layout
+from the user's screenshot exactly.
