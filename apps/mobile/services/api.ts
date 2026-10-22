@@ -847,3 +847,66 @@ export async function voidVendorCredit(businessId: string, id: string, void_reas
   const r = await api.post<VendorCreditRow>(`/businesses/${businessId}/vendor-credits/${id}/void`, { void_reason });
   return r.data;
 }
+
+// --- Bank Transactions (Banking inbox) — shapes read directly from
+// BankTransactionsTable (db/types.ts) and bankTransactions.ts's route
+// handlers. This is the triage inbox for bank-feed rows BEFORE they
+// become journal entries — confirmed separate from the Cash Flow report
+// (which only reads already-posted journal_entries) and separate from
+// Reconciliation proper (ReconcileWorksheetPage.tsx — ticking cleared
+// transactions against a statement balance), which is NOT built this
+// chunk; this only covers the review/triage actions.
+//
+// Scoped to Categorize/Exclude/Unreview — deliberately NOT building
+// "Match to an existing journal entry" this chunk. Matching needs a
+// picker over existing JEs (search by date/amount, no simple
+// name-based list the way every other picker in this app has), a
+// materially different UI problem than the others, and Categorize (the
+// "Add" case) covers the common path. CSV import is desktop-only,
+// not attempted here either — review-only, same reasoning as every
+// other read-first chunk this session.
+
+export type BankTransactionStatus = 'unreviewed' | 'matched' | 'categorized' | 'excluded';
+export type BankTransactionRow = {
+  id: string; business_id: string; bank_account_id: string; transaction_date: string;
+  description: string; amount: string; external_id: string | null;
+  status: BankTransactionStatus; matched_journal_entry_id: string | null;
+  excluded_reason: string | null; is_reconciled: boolean; reconciliation_id: string | null;
+  imported_at: string; reviewed_at: string | null; reviewed_by_user_id: string | null;
+  import_batch_id: string | null;
+};
+
+export async function listBankTransactions(
+  businessId: string,
+  params: { bank_account_id?: string; status?: BankTransactionStatus; is_reconciled?: boolean } = {},
+) {
+  const r = await api.get<{ bank_transactions: BankTransactionRow[] }>(`/businesses/${businessId}/bank-transactions`, { params });
+  return r.data.bank_transactions;
+}
+
+export async function getBankTransaction(businessId: string, id: string) {
+  const r = await api.get<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}`);
+  return r.data;
+}
+
+export type BankTransactionSuggestion = { account_id: string; confidence: number; band: ConfidenceBand; source_layer: CodingLayerId } | null;
+
+export async function getBankTransactionSuggestion(businessId: string, id: string) {
+  const r = await api.get<{ suggestion: BankTransactionSuggestion }>(`/businesses/${businessId}/bank-transactions/${id}/suggestion`);
+  return r.data.suggestion;
+}
+
+export async function categorizeBankTransaction(businessId: string, id: string, body: { offset_account_id: string; memo?: string | null }) {
+  const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/categorize`, body);
+  return r.data;
+}
+
+export async function excludeBankTransaction(businessId: string, id: string, excluded_reason: string) {
+  const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/exclude`, { excluded_reason });
+  return r.data;
+}
+
+export async function unreviewBankTransaction(businessId: string, id: string) {
+  const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/unreview`);
+  return r.data;
+}

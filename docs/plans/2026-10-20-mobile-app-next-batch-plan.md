@@ -1226,3 +1226,56 @@ unverified live across all of Payments/Bill Payments/Credit Memos/
 Vendor Credits. Recommended to the user that this whole family of
 screens gets a real test pass once real AR/AP data exists, before
 building anything further on top.
+
+### Redesign chunk 20 (2026-10-22) — Bank Transactions review inbox — done
+
+First piece of the Banking area, researched before anything was built to
+settle a scope question up front: is "Bank Transactions review" the same
+feature as Reconciliation? Confirmed **no** — `bank_transactions` is a
+staging/triage table for bank-feed rows before they become journal
+entries; Reconciliation (`ReconcileWorksheetPage.tsx`) is a separate
+workflow that ticks already-coded transactions against a statement
+balance, and only *consumes* `is_reconciled` on rows this inbox produces.
+Scoped this chunk to the triage inbox only — Reconciliation stays
+unbuilt, a distinct future chunk.
+
+- **Deliberately not built this chunk**: "Match to an existing journal
+  entry" (needs a date/amount-search picker over JEs, a materially
+  different UI problem than every name-based picker in this app) and CSV
+  import (desktop-only). Categorize (the QBO "Add" case) and Exclude
+  cover the common review path; Unreview (accountant+, blocked once
+  `is_reconciled`) undoes either.
+- `services/api.ts`: added `BankTransactionRow`/`BankTransactionStatus`/
+  `BankTransactionSuggestion` types + `listBankTransactions`/
+  `getBankTransaction`/`getBankTransactionSuggestion`/
+  `categorizeBankTransaction`/`excludeBankTransaction`/
+  `unreviewBankTransaction`, all read directly from
+  `BankTransactionsTable` and the route handlers' actual `res.json(...)`
+  calls (the shared `bankTransaction.ts` zod schema checked out as
+  accurate, unlike several stale ones found earlier this session).
+- **`app/bank-transactions.tsx`**: one-bank-account-at-a-time (same as
+  web's per-account card selector — a transaction's running context only
+  makes sense within one account), status filter chips (For review/
+  Categorized/Matched/Excluded).
+- **`app/bank-transaction/[id].tsx`**: reuses the existing
+  `ConfidenceBadge` component built for the AI document inbox (same
+  `{confidence, band, source_layer}` shape the auto-coding engine
+  returns everywhere) to show the AI's suggested category with a
+  one-tap "Use X" shortcut, plus the Categorize form (account picker +
+  memo) and a separate Exclude form (reason required) when
+  `status === 'unreviewed'`; otherwise shows the outcome and an Unreview
+  button gated to accountant+.
+- Wired into the drawer's Accounting > Bank Transactions item and the
+  More tab.
+
+**Verified**: `tsc --noEmit` clean (one real type error caught and fixed
+— `AppButton`'s `children` prop is typed `string`, not `string[]`, so a
+JSX-interpolated multi-part label needed a single template literal
+instead), a fresh `expo export --platform ios` bundle built with no
+errors, `GET /bank-transactions` hit live (both bank accounts, no status
+filter, every combination) and confirmed the `{ bank_transactions: [] }`
+wrapper shape — but this demo business has genuinely zero bank
+transactions ever imported, so none of the per-row fields or the
+Categorize/Exclude/Unreview actions have been exercised against real
+data. Continuing the pattern flagged in the last several chunks: this is
+now six write/action-capable screens in a row without a live round trip.
