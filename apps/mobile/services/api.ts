@@ -748,3 +748,53 @@ export async function voidBillPayment(businessId: string, id: string, void_reaso
   const r = await api.post<BillPaymentRow>(`/businesses/${businessId}/bill-payments/${id}/void`, { void_reason });
   return r.data;
 }
+
+// --- Credit Memos (AR) — shapes read directly from CreditMemosTable
+// (db/types.ts) and creditMemoService.ts's actual return statements.
+// Two real differences from Payments, both confirmed rather than assumed:
+// (1) no GET /credit-memos/:id detail route exists at all — only list,
+// create, post, apply, void — so there's no getCreditMemo()/CreditMemoDetail
+// here; the detail screen fetches the list and finds by id, same as web's
+// own CreditMemoDetailPage.tsx does. (2) applying to an invoice is always
+// a separate POST .../apply call (invoice_id + applied_amount), never an
+// initial_applications field at creation — credit memos reuse the exact
+// same payment_applications table as Payments (keyed by credit_memo_id
+// instead of payment_id), just through a different endpoint shape.
+
+export type CreditMemoStatus = 'draft' | 'posted' | 'applied' | 'voided';
+export type CreditMemoRow = {
+  id: string; business_id: string; customer_id: string; credit_memo_number: string | null;
+  memo_date: string; status: CreditMemoStatus; amount: string; remaining_amount: string;
+  source_payment_id: string | null; ar_account_id: string; revenue_account_id: string;
+  posted_journal_entry_id: string | null; memo: string | null;
+  posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type CreditMemoInput = {
+  customer_id: string; memo_date: string; amount: string; revenue_account_id: string; memo?: string | null;
+};
+
+export async function listCreditMemos(businessId: string, params: { customer_id?: string } = {}) {
+  const r = await api.get<{ credit_memos: CreditMemoRow[] }>(`/businesses/${businessId}/credit-memos`, { params });
+  return r.data.credit_memos;
+}
+
+export async function createCreditMemo(businessId: string, input: CreditMemoInput) {
+  const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos`, input);
+  return r.data;
+}
+
+export async function postCreditMemo(businessId: string, id: string) {
+  const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos/${id}/post`);
+  return r.data;
+}
+
+export async function applyCreditMemoToInvoice(businessId: string, id: string, body: { invoice_id: string; applied_amount: string }) {
+  await api.post(`/businesses/${businessId}/credit-memos/${id}/apply`, body);
+}
+
+export async function voidCreditMemo(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<CreditMemoRow>(`/businesses/${businessId}/credit-memos/${id}/void`, { void_reason });
+  return r.data;
+}

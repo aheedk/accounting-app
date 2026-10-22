@@ -31,7 +31,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Customers', path: '/clients', params: { tab: 'customers' } },
       { label: 'Invoices', path: '/invoices' },
       { label: 'Payments', path: '/payments' },
-      { label: 'Credit Memos' },
+      { label: 'Credit Memos', path: '/credit-memos' },
       { label: 'Aging', path: '/ar-aging' },
       { label: 'Statements' },
     ],

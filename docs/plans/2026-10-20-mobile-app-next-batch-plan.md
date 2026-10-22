@@ -1141,3 +1141,47 @@ chunks 15/16 — this demo business has no bills, so the full create→
 post→void round trip and the per-row field names in a populated response
 are still unverified live; the shapes come from `db/types.ts` and the
 route handlers' actual `res.json(...)` calls, not guessed.
+
+### Redesign chunk 18 (2026-10-22) — Credit Memos (AR) — done
+
+Rounds out the AR side. Two real structural differences from Payments,
+both confirmed against the actual route/service/table code before
+writing anything (not assumed to follow the same shape as Payments just
+because it's a sibling AR entity):
+
+- **No `GET /credit-memos/:id` detail route exists at all** — only list/
+  create/post/apply/void. Web's own `CreditMemoDetailPage.tsx` fetches
+  the whole list and finds the row client-side; mobile's
+  `app/credit-memo/[id].tsx` does the exact same thing rather than
+  inventing a detail endpoint that isn't there.
+- **Applying to an invoice is always a separate `POST .../apply` call**
+  (`{invoice_id, applied_amount}`), never an `initial_applications` field
+  at creation the way Payments has — confirmed credit memos reuse the
+  *same* `payment_applications` table as Payments (keyed by
+  `credit_memo_id` instead of `payment_id`), just through a different
+  endpoint shape. The detail screen's "Apply to an invoice" section
+  (single invoice picker + amount, pre-filled to `min(invoice balance,
+  credit memo remaining)`) is a deliberate separate step after posting,
+  matching web exactly rather than trying to fold it into creation.
+- **Role gap caught and fixed before shipping**: credit memo creation
+  requires `accountant`, stricter than every other AR/AP write built so
+  far (`staff`). The generic `useCanOpen('/credit-memo/new')` check only
+  knows the viewer/client rules, so a staff login would have seen the
+  "+ New credit memo" button and the Create-tab entry, then hit a 403 on
+  save. Fixed by gating both directly with `hasMinRole(effectiveRole,
+  'accountant')`, same pattern already used for Void buttons elsewhere.
+- `services/api.ts`: added `CreditMemoRow`/`CreditMemoInput` types +
+  `listCreditMemos`/`createCreditMemo`/`postCreditMemo`/
+  `applyCreditMemoToInvoice`/`voidCreditMemo` (no `getCreditMemo` — see
+  above). Local `CM_BADGE` status-color map in both the list and detail
+  screens, same reasoning as invoices.tsx's `INVOICE_BADGE`: "posted"
+  here means an active unspent credit (blue/open), not a settled state —
+  "applied" (fully used up) gets the green/settled treatment instead.
+- Wired into the drawer's AR > Credit Memos item, the Create tab (gated
+  to accountant+), and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /credit-memos` hit live and confirmed
+the `{ credit_memos: [] }` wrapper shape. Same data gap as the last three
+chunks (no customers on this demo business at all, so credit memos are
+moot) — full create→post→apply→void flow unverified live.
