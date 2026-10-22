@@ -1279,3 +1279,90 @@ transactions ever imported, so none of the per-row fields or the
 Categorize/Exclude/Unreview actions have been exercised against real
 data. Continuing the pattern flagged in the last several chunks: this is
 now six write/action-capable screens in a row without a live round trip.
+
+### Redesign chunk 21 (2026-10-22) — Reconciliation (Start/Worksheet/History) — done
+
+The last big distinct feature area from the original scope. Read the
+route file and service code directly end-to-end before writing anything,
+which immediately surfaced something worth flagging: **two separate
+backend systems exist** — an older `/reconciliations` route
+(`reconciliationService.ts`) that appears unused by web at all, and the
+real one, `/bank-rec/*` (`bankReconciliationWorksheetService.ts`), which
+is what every `Reconcile*Page.tsx` on web actually calls. Built against
+`/bank-rec/*` only; the older route was left untouched.
+
+- **Scoped to Start/Resume → tick/save → Finish, plus a flat History
+  list.** Deliberately not built: Undo (`firm_admin`-only, rare — "I
+  finished a reconciliation by mistake" is not a common mobile moment),
+  Cancel wired into the UI (exists server-side, used only for this
+  chunk's own live-API cleanup, see below), and a discrepancy-account
+  picker on Finish (the server already defaults to Opening Balance
+  Equity when `accept_difference: true` is sent with no account —
+  covers the common case without an extra picker).
+- **Beginning balance is never user-entered** — confirmed the server
+  always computes it from the prior completed reconciliation's ending
+  balance (0.00 if none), so the Start form only asks for the statement
+  ending balance and date, matching the real constraint rather than
+  adding a field the API would ignore.
+- **Clearing is kept client-local** (a `Record<string, boolean>` built
+  from the worksheet's `items[].is_cleared` on load), recomputing the
+  running summary (cleared balance, difference, checked count) in JS on
+  every tap rather than a network round trip per toggle — same approach
+  web's own worksheet takes. An explicit Save button sends the full
+  current state in one `PATCH .../items` call (the endpoint's own
+  contract: idempotent upsert keyed on `transaction_type`+
+  `transaction_id`), and Finish auto-saves once more right before
+  calling finish, so a forgotten Save tap can't lose ticks.
+- **Finish handles the non-zero-difference case explicitly**: confirmed
+  the server does *not* require an exact match — a nonzero difference
+  without `accept_difference: true` throws a precondition error naming
+  the amount, so the mobile Finish button checks the local difference
+  first and, if nonzero, shows an alert ("$X difference... Finish
+  anyway posts an adjusting entry") before calling finish with
+  `accept_difference: true`.
+- `services/api.ts`: added `ReconcilableAccount`/`ReconciliationRow`/
+  `WorksheetItem`/`ReconciliationSummary`/`Worksheet`/
+  `ReconciliationHistoryRow` types + `listReconcilableAccounts`/
+  `getReconciliationStatus`/`startReconciliation`/`getWorksheet`/
+  `saveReconciliationProgress`/`finishReconciliation`/
+  `listReconciliationHistory` — the worksheet's `account` field reuses
+  the existing `CoaAccount` type from the Chart of Accounts chunk rather
+  than redeclaring it, since `resolveAccount`'s `selectAll()` returns
+  the exact same `chart_of_accounts` row shape.
+- **`app/reconcile.tsx`**: account picker (any reconcilable asset/
+  liability/equity account, not just registered bank accounts) +
+  beginning-balance display + Resume/Start.
+- **`app/reconcile/start.tsx`**: ending balance + date only (service
+  charge/interest fields exist server-side but were left off the mobile
+  form — skippable, and keeps the form short for the common case).
+- **`app/reconcile/[id].tsx`**: the worksheet itself — summary card,
+  Deposits/Payments filter chips, tap-to-tick rows (no separate detail
+  navigation — ticking *is* the primary interaction, matching every real
+  reconciliation tool), Save/Finish footer.
+- **`app/reconcile-history.tsx`**: flat list across every account (no
+  expandable QBO-style report view — that's a `getReconciliationDetail`
+  call not wired up this chunk).
+- Retired the long-standing "Reconciliation" disabled stub in the More
+  tab (present since the earliest redesign chunks) now that it's real —
+  the `STUB_ITEMS` array it was the last entry in is now gone entirely.
+- Wired into the drawer's Accounting > Reconcile item and the More tab.
+
+**Verified** — by far the most thorough live check this session, because
+this account (1120 — Cash in Bank) actually has real transaction
+history, unlike every AR/AP/bank-transactions chunk before it: `tsc
+--noEmit` clean, a fresh `expo export --platform ios` bundle built with
+no errors, and then a full live round trip via direct API calls (not
+through the unfinished mobile UI, to keep it safely reversible) —
+`listReconcilableAccounts` (59 real accounts), `getReconciliationStatus`,
+`startReconciliation` (confirmed every `ReconciliationRow` field),
+`getWorksheet` (64 real items, confirmed `WorksheetItem` and `summary`
+field-for-field, confirmed the `account` sub-object matches `CoaAccount`
+exactly), `saveReconciliationProgress` (ticked one real item, confirmed
+the returned `{reconciliation, summary}` and the recomputed difference
+math), then `cancel` to discard the test session cleanly — confirmed via
+a final `getReconciliationStatus` call that `in_progress_id` went back
+to `null`, leaving no trace. Deliberately did **not** call `finish` live,
+since that would have permanently marked a real transaction reconciled
+and posted a real adjustment journal entry — tested everything finish
+depends on (save, the difference calculation) short of the one
+irreversible step.

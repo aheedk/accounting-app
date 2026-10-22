@@ -65,7 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Client Overview' }, { label: 'Books Review' }, { label: 'Approvals' },
       { label: 'Bank Accounts' }, { label: 'Bank Transactions', path: '/bank-transactions' }, { label: 'Integration Transactions' },
-      { label: 'Receipts' }, { label: 'Reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
+      { label: 'Receipts' }, { label: 'Reconcile', path: '/reconcile' }, { label: 'Rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
       { label: 'Recurring Transactions' }, { label: 'Fixed Assets' }, { label: 'Journal', path: '/journal-entries' },
     ],
   },

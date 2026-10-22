@@ -910,3 +910,105 @@ export async function unreviewBankTransaction(businessId: string, id: string) {
   const r = await api.post<BankTransactionRow>(`/businesses/${businessId}/bank-transactions/${id}/unreview`);
   return r.data;
 }
+
+// --- Reconciliation — shapes read directly from
+// bankReconciliationWorksheetService.ts's actual return statements and
+// ReconciliationsTable/ReconciliationItemsTable in db/types.ts. Confirmed
+// there are TWO backend systems (an older, apparently web-unused
+// /reconciliations route, and this one, /bank-rec/*, which is what
+// web's Reconcile*Page.tsx components actually call) — built against
+// /bank-rec/* only, not the unused one.
+//
+// Scoped to Start/Resume → Worksheet (tick + save + finish) → History.
+// Deliberately NOT built: Undo (firm_admin-only, rare, can follow later),
+// Cancel (abandoning an in-progress session — same reasoning), and a
+// discrepancy-account picker on Finish (the server already defaults to
+// Opening Balance Equity when none is given, so "accept the difference"
+// needs no extra picker for the common case).
+
+export type ReconcilableCategory =
+  | 'Bank' | 'Credit Card' | 'Other Current Asset' | 'Fixed Asset' | 'Other Asset'
+  | 'Other Current Liability' | 'Long-Term Liability' | 'Equity';
+export type ReconcilableAccount = { id: string; code: string; name: string; category: ReconcilableCategory };
+
+export async function listReconcilableAccounts(businessId: string) {
+  const r = await api.get<{ accounts: ReconcilableAccount[] }>(`/businesses/${businessId}/bank-rec/accounts`);
+  return r.data.accounts;
+}
+
+export async function getReconciliationStatus(businessId: string, accountId: string) {
+  const r = await api.get<{ beginning_balance: string; in_progress_id: string | null }>(
+    `/businesses/${businessId}/bank-rec/status`, { params: { account_id: accountId } },
+  );
+  return r.data;
+}
+
+export type ReconciliationSessionStatus = 'in_progress' | 'completed' | 'cancelled';
+export type ReconciliationRow = {
+  id: string; business_id: string; account_id: string;
+  statement_beginning_balance: string; statement_ending_balance: string; statement_ending_date: string;
+  beginning_balance: string;
+  service_charge_amount: string; service_charge_date: string | null; service_charge_account_id: string | null;
+  interest_earned_amount: string; interest_earned_date: string | null; interest_earned_account_id: string | null;
+  status: ReconciliationSessionStatus; difference: string; adjustment_journal_entry_id: string | null;
+  completed_at: string | null; completed_by_user_id: string | null;
+  created_by_user_id: string | null; created_at: string; updated_at: string;
+};
+
+export type ReconciliationStartInput = {
+  account_id: string; statement_ending_balance: string; statement_ending_date: string;
+  service_charge_amount?: string | null; service_charge_date?: string | null; service_charge_account_id?: string | null;
+  interest_earned_amount?: string | null; interest_earned_date?: string | null; interest_earned_account_id?: string | null;
+};
+
+export async function startReconciliation(businessId: string, input: ReconciliationStartInput) {
+  const r = await api.post<ReconciliationRow>(`/businesses/${businessId}/bank-rec/start`, input);
+  return r.data;
+}
+
+export type ReconciliationItemType = 'deposit' | 'expense' | 'check' | 'journal_entry' | 'service_charge' | 'interest';
+export type WorksheetItem = {
+  transaction_type: ReconciliationItemType; transaction_id: string; transaction_date: string;
+  type_label: string; ref_no: string | null; name: string | null; description: string | null;
+  amount: string; is_cleared: boolean; auto_matched: boolean; transaction_path: string;
+};
+export type ReconciliationSummary = {
+  statement_beginning_balance: string; statement_ending_balance: string; cleared_balance: string;
+  difference: string; cleared_count: number; total_count: number; auto_matched_count: number;
+};
+export type Worksheet = {
+  reconciliation: ReconciliationRow; account: CoaAccount; category: ReconcilableCategory;
+  items: WorksheetItem[]; summary: ReconciliationSummary;
+};
+
+export async function getWorksheet(businessId: string, id: string) {
+  const r = await api.get<Worksheet>(`/businesses/${businessId}/bank-rec/${id}/worksheet`);
+  return r.data;
+}
+
+export async function saveReconciliationProgress(
+  businessId: string, id: string,
+  items: Array<{ transaction_type: ReconciliationItemType; transaction_id: string; is_cleared: boolean }>,
+) {
+  const r = await api.patch<{ reconciliation: ReconciliationRow; summary: ReconciliationSummary }>(
+    `/businesses/${businessId}/bank-rec/${id}/items`, { items },
+  );
+  return r.data;
+}
+
+export async function finishReconciliation(businessId: string, id: string, accept_difference?: boolean) {
+  const r = await api.post<ReconciliationRow>(`/businesses/${businessId}/bank-rec/${id}/finish`, { accept_difference });
+  return r.data;
+}
+
+export type ReconciliationHistoryRow = ReconciliationRow & {
+  account_code: string; account_name: string;
+  account_type: string; detail_type: string | null;
+  category: ReconcilableCategory; items_cleared: number; changes: number;
+  auto_adjustment: string | null; completed_by: string | null;
+};
+
+export async function listReconciliationHistory(businessId: string, params: { account_id?: string } = {}) {
+  const r = await api.get<{ reconciliations: ReconciliationHistoryRow[] }>(`/businesses/${businessId}/bank-rec/history`, { params });
+  return r.data.reconciliations;
+}

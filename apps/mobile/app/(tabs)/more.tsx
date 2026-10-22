@@ -6,10 +6,6 @@ import { AppHeader } from '../../components/AppHeader';
 import type { AppTheme } from '../../theme';
 import { spacing, fontFamily } from '../../theme';
 
-const STUB_ITEMS = [
-  { icon: 'bank-check', label: 'Reconciliation' },
-] as const;
-
 export default function MoreScreen() {
   const theme = useTheme<AppTheme>();
   const { user } = useAuth();
@@ -122,19 +118,12 @@ export default function MoreScreen() {
         left={props => <List.Icon {...props} icon="bank-outline" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
-      <Divider />
-
-      {STUB_ITEMS.map(item => (
-        <List.Item
-          key={item.label}
-          title={item.label}
-          description="Available on desktop"
-          left={props => <List.Icon {...props} icon={item.icon} color={theme.app.mutedForeground} />}
-          titleStyle={{ color: theme.app.foreground }}
-          descriptionStyle={{ color: theme.app.mutedForeground }}
-          disabled
-        />
-      ))}
+      <List.Item
+        title="Reconcile"
+        onPress={() => router.push('/reconcile')}
+        left={props => <List.Icon {...props} icon="bank-check" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
 
       <Divider style={{ marginVertical: spacing.md }} />
 
