@@ -622,6 +622,56 @@ export async function getPerformanceReport(businessId: string) {
   return r.data;
 }
 
+export type CustomReportGroupBy = 'account' | 'month' | 'cost_center' | 'customer' | 'vendor';
+export type CustomReportColumn = 'debit' | 'credit' | 'net';
+export type CustomReportDefinition = {
+  account_ids: string[];
+  date_range: { from: string; to: string };
+  group_by: CustomReportGroupBy;
+  columns: CustomReportColumn[];
+};
+export type CustomReport = {
+  id: string; business_id: string; name: string; owner_user_id: string;
+  definition: CustomReportDefinition; created_at: string; updated_at: string;
+};
+export type CustomReportRow = { group_key: string; debit: string; credit: string; net: string };
+
+export async function listCustomReports(businessId: string) {
+  const r = await api.get<{ reports: CustomReport[] }>(`/businesses/${businessId}/custom-reports`);
+  return r.data.reports;
+}
+
+export async function getCustomReport(businessId: string, id: string) {
+  const r = await api.get<CustomReport>(`/businesses/${businessId}/custom-reports/${id}`);
+  return r.data;
+}
+
+export async function createCustomReport(businessId: string, name: string, definition: CustomReportDefinition) {
+  const r = await api.post<CustomReport>(`/businesses/${businessId}/custom-reports`, { name, definition });
+  return r.data;
+}
+
+export async function updateCustomReport(
+  businessId: string, id: string, patch: { name?: string; definition?: CustomReportDefinition },
+) {
+  const r = await api.patch<CustomReport>(`/businesses/${businessId}/custom-reports/${id}`, patch);
+  return r.data;
+}
+
+export async function deleteCustomReport(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/custom-reports/${id}`);
+}
+
+export async function runSavedCustomReport(businessId: string, id: string) {
+  const r = await api.post<{ rows: CustomReportRow[] }>(`/businesses/${businessId}/custom-reports/${id}/run`);
+  return r.data.rows;
+}
+
+export async function runCustomReport(businessId: string, definition: CustomReportDefinition) {
+  const r = await api.post<{ rows: CustomReportRow[] }>(`/businesses/${businessId}/custom-reports/run`, { definition });
+  return r.data.rows;
+}
+
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
 // reports) directly. packages/shared's agingRowSchema is stale — its field
 // names (customer_id/customer_name/over_30/over_60/over_90) don't match

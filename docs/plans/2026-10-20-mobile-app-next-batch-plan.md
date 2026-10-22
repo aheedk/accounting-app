@@ -1903,3 +1903,41 @@ March–June 2026).
 Remaining in the Reports group: Custom Reports and Financial Planning
 (both full-CRUD, next chunk), Spreadsheet Sync (deferred, low
 priority).
+
+## Chunk: Custom Reports (2026-10-22)
+
+The first full-CRUD report builder in the mobile app. One screen,
+two modes (list / builder) rather than a separate route, since the
+builder is really just an inline editor over the list:
+
+- **`app/custom-reports.tsx`**: list mode shows saved reports (name +
+  group-by + date range), tap to run-and-open in builder mode;
+  `accountant`+ gets a delete icon per row (matches the DELETE route's
+  own `requireMinRole('accountant')`, confirmed by reading
+  `customReports.ts` directly — create/update are `staff`+, delete is
+  stricter). Builder mode: name field, date-range pickers, a group-by
+  dropdown (account/month/cost_center/customer/vendor), column toggles
+  (debit/credit/net, `AppChip`s), and a collapsible account multi-select
+  (checkbox list over the existing CoA — empty selection means "all
+  accounts," matching the backend's own `account_ids: []` semantics).
+  "Run" calls the ad-hoc `POST .../custom-reports/run` without saving;
+  "Save & Run" creates it, then runs the saved version. Results render
+  as a simple group-key + column table.
+- `services/api.ts`: added `CustomReportDefinition`/`CustomReport`/
+  `CustomReportRow` types + list/get/create/update/delete/run functions,
+  confirmed against `customReportService.ts` and
+  `CustomReportDefinitionsTable` directly — particularly the result row
+  shape (`{group_key, debit, credit, net}`), which isn't obvious from
+  the route file alone.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Ran a full live CRUD round-trip
+against the dev server: ad-hoc run (grouped by month, real non-zero
+data), create, run-the-saved-version (identical rows), then delete
+(204) — the demo record was cleaned up after, not left in the
+business's data.
+
+Remaining in the Reports group: Financial Planning (full-CRUD budgets,
+next chunk), Spreadsheet Sync (deferred, low priority — a thin
+CSV/PDF-export wrapper, not a real sync feature).
