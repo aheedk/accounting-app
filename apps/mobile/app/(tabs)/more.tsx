@@ -29,6 +29,7 @@ const SECTIONS: Section[] = [
       { title: 'Standard Reports', path: '/standard-reports', icon: 'view-list-outline' },
       { title: 'Cash Activity by Account', path: '/cash-activity', icon: 'bank-transfer' },
       { title: 'Custom Reports', path: '/custom-reports', icon: 'file-chart-outline' },
+      { title: 'Financial Planning', path: '/financial-planning', icon: 'chart-box-outline' },
       { title: 'Management Reports', path: '/management-reports', icon: 'finance' },
       { title: 'Performance Center', path: '/performance-center', icon: 'trending-up' },
     ],

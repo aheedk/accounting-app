@@ -1941,3 +1941,51 @@ business's data.
 Remaining in the Reports group: Financial Planning (full-CRUD budgets,
 next chunk), Spreadsheet Sync (deferred, low priority — a thin
 CSV/PDF-export wrapper, not a real sync feature).
+
+## Chunk: Financial Planning / Budgets (2026-10-22)
+
+"Financial Planning" is plain budgets + variance, not a distinct
+planning module — confirmed no spec exists for it and the backend
+(`budgets.ts`) is literally a budget CRUD + variance API. Mirrors web's
+`FinancialPlanningPage.tsx` functionally, but adapted for a phone
+screen: web renders a full account × 12-month grid for every active
+account at once, which doesn't fit mobile — rebuilt as an account
+picker + a 12-row vertical list for whichever account is selected, same
+underlying per-cell PATCH, no functionality lost.
+
+- **`app/financial-planning.tsx`**: list mode (budgets + status badge +
+  `firm_admin`-only delete, matching the DELETE route's
+  `requireMinRole('firm_admin')` — stricter than every other write on
+  this route, confirmed by reading `budgets.ts` directly) + a "New
+  Budget" form (`accountant`+, name + fiscal year). Detail mode: a
+  status segmented control (draft/active/archived, `accountant`+) and
+  an Edit/Variance mode toggle. Edit mode shows the selected account's
+  12 months as editable amount fields, saved on blur via
+  `PATCH .../lines` (one cell at a time, same as web). Variance mode
+  shows budget/actual/variance per month for that account, colored by
+  sign.
+- `services/api.ts`: added `Budget`/`BudgetLine`/`BudgetWithLines`/
+  `BudgetVarianceRow` types + list/get/create/update/delete/
+  setBudgetLine/getVariance functions, confirmed against
+  `budgetService.ts` and `BudgetsTable`/`BudgetLinesTable` directly —
+  particularly the variance row shape, which isn't derivable from the
+  route file alone.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Live round-trip against the dev
+server: create → get-with-lines → set one line (`PATCH .../lines`,
+amount persisted and normalized to `"500.0000"`) → variance (real rows
+against actual posted activity) → status update (`draft` → `active`) →
+delete attempt correctly 403'd for the accountant-role demo login,
+confirming the firm_admin-only gate matches the mobile screen's own
+check. The leftover test budget couldn't be cleaned up under this
+login (by design) and was left on the demo business — harmless test
+data, same as other chunks' demo artifacts.
+
+Reports group is now fully built except Spreadsheet Sync, which stays
+deliberately deferred (a thin CSV/PDF-export wrapper around the
+already-built Journal Entries data, not a distinct feature worth its
+own screen). Remaining disabled items overall: Spreadsheet Sync,
+Inventory (6 items, unresearched), and two top-level items (Messages,
+Send documents).

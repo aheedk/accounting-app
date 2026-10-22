@@ -672,6 +672,52 @@ export async function runCustomReport(businessId: string, definition: CustomRepo
   return r.data.rows;
 }
 
+export type BudgetStatus = 'draft' | 'active' | 'archived';
+export type Budget = {
+  id: string; business_id: string; name: string; fiscal_year: number; status: BudgetStatus;
+  created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+export type BudgetLine = { id: string; budget_id: string; account_id: string; month_offset: number; amount: string };
+export type BudgetWithLines = Budget & { lines: BudgetLine[] };
+export type BudgetVarianceRow = {
+  account_id: string; account_code: string; account_name: string; month_offset: number;
+  budget: string; actual: string; variance: string;
+};
+
+export async function listBudgets(businessId: string) {
+  const r = await api.get<{ budgets: Budget[] }>(`/businesses/${businessId}/budgets`);
+  return r.data.budgets;
+}
+
+export async function getBudget(businessId: string, id: string) {
+  const r = await api.get<BudgetWithLines>(`/businesses/${businessId}/budgets/${id}`);
+  return r.data;
+}
+
+export async function createBudget(businessId: string, name: string, fiscal_year: number) {
+  const r = await api.post<Budget>(`/businesses/${businessId}/budgets`, { name, fiscal_year });
+  return r.data;
+}
+
+export async function updateBudget(businessId: string, id: string, patch: { name?: string; status?: BudgetStatus }) {
+  const r = await api.patch<Budget>(`/businesses/${businessId}/budgets/${id}`, patch);
+  return r.data;
+}
+
+export async function deleteBudget(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/budgets/${id}`);
+}
+
+export async function setBudgetLine(businessId: string, id: string, account_id: string, month_offset: number, amount: string) {
+  const r = await api.patch<BudgetLine>(`/businesses/${businessId}/budgets/${id}/lines`, { account_id, month_offset, amount });
+  return r.data;
+}
+
+export async function getBudgetVariance(businessId: string, id: string) {
+  const r = await api.get<{ rows: BudgetVarianceRow[] }>(`/businesses/${businessId}/budgets/${id}/variance`);
+  return r.data.rows;
+}
+
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
 // reports) directly. packages/shared's agingRowSchema is stale — its field
 // names (customer_id/customer_name/over_30/over_60/over_90) don't match
