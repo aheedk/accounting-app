@@ -126,7 +126,9 @@ bank type or it is set up under Banking.
 ## Still to do
 
 Nothing from this video. Still open around it: his PDF and check stubs (item 34
-in the 10-10 notes), and the second video.
+in the 10-10 notes). The second video (10-21) is
+[`2026-10-21-faizan-video-2.md`](./2026-10-21-faizan-video-2.md); about half of
+it asks again for what is here.
 
 ## Ask Faizan
 

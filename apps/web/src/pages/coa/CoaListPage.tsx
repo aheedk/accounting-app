@@ -37,6 +37,9 @@ const COL_ALIASES: Record<string, string> = {
   'type': 'account_type',
   'account_type': 'account_type',
   'acct type': 'account_type',
+  // QuickBooks' own export has it, so its accounts keep their detail type.
+  'detail type': 'detail_type',
+  'detail_type': 'detail_type',
 };
 
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'] as const;
@@ -68,8 +71,8 @@ const TYPE_ALIASES: Record<string, { type: string; detail?: string }> = {
   'loan': { type: 'liability', detail: 'Loan Payable' },
   'other current liability': { type: 'liability' },
   'other current liabilities': { type: 'liability' },
-  'long term liability': { type: 'liability' },
-  'long-term liability': { type: 'liability' },
+  'long term liability': { type: 'liability', detail: 'Other Long Term Liabilities' },
+  'long-term liability': { type: 'liability', detail: 'Other Long Term Liabilities' },
   'equity': { type: 'equity' },
   "owner's equity": { type: 'equity' },
   'owner equity': { type: 'equity' },
@@ -77,14 +80,46 @@ const TYPE_ALIASES: Record<string, { type: string; detail?: string }> = {
   'revenue': { type: 'revenue' },
   'income': { type: 'revenue' },
   'sales': { type: 'revenue', detail: 'Sales Income' },
-  'other income': { type: 'revenue', detail: 'Other Income' },
+  'other income': { type: 'revenue', detail: 'Other Miscellaneous Income' },
   'expense': { type: 'expense' },
   'expenses': { type: 'expense' },
-  'cost of goods sold': { type: 'expense', detail: 'Cost of Labor' },
-  'cogs': { type: 'expense', detail: 'Cost of Labor' },
-  'other expense': { type: 'expense', detail: 'Other Expenses' },
-  'other expenses': { type: 'expense', detail: 'Other Expenses' },
+  // Was 'Cost of Labor', which is an ordinary expense: imported cost of goods
+  // landed under Expenses on the P&L, after Gross Profit (2026-10-22).
+  'cost of goods sold': { type: 'expense', detail: 'Supplies & Materials - COGS' },
+  'cogs': { type: 'expense', detail: 'Supplies & Materials - COGS' },
+  'other expense': { type: 'expense', detail: 'Other Miscellaneous Expense' },
+  'other expenses': { type: 'expense', detail: 'Other Miscellaneous Expense' },
 };
+
+// A sheet that names QuickBooks' account types exactly ("Accounts receivable
+// (A/R)", "Long Term Liabilities"): the detail type an account of that type
+// gets when the sheet gives none. Equity, Income and Expenses need none.
+const GROUP_DEFAULT_DETAIL: Partial<Record<AccountGroup, string>> = {
+  'Bank': 'Checking',
+  'Accounts receivable (A/R)': 'Accounts receivable (A/R)',
+  'Other Current Assets': 'Other Current Assets',
+  'Fixed Assets': 'Other fixed assets',
+  'Other Assets': 'Other Long-term Assets',
+  'Credit Card': 'Credit Card',
+  'Accounts payable (A/P)': 'AP',
+  'Other Current Liabilities': 'Other Current Liabilities',
+  'Long Term Liabilities': 'Other Long Term Liabilities',
+  'Other Income': 'Other Miscellaneous Income',
+  'Cost of Goods Sold': 'Supplies & Materials - COGS',
+  'Other Expense': 'Other Miscellaneous Expense',
+};
+
+/** An import sheet's type name as our base type and, when it says, a detail type. */
+function importType(name: string): { type: string; detail?: string } | null {
+  const lower = name.trim().toLowerCase();
+  const group = ACCOUNT_TYPE_GROUPS.flatMap(entry => [...entry.items] as AccountGroup[])
+    .find(item => item.toLowerCase() === lower);
+  if (group) {
+    const detail = GROUP_DEFAULT_DETAIL[group];
+    return { type: baseTypeOf(group), ...(detail ? { detail } : {}) };
+  }
+  return TYPE_ALIASES[lower] ?? null;
+}
 
 // The QuickBooks account type an account shows under ("Bank", "Fixed Assets"):
 // read from its detail type, except that an account set up under Banking is a bank.
@@ -528,12 +563,13 @@ export default function CoaListPage() {
           }
           // Normalize QBO-style type names so validation issues surface in
           // the preview instead of failing at the API.
-          const alias = TYPE_ALIASES[row['account_type']!.toLowerCase()];
+          const alias = importType(row['account_type']!);
           if (!alias) {
             return { data: row, status: 'pending' as const, error: `Unknown account type "${row['account_type']}"` };
           }
           row['account_type'] = alias.type;
-          if (alias.detail) row['detail_type'] = alias.detail;
+          // A detail type the sheet gives is kept; the type name's is only a fallback.
+          if (!row['detail_type'] && alias.detail) row['detail_type'] = alias.detail;
           return { data: row, status: 'pending' as const, error: null };
         });
         setImportRows(parsed);

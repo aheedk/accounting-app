@@ -150,7 +150,8 @@ describe('ledgerService.postJournalEntry', () => {
     expect(automatic.journal_number).toBe('999999999999999999');
   });
 
-  it('rejects a duplicate custom journal number within the business', async () => {
+  // Faizan, 10-21 (item 88): entry 1 in January and entry 1 again in February.
+  it('allows a custom journal number to be used again', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const input = {
       business_id: biz.id,
@@ -163,10 +164,11 @@ describe('ledgerService.postJournalEntry', () => {
         { account_id: revenue.id, debit: '0.0000', credit: '10.0000', memo: null },
       ],
     };
-    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, input));
+    const first = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, input));
+    const second = await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, { ...input, entry_date: '2026-05-15' }));
 
-    await expect(t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, input)))
-      .rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
+    expect(second.id).not.toBe(first.id);
+    expect(second.journal_number).toBe('AJE-7');
   });
 
   it('rejects unbalanced entry with UNBALANCED_ENTRY (service-layer guard)', async () => {
@@ -449,7 +451,7 @@ describe('ledgerService.postJournalEntry', () => {
     expect(reversals).toHaveLength(0);
   });
 
-  it('allows a 99-character base number and rejects a typed reversal-number collision', async () => {
+  it('allows a 99-character base number, and a reversal number that is already used', async () => {
     const { biz, ctx, cash, revenue } = await setup(t);
     const lines = [
       { account_id: cash.id, debit: '10.0000', credit: '0.0000', memo: null },
@@ -501,9 +503,11 @@ describe('ledgerService.postJournalEntry', () => {
       lines,
     }));
 
-    await expect(t.db.transaction().execute(trx => ledger.reverseJournalEntry(
+    // Numbers may repeat (item 88), so 25R on another entry does not stop the reversal.
+    const reversal = await t.db.transaction().execute(trx => ledger.reverseJournalEntry(
       trx, ctx, { journal_entry_id: original.id },
-    ))).rejects.toMatchObject({ code: ERR.DUPLICATE_RESOURCE });
+    ));
+    expect(reversal.journal_number).toBe('25R');
   });
 
   it('rejects standalone reversal of a source-generated entry', async () => {

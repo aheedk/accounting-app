@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSidebarHidden } from '@/lib/sidebarHidden';
 import { CreateMenu } from './CreateMenu';
 import { BookmarkMenu } from './BookmarkMenu';
 import { JOURNAL_NAV_ITEM } from '@/pages/journal/journalNavigation';
@@ -411,6 +412,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                 to={firstChild.to}
                 onClick={() => onNavigate?.()}
                 aria-expanded={isOpen}
+                data-disclosure
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   'hover:bg-sidebar-hover/[0.08] hover:text-white',
@@ -433,6 +435,7 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
                 type="button"
                 onClick={() => setOpenGroupId(id => (id === group.id ? null : group.id))}
                 aria-expanded={isOpen}
+                data-disclosure
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   'hover:bg-sidebar-hover/[0.08] hover:text-white',
@@ -500,10 +503,12 @@ export function SidebarNav({ expandOnHover = true, onNavigate }: SidebarNavProps
 }
 
 // Static sidebar for desktop (`lg` and up). On smaller viewports it is hidden and
-// the same nav is presented through the `MobileNav` drawer.
+// the same nav is presented through the `MobileNav` drawer. The top bar's
+// SidebarToggle hides it on desktop too (item 89).
 export function Sidebar() {
+  const hiddenOnDesktop = useSidebarHidden();
   return (
-    <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex">
+    <aside className={cn('hidden h-full w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground', !hiddenOnDesktop && 'lg:flex')}>
       <SidebarBrand />
       <CreateMenu />
       <BookmarkMenu />

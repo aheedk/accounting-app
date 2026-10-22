@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth';
 import { roleLabel } from '@/lib/roleAccess';
 import { setExportCompany } from '@/lib/reportExport';
 import { Sidebar } from './Sidebar';
+import { SidebarToggle } from './SidebarToggle';
 import { MobileNav } from './MobileNav';
 
 // The firm's own view, with no client selected (Faizan's item 68), as in
@@ -42,6 +43,7 @@ export function FirmShell() {
             >
               <Menu className="h-5 w-5" />
             </button>
+            <SidebarToggle />
             <span className="inline-flex h-9 items-center gap-2 rounded-md border border-dashed border-input px-3 text-muted-foreground">
               <Building2 className="h-4 w-4 shrink-0" />
               <span className="font-medium text-foreground">All clients</span>

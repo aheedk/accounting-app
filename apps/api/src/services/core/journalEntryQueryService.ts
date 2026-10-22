@@ -34,6 +34,8 @@ export type JournalEntryListQuery = {
   status?: JournalEntryStatus;
   period_start?: string;
   period_end?: string;
+  /** Entries with this number: the entry screen warns when a number is used again (item 88). */
+  journal_number?: string;
   limit: number;
   offset: number;
 };
@@ -92,6 +94,7 @@ export async function listJournalEntries(
   if (query.status) entriesQuery = entriesQuery.where('status', '=', query.status);
   if (query.period_start) entriesQuery = entriesQuery.where('entry_date', '>=', query.period_start);
   if (query.period_end) entriesQuery = entriesQuery.where('entry_date', '<=', query.period_end);
+  if (query.journal_number) entriesQuery = entriesQuery.where('journal_number', '=', query.journal_number);
 
   const orderedEntries = query.sort === 'recent'
     ? entriesQuery.orderBy('created_at', 'desc').orderBy('id', 'desc')
@@ -156,7 +159,6 @@ function reversalBlockReason(
   entry: { status: JournalEntryStatus; journal_number: string },
   sourceGenerated: boolean,
   hasReversal: boolean,
-  reversalNumberConflict: boolean,
 ): string | null {
   if (!hasMinRole(effectiveRole, 'accountant')) {
     return 'Accountant access is required to reverse journal entries.';
@@ -172,9 +174,6 @@ function reversalBlockReason(
   }
   if (`${entry.journal_number}R`.length > 100) {
     return 'This legacy journal number is too long to create a reversal.';
-  }
-  if (reversalNumberConflict) {
-    return `Journal number ${entry.journal_number}R is already in use.`;
   }
   return null;
 }
@@ -198,18 +197,12 @@ export async function getJournalEntryDetail(
     .where('reversed_entry_id', '=', entry.id)
     .executeTakeFirst();
   const hasReversal = existingReversal !== undefined;
-  const reversalNumberConflict = await db.selectFrom('journal_entries').select('id')
-    .where('business_id', '=', ctx.business_id)
-    .where('journal_number', '=', `${entry.journal_number}R`)
-    .where('status', '<>', 'voided')
-    .executeTakeFirst();
   const blockReason = correctionBlockReason(ctx.effective_role, entry, sourceGenerated, hasReversal);
   const reverseBlockReason = reversalBlockReason(
     ctx.effective_role,
     entry,
     sourceGenerated,
     hasReversal,
-    reversalNumberConflict !== undefined,
   );
   const deletePlan = await planJournalEntryDelete(db, ctx, entry);
 

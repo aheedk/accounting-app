@@ -170,6 +170,29 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
     return () => journalNumberRequestGateRef.current.invalidate();
   }, [businessId, existing, reverseSource, numberRefresh]);
 
+  // A number typed that another entry already has: allowed, as in QuickBooks
+  // (item 88: numbering starts again each month), but said so before saving.
+  const typedNumber = form.journalNo.trim();
+  const checkTypedNumber = !readOnly && !reverseSource && !automaticJournalNumber && typedNumber !== ''
+    && typedNumber !== existing?.entry.journal_number;
+  const [numberUsedOn, setNumberUsedOn] = useState<string | null>(null);
+  useEffect(() => {
+    if (!businessId || !checkTypedNumber) { setNumberUsedOn(null); return; }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      api.get<{ entries: Array<{ id: string; journal_number: string; entry_date: string; status: string }> }>(
+        `/businesses/${businessId}/journal-entries`, { params: { journal_number: typedNumber, limit: 5 } },
+      ).then(response => {
+        if (cancelled) return;
+        const other = response.data.entries.find(entry => (
+          entry.journal_number === typedNumber && entry.id !== existing?.entry.id && entry.status !== 'voided'
+        ));
+        setNumberUsedOn(other ? String(other.entry_date).slice(0, 10) : null);
+      }).catch(() => { if (!cancelled) setNumberUsedOn(null); });
+    }, 400);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [businessId, checkTypedNumber, typedNumber, existing]);
+
   useEffect(() => {
     function handle(event: MouseEvent) {
       if (saveMenuRef.current && !saveMenuRef.current.contains(event.target as Node)) {
@@ -493,6 +516,11 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
             disabled={readOnly || reverseSource !== undefined}
             className="w-44"
           />
+          {numberUsedOn && (
+            <p className="mt-1 w-44 text-xs text-amber-700" role="status">
+              No. {typedNumber} is already used, on {fmtJournalDate(numberUsedOn)}. It can be used again.
+            </p>
+          )}
         </div>
         <label className="flex items-center gap-2 pb-0.5 text-sm text-muted-foreground">
           <span>Is Adjusting Journal Entry?</span>
@@ -512,7 +540,7 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
             <thead>
               <tr className="border-b border-t">
                 <th className="w-8 px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">#</th>
-                <th className="min-w-[180px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">ACCOUNT</th>
+                <th className="min-w-[260px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">ACCOUNT</th>
                 <th className="w-32 px-2 py-2.5 text-right text-xs font-semibold text-muted-foreground">DEBITS</th>
                 <th className="w-32 px-2 py-2.5 text-right text-xs font-semibold text-muted-foreground">CREDITS</th>
                 <th className="min-w-[160px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">DESCRIPTION</th>
@@ -802,6 +830,7 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
                 disabled={!canSave}
                 aria-label="Save destination menu"
                 onClick={() => setShowSaveMenu(current => !current)}
+                aria-expanded={showSaveMenu}
                 className="rounded-l-none border-l border-l-primary-foreground/30 px-2"
               >
                 <ChevronDown className="h-4 w-4" />

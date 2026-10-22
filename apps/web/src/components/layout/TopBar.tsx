@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
+import { SidebarToggle } from '@/components/layout/SidebarToggle';
 import { roleLabel, useEffectiveRole } from '@/lib/roleAccess';
 
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
@@ -25,6 +26,7 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         >
           <Menu className="h-5 w-5" />
         </button>
+        <SidebarToggle />
         <BusinessSwitcher />
       </div>
 

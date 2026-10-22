@@ -15,27 +15,7 @@ import { ReportAmountLink } from '@/components/ui/ReportAmountLink';
 import { generalLedgerDrilldownUrl } from '@/lib/reportDrilldown';
 import { printReport } from '@/lib/reportExport';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
-
-type PnlLine = {
-  account_id: string;
-  account_code: string;
-  account_name: string;
-  amount: string;
-};
-
-type PnlReport = {
-  period_start: string;
-  period_end: string;
-  revenue_lines: PnlLine[];
-  revenue_total: string;
-  expense_lines: PnlLine[];
-  expense_total: string;
-  gross_profit: string;
-  operating_expenses_total: string;
-  operating_income: string;
-  other_expenses_total: string;
-  net_income: string;
-};
+import { pnlRows, type PnlReport } from './pnlLayout';
 
 function pickErr(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
@@ -90,17 +70,14 @@ export default function ProfitLossPage() {
 
   // No Section column: each section is a heading row of its own, as on the page.
   const dlHeaders = ['Code', 'Account', 'Amount'];
-  const dlRows = () => report ? [
-    ['', 'Income', ''],
-    ...report.revenue_lines.map(l => [l.account_code, l.account_name, l.amount]),
-    ['', 'Total Income', report.revenue_total],
-    ['', 'GROSS PROFIT', report.gross_profit],
-    ['', 'Expenses', ''],
-    ...report.expense_lines.map(l => [l.account_code, l.account_name, l.amount]),
-    ['', 'Total Expenses', report.expense_total],
-    ['', 'NET OPERATING INCOME', report.operating_income],
-    ['', 'NET INCOME', report.net_income],
-  ] : [];
+  const dlRows = () => report ? pnlRows(report).map(row => {
+    switch (row.kind) {
+      case 'heading': return ['', row.label, ''];
+      case 'line': return [row.line.account_code, row.line.account_name, row.line.amount];
+      case 'empty': return ['', row.label, ''];
+      default: return ['', row.label, row.amount];
+    }
+  }) : [];
 
   const netIncomeNum = report ? parseFloat(report.net_income) : 0;
   function handleExport() {
@@ -183,66 +160,46 @@ export default function ProfitLossPage() {
             <div className="w-full overflow-x-auto">
             <table className="w-full text-sm">
               <tbody>
-                <tr className="border-b">
-                  <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Income</td>
-                </tr>
-                {report.revenue_lines.length === 0 && (
-                  <tr className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">No revenue recorded.</td></tr>
-                )}
-                {report.revenue_lines.map(r => (
-                  <tr key={r.account_id} className="border-b hover:bg-muted/30">
-                    <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{r.account_code}</span>{r.account_name}</td>
-                    <td className="p-3 text-right font-mono">
-                      <ReportAmountLink
-                        to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: report.period_start, periodEnd: report.period_end })}
-                        title={`View ${r.account_name} transactions in the General Ledger`}
-                      >
-                        {fmtMoney(r.amount)}
-                      </ReportAmountLink>
-                    </td>
-                  </tr>
-                ))}
-                <tr className="border-b font-semibold">
-                  <td className="p-3">Total Income</td>
-                  <td className="p-3 text-right font-mono">{fmtMoney(report.revenue_total)}</td>
-                </tr>
-                <tr className="border-b font-semibold">
-                  <td className="p-3">GROSS PROFIT</td>
-                  <td className="p-3 text-right font-mono">{fmtSigned(report.gross_profit)}</td>
-                </tr>
-
-                <tr className="border-b">
-                  <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Expenses</td>
-                </tr>
-                {report.expense_lines.length === 0 && (
-                  <tr className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">No expenses recorded.</td></tr>
-                )}
-                {report.expense_lines.map(r => (
-                  <tr key={r.account_id} className="border-b hover:bg-muted/30">
-                    <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{r.account_code}</span>{r.account_name}</td>
-                    <td className="p-3 text-right font-mono">
-                      <ReportAmountLink
-                        to={generalLedgerDrilldownUrl({ accountId: r.account_id, periodStart: report.period_start, periodEnd: report.period_end })}
-                        title={`View ${r.account_name} transactions in the General Ledger`}
-                      >
-                        {fmtMoney(r.amount)}
-                      </ReportAmountLink>
-                    </td>
-                  </tr>
-                ))}
-                <tr className="border-b font-semibold">
-                  <td className="p-3">Total Expenses</td>
-                  <td className="p-3 text-right font-mono">{fmtMoney(report.expense_total)}</td>
-                </tr>
-
-                <tr className="border-b font-semibold">
-                  <td className="p-3">NET OPERATING INCOME</td>
-                  <td className="p-3 text-right font-mono">{fmtSigned(report.operating_income)}</td>
-                </tr>
-                <tr className="font-semibold">
-                  <td className="p-3">NET INCOME</td>
-                  <td className={`p-3 text-right font-mono ${netIncomeClass}`}>{fmtSigned(report.net_income)}</td>
-                </tr>
+                {pnlRows(report).map((row, i) => {
+                  switch (row.kind) {
+                    case 'heading':
+                      return (
+                        <tr key={i} className="border-b">
+                          <td colSpan={2} className="p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">{row.label}</td>
+                        </tr>
+                      );
+                    case 'empty':
+                      return <tr key={i} className="border-b"><td colSpan={2} className="p-3 pl-8 text-muted-foreground">{row.label}</td></tr>;
+                    case 'line':
+                      return (
+                        <tr key={i} className="border-b hover:bg-muted/30">
+                          <td className="p-3 pl-8"><span className="mr-3 font-mono text-muted-foreground">{row.line.account_code}</span>{row.line.account_name}</td>
+                          <td className="p-3 text-right font-mono">
+                            <ReportAmountLink
+                              to={generalLedgerDrilldownUrl({ accountId: row.line.account_id, periodStart: report.period_start, periodEnd: report.period_end })}
+                              title={`View ${row.line.account_name} transactions in the General Ledger`}
+                            >
+                              {fmtMoney(row.line.amount)}
+                            </ReportAmountLink>
+                          </td>
+                        </tr>
+                      );
+                    case 'total':
+                      return (
+                        <tr key={i} className="border-b font-semibold">
+                          <td className="p-3">{row.label}</td>
+                          <td className="p-3 text-right font-mono">{fmtMoney(row.amount)}</td>
+                        </tr>
+                      );
+                    case 'result':
+                      return (
+                        <tr key={i} className={row.final ? 'font-semibold' : 'border-b font-semibold'}>
+                          <td className="p-3">{row.label}</td>
+                          <td className={`p-3 text-right font-mono ${row.final ? netIncomeClass : ''}`}>{fmtSigned(row.amount)}</td>
+                        </tr>
+                      );
+                  }
+                })}
               </tbody>
             </table>
             </div>

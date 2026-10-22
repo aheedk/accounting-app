@@ -135,17 +135,8 @@ export async function postJournalEntry(
     if (/^[1-9]\d{0,17}$/.test(requestedNumber)) {
       await reserveCounterAtLeast(trx, input.business_id, 'journal_entry', requestedNumber);
     }
-    const duplicate = await trx.selectFrom('journal_entries').select('id')
-      .where('business_id', '=', input.business_id)
-      .where('journal_number', '=', requestedNumber)
-      .where('status', '<>', 'voided')
-      .executeTakeFirst();
-    if (duplicate) {
-      throw new BusinessRuleError(
-        ERR.DUPLICATE_RESOURCE,
-        `Journal number ${requestedNumber} already exists`,
-      );
-    }
+    // A number may be used again (entry 1 in January, entry 1 in February), as in
+    // QuickBooks; the entry screen warns first (item 88, migration 0110).
     journalNumber = requestedNumber;
   } else {
     journalNumber = String(await nextCounter(trx, input.business_id, 'journal_entry'));
@@ -370,17 +361,6 @@ export async function reverseJournalEntry(
   if (reversalJournalNumber.length > 100) {
     throw new PreconditionError('This legacy journal number is too long to create a reversal number');
   }
-  const numberConflict = await trx.selectFrom('journal_entries').select('id')
-    .where('business_id', '=', original.business_id)
-    .where('journal_number', '=', reversalJournalNumber)
-    .where('status', '<>', 'voided')
-    .executeTakeFirst();
-  if (numberConflict) {
-    throw new BusinessRuleError(
-      ERR.DUPLICATE_RESOURCE,
-      `Journal number ${reversalJournalNumber} is already in use`,
-    );
-  }
   const reversalPeriod = await findPeriodForDate(
     trx as unknown as Kysely<DB>,
     original.business_id,
@@ -569,18 +549,6 @@ export async function updateJournalEntry(
     }
     if (/^[1-9]\d{0,17}$/.test(requestedNumber)) {
       await reserveCounterAtLeast(trx, ctx.business_id, 'journal_entry', requestedNumber);
-    }
-    const duplicate = await trx.selectFrom('journal_entries').select('id')
-      .where('business_id', '=', ctx.business_id)
-      .where('journal_number', '=', requestedNumber)
-      .where('status', '<>', 'voided')
-      .where('id', '<>', originalBefore.id)
-      .executeTakeFirst();
-    if (duplicate) {
-      throw new BusinessRuleError(
-        ERR.DUPLICATE_RESOURCE,
-        `Journal number ${requestedNumber} already exists`,
-      );
     }
     journalNumber = requestedNumber;
   }

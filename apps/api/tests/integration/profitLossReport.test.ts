@@ -89,6 +89,42 @@ describe('P&L report', () => {
     expect(rpt.expenseSection({ code: '4444', name: 'Rent', detail_type: null })).toBe('operating');
   });
 
+  // Faizan, 10-21 (item 83): Other Income sat inside Income, ahead of Gross Profit.
+  it('keeps Other Income out of Gross Profit and nets it against Other Expenses', async () => {
+    const { biz, ctx, revenue, expense } = await setup();
+    const cash = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '1020').executeTakeFirstOrThrow();
+    const interest = await makeAccount(t.db, biz.id, { code: '7010', name: 'Interest Earned', account_type: 'revenue', detail_type: 'Interest Earned' });
+    const penalties = await makeAccount(t.db, biz.id, { code: '8010', name: 'Penalties', account_type: 'expense', detail_type: 'Penalties & Settlements' });
+    await t.db.transaction().execute(trx => ledger.postJournalEntry(trx, ctx, {
+      business_id: biz.id, entry_date: '2026-04-20', source_type: 'manual', memo: 'April',
+      lines: [
+        { account_id: cash.id, debit: '1000.0000', credit: '0.0000', memo: null },
+        { account_id: revenue.id, debit: '0.0000', credit: '1000.0000', memo: null },
+        { account_id: cash.id, debit: '40.0000', credit: '0.0000', memo: null },
+        { account_id: interest.id, debit: '0.0000', credit: '40.0000', memo: null },
+        { account_id: expense.id, debit: '300.0000', credit: '0.0000', memo: null },
+        { account_id: penalties.id, debit: '15.0000', credit: '0.0000', memo: null },
+        { account_id: cash.id, debit: '0.0000', credit: '315.0000', memo: null },
+      ],
+    }));
+
+    const r = await rpt.profitLoss(t.db, { business_id: biz.id, period_start: '2026-04-01', period_end: '2026-04-30' });
+    expect(r.income_total).toBe('1000.0000');
+    expect(r.cogs_total).toBe('300.0000');           // 5010 Cost of Goods Sold
+    expect(r.gross_profit).toBe('700.0000');         // interest is not in it
+    expect(r.operating_income).toBe('700.0000');
+    expect(r.other_income_total).toBe('40.0000');
+    expect(r.other_expenses_total).toBe('15.0000');
+    expect(r.net_other_income).toBe('25.0000');
+    expect(r.net_income).toBe('725.0000');
+    expect(r.revenue_total).toBe('1040.0000');       // all income, as the mobile app reads it
+    expect(r.revenue_lines.find(l => l.account_id === interest.id)?.section).toBe('other_income');
+    expect(r.expense_lines.find(l => l.account_id === penalties.id)?.section).toBe('other_expense');
+
+    expect(rpt.incomeSection({ name: 'Interest Income', detail_type: null })).toBe('other_income');
+    expect(rpt.incomeSection({ name: 'Sales', detail_type: null })).toBe('income');
+  });
+
   // Found by the report tie-out on 2026-10-07: a month-end accrual and its reversing
   // entry are both posted. The P&L skipped every reversal, so it kept the accrual and
   // lost the entry that takes it back, and disagreed with the balance sheet.

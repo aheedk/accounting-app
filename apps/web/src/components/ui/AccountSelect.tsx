@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
+import { accountGroup } from '@accounting/shared';
 import { cn } from '@/lib/utils';
 
 export type AccountLike = {
@@ -7,6 +8,8 @@ export type AccountLike = {
   code: string;
   name: string;
   account_type: string;
+  /** When given, the list shows the QuickBooks account type ("Bank", "Expenses") instead of "asset". */
+  detail_type?: string | null;
 };
 
 const FOCUSABLE_SELECTOR = [
@@ -199,7 +202,7 @@ export function AccountSelect({
             top: menuPosition.top,
             left: menuPosition.left,
             // A narrow box (w-56 on Expense) still gets a menu wide enough to read names in.
-            width: Math.max(menuPosition.width, 288),
+            width: Math.max(menuPosition.width, 360),
             zIndex: 9999,
           }}
           className="overflow-hidden rounded-md border bg-background shadow-md"
@@ -224,9 +227,10 @@ export function AccountSelect({
                       i === activeIdx && 'bg-accent text-accent-foreground',
                     )}
                   >
-                    <span className="w-14 font-mono text-xs text-muted-foreground">{a.code}</span>
-                    <span className="flex-1 truncate" title={a.name}>{a.name}</span>
-                    <AccountBadges type={a.account_type} />
+                    <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{a.code}</span>
+                    {/* The whole name, on two lines if it must (item 85: long names were cut off). */}
+                    <span className="min-w-0 flex-1 break-words">{a.name}</span>
+                    <AccountBadges account={a} />
                   </li>
                 ))}
               </ul>
@@ -272,19 +276,19 @@ export function AccountSelect({
           type="button"
           disabled={disabled}
           onClick={openMenu}
-          // A long name is cut off with "…"; hovering shows all of it.
           {...(selected ? { title: `${selected.code} ${selected.name}` } : {})}
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-left ring-offset-background',
+            'flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-left ring-offset-background',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
           )}
         >
           {selected ? (
-            <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="font-mono text-xs text-muted-foreground">{selected.code}</span>
-              <span className="truncate">{selected.name}</span>
-              <AccountBadges type={selected.account_type} />
+            // The whole name, wrapping in a narrow column rather than cut off (item 85);
+            // the type badges are in the list, where there is room for them.
+            <span className="flex min-w-0 flex-1 items-baseline gap-2">
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">{selected.code}</span>
+              <span className="min-w-0 break-words">{selected.name}</span>
             </span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -310,12 +314,13 @@ export function AccountSelect({
   );
 }
 
-function AccountBadges({ type }: { type: string }) {
-  const dr = NORMAL_BALANCE[type];
+function AccountBadges({ account }: { account: AccountLike }) {
+  const dr = NORMAL_BALANCE[account.account_type];
+  const group = account.detail_type !== undefined ? accountGroup(account) : null;
   return (
     <span className="ml-auto inline-flex shrink-0 items-center gap-1">
-      <span className="rounded border px-1 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-        {type}
+      <span className={cn('rounded border px-1 py-0.5 text-[10px] text-muted-foreground', !group && 'uppercase tracking-wide')}>
+        {group ?? account.account_type}
       </span>
       {dr && (
         <span

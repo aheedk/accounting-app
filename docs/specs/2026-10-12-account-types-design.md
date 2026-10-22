@@ -111,12 +111,30 @@ Two knock-on effects, both deliberate:
   It now looks for Savings and Money Market only; a transfer whose description
   says "checking" still finds a checking account by name, as before.
 
+## The P&L
+
+Since 2026-10-22 (item 83 in `../meetings/2026-10-21-faizan-video-2.md`) the P&L
+is laid out as QuickBooks lays it out, from the same account types:
+
+Income → Total Income; Cost of Goods Sold → Total Cost of Goods Sold; **Gross
+Profit**; Expenses → Total Expenses; **Net Operating Income**; Other Income →
+Total Other Income; Other Expenses → Total Other Expenses; **Net Other
+Income**; **Net Income**.
+
+Each line of `GET /reports/pnl` carries its `section` (`income`, `cogs`,
+`operating`, `other_income`, `other_expense`), with a total for each and
+`net_other_income`. Gross Profit no longer counts Other Income. An income
+account with no detail type is Income unless its name says other income,
+interest or dividends; an expense account with no detail type falls back as
+before (`expenseSection`). Cost of Goods Sold and the two "other" sections are
+left out when empty. `revenue_*` and `expense_*` still list every income and
+every expense account, for the mobile app.
+
 ## Not done here
 
 - **Accounts outside the starting chart are not rewritten.** One with no detail
   type shows under the fallback type until someone gives it one in the edit
   form. Tidying a client's own accounts in one go is a data fix per client, to
   be reviewed by an accountant, not guessed by a migration.
-- **Other Income on the P&L** is not broken out from Income yet.
 - **Importing a chart** still maps type names with its own alias table in
   `CoaListPage.tsx`; its detail names predate this list.

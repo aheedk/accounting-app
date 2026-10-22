@@ -93,6 +93,15 @@ Editable controls:
 - Memo
 - copy line, delete line, add lines, and clear lines
 
+**Journal numbers may repeat** (since 2026-10-22, item 88 in
+`../meetings/2026-10-21-faizan-video-2.md`): the firm starts numbering again
+each month, as QuickBooks allows. Migration `0110` dropped the unique index on
+`(business_id, journal_number)`, and the ledger no longer refuses a number or a
+reversal's `R` number that is in use. The editor looks the typed number up
+(`GET /journal-entries?journal_number=`) and says, under the box, that it is
+already used and on what date; saving goes ahead. A number ending in R is still
+kept for reversals.
+
 The editor pads loaded entries to at least eight visible rows, keeps the current balanced-state feedback, and uses the project's decimal money helpers when creating request payloads.
 
 For eligible existing entries, Save calls the update endpoint and stays on the same entry ID. A visible notice explains that saving updates the entry in place and records the change in audit history. Read-only entries use the same visual structure with disabled controls and a specific reason.

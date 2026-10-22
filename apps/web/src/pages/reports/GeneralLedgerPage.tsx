@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronUp,
   FileDown,
+  MoreVertical,
   Printer,
   RotateCcw,
   SlidersHorizontal,
@@ -848,7 +849,7 @@ export default function GeneralLedgerPage() {
                         <th
                           key={column}
                           aria-sort={columnSort?.column === column ? (columnSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
-                          className={`whitespace-nowrap ${preferences.density === 'compact' ? 'px-2.5 py-1.5' : 'px-2.5 py-2.5'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}
+                          className={`group whitespace-nowrap ${preferences.density === 'compact' ? 'px-2.5 py-1.5' : 'px-2.5 py-2.5'} ${definition.numeric ? 'text-right' : 'text-left'} ${column === 'date' ? 'min-w-[6rem]' : ''}`}
                         >
                           {/* Click to sort each account's lines by this column: A to Z, Z to A, then back to date order. */}
                           <button
@@ -862,6 +863,16 @@ export default function GeneralLedgerPage() {
                               columnSort.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                             )}
                           </button>
+                          <ColumnHeadingMenu
+                            label={definition.label}
+                            align={definition.numeric ? 'right' : 'left'}
+                            canHide={visibleColumns.length > 1}
+                            onSort={direction => setColumnSort(direction ? { column, direction } : null)}
+                            onHide={() => {
+                              if (columnSort?.column === column) setColumnSort(null);
+                              toggleColumn(column);
+                            }}
+                          />
                         </th>
                       );
                     })}
@@ -1292,5 +1303,60 @@ function SummaryRow({
         return <td key={column} className={`${padding} ${numeric ? 'text-right font-mono' : ''}`}>{value}</td>;
       })}
     </tr>
+  );
+}
+
+/**
+ * The menu beside a General Ledger heading, as in QuickBooks (item 87): sort
+ * either way, back to date order, or hide the column. Shown when the heading is
+ * hovered or focused; the column picker in Customize brings a column back.
+ */
+function ColumnHeadingMenu({ label, align, canHide, onSort, onHide }: {
+  label: string;
+  align: 'left' | 'right';
+  canHide: boolean;
+  onSort: (direction: 'asc' | 'desc' | null) => void;
+  onHide: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  const choose = (action: () => void) => () => { setOpen(false); action(); };
+  const item = 'block w-full px-3 py-1.5 text-left text-xs font-normal normal-case tracking-normal hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50';
+  return (
+    <span ref={ref} className="relative ml-0.5 inline-flex align-middle print:hidden">
+      <button
+        type="button"
+        aria-label={`${label} column options`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+        className="rounded p-0.5 opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100"
+      >
+        <MoreVertical className="h-3 w-3" />
+      </button>
+      {open && (
+        <div role="menu" className={`absolute top-full z-20 mt-1 w-40 rounded-md border bg-background py-1 text-foreground shadow-md ${align === 'right' ? 'right-0' : 'left-0'}`}>
+          <button type="button" role="menuitem" className={item} onClick={choose(() => onSort('asc'))}>Sort ascending</button>
+          <button type="button" role="menuitem" className={item} onClick={choose(() => onSort('desc'))}>Sort descending</button>
+          <button type="button" role="menuitem" className={item} onClick={choose(() => onSort(null))}>Default order</button>
+          <div className="my-1 border-t" />
+          <button type="button" role="menuitem" className={item} disabled={!canHide} onClick={choose(onHide)}>Hide column</button>
+        </div>
+      )}
+    </span>
   );
 }

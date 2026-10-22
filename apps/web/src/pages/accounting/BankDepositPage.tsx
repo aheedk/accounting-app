@@ -885,7 +885,7 @@ export default function BankDepositPage() {
                 <tr className="border-b border-t">
                   <th className="w-8 px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">#</th>
                   <th className="min-w-[130px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">RECEIVED FROM</th>
-                  <th className="min-w-[180px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">ACCOUNT</th>
+                  <th className="min-w-[260px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">ACCOUNT</th>
                   <th className="min-w-[150px] px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">DESCRIPTION</th>
                   <th className="w-36 px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">PAYMENT METHOD</th>
                   <th className="w-28 px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">REF NO.</th>
@@ -1065,7 +1065,7 @@ export default function BankDepositPage() {
 
         <div className="mx-auto flex items-center gap-3 text-sm">
           <div className="relative">
-            <button type="button" onClick={() => setPrintOpen(prev => !prev)} className="text-link hover:underline">
+            <button type="button" aria-expanded={printOpen} onClick={() => setPrintOpen(prev => !prev)} className="text-link hover:underline">
               Print
             </button>
             {printOpen && (
@@ -1114,7 +1114,7 @@ export default function BankDepositPage() {
             <>
               <span className="text-muted-foreground">·</span>
               <div className="relative">
-                <button type="button" onClick={() => setMoreOpen(prev => !prev)} className="text-link hover:underline">
+                <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen(prev => !prev)} className="text-link hover:underline">
                   More
                 </button>
                 {moreOpen && (
@@ -1179,6 +1179,7 @@ export default function BankDepositPage() {
             <Button
               type="button"
               onClick={() => setShowSaveMenu(prev => !prev)}
+              aria-expanded={showSaveMenu}
               className="rounded-l-none border-l border-l-primary-foreground/30 px-2"
             >
               <ChevronDown className="h-4 w-4" />
