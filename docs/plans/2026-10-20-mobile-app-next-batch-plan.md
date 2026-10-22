@@ -1093,3 +1093,51 @@ bills (expenses were entered directly instead, a common QBO-style
 pattern), so the per-row and per-line field names are confirmed from
 `db/types.ts` directly rather than a populated live response — worth a
 real check once this business (or another) has an actual bill.
+
+### Redesign chunk 17 (2026-10-22) — Bill Payments (AP write path) — done
+
+Vendor-side mirror of chunk 15's Record Payment, now that Bills exist to
+pay (chunk 16). Confirmed the field-name mapping before writing any code
+rather than assuming the AR shapes carry over 1:1: `vendor_id`/`bill_id`
+replace `customer_id`/`invoice_id`, but `applied_amount`/
+`unapplied_amount` are the exact same column names on both sides — a
+real difference and a real match, checked against
+`BillPaymentsTable`/`BillPaymentApplicationsTable` in `db/types.ts`
+rather than guessed either way.
+
+- **Scope note worth flagging**: web actually has *two* AP payment UIs —
+  a single-vendor `BillPaymentNewPage.tsx` (the true 1:1 analog of
+  `PaymentNewPage.tsx`, which is what this chunk mirrors) and a separate
+  QuickBooks-style multi-vendor "Pay Bills" batch grid
+  (`PayBillsPage.tsx`, one table of every unpaid bill across *all*
+  vendors, posting one payment per vendor via a batch endpoint). Mobile
+  only mirrors the single-vendor flow — the batch grid is a materially
+  bigger, different UX that wasn't asked for and would need its own
+  design pass, not a quick extension of this chunk.
+- `services/api.ts`: added `BillPaymentRow`/`BillPaymentApplication`/
+  `BillPaymentDetail`/`BillPaymentInput` types + `listBillPayments`/
+  `getBillPayment`/`createBillPayment`/`postBillPayment`/
+  `voidBillPayment`, reusing the existing `PaymentMethod`/`PaymentStatus`
+  enums since both sides use identical values.
+- **`app/bill-payment/new.tsx`**: vendor picker, date, reference, method,
+  payment account, outstanding-bills checklist, optional amount
+  override — same structure as `app/payment/new.tsx`, but simpler in one
+  way: `listBills` already returns `open_balance` per row, so no N+1
+  per-bill detail fetch was needed (unlike invoices, where `listInvoices`
+  doesn't carry a balance).
+- **`app/bill-payment/[id].tsx`**: same Void guard as the AR side (zero
+  applications required, mirroring the server's `BillPaymentHasApplicationsError`)
+  and the same `Alert.prompt` void-reason flow.
+- **`app/bill-payments.tsx`**: list screen, exact `payments.tsx` pattern.
+- Wired into the drawer's AP > Pay Bills / Bill Payments items, the
+  Create tab, and the More tab. No `lib/roleAccess.ts` change needed —
+  `/bill-payment/new` is already blocked for viewer/client by the
+  existing `/new` regex and the client default-deny.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, `GET /bill-payments` hit live and confirmed
+the `{ bill_payments: [] }` wrapper shape. Same data limitation as
+chunks 15/16 — this demo business has no bills, so the full create→
+post→void round trip and the per-row field names in a populated response
+are still unverified live; the shapes come from `db/types.ts` and the
+route handlers' actual `res.json(...)` calls, not guessed.

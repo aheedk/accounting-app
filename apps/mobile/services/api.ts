@@ -690,3 +690,61 @@ export async function getBill(businessId: string, id: string) {
   const r = await api.get<BillDetail>(`/businesses/${businessId}/bills/${id}`);
   return r.data;
 }
+
+// --- Bill Payments (AP) — the vendor-side mirror of Payments (AR) above.
+// Shapes read directly from billPaymentService.ts / db/types.ts's
+// BillPaymentsTable/BillPaymentApplicationsTable: field names mirror the
+// AR side 1:1 (applied_amount/unapplied_amount are identical names, only
+// the FK differs — vendor_id/bill_id instead of customer_id/invoice_id),
+// confirmed rather than assumed. PaymentMethod/PaymentStatus are the same
+// enums on both sides, reused as-is.
+//
+// Web has TWO AP payment UIs: a single-vendor BillPaymentNewPage.tsx (the
+// true 1:1 analog of PaymentNewPage.tsx we mirrored for AR) and a
+// separate QuickBooks-style multi-vendor "Pay Bills" batch grid
+// (PayBillsPage.tsx, posting one bill_payment per vendor via a batch
+// endpoint). Mobile mirrors only the single-vendor flow, same reasoning
+// as scoping Payments to create-and-post-only — the batch grid is a
+// bigger, different UX not asked for here.
+
+export type BillPaymentRow = {
+  id: string; business_id: string; vendor_id: string; payment_date: string;
+  payment_method: PaymentMethod; reference: string | null;
+  amount: string; unapplied_amount: string; cash_account_id: string;
+  status: PaymentStatus; posted_journal_entry_id: string | null;
+  memo: string | null; posted_at: string | null; posted_by_user_id: string | null;
+  voided_at: string | null; voided_by_user_id: string | null;
+  created_at: string; created_by_user_id: string | null; updated_at: string;
+};
+export type BillPaymentApplication = { id: string; bill_id: string; bill_number: string; applied_amount: string; applied_at: string };
+export type BillPaymentDetail = { bill_payment: BillPaymentRow; applications: BillPaymentApplication[] };
+export type BillPaymentInput = {
+  vendor_id: string; payment_date: string; payment_method: PaymentMethod;
+  reference?: string | null; amount: string; cash_account_id: string; memo?: string | null;
+  initial_applications?: Array<{ bill_id: string; applied_amount: string }>;
+};
+
+export async function listBillPayments(businessId: string, params: { vendor_id?: string; status?: PaymentStatus } = {}) {
+  const r = await api.get<{ bill_payments: BillPaymentRow[] }>(`/businesses/${businessId}/bill-payments`, { params });
+  return r.data.bill_payments;
+}
+
+export async function getBillPayment(businessId: string, id: string) {
+  const r = await api.get<BillPaymentDetail>(`/businesses/${businessId}/bill-payments/${id}`);
+  return r.data;
+}
+
+export async function createBillPayment(businessId: string, input: BillPaymentInput) {
+  const r = await api.post<{ bill_payment: BillPaymentRow }>(`/businesses/${businessId}/bill-payments`, input);
+  return r.data.bill_payment;
+}
+
+export async function postBillPayment(businessId: string, id: string) {
+  const r = await api.post<BillPaymentRow>(`/businesses/${businessId}/bill-payments/${id}/post`);
+  return r.data;
+}
+
+export async function voidBillPayment(businessId: string, id: string, void_reason: string) {
+  const r = await api.post<BillPaymentRow>(`/businesses/${businessId}/bill-payments/${id}/void`, { void_reason });
+  return r.data;
+}

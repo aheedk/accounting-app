@@ -61,6 +61,14 @@ export default function CreateScreen() {
         titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
         descriptionStyle={{ color: theme.app.mutedForeground }}
       />
+      <List.Item
+        title="Pay Bills"
+        description="Pay a vendor's open bills"
+        onPress={() => router.push('/bill-payment/new')}
+        left={props => <List.Icon {...props} icon="cash-fast" color={theme.app.primary} />}
+        titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+        descriptionStyle={{ color: theme.app.mutedForeground }}
+      />
       <Divider style={{ marginVertical: spacing.sm }} />
 
       {STUB_ITEMS.map(item => (

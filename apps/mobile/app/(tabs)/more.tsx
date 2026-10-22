@@ -98,6 +98,12 @@ export default function MoreScreen() {
         left={props => <List.Icon {...props} icon="file-document-outline" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
+      <List.Item
+        title="Bill Payments"
+        onPress={() => router.push('/bill-payments')}
+        left={props => <List.Icon {...props} icon="cash-fast" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
       <Divider />
 
       {STUB_ITEMS.map(item => (
