@@ -54,6 +54,9 @@ const SECTIONS: Section[] = [
       { title: 'Receipts', path: '/receipts', icon: 'receipt' },
       { title: 'Bank Rules', path: '/bank-rules', icon: 'filter-variant' },
       { title: 'Fixed Assets', path: '/fixed-assets', icon: 'office-building-outline' },
+      { title: 'Approvals', path: '/approvals', icon: 'check-decagram-outline' },
+      { title: 'Integration Transactions', path: '/integration-transactions', icon: 'swap-horizontal' },
+      { title: 'Recurring Transactions', path: '/recurring-templates', icon: 'autorenew' },
     ],
   },
   {

@@ -1247,3 +1247,94 @@ export async function listBankRules(businessId: string) {
 export async function deleteBankRule(businessId: string, id: string) {
   await api.delete(`/businesses/${businessId}/bank-rules/${id}`);
 }
+
+// --- Approvals — the queue CLAUDE.md's HELD_ACTIONS note refers to:
+// a staff-level save that posts to the ledger waits here when
+// staff_entries_need_approval is on, until an accountant approves (which
+// replays the original request as them) or rejects it. Shapes read
+// directly from approvalService.ts/approvals.ts route.
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type ApprovalRow = {
+  id: string; action: string; summary: string; amount: string | null; status: string;
+  payload: unknown; created_at: string; requested_by: string;
+  decided_by: string | null; decided_at: string | null; decision_note: string | null;
+};
+
+export async function listApprovals(businessId: string, params: { status?: ApprovalStatus } = {}) {
+  const r = await api.get<{ requests: ApprovalRow[]; needs_approval: boolean }>(`/businesses/${businessId}/approvals`, { params });
+  return r.data;
+}
+
+export async function approveRequest(businessId: string, approvalId: string) {
+  const r = await api.post<{ id: string; status: string; result: unknown }>(`/businesses/${businessId}/approvals/${approvalId}/approve`);
+  return r.data;
+}
+
+export async function rejectRequest(businessId: string, approvalId: string, note?: string) {
+  const r = await api.post<{ id: string; status: string }>(`/businesses/${businessId}/approvals/${approvalId}/reject`, { note });
+  return r.data;
+}
+
+// --- Recurring Templates — shapes read directly from RecurringTemplatesTable
+// (db/types.ts) and recurringTemplates.ts's route. Read-only list this
+// chunk, plus the one simple action worth wiring (pause/resume — there's
+// no dedicated endpoint for it, confirmed: it's just PATCH {is_active}).
+// Create/edit-the-payload/run-now/delete are real but not built here.
+
+export type RecurringTemplateType = 'journal_entry' | 'invoice' | 'bill' | 'deposit' | 'expense' | 'check';
+export type RecurringTemplateRecurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type RecurringTemplateRow = {
+  id: string; business_id: string; name: string; template_type: RecurringTemplateType;
+  recurrence: RecurringTemplateRecurrence; recurrence_type: 'scheduled' | 'reminder' | 'unscheduled';
+  days_in_advance: number | null; next_run_date: string; end_date: string | null;
+  last_run_at: string | null; is_active: boolean; created_at: string; updated_at: string;
+  created_by_user_id: string | null;
+};
+
+export async function listRecurringTemplates(businessId: string) {
+  const r = await api.get<{ templates: RecurringTemplateRow[] }>(`/businesses/${businessId}/recurring-templates`);
+  return r.data.templates;
+}
+
+export async function setRecurringTemplateActive(businessId: string, id: string, is_active: boolean) {
+  await api.patch(`/businesses/${businessId}/recurring-templates/${id}`, { is_active });
+}
+
+// --- Integration Transactions (integration inbox) — rows imported from
+// a 3rd-party platform CSV export (Stripe/PayPal/Shopify/generic),
+// confirmed distinct from bank-feed Bank Transactions AND the AI email
+// Document Inbox by reading all three route files. Mirrors the Bank
+// Transactions review screen's Categorize/Exclude pattern, with one real
+// difference: categorize here needs BOTH a cash_account_id and an
+// offset_account_id (no bank_account_id on the row to imply the cash
+// side, unlike a bank transaction which already belongs to one account).
+
+export type IntegrationSource = 'stripe_csv' | 'paypal_csv' | 'shopify_csv' | 'generic';
+export type IntegrationInboxStatus = 'pending' | 'matched' | 'categorized' | 'excluded';
+export type IntegrationInboxRow = {
+  id: string; business_id: string; source: IntegrationSource; external_id: string | null;
+  occurred_at: string; description: string; amount: string; status: IntegrationInboxStatus;
+  matched_journal_entry_id: string | null; excluded_reason: string | null;
+  imported_at: string; reviewed_at: string | null; reviewed_by_user_id: string | null;
+};
+
+export async function listIntegrationInbox(businessId: string, params: { status?: IntegrationInboxStatus; source?: IntegrationSource } = {}) {
+  const r = await api.get<{ integration_inbox: IntegrationInboxRow[] }>(`/businesses/${businessId}/integration-inbox`, { params });
+  return r.data.integration_inbox;
+}
+
+export async function getIntegrationInboxSuggestion(businessId: string, id: string) {
+  const r = await api.get<{ suggestion: BankTransactionSuggestion }>(`/businesses/${businessId}/integration-inbox/${id}/suggestion`);
+  return r.data.suggestion;
+}
+
+export async function categorizeIntegrationRow(
+  businessId: string, id: string, body: { cash_account_id: string; offset_account_id: string; memo?: string | null },
+) {
+  await api.post(`/businesses/${businessId}/integration-inbox/${id}/categorize`, body);
+}
+
+export async function excludeIntegrationRow(businessId: string, id: string, excluded_reason: string) {
+  await api.post(`/businesses/${businessId}/integration-inbox/${id}/exclude`, { excluded_reason });
+}

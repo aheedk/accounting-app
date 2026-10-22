@@ -63,10 +63,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'accounting', label: 'Accounting', icon: 'book-open-outline',
     children: [
-      { label: 'Client Overview' }, { label: 'Books Review' }, { label: 'Approvals' },
-      { label: 'Bank Accounts', path: '/bank-accounts' }, { label: 'Bank Transactions', path: '/bank-transactions' }, { label: 'Integration Transactions' },
+      { label: 'Client Overview' }, { label: 'Books Review' }, { label: 'Approvals', path: '/approvals' },
+      { label: 'Bank Accounts', path: '/bank-accounts' }, { label: 'Bank Transactions', path: '/bank-transactions' }, { label: 'Integration Transactions', path: '/integration-transactions' },
       { label: 'Receipts', path: '/receipts' }, { label: 'Reconcile', path: '/reconcile' }, { label: 'Rules', path: '/bank-rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
-      { label: 'Recurring Transactions' }, { label: 'Fixed Assets', path: '/fixed-assets' }, { label: 'Journal', path: '/journal-entries' },
+      { label: 'Recurring Transactions', path: '/recurring-templates' }, { label: 'Fixed Assets', path: '/fixed-assets' }, { label: 'Journal', path: '/journal-entries' },
     ],
   },
   {

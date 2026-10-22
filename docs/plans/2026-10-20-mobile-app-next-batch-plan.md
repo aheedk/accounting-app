@@ -1684,3 +1684,63 @@ divergence since nothing's been reconciled, not a bug); Fixed Assets/
 Receipts/Bank Rules all confirmed their wrapper shapes but came back
 empty — none of those three features have been used on this demo
 business yet.
+
+### Redesign chunk 29 (2026-10-22) — Approvals, Recurring Transactions, Integration Transactions — done
+
+Third survey batch. Two deliberate scope decisions made before building
+anything:
+
+- **Books Review deferred, not skipped.** Confirmed it's not a flat
+  flagged-transactions list — it's a per-fiscal-period checklist
+  (`GET /fiscal-periods/:periodId/review-tasks`, no business-wide list
+  endpoint), so it needs a period picker first. Mobile has no Fiscal
+  Periods screen yet (a separate Setup item still on the survey list) —
+  building Books Review properly means building that foundation first,
+  so it's paired with Fiscal Periods in a future chunk rather than
+  half-built now.
+- **Client Overview skipped outright.** Confirmed `/accounting/client-
+  overview` on web actually redirects to `/firm`, a `firm_admin`-only,
+  cross-business dashboard with no `businessId` in its own route at all
+  (`ctx.business_id: null`) — a roster of every business under the firm,
+  not a single-business page. This genuinely doesn't fit the mobile
+  app's per-business screen model (every other screen this session
+  scopes to `activeBusinessId`); porting it would mean inventing a
+  firm-wide mode outside that pattern. Left disabled, same category as
+  Payroll (chunk "Survey") — a real product-shape mismatch, not
+  something to force in.
+
+What shipped:
+
+- **`app/approvals.tsx`**: the queue CLAUDE.md's own HELD_ACTIONS note
+  describes — a staff save that posts to the ledger waits here when a
+  business has staff entries wait for an accountant. Status filter chips,
+  Approve/Reject inline (both `accountant`+; approving replays the
+  original held request as the accountant server-side, so it goes
+  through every check the original route makes).
+- **`app/recurring-templates.tsx`**: read-only list + one simple action —
+  pause/resume via a `Switch`, which is literally just `PATCH
+  {is_active}` (confirmed there's no dedicated pause/resume endpoint).
+  Create/edit-the-payload/run-now/delete exist server-side but aren't
+  built here.
+- **`app/integration-transactions.tsx`** + **`app/integration-transaction/[id].tsx`**:
+  rows imported from a 3rd-party CSV export (Stripe/PayPal/Shopify/
+  generic) — confirmed genuinely distinct from both Bank Transactions
+  and the AI email inbox by reading all three route files before writing
+  anything. Mirrors the Bank Transactions Categorize/Exclude screen
+  closely, with one real difference handled correctly: Categorize here
+  needs **two** account pickers (cash/clearing side + category side),
+  since a row has no `bank_account_id` to imply one side the way a bank
+  transaction already does. No detail GET route exists — list-and-find,
+  same pattern as Credit Memos/Vendor Credits.
+- `services/api.ts`: added `ApprovalRow`/`RecurringTemplateRow`/
+  `IntegrationInboxRow` types + the matching list/action functions,
+  reusing the existing `BankTransactionSuggestion` type for the
+  integration inbox's AI suggestion (confirmed identical shape).
+- Wired into the drawer's Accounting group and the More tab's
+  Accounting section.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors, all three endpoints hit live and confirmed
+wrapper shapes (`{requests, needs_approval}`, `{templates}`,
+`{integration_inbox}`) — empty data for all three, consistent with
+every chunk's data-sparsity pattern on this demo business.
