@@ -1498,3 +1498,37 @@ bundle built with no errors, `GET /suspense` hit live and confirmed the
 exists (`account_id` populated) but currently has zero parked items, so
 the per-item fields and the reclassify flow are unverified against a
 populated response; worth a check once something real lands in Suspense.
+
+### Redesign chunk 25 (2026-10-22) — AI Coding Rules — done
+
+The "learned client rule" layer CLAUDE.md's auto-coding order starts
+with — pairs with Suspense (chunk 24) and the AI Document Inbox.
+
+- **No create form, confirmed by reading the whole route file**: rules
+  only ever get created implicitly by the auto-coding engine itself
+  (e.g. Suspense's "Remember for this payee" checkbox) — only `PATCH`
+  (change which account(s) it posts to) and `DELETE` exist, matching
+  web's own `CodingRulesPage.tsx` exactly (no create UI there either).
+  A rule is keyed on normalized vendor + direction (+ optional bank
+  account), not a free-text pattern — confirmed from
+  `AccountCodingMemoryTable` directly rather than assumed.
+- Flat list, search-by-vendor (client-side substring), tap-to-expand
+  inline edit — same structural pattern as Suspense (one `PickerField`+
+  `SearchablePicker` per line this time, since a rule can have multiple
+  lines, each needing its own target account), Delete with a confirm
+  Alert naming the vendor. Both actions `accountant`+, same permission-
+  message fallback pattern as Suspense for a lower role.
+- `services/api.ts`: added `CodingRule`/`CodingRuleLine` types +
+  `listCodingRules`/`updateCodingRule`/`deleteCodingRule`.
+- Wired into the drawer's AI > Coding Rules item and the More tab.
+
+**Verified** — this is the first AI-area chunk with real populated
+data: `tsc --noEmit` clean, a fresh `expo export --platform ios` bundle
+built with no errors, `GET /ai/coding-rules` hit live (5 real learned
+rules) confirming `CodingRule`/`CodingRuleLine` field-for-field, then
+`PATCH` exercised live by re-applying one real rule's existing
+`account_id` (safe — same value, no functional change beyond the
+expected `times_corrected`/`updated_at` bump from calling the endpoint
+at all). Did **not** call `DELETE` live — removing a real learned rule
+with no create endpoint to restore it would be a one-way action, same
+caution as skipping `finish` in the Reconciliation chunk.

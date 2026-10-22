@@ -56,7 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'ai', label: 'AI', icon: 'creation',
     children: [
       { label: 'Document Inbox', path: '/inbox' },
-      { label: 'Coding Rules' },
+      { label: 'Coding Rules', path: '/coding-rules' },
       { label: 'Suspense', path: '/suspense' },
     ],
   },

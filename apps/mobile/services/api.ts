@@ -1060,3 +1060,32 @@ export async function reclassifySuspenseItem(
   );
   return r.data;
 }
+
+// --- AI Coding Rules — the "learned client rule" layer CLAUDE.md's
+// auto-coding order starts with. Shapes read directly from the route's
+// actual query/select and AccountCodingMemoryTable in db/types.ts. No
+// create endpoint exists anywhere — rules are only ever created
+// implicitly by the engine (e.g. Suspense's "Remember for this payee"),
+// confirmed by reading the whole route file, not assumed from the
+// pattern of every other entity having one. Only edit (which account(s)
+// a rule posts to) and delete exist.
+
+export type CodingRuleLine = { account_id: string; debit: string; credit: string; memo: string | null };
+export type CodingRule = {
+  id: string; normalized_vendor: string; direction: 'debit' | 'credit';
+  lines: CodingRuleLine[]; times_applied: number; times_corrected: number;
+  last_applied_at: string | null; created_at: string; bank_account_name: string | null;
+};
+
+export async function listCodingRules(businessId: string) {
+  const r = await api.get<{ rules: CodingRule[] }>(`/businesses/${businessId}/ai/coding-rules`);
+  return r.data.rules;
+}
+
+export async function updateCodingRule(businessId: string, ruleId: string, account_ids: string[]) {
+  await api.patch(`/businesses/${businessId}/ai/coding-rules/${ruleId}`, { account_ids });
+}
+
+export async function deleteCodingRule(businessId: string, ruleId: string) {
+  await api.delete(`/businesses/${businessId}/ai/coding-rules/${ruleId}`);
+}

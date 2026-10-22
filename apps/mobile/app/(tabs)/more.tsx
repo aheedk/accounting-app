@@ -136,6 +136,12 @@ export default function MoreScreen() {
         left={props => <List.Icon {...props} icon="help-circle-outline" color={theme.app.foreground} />}
         titleStyle={{ color: theme.app.foreground }}
       />
+      <List.Item
+        title="Coding Rules"
+        onPress={() => router.push('/coding-rules')}
+        left={props => <List.Icon {...props} icon="creation" color={theme.app.foreground} />}
+        titleStyle={{ color: theme.app.foreground }}
+      />
 
       <Divider style={{ marginVertical: spacing.md }} />
 
