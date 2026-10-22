@@ -1847,3 +1847,59 @@ Note: `periodReview.ts`'s two routes are absent from
 `apps/api/tests/integration/roleMatrix.test.ts` — a pre-existing gap on
 the backend, not something this mobile port introduced or is in scope
 to fix.
+
+## Chunk: Reports group, part 1 (2026-10-22)
+
+Researched all 7 remaining disabled Reports items before building
+anything. Per-item verdict: Standard Reports is a pure index page (no
+API of its own) — ALIAS-FIX, just needs a drawer link to a menu screen.
+Cash Activity, Management Reports, and Performance Center are real,
+distinct, already-fully-built-on-web features — BUILD. Custom Reports
+and Financial Planning are real but substantially larger (full CRUD) —
+deferred to their own chunk. Spreadsheet Sync is real but a thin
+CSV/PDF-export wrapper, not an actual sync — lowest priority, deferred.
+
+What shipped this chunk:
+
+- **`app/standard-reports.tsx`**: grouped list of links to the 10
+  already-built reports, mirroring web's own grouping
+  (`StandardReportsPage.tsx`) exactly — no new API integration.
+- **`app/cash-activity.tsx`**: a single bank account's register with a
+  running balance — confirmed genuinely distinct from the already-built
+  Statement of Cash Flows (`cash-flow.tsx`, hitting
+  `/reports/statement-of-cash-flows`) by reading both route handlers
+  directly; this one hits `/reports/cash-flow` and defaults to the
+  Operating Bank Account when no account is picked. Bank-account picker
+  (reusing the existing `listBankAccounts`), date range, 3 summary
+  tiles, tap-through to the underlying journal entry — same drilldown
+  pattern as General Ledger.
+- **`app/management-reports.tsx`**: trailing-12-month revenue-by-month
+  (rendered as simple proportional bars, no new chart dependency — the
+  mobile app has no chart library yet and this doesn't justify adding
+  one) + top-10 expense accounts. Entirely read-only, no filters —
+  matches the backend's fixed trailing-12-month window exactly.
+- **`app/performance-center.tsx`**: revenue/expense/net-income trends
+  with a 3M/6M/12M range toggle and period-over-period delta %, both
+  computed client-side from the always-12-month API response (same as
+  web — there's no server-side range param).
+- `services/api.ts`: added `CashActivityReport`/`CashActivityLine`,
+  `ManagementReport`, `PerformanceReport`/`MonthAmount` types + 3 new
+  fetch functions, all confirmed against the actual route/service files
+  (`financialReports.ts`, `managementReportService.ts`,
+  `performanceReportService.ts`), not guessed.
+- Wired all 4 into the drawer's Reports group and the More tab's
+  Reports section.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. The dev API server had stopped
+running since the start of this session and was restarted
+(`npm -w @accounting/api run dev`) to live-verify; all 4 endpoints hit
+and confirmed field-for-field against the hand-written types —
+`/bank-accounts`, `/reports/cash-flow` (real zero-balance data on this
+demo business's default account), `/management-report` and
+`/performance-report` (both returning real non-zero months from
+March–June 2026).
+
+Remaining in the Reports group: Custom Reports and Financial Planning
+(both full-CRUD, next chunk), Spreadsheet Sync (deferred, low
+priority).

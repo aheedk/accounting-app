@@ -578,6 +578,50 @@ export async function getStatementOfCashFlows(businessId: string, params: { peri
   return r.data;
 }
 
+// --- Cash Activity by Account — a single bank account's register with a
+// running balance, distinct from the Statement of Cash Flows above
+// (operating/investing/financing categorization). Defaults to the
+// business's Operating Bank Account when cash_account_id is omitted.
+
+export type CashActivityLine = {
+  entry_date: string; journal_entry_id: string; source_type: string; status: 'posted' | 'voided';
+  memo: string | null; debit: string; credit: string; net_amount: string; running_balance: string;
+};
+export type CashActivityReport = {
+  period_start: string; period_end: string;
+  cash_account_id: string; cash_account_code: string; cash_account_name: string;
+  beginning_balance: string; ending_balance: string; net_change: string;
+  lines: CashActivityLine[];
+};
+
+export async function getCashActivity(
+  businessId: string, params: { period_start: string; period_end: string; cash_account_id?: string },
+) {
+  const r = await api.get<CashActivityReport>(`/businesses/${businessId}/reports/cash-flow`, { params });
+  return r.data;
+}
+
+export type MonthAmount = { month: string; amount: string };
+export type ManagementReport = {
+  revenue_by_month: MonthAmount[];
+  expense_breakdown: Array<{ account_code: string; account_name: string; amount: string }>;
+  total_revenue_last_12: string; total_expense_last_12: string;
+};
+
+export async function getManagementReport(businessId: string) {
+  const r = await api.get<ManagementReport>(`/businesses/${businessId}/management-report`);
+  return r.data;
+}
+
+export type PerformanceReport = {
+  revenue_trend: MonthAmount[]; expense_trend: MonthAmount[]; net_income_trend: MonthAmount[];
+};
+
+export async function getPerformanceReport(businessId: string) {
+  const r = await api.get<PerformanceReport>(`/businesses/${businessId}/performance-report`);
+  return r.data;
+}
+
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
 // reports) directly. packages/shared's agingRowSchema is stale — its field
 // names (customer_id/customer_name/over_30/over_60/over_90) don't match

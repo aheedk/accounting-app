@@ -72,12 +72,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'reports', label: 'Reports', icon: 'chart-bar',
     children: [
-      { label: 'Standard Reports' },
+      { label: 'Standard Reports', path: '/standard-reports' },
       { label: 'Profit & Loss', path: '/pnl' },
       { label: 'Balance Sheet', path: '/balance-sheet' },
       { label: 'General Ledger', path: '/general-ledger' },
-      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity' }, { label: 'Custom Reports' },
-      { label: 'Management Reports' }, { label: 'Performance Center' }, { label: 'Financial Planning' },
+      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity', path: '/cash-activity' }, { label: 'Custom Reports' },
+      { label: 'Management Reports', path: '/management-reports' }, { label: 'Performance Center', path: '/performance-center' }, { label: 'Financial Planning' },
       { label: 'Spreadsheet Sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },

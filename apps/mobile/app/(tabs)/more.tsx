@@ -26,6 +26,10 @@ const SECTIONS: Section[] = [
       { title: 'AP Aging', path: '/ap-aging', icon: 'calendar-clock-outline' },
       { title: 'Customer Statement', path: '/customer-statement', icon: 'file-account-outline' },
       { title: '1099s', path: '/1099s', icon: 'file-document-outline' },
+      { title: 'Standard Reports', path: '/standard-reports', icon: 'view-list-outline' },
+      { title: 'Cash Activity by Account', path: '/cash-activity', icon: 'bank-transfer' },
+      { title: 'Management Reports', path: '/management-reports', icon: 'finance' },
+      { title: 'Performance Center', path: '/performance-center', icon: 'trending-up' },
     ],
   },
   {
