@@ -41,4 +41,27 @@ describe('pnlRows', () => {
       'NET INCOME',
     ]);
   });
+
+  // 10-22: Netlify had the new page while Railway still ran the old API. Total
+  // Expenses was then the operating total under a list that held every expense.
+  it('totals every expense listed when the API sends no sections', () => {
+    const report: PnlReport = {
+      period_start: '2026-01-01',
+      period_end: '2026-10-22',
+      revenue_lines: [{ account_id: 'r', account_code: '4010', account_name: 'Sales', amount: '1000.0000' }],
+      revenue_total: '1000.0000',
+      expense_lines: [
+        { account_id: 'c', account_code: '5010', account_name: 'Cost of Goods Sold', amount: '300.0000' },
+        { account_id: 'o', account_code: '5200', account_name: 'Rent', amount: '100.0000' },
+      ],
+      expense_total: '400.0000',
+      gross_profit: '700.0000',
+      operating_expenses_total: '100.0000',
+      operating_income: '600.0000',
+      other_expenses_total: '0.0000',
+      net_income: '600.0000',
+    };
+    const total = pnlRows(report).find(row => row.kind === 'total' && row.label === 'Total Expenses');
+    expect(total).toEqual({ kind: 'total', label: 'Total Expenses', amount: '400.0000' });
+  });
 });

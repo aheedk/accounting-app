@@ -14,10 +14,24 @@ journal entries. One migration, `0110`, which Railway runs on deploy.
 before 10-12.** He shows Reverse asking only for a reason and numbering the
 reversal 24, "Back to practice" still naming Michael Pharmacy, + New entries
 that cannot open in a new tab, and the Chart of Accounts saying "Assets" on
-every asset. All of those were changed on 10-12 or 10-16 and pushed. So
-either the site he tests on is behind `main`, or the video was recorded before
-10-16. That is the first thing to find out (see "Ask Faizan"); the same
-question came up with the first video.
+every asset. All of those were changed on 10-12 or 10-16 and pushed.
+
+**Why (answered 10-22):** Faizan tests on the deployed web app,
+https://shiny-dusk-be3da0.netlify.app, and Netlify had stopped picking up
+pushes about a week earlier. It is up to date again on 10-22 (checked: the
+live bundle has every change through item 89).
+
+**The API on Railway is behind.** On 10-22 it still ran code from before the
+10-21 push: no `X-Frame-Options` or `Cache-Control` headers, `x-powered-by`
+still sent, no estimates route. Riham's 10-20 push had deployed, so Railway
+stopped at the first push carrying the 10-21 security work. The likeliest
+reason is the new start-up check, which refuses to run in production with the
+example sign-in secrets from `.env.example`; a migration failing is the other
+one. **Until it deploys, the up-to-date web app talks to the old API:**
+Estimates says "Failed", and so will Company Settings and the firm sign-in
+settings, and the P&L comes back without its sections (laid out the old way;
+since 10-22 its Total Expenses at least matches the lines). To do: Railway →
+the API service → Deployments, read why the newest one failed.
 
 ## Already built: he asked again
 
@@ -97,8 +111,9 @@ already under Cost of Goods Sold when its name says so.
 
 ## Ask Faizan
 
-- **Which site he tests on, and when this video was recorded.** Nearly half of
-  it is what the first video asked for and was built on 10-12 and 10-16.
+- ~~Which site he tests on~~: the Netlify site, which had stopped updating
+  (answered 10-22, above). Worth asking him to record again once Railway's API
+  is current too.
 - **Item 84:** which account showed as a liability on the P&L, and on which
   client.
 - **Item 90:** which screen the bank was missing from (deposit, check,

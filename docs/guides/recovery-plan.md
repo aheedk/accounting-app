@@ -7,7 +7,11 @@ happened, what to do, and what is lost. Taking and checking backups is in
 
 Production is on Railway: the API service (`@accounting/api`,
 https://accountingapi-production.up.railway.app), its Postgres service, and a
-volume holding uploaded files.
+volume holding uploaded files. The web app is on Netlify,
+https://shiny-dusk-be3da0.netlify.app. Each deploys from `main` on its own, so
+one can fall behind the other: in October 2026 Netlify stopped picking up pushes
+for a week, then Railway did. To see what is live, compare the web bundle or the
+API's response headers with the newest commit.
 
 ## Keep these somewhere other than Railway
 

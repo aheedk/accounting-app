@@ -61,7 +61,9 @@ export function pnlRows(report: PnlReport): PnlRow[] {
   block('Income', income, report.income_total ?? report.revenue_total, 'Total Income', 'No income recorded.');
   if (cogs.length > 0) block('Cost of Goods Sold', cogs, report.cogs_total ?? '0', 'Total Cost of Goods Sold');
   rows.push({ kind: 'result', label: 'GROSS PROFIT', amount: report.gross_profit });
-  block('Expenses', expenses, report.operating_expenses_total, 'Total Expenses', 'No expenses recorded.');
+  // An API from before the sections lists every expense here, so its total is all of them.
+  const expensesTotal = report.income_total === undefined ? report.expense_total : report.operating_expenses_total;
+  block('Expenses', expenses, expensesTotal, 'Total Expenses', 'No expenses recorded.');
   rows.push({ kind: 'result', label: 'NET OPERATING INCOME', amount: report.operating_income });
   if (otherIncome.length > 0 || otherExpenses.length > 0) {
     if (otherIncome.length > 0) block('Other Income', otherIncome, report.other_income_total ?? '0', 'Total Other Income');

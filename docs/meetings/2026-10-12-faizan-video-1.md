@@ -132,6 +132,6 @@ it asks again for what is here.
 
 ## Ask Faizan
 
-- **Which site he tests on**, and when the video was recorded (see "Already
-  fixed").
+- ~~Which site he tests on~~: the Netlify site, which had stopped picking up
+  pushes for about a week (answered 10-22; see the second video's notes).
 - ~~My Menu~~: answered in the 10-16 meeting, remove it (item 76).
