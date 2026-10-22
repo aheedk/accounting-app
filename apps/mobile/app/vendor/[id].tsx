@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Linking, RefreshControl } from 'react-native';
-import { Text, Appbar, Card, SegmentedButtons, TextInput, useTheme } from 'react-native-paper';
+import { Text, Appbar, Card, useTheme } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,8 @@ import { LoadingIndicator } from '../../components/LoadingIndicator';
 import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { AppButton } from '../../components/ui/AppButton';
+import { AppSegmentedControl } from '../../components/ui/AppSegmentedControl';
+import { AppTextInput } from '../../components/ui/AppTextInput';
 import { pickErr } from '../../services/apiClient';
 import { fmtMoney, fmtShortDate } from '../../lib/money';
 import { spacing, typeScale, fontFamily, type AppTheme } from '../../theme';
@@ -102,10 +104,10 @@ export default function VendorDetailScreen() {
           </View>
 
           <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.sm }}>
-            <SegmentedButtons
+            <AppSegmentedControl
               value={tab}
-              onValueChange={v => setTab(v as Tab)}
-              buttons={[
+              onChange={setTab}
+              options={[
                 { value: 'transactions', label: 'Transactions' },
                 { value: 'details', label: 'Details' },
                 { value: 'notes', label: 'Notes' },
@@ -186,13 +188,12 @@ export default function VendorDetailScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.addNoteRow}>
-                <TextInput
-                  mode="outlined"
+                <AppTextInput
                   placeholder="Add a note"
                   value={newNote}
                   onChangeText={setNewNote}
                   multiline
-                  style={{ flex: 1, backgroundColor: theme.app.surface }}
+                  containerStyle={{ flex: 1 }}
                 />
                 <AppButton onPress={() => void submitNote()} loading={addingNote} disabled={!newNote.trim()}>Add</AppButton>
               </View>

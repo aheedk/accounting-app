@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
-import { Text, Appbar, List, Switch, SegmentedButtons, Divider, useTheme } from 'react-native-paper';
+import { Text, Appbar, List, Switch, Divider, useTheme } from 'react-native-paper';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { useThemePreference, type ThemePreference } from '../hooks/useThemePreference';
 import { usePushPreference } from '../hooks/usePushPreference';
+import { AppSegmentedControl } from '../components/ui/AppSegmentedControl';
 import { spacing, typeScale, type AppTheme } from '../theme';
 
 const BIOMETRIC_PASSWORD_KEY = 'acct_biometric_password';
@@ -84,7 +85,7 @@ export default function SettingsScreen() {
 
         <SectionLabel theme={theme} text="APPEARANCE" />
         <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
-          <SegmentedButtons value={preference} onValueChange={(v) => setPreference(v as ThemePreference)} buttons={THEME_OPTIONS} />
+          <AppSegmentedControl value={preference} onChange={setPreference} options={THEME_OPTIONS} />
         </View>
         <Divider />
 

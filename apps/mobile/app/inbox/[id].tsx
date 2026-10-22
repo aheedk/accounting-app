@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Alert } from 'react-native';
-import { Text, Appbar, Checkbox, TextInput, useTheme } from 'react-native-paper';
+import { Text, Appbar, Checkbox, IconButton, useTheme } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { statementBankAccounts } from '../../lib/bankAccountOptions';
 import { deriveImportTitle, bestVendorMatch, isInflowLine } from '../../lib/emailImportLabel';
 import { pickErr } from '../../services/apiClient';
 import { PickerField } from '../../components/PickerField';
+import { AppTextInput } from '../../components/ui/AppTextInput';
 import { SearchablePicker, type PickerOption } from '../../components/SearchablePicker';
 import { ConfidenceBadge } from '../../components/ConfidenceBadge';
 import { LoadingIndicator } from '../../components/LoadingIndicator';
@@ -334,13 +335,11 @@ function AddVendorFooter({ theme, onAdd }: { theme: AppTheme; onAdd: (name: stri
   const [text, setText] = useState('');
   return (
     <View style={{ paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.app.border }}>
-      <TextInput
-        mode="outlined"
+      <AppTextInput
         placeholder="+ Add new vendor"
         value={text}
         onChangeText={setText}
-        dense
-        right={text ? <TextInput.Icon icon="check" onPress={() => onAdd(text)} /> : undefined}
+        right={text ? <IconButton icon="check" size={18} onPress={() => onAdd(text)} style={{ margin: 0 }} /> : undefined}
         onSubmitEditing={() => text && onAdd(text)}
       />
     </View>

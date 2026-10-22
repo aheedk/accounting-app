@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, Checkbox, useTheme } from 'react-native-paper';
+import { Text, Button, Checkbox, useTheme } from 'react-native-paper';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import { AppButton } from '../../components/ui/AppButton';
+import { AppTextInput } from '../../components/ui/AppTextInput';
 import { spacing, typeScale, type AppTheme } from '../../theme';
 
 const REMEMBERED_EMAIL_KEY = 'acct_remembered_email';
@@ -97,24 +98,22 @@ export default function LoginScreen() {
             Sign in
           </Text>
 
-          <TextInput
-            mode="outlined"
+          <AppTextInput
             label="Email"
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
-            style={styles.input}
+            containerStyle={styles.input}
           />
-          <TextInput
-            mode="outlined"
+          <AppTextInput
             label="Password"
             secureTextEntry
             autoComplete="password"
             value={password}
             onChangeText={setPassword}
-            style={styles.input}
+            containerStyle={styles.input}
             onSubmitEditing={() => { void submit(); }}
           />
 
