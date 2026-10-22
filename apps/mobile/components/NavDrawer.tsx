@@ -22,8 +22,8 @@ type NavGroup = { id: string; label: string; icon: keyof typeof MaterialCommunit
 
 const NAV_GROUPS: NavGroup[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'view-dashboard-outline', path: '/(tabs)' },
-  { id: 'messages', label: 'Messages', icon: 'message-outline' },
-  { id: 'send-documents', label: 'Send documents', icon: 'upload-outline' },
+  { id: 'messages', label: 'Messages', icon: 'message-outline', path: '/messages' },
+  { id: 'send-documents', label: 'Send documents', icon: 'upload-outline', path: '/send-documents' },
   { id: 'transactions', label: 'Transactions', icon: 'format-list-checks', path: '/(tabs)/transactions' },
   {
     id: 'ar', label: 'Accounts Receivable', icon: 'account-group-outline',

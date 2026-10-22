@@ -16,6 +16,12 @@ type Section = { label: string; items: Item[] };
 // were clipped on a small screen, not just visually noisy).
 const SECTIONS: Section[] = [
   {
+    label: 'General', items: [
+      { title: 'Messages', path: '/messages', icon: 'message-outline' },
+      { title: 'Send Documents', path: '/send-documents', icon: 'upload-outline' },
+    ],
+  },
+  {
     label: 'Reports', items: [
       { title: 'Profit & Loss', path: '/pnl', icon: 'chart-line' },
       { title: 'Balance Sheet', path: '/balance-sheet', icon: 'scale-balance' },

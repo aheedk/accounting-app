@@ -718,6 +718,34 @@ export async function getBudgetVariance(businessId: string, id: string) {
   return r.data.rows;
 }
 
+export type MessageRow = {
+  id: string; body: string; created_at: string; author_name: string; author_role: string; mine: boolean;
+};
+
+export async function listMessages(businessId: string, params: { limit?: number; before?: string } = {}) {
+  const r = await api.get<{ messages: MessageRow[]; has_more: boolean }>(`/businesses/${businessId}/messages`, { params });
+  return r.data;
+}
+
+export async function getUnreadMessageCount(businessId: string) {
+  const r = await api.get<{ count: number }>(`/businesses/${businessId}/messages/unread-count`);
+  return r.data.count;
+}
+
+export async function postMessage(businessId: string, body: string) {
+  // The raw inserted row — id/business_id/author_user_id/body/created_at,
+  // not the joined MessageRow shape listMessages returns. Callers should
+  // invalidate and refetch the list rather than rely on this response.
+  const r = await api.post<{ id: string; business_id: string; author_user_id: string; body: string; created_at: string }>(
+    `/businesses/${businessId}/messages`, { body },
+  );
+  return r.data;
+}
+
+export async function markMessagesRead(businessId: string) {
+  await api.post(`/businesses/${businessId}/messages/read`);
+}
+
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
 // reports) directly. packages/shared's agingRowSchema is stale — its field
 // names (customer_id/customer_name/over_30/over_60/over_90) don't match

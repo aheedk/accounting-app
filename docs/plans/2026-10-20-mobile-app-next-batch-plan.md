@@ -1999,3 +1999,43 @@ unless a user actually asks for on-device export.
 Reports group is now fully built except that one deliberate exclusion.
 Remaining disabled items overall: Inventory (6 items, unresearched),
 and two top-level items (Messages, Send documents).
+
+## Chunk: Messages and Send Documents (2026-10-22)
+
+Researched both before building — unlike Spreadsheet Sync, neither
+needed anything mobile doesn't already have.
+
+- **`app/messages.tsx`**: one thread per company (not per-conversation —
+  matches web's `MessagesPage.tsx`, a single client-to-firm channel),
+  polled every 30s (no websocket infra exists to do better). Chat-
+  bubble list, composer hidden behind a "view-only can't send" notice
+  for the `viewer` role (matches the backend's own `refuseViewOnly`
+  gate on the POST route), marks read on load.
+- **`app/send-documents.tsx`**: turned out to need no new upload
+  plumbing at all — `uploadDocument()` (services/api.ts) and the full
+  camera/library/Files picker flow already existed as
+  `components/CameraCaptureButton.tsx`, built earlier for a header
+  icon. This screen is just a proper landing page wrapping that same
+  component, open to the same roles the backend actually allows
+  (`refuseViewOnly` — any non-viewer, client included), not gated
+  client-only the way web's UI choice to route staff to the AI inbox
+  instead implies.
+- `services/api.ts`: added `MessageRow` + list/unread-count/post/
+  mark-read functions, confirmed against `messageService.ts` directly
+  — including that the POST route returns the raw inserted row, not
+  the joined list shape, which isn't obvious from the route file alone.
+- `lib/roleAccess.ts`'s `CLIENT_PAGES`: added `/messages` and
+  `/send-documents` — confirmed against web's own `roleAccess.ts`
+  client allow-list and `apps/api/src/lib/clientAccess.ts`, both of
+  which already permit a client login on these two pages. Without this
+  the drawer would have hidden both from client logins even though the
+  backend fully allows them.
+- Wired into the drawer (both are top-level items, not inside a group)
+  and a new "General" section at the top of the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Hit all 4 message endpoints live:
+list (empty thread), unread-count, post (real row persisted), mark-read
+— all matching the hand-written types.
+
+Remaining disabled items overall: Inventory (6 items).
