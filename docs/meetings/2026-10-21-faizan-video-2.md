@@ -21,17 +21,15 @@ https://shiny-dusk-be3da0.netlify.app, and Netlify had stopped picking up
 pushes about a week earlier. It is up to date again on 10-22 (checked: the
 live bundle has every change through item 89).
 
-**The API on Railway is behind.** On 10-22 it still ran code from before the
-10-21 push: no `X-Frame-Options` or `Cache-Control` headers, `x-powered-by`
-still sent, no estimates route. Riham's 10-20 push had deployed, so Railway
-stopped at the first push carrying the 10-21 security work. The likeliest
-reason is the new start-up check, which refuses to run in production with the
-example sign-in secrets from `.env.example`; a migration failing is the other
-one. **Until it deploys, the up-to-date web app talks to the old API:**
-Estimates says "Failed", and so will Company Settings and the firm sign-in
-settings, and the P&L comes back without its sections (laid out the old way;
-since 10-22 its Total Expenses at least matches the lines). To do: Railway →
-the API service → Deployments, read why the newest one failed.
+**The API on Railway was behind too (fixed 10-22).** It had skipped every push
+since 10-21 as "No changes to watched files": it only rebuilt for changes under
+`apps/api`, and judged a push by its last commit, which was a merge of Riham's
+mobile-only work. So the updated web app talked to the API of 10-20 (Estimates
+said "Failed", the P&L had no sections). `railway.json` now watches every path
+the API is built from and has its health check back (see the recovery plan).
+The deploy that followed waited out a Railway outage that had switched builds
+off for Hobby plans, and went live at 17:24 EDT with migrations `0108` to
+`0110` in. Everyone was signed out once, as the new session limits apply.
 
 ## Already built: he asked again
 
@@ -112,8 +110,8 @@ already under Cost of Goods Sold when its name says so.
 ## Ask Faizan
 
 - ~~Which site he tests on~~: the Netlify site, which had stopped updating
-  (answered 10-22, above). Worth asking him to record again once Railway's API
-  is current too.
+  (answered 10-22, above). Netlify and Railway are both current since 10-22,
+  17:24 EDT, so he can record again.
 - **Item 84:** which account showed as a liability on the P&L, and on which
   client.
 - **Item 90:** which screen the bank was missing from (deposit, check,
