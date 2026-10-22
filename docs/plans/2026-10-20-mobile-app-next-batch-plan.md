@@ -1800,12 +1800,50 @@ the hand-written types field-for-field. `GET /me/firm/users` correctly
 403'd for the accountant-role demo user, confirming the Users screen's
 gate matches the server's.
 
-Setup group is now fully built. Remaining disabled items: Books Review
-(now unblocked — Fiscal Periods exists, needs a period-picker screen
-feeding `periodId` to `GET /fiscal-periods/:periodId/review-tasks`),
-the rest of Reports (Standard Reports, Cash Activity, Custom Reports,
-Management Reports, Performance Center, Financial Planning, Spreadsheet
-Sync — the last two still need their backend confirmed), Inventory (6
-items, unresearched), and two top-level items (Messages, Send
-documents). Payroll and Client Overview remain deliberately excluded
-(see the Survey chunk).
+Setup group is now fully built. Remaining disabled items: the rest of
+Reports (Standard Reports, Cash Activity, Custom Reports, Management
+Reports, Performance Center, Financial Planning, Spreadsheet Sync — the
+last two still need their backend confirmed), Inventory (6 items,
+unresearched), and two top-level items (Messages, Send documents).
+Payroll and Client Overview remain deliberately excluded (see the
+Survey chunk).
+
+## Chunk: Books Review (2026-10-22)
+
+Unblocked once Fiscal Periods shipped. Mirrors web's
+`BooksReviewPage.tsx` exactly rather than inventing a different shape:
+
+- **`app/books-review.tsx`**: a period picker (`AppMenu` over the
+  existing `listFiscalPeriods`, descending by `starts_on`) defaulting to
+  the period containing today, else the latest open period that's
+  started, else the latest open period, else the first — same fallback
+  chain as web. Below it, a fixed 4-task checklist per period
+  (`reconcile_bank`/`post_adjustments`/`review_unreviewed_txns`/
+  `close_period`, hardcoded labels — the task set is server-seeded per
+  period, not DB-driven on this screen either) rendered as a 3-way
+  `AppSegmentedControl` (To do/In progress/Done) + a notes field saved
+  on blur + a "Sign off" button. Sign-off is `accountant`+ only
+  (`hideUnless`-equivalent: the button simply isn't rendered below that
+  role), matching the PATCH route's own `requireMinRole('accountant')`.
+  The GET route has no role guard beyond non-client staff+, confirmed by
+  reading `periodReview.ts` directly rather than assuming it matched the
+  PATCH route's gate.
+- `services/api.ts`: added `ReviewTask`/`ReviewTaskStatus`/
+  `ReviewTaskKey` + `listReviewTasks`/`updateReviewTask`, hitting
+  `GET /businesses/:businessId/fiscal-periods/:periodId/review-tasks`
+  and `PATCH /businesses/:businessId/review-tasks/:id` — both confirmed
+  against `periodReview.ts` and `PeriodReviewTasksTable` in
+  `apps/api/src/db/types.ts`, not guessed.
+- Wired into the drawer's Accounting group (previously a bare label with
+  no `path`) and the More tab's Accounting section, next to Approvals.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform ios`
+bundle built with no errors. Hit both endpoints live: GET returned the
+real 4-task checklist for the demo business's first period with
+exact-matching field names, and a PATCH (`notes`) round-tripped and was
+reverted to confirm the write path works before moving on.
+
+Note: `periodReview.ts`'s two routes are absent from
+`apps/api/tests/integration/roleMatrix.test.ts` — a pre-existing gap on
+the backend, not something this mobile port introduced or is in scope
+to fix.

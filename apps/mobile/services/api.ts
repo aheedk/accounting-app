@@ -1430,3 +1430,25 @@ export async function reopenFiscalPeriod(businessId: string, id: string, reason:
   const r = await api.post<FiscalPeriod>(`/businesses/${businessId}/periods/${id}/reopen`, { reason });
   return r.data;
 }
+
+export type ReviewTaskStatus = 'todo' | 'in_progress' | 'done';
+export type ReviewTaskKey = 'reconcile_bank' | 'post_adjustments' | 'review_unreviewed_txns' | 'close_period';
+export type ReviewTask = {
+  id: string; business_id: string; period_id: string; task_key: ReviewTaskKey; status: ReviewTaskStatus;
+  assignee_user_id: string | null; notes: string | null;
+  signed_off_at: string | null; signed_off_by_user_id: string | null;
+  created_at: string; updated_at: string;
+};
+
+export async function listReviewTasks(businessId: string, periodId: string) {
+  const r = await api.get<{ tasks: ReviewTask[] }>(`/businesses/${businessId}/fiscal-periods/${periodId}/review-tasks`);
+  return r.data.tasks;
+}
+
+export async function updateReviewTask(
+  businessId: string, taskId: string,
+  patch: { status?: ReviewTaskStatus; notes?: string | null },
+) {
+  const r = await api.patch<ReviewTask>(`/businesses/${businessId}/review-tasks/${taskId}`, patch);
+  return r.data;
+}
