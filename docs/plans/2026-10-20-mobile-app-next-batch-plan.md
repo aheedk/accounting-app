@@ -2193,3 +2193,57 @@ journal number is correct.
 This was the actual last remaining stub in the app — the Create tab's
 own placeholder list, not just the drawer. No further disabled/stub
 entry points are known as of this chunk.
+
+## Chunk: Spreadsheet Sync (2026-10-23)
+
+Previously excluded (2026-10-22 chunk) because it needed a file-
+download/share mechanism this app didn't have, and was the lowest-
+value item in that batch. Revisited on explicit user request — asked
+which of the three remaining "coming soon" items (Payroll, Client
+Overview, Spreadsheet Sync) to tackle, user chose this one specifically
+(smallest scope, the other two need either a new architecture decision
+or a full feature area).
+
+- Added `expo-sharing` (~58.0.20) and `expo-file-system` (~58.0.10) via
+  `npx expo install` (SDK-58-matched versions, not hand-picked).
+- **`app/spreadsheet-sync.tsx`**: a report-type chip row (Trial Balance
+  / Journal Entries / General Ledger — the same 3 reports web's
+  `SpreadsheetSyncPage.tsx` exports, confirmed by reading
+  `csvExportService.ts` directly) with the matching date filter(s) per
+  report (as-of date; or a from/to range, with an optional account
+  filter for General Ledger). "Export CSV" fetches the raw CSV text
+  from the existing `/csv-exports/*` routes (`responseType: 'text'`,
+  since these return `Content-Type: text/csv`, not JSON), writes it to
+  a cache file via the new `File`/`Paths` API (`expo-file-system`'s
+  SDK-58 class-based API, not the legacy `FileSystem.writeAsStringAsync`
+  function API), then opens the native share sheet
+  (`expo-sharing`'s `shareAsync`) — save to Files, AirDrop, mail, or
+  open directly in a spreadsheet app already on the device. Matches
+  what web actually does (a browser download), not a real two-way sync
+  — there's no Google Sheets/Excel Online connection anywhere in this
+  codebase, confirmed by the absence of any such integration.
+- `services/api.ts`: added `exportTrialBalanceCsv`/
+  `exportJournalEntriesCsv`/`exportGeneralLedgerCsv`, each returning
+  `{content, filename}` with the filename built client-side to match
+  `csvExportService.ts`'s own naming convention exactly.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB, both new native modules
+included). Hit all 3 export endpoints live and confirmed real CSV
+content with the exact headers and filename my code expects
+(`Content-Type: text/csv`, `Content-Disposition: attachment;
+filename="..."` matching byte-for-byte what the client constructs).
+**Not verified**: the on-device half (`File.write` to cache, then
+`Sharing.shareAsync`) — curl can exercise the HTTP fetch but not native
+file-system/share-sheet behavior; that needs an actual simulator or
+device run, which the user should do themselves per this app's
+established division of labor (localhost/device acceptance testing is
+the user's side of verification, not something a backend check can
+substitute for).
+
+All three deliberately-excluded "coming soon" items are now resolved
+or explicitly deferred: Spreadsheet Sync shipped; Payroll and Client
+Overview remain excluded, pending the user's call on whether to tackle
+either (Payroll is a full new feature area; Client Overview needs an
+architecture decision since it's firm-wide, not per-business).

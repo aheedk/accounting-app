@@ -78,7 +78,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'General Ledger', path: '/general-ledger' },
       { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity', path: '/cash-activity' }, { label: 'Custom Reports', path: '/custom-reports' },
       { label: 'Management Reports', path: '/management-reports' }, { label: 'Performance Center', path: '/performance-center' }, { label: 'Financial Planning', path: '/financial-planning' },
-      { label: 'Spreadsheet Sync' }, { label: 'Trial Balance', path: '/trial-balance' },
+      { label: 'Spreadsheet Sync', path: '/spreadsheet-sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },
   {

@@ -1871,3 +1871,29 @@ export async function updateReviewTask(
   const r = await api.patch<ReviewTask>(`/businesses/${businessId}/review-tasks/${taskId}`, patch);
   return r.data;
 }
+
+// --- CSV exports ("Spreadsheet Sync") — these routes return a raw CSV
+// file (Content-Type: text/csv, Content-Disposition: attachment), not
+// JSON; the filename matches csvExportService.ts's own convention so a
+// user who shares/saves it sees the same name web's download would give.
+
+export async function exportTrialBalanceCsv(businessId: string, asOf: string) {
+  const r = await api.get<string>(`/businesses/${businessId}/csv-exports/trial-balance`, {
+    params: { as_of: asOf }, responseType: 'text',
+  });
+  return { content: r.data, filename: `trial-balance-${asOf}.csv` };
+}
+
+export async function exportJournalEntriesCsv(businessId: string, from: string, to: string) {
+  const r = await api.get<string>(`/businesses/${businessId}/csv-exports/journal-entries`, {
+    params: { from, to }, responseType: 'text',
+  });
+  return { content: r.data, filename: `journal-entries-${from}-to-${to}.csv` };
+}
+
+export async function exportGeneralLedgerCsv(businessId: string, periodStart: string, periodEnd: string, accountId?: string) {
+  const r = await api.get<string>(`/businesses/${businessId}/csv-exports/general-ledger`, {
+    params: { period_start: periodStart, period_end: periodEnd, ...(accountId ? { account_id: accountId } : {}) }, responseType: 'text',
+  });
+  return { content: r.data, filename: `general-ledger-${periodStart}-to-${periodEnd}.csv` };
+}
