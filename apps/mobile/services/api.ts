@@ -67,6 +67,29 @@ export async function listInvoices(businessId: string, params: { status?: string
   return r.data.invoices;
 }
 
+export async function getNextInvoiceNumber(businessId: string) {
+  const r = await api.get<{ next_number: string }>(`/businesses/${businessId}/invoices/next-number`);
+  return r.data.next_number;
+}
+
+export type InvoiceLineInput = { description: string; quantity: string; unit_price: string; revenue_account_id: string };
+export type InvoiceCreateResult = { id: string; invoice_number: string; total: string; status: string };
+
+export async function createInvoiceDraft(
+  businessId: string,
+  input: { customer_id: string; invoice_number: string; issue_date: string; due_date: string; memo?: string | null; terms?: string | null; lines: InvoiceLineInput[] },
+) {
+  // The route returns { invoice, lines }, not the invoice flat — confirmed
+  // against invoiceService.ts's createDraft, not guessed from the route file.
+  const r = await api.post<{ invoice: InvoiceCreateResult; lines: unknown[] }>(`/businesses/${businessId}/invoices`, input);
+  return r.data.invoice;
+}
+
+export async function postInvoice(businessId: string, id: string) {
+  const r = await api.post<InvoiceCreateResult>(`/businesses/${businessId}/invoices/${id}/post`);
+  return r.data;
+}
+
 // invoices.ts's list/detail routes return every InvoicesTable column — these
 // types only declare the subset the mobile screens actually use, same as
 // the web app's own InvoiceListPage/-DetailPage narrow their local types.
@@ -353,6 +376,27 @@ export async function getCheck(businessId: string, id: string) {
   return r.data;
 }
 
+export async function getNextCheckNumber(businessId: string, bankAccountId: string) {
+  const r = await api.get<{ check_number: string | null }>(`/businesses/${businessId}/checks/next-number`, { params: { bank_account_id: bankAccountId } });
+  return r.data.check_number;
+}
+
+export type CheckPayeeType = 'vendor' | 'customer' | 'other';
+export type CheckLineInput = { account_id: string; description?: string | null; amount: string };
+export type CheckCreateResult = { id: string; check_number: string; total_amount: string; status: string; journal_entry_id: string | null };
+
+export async function createCheck(
+  businessId: string,
+  input: {
+    payment_date: string; bank_account_id: string; check_number?: string | null;
+    payee_id?: string | null; payee_type?: CheckPayeeType | null; payee_text?: string | null;
+    memo?: string | null; lines: CheckLineInput[];
+  },
+) {
+  const r = await api.post<CheckCreateResult>(`/businesses/${businessId}/checks`, input);
+  return r.data;
+}
+
 export type JournalEntryDetail = {
   entry: {
     id: string; entry_date: string; journal_number: string; memo: string | null;
@@ -365,6 +409,22 @@ export type JournalEntryDetail = {
 };
 export async function getJournalEntry(businessId: string, id: string) {
   const r = await api.get<JournalEntryDetail>(`/businesses/${businessId}/journal-entries/${id}`);
+  return r.data;
+}
+
+export async function getNextJournalNumber(businessId: string) {
+  const r = await api.get<{ journal_number: string }>(`/businesses/${businessId}/journal-entries/next-number`);
+  return r.data.journal_number;
+}
+
+export type JournalLineInput = { account_id: string; debit: string; credit: string; memo?: string | null };
+export type JournalEntryCreateResult = { id: string; journal_number: string; entry_date: string; status: string };
+
+export async function createJournalEntry(
+  businessId: string,
+  input: { entry_date: string; journal_number?: string | null; memo?: string | null; reference?: string | null; lines: JournalLineInput[] },
+) {
+  const r = await api.post<JournalEntryCreateResult>(`/businesses/${businessId}/journal-entries`, input);
   return r.data;
 }
 

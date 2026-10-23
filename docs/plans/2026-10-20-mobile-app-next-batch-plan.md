@@ -2128,3 +2128,68 @@ the Inventory group — the last unresearched area. Remaining disabled
 items app-wide: none identified in this session's research passes
 beyond the deliberately excluded Payroll, Client Overview, and
 Spreadsheet Sync.
+
+## Chunk: Create tab stubs — Invoice, Check, Journal Entry (2026-10-23)
+
+A final sweep of the app (not just the drawer — the Create tab's own
+`STUB_ITEMS` list) turned up three more disabled "new" forms: Invoice,
+Check, and Journal Entry. All three already had list/detail screens
+built in earlier chunks (`invoices.tsx`/`invoice/[id].tsx`,
+`checks.tsx` + `transaction/[id].tsx`'s `type=check` case,
+`journal-entries.tsx` + `transaction/[id].tsx`'s `type=journal` case)
+— only the creation form was missing in each case, which is exactly
+what the Create tab's disabled placeholders were marking.
+
+- **`app/check/new.tsx`**: payee (vendor/customer/free-text toggle),
+  bank account, date, an auto-fetched next check number, and a
+  multi-line category/description/amount editor (expense accounts
+  sorted first, matching web's `CheckPage.tsx` ordering — but not
+  restricted to expense-only, same as web). Posts immediately on save
+  (no separate draft step — confirmed by reading `checkService.ts`
+  directly), `staff`+.
+- **`app/invoice/new.tsx`**: customer, auto-fetched next invoice
+  number, issue/due dates (due date defaults to +30 days, matching the
+  net-30 fallback used elsewhere in this app), and a line editor
+  (description + revenue account + qty + price). Create is `staff`+
+  but **posting is `accountant`+ only** — matched to web's own
+  `useSaveAndPost` gate (`canPost = hasMinRole(role, 'accountant')`)
+  rather than assumed: a staff login only sees "Save draft," an
+  accountant+ login sees both "Save draft" and "Save & post."
+- **`app/journal-entry/new.tsx`**: date, auto-fetched next journal
+  number, and a debit/credit line editor (tap a chip to flip a line
+  between debit and credit) with a live balanced/out-of-balance
+  indicator — Save is disabled until debits equal credits, matching
+  the schema's own two-line-minimum and balance requirement. Gated
+  `accountant`+ end-to-end: hidden from the Create tab for lower
+  roles (matching the route's `requireMinRole('accountant')`) rather
+  than shown and left to 403.
+- `services/api.ts`: added `createCheck`/`getNextCheckNumber`,
+  `createInvoiceDraft`/`postInvoice`/`getNextInvoiceNumber`,
+  `createJournalEntry`/`getNextJournalNumber` + their types.
+- `app/(tabs)/create.tsx`: removed the `STUB_ITEMS` disabled-placeholder
+  array entirely and wired all three to real routes.
+
+**Two real bugs caught during live verification, not hypothetical:**
+1. `journal-entries/next-number` returns `{ journal_number }`, not
+   `{ next_number }` as first assumed — a live curl check caught the
+   mismatch before it shipped; fixed the type and accessor.
+2. `POST /invoices` (create draft) returns `{ invoice, lines }`, not
+   the invoice fields flat — unlike `postInvoice`, which does return
+   them flat. A live curl showed the real shape; `createInvoiceDraft`
+   now unwraps `.invoice` before returning, so the screen's existing
+   `created.id` usage needed no further change.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Full live round-trip for all three:
+check create (posted immediately, real `journal_entry_id` attached);
+invoice create → post → get (hit a pre-existing inactive-AR-account
+precondition on this demo business first, same category of issue as
+the inventory chunk's inactive-AP-account hit — temporarily reactivated
+the account to complete verification, confirming the request/response
+shapes rather than leaving the check incomplete); journal entry create
+→ get, confirmed balanced two-line entry posts and the auto-incrementing
+journal number is correct.
+
+This was the actual last remaining stub in the app — the Create tab's
+own placeholder list, not just the drawer. No further disabled/stub
+entry points are known as of this chunk.
