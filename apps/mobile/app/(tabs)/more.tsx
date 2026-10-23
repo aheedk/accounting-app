@@ -80,6 +80,16 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    label: 'Inventory', items: [
+      { title: 'Overview', path: '/inventory-overview', icon: 'view-dashboard-outline' },
+      { title: 'Inventory', path: '/inventory-items', icon: 'package-variant-closed' },
+      { title: 'Purchase Orders', path: '/purchase-orders', icon: 'clipboard-list-outline' },
+      { title: 'Item Receipts', path: '/item-receipts', icon: 'package-down' },
+      { title: 'Sales Orders', path: '/sales-orders', icon: 'cart-outline' },
+      { title: 'Shipping Labels', path: '/shipping-labels', icon: 'truck-outline' },
+    ],
+  },
+  {
     label: 'Setup', items: [
       { title: 'Entity', path: '/entity', icon: 'domain' },
       { title: 'Company Settings', path: '/company-settings', icon: 'cog-outline' },

@@ -746,6 +746,197 @@ export async function markMessagesRead(businessId: string) {
   await api.post(`/businesses/${businessId}/messages/read`);
 }
 
+// --- Inventory ---
+
+export type InventoryOverview = {
+  total_items_count: number; total_stock_value: string; unposted_stock_value: string;
+  recent_receipts: Array<{ id: string; receipt_date: string; po_number: string }>;
+  recent_sales: Array<{ id: string; order_date: string; so_number: string }>;
+};
+
+export async function getInventoryOverview(businessId: string) {
+  const r = await api.get<InventoryOverview>(`/businesses/${businessId}/inventory-overview`);
+  return r.data;
+}
+
+export async function postOpeningInventoryBalance(businessId: string, entry_date: string) {
+  const r = await api.post<{ journal_entry_id: string | null; movement_count: number; value: string }>(
+    `/businesses/${businessId}/inventory/post-opening-balance`, { entry_date },
+  );
+  return r.data;
+}
+
+export type StockMovementReason = 'adjustment' | 'opening_balance' | 'manual_in' | 'manual_out' | 'write_off';
+export type InventoryItem = {
+  id: string; business_id: string; sku: string; name: string; description: string | null;
+  unit_of_measure: string; purchase_cost: string | null; sale_price: string | null;
+  income_account_id: string | null; expense_account_id: string | null; inventory_asset_account_id: string | null;
+  is_active: boolean; created_at: string; updated_at: string; deleted_at: string | null;
+  quantity_on_hand: string;
+};
+export type StockMovement = {
+  id: string; inventory_item_id: string; movement_date: string; quantity_delta: string;
+  reason: StockMovementReason; memo: string | null; posted_by_user_id: string | null; created_at: string;
+  posted_by_name: string | null;
+};
+export type InventoryItemWithMovements = InventoryItem & { stock_movements: StockMovement[] };
+
+export async function listInventoryItems(businessId: string, params: { include_inactive?: boolean } = {}) {
+  const r = await api.get<{ items: InventoryItem[] }>(`/businesses/${businessId}/inventory-items`, {
+    params: params.include_inactive ? { include_inactive: 'true' } : undefined,
+  });
+  return r.data.items;
+}
+
+export async function getInventoryItem(businessId: string, id: string) {
+  const r = await api.get<InventoryItemWithMovements>(`/businesses/${businessId}/inventory-items/${id}`);
+  return r.data;
+}
+
+export type InventoryItemCreate = {
+  sku: string; name: string; description?: string | null; unit_of_measure?: string;
+  purchase_cost?: string | null; sale_price?: string | null;
+  income_account_id?: string | null; expense_account_id?: string | null; inventory_asset_account_id?: string | null;
+};
+
+export async function createInventoryItem(businessId: string, input: InventoryItemCreate) {
+  const r = await api.post<InventoryItem>(`/businesses/${businessId}/inventory-items`, input);
+  return r.data;
+}
+
+export async function updateInventoryItem(businessId: string, id: string, patch: Partial<InventoryItemCreate> & { is_active?: boolean }) {
+  const r = await api.patch<InventoryItem>(`/businesses/${businessId}/inventory-items/${id}`, patch);
+  return r.data;
+}
+
+export async function deleteInventoryItem(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/inventory-items/${id}`);
+}
+
+export async function adjustInventoryStock(
+  businessId: string, id: string,
+  input: { movement_date: string; quantity_delta: string; reason: StockMovementReason; memo?: string | null; unit_cost?: string },
+) {
+  const r = await api.post<StockMovement>(`/businesses/${businessId}/inventory-items/${id}/adjust-stock`, input);
+  return r.data;
+}
+
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
+export type PurchaseOrder = {
+  id: string; business_id: string; po_number: string; vendor_id: string; order_date: string;
+  expected_delivery_date: string | null; status: PurchaseOrderStatus; memo: string | null;
+  created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+export type PurchaseOrderLine = {
+  id: string; purchase_order_id: string; line_number: number; inventory_item_id: string;
+  description: string | null; quantity: string; unit_cost: string;
+};
+export type PurchaseOrderWithLines = PurchaseOrder & { lines: PurchaseOrderLine[] };
+
+export async function listPurchaseOrders(businessId: string, params: { status?: PurchaseOrderStatus } = {}) {
+  const r = await api.get<{ purchase_orders: PurchaseOrder[] }>(`/businesses/${businessId}/purchase-orders`, { params });
+  return r.data.purchase_orders;
+}
+
+export async function getPurchaseOrder(businessId: string, id: string) {
+  const r = await api.get<PurchaseOrderWithLines>(`/businesses/${businessId}/purchase-orders/${id}`);
+  return r.data;
+}
+
+export type PurchaseOrderLineInput = { inventory_item_id: string; quantity: string; unit_cost: string; description?: string | null };
+export async function createPurchaseOrder(
+  businessId: string,
+  input: { vendor_id: string; order_date: string; expected_delivery_date?: string | null; memo?: string | null; lines: PurchaseOrderLineInput[] },
+) {
+  const r = await api.post<PurchaseOrderWithLines>(`/businesses/${businessId}/purchase-orders`, input);
+  return r.data;
+}
+
+export async function voidPurchaseOrder(businessId: string, id: string) {
+  const r = await api.post<PurchaseOrder>(`/businesses/${businessId}/purchase-orders/${id}/void`);
+  return r.data;
+}
+
+export type ItemReceipt = {
+  id: string; business_id: string; purchase_order_id: string; receipt_date: string;
+  bill_id: string | null; memo: string | null; created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+
+export async function listItemReceipts(businessId: string) {
+  const r = await api.get<{ item_receipts: ItemReceipt[] }>(`/businesses/${businessId}/item-receipts`);
+  return r.data.item_receipts;
+}
+
+export async function createItemReceipt(businessId: string, input: { purchase_order_id: string; receipt_date: string; memo?: string | null }) {
+  const r = await api.post<ItemReceipt>(`/businesses/${businessId}/item-receipts`, input);
+  return r.data;
+}
+
+export type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
+export type SalesOrder = {
+  id: string; business_id: string; so_number: string; customer_id: string; order_date: string;
+  status: SalesOrderStatus; invoice_id: string | null; memo: string | null;
+  created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+export type SalesOrderLine = {
+  id: string; sales_order_id: string; line_number: number; inventory_item_id: string;
+  description: string | null; quantity: string; unit_price: string;
+};
+export type SalesOrderWithLines = SalesOrder & { lines: SalesOrderLine[] };
+
+export async function listSalesOrders(businessId: string, params: { status?: SalesOrderStatus } = {}) {
+  const r = await api.get<{ sales_orders: SalesOrder[] }>(`/businesses/${businessId}/sales-orders`, { params });
+  return r.data.sales_orders;
+}
+
+export async function getSalesOrder(businessId: string, id: string) {
+  const r = await api.get<SalesOrderWithLines>(`/businesses/${businessId}/sales-orders/${id}`);
+  return r.data;
+}
+
+export type SalesOrderLineInput = { inventory_item_id: string; quantity: string; unit_price: string; description?: string | null };
+export async function createSalesOrder(
+  businessId: string,
+  input: { customer_id: string; order_date: string; memo?: string | null; lines: SalesOrderLineInput[] },
+) {
+  const r = await api.post<SalesOrderWithLines>(`/businesses/${businessId}/sales-orders`, input);
+  return r.data;
+}
+
+export async function fulfillSalesOrder(businessId: string, id: string) {
+  const r = await api.post<SalesOrder>(`/businesses/${businessId}/sales-orders/${id}/fulfill`);
+  return r.data;
+}
+
+export async function voidSalesOrder(businessId: string, id: string) {
+  const r = await api.post<SalesOrder>(`/businesses/${businessId}/sales-orders/${id}/void`);
+  return r.data;
+}
+
+export type ShippingLabel = {
+  id: string; business_id: string; invoice_id: string | null; sales_order_id: string | null;
+  carrier: string; tracking_number: string; shipped_at: string; cost: string | null;
+  label_file_id: string | null; notes: string | null; created_at: string; updated_at: string;
+  created_by_user_id: string | null; invoice_number: string | null; so_number: string | null;
+};
+
+export async function listShippingLabels(businessId: string, params: { invoice_id?: string; sales_order_id?: string } = {}) {
+  const r = await api.get<{ labels: ShippingLabel[] }>(`/businesses/${businessId}/shipping-labels`, { params });
+  return r.data.labels;
+}
+
+export async function createShippingLabel(
+  businessId: string,
+  input: { carrier: string; tracking_number: string; shipped_at: string; invoice_id?: string | null; sales_order_id?: string | null; cost?: string | null; notes?: string | null },
+) {
+  const r = await api.post<ShippingLabel>(`/businesses/${businessId}/shipping-labels`, input);
+  return r.data;
+}
+
+export async function deleteShippingLabel(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/shipping-labels/${id}`);
+}
+
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
 // reports) directly. packages/shared's agingRowSchema is stale — its field
 // names (customer_id/customer_name/over_30/over_60/over_90) don't match

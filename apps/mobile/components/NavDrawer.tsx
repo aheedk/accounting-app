@@ -84,8 +84,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'inventory', label: 'Inventory', icon: 'package-variant-closed',
     children: [
-      { label: 'Overview' }, { label: 'Inventory' }, { label: 'Purchase Orders' },
-      { label: 'Item Receipts' }, { label: 'Sales Orders' }, { label: 'Shipping Labels' },
+      { label: 'Overview', path: '/inventory-overview' }, { label: 'Inventory', path: '/inventory-items' }, { label: 'Purchase Orders', path: '/purchase-orders' },
+      { label: 'Item Receipts', path: '/item-receipts' }, { label: 'Sales Orders', path: '/sales-orders' }, { label: 'Shipping Labels', path: '/shipping-labels' },
     ],
   },
   {

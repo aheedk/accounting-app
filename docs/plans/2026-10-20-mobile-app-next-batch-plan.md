@@ -2039,3 +2039,92 @@ list (empty thread), unread-count, post (real row persisted), mark-read
 — all matching the hand-written types.
 
 Remaining disabled items overall: Inventory (6 items).
+
+## Chunk: Inventory group (2026-10-23)
+
+Researched all 6 items before building — confirmed real, distinct,
+buildable features (the backend has a full `services/inventory/`
+surface: items, stock movements, purchase orders, item receipts, sales
+orders, shipping labels). No scope exclusions this chunk; every item
+shipped.
+
+What shipped:
+
+- **`app/inventory-overview.tsx`**: KPI dashboard (`GET
+  /inventory-overview` — item count, stock value, unposted value) +
+  recent receipts/fulfilled sales + a "Post opening balance"
+  action (`accountant`+, optional entry date) for whatever unposted
+  stock value exists.
+- **`app/inventory-items.tsx`**: list + detail, in the established
+  list/detail-toggle-in-one-screen pattern. Create/edit `staff`+,
+  delete `accountant`+. Detail view adds an "Adjust stock" action
+  (date + signed quantity + reason + memo) and a stock-movement history
+  list. **Caught during live verification**: the create form originally
+  had no income/expense/inventory-asset account fields — without an
+  asset account, `POST .../item-receipts` refuses with
+  `PRECONDITION_FAILED` ("item has no inventory_asset_account_id"), a
+  real blocker, not a hypothetical. Added all 3 account pickers to
+  create, plus a "Set/Change asset account" action on the detail view
+  for items created before this fix.
+- **`app/purchase-orders.tsx`** + **`app/purchase-order/new.tsx`** +
+  **`app/purchase-order/[id].tsx`**: status-filtered list, a line-item
+  builder (item picker + qty + unit cost, add/remove lines, running
+  total), and a detail view with a "Receive" shortcut (`staff`+, jumps
+  into Item Receipts with the PO pre-selected) and void (`accountant`+).
+  **Caught during live verification**: initially gated "Receive"/the
+  Item Receipts PO picker to `sent`/`received` status only — reading
+  web's `PurchaseOrderDetailPage.tsx` `canReceive` gate directly showed
+  a `draft` PO can be received too (there's no separate "send" step at
+  all); fixed both the picker filter and matched web's exact
+  void-exclusion set (`void`/`received`, not just `void`).
+- **`app/item-receipts.tsx`**: list + inline create (PO picker + date +
+  memo) — no detail page, matching the backend (list-and-create only,
+  no GET /:id route). Accepts an optional `poId` route param so the PO
+  detail screen's "Receive" button can pre-select it.
+- **`app/sales-orders.tsx`** + **`app/sales-order/new.tsx`** +
+  **`app/sales-order/[id].tsx`**: same shape as purchase orders
+  (status-filtered list, line-item builder with customer + items), plus
+  fulfill (`accountant`+, creates the linked invoice) and void.
+- **`app/shipping-labels.tsx`**: list + inline create + delete
+  (`accountant`+). **Caught during live verification**: the backend's
+  `shippingLabelCreateSchema` has a `.refine()` requiring either
+  `invoice_id` or `sales_order_id` — a live `VALIDATION_FAILED` with
+  empty `field_errors` (refinement errors don't map to a field) surfaced
+  this. Fixed by adding an Invoice/Sales order segmented toggle (the
+  form originally only offered sales order, and treated it as
+  optional) so a label can link to either, matching what the schema
+  actually requires.
+- `services/api.ts`: added the full inventory type/function surface —
+  `InventoryOverview`, `InventoryItem`/`InventoryItemWithMovements`/
+  `StockMovement`, `PurchaseOrder(WithLines)`, `ItemReceipt`,
+  `SalesOrder(WithLines)`, `ShippingLabel` + every list/get/create/
+  update/delete/action function — all confirmed against the actual
+  route and service files (`inventoryItems.ts`, `inventoryOverview.ts`,
+  `purchaseOrders.ts`, `itemReceipts.ts`, `salesOrders.ts`,
+  `shippingLabels.ts`, `inventoryItemService.ts`,
+  `inventoryOverviewService.ts`, `purchaseOrderService.ts`,
+  `itemReceiptService.ts`, `salesOrderService.ts`,
+  `shippingLabelService.ts`) and the matching `apps/api/src/db/types.ts`
+  tables, not guessed.
+- Wired all 6 into the drawer's Inventory group and a new Inventory
+  section on the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.4MB). Full live round-trip against
+the dev server for every entity: inventory item create → get →
+adjust-stock → update (including the asset-account fix); purchase
+order create → get → void; item receipt create against a draft PO
+(correctly 404/precondition-checked before the asset-account fix, then
+succeeded up to an unrelated pre-existing demo-business data issue — an
+inactive AP account on this seed business, not a code bug); sales
+order create → get → void; shipping label create (linked to a sales
+order) → list (confirmed the `so_number`/`invoice_number` join) →
+delete (204). Two throwaway demo records (a test customer, one
+inventory item) were left on the demo business from this verification,
+consistent with every other chunk's demo-data footprint this session.
+
+This closes out the entire "continue until there are none" mandate for
+the Inventory group — the last unresearched area. Remaining disabled
+items app-wide: none identified in this session's research passes
+beyond the deliberately excluded Payroll, Client Overview, and
+Spreadsheet Sync.
