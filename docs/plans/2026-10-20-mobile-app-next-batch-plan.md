@@ -2039,3 +2039,264 @@ list (empty thread), unread-count, post (real row persisted), mark-read
 — all matching the hand-written types.
 
 Remaining disabled items overall: Inventory (6 items).
+
+## Chunk: Inventory group (2026-10-23)
+
+Researched all 6 items before building — confirmed real, distinct,
+buildable features (the backend has a full `services/inventory/`
+surface: items, stock movements, purchase orders, item receipts, sales
+orders, shipping labels). No scope exclusions this chunk; every item
+shipped.
+
+What shipped:
+
+- **`app/inventory-overview.tsx`**: KPI dashboard (`GET
+  /inventory-overview` — item count, stock value, unposted value) +
+  recent receipts/fulfilled sales + a "Post opening balance"
+  action (`accountant`+, optional entry date) for whatever unposted
+  stock value exists.
+- **`app/inventory-items.tsx`**: list + detail, in the established
+  list/detail-toggle-in-one-screen pattern. Create/edit `staff`+,
+  delete `accountant`+. Detail view adds an "Adjust stock" action
+  (date + signed quantity + reason + memo) and a stock-movement history
+  list. **Caught during live verification**: the create form originally
+  had no income/expense/inventory-asset account fields — without an
+  asset account, `POST .../item-receipts` refuses with
+  `PRECONDITION_FAILED` ("item has no inventory_asset_account_id"), a
+  real blocker, not a hypothetical. Added all 3 account pickers to
+  create, plus a "Set/Change asset account" action on the detail view
+  for items created before this fix.
+- **`app/purchase-orders.tsx`** + **`app/purchase-order/new.tsx`** +
+  **`app/purchase-order/[id].tsx`**: status-filtered list, a line-item
+  builder (item picker + qty + unit cost, add/remove lines, running
+  total), and a detail view with a "Receive" shortcut (`staff`+, jumps
+  into Item Receipts with the PO pre-selected) and void (`accountant`+).
+  **Caught during live verification**: initially gated "Receive"/the
+  Item Receipts PO picker to `sent`/`received` status only — reading
+  web's `PurchaseOrderDetailPage.tsx` `canReceive` gate directly showed
+  a `draft` PO can be received too (there's no separate "send" step at
+  all); fixed both the picker filter and matched web's exact
+  void-exclusion set (`void`/`received`, not just `void`).
+- **`app/item-receipts.tsx`**: list + inline create (PO picker + date +
+  memo) — no detail page, matching the backend (list-and-create only,
+  no GET /:id route). Accepts an optional `poId` route param so the PO
+  detail screen's "Receive" button can pre-select it.
+- **`app/sales-orders.tsx`** + **`app/sales-order/new.tsx`** +
+  **`app/sales-order/[id].tsx`**: same shape as purchase orders
+  (status-filtered list, line-item builder with customer + items), plus
+  fulfill (`accountant`+, creates the linked invoice) and void.
+- **`app/shipping-labels.tsx`**: list + inline create + delete
+  (`accountant`+). **Caught during live verification**: the backend's
+  `shippingLabelCreateSchema` has a `.refine()` requiring either
+  `invoice_id` or `sales_order_id` — a live `VALIDATION_FAILED` with
+  empty `field_errors` (refinement errors don't map to a field) surfaced
+  this. Fixed by adding an Invoice/Sales order segmented toggle (the
+  form originally only offered sales order, and treated it as
+  optional) so a label can link to either, matching what the schema
+  actually requires.
+- `services/api.ts`: added the full inventory type/function surface —
+  `InventoryOverview`, `InventoryItem`/`InventoryItemWithMovements`/
+  `StockMovement`, `PurchaseOrder(WithLines)`, `ItemReceipt`,
+  `SalesOrder(WithLines)`, `ShippingLabel` + every list/get/create/
+  update/delete/action function — all confirmed against the actual
+  route and service files (`inventoryItems.ts`, `inventoryOverview.ts`,
+  `purchaseOrders.ts`, `itemReceipts.ts`, `salesOrders.ts`,
+  `shippingLabels.ts`, `inventoryItemService.ts`,
+  `inventoryOverviewService.ts`, `purchaseOrderService.ts`,
+  `itemReceiptService.ts`, `salesOrderService.ts`,
+  `shippingLabelService.ts`) and the matching `apps/api/src/db/types.ts`
+  tables, not guessed.
+- Wired all 6 into the drawer's Inventory group and a new Inventory
+  section on the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.4MB). Full live round-trip against
+the dev server for every entity: inventory item create → get →
+adjust-stock → update (including the asset-account fix); purchase
+order create → get → void; item receipt create against a draft PO
+(correctly 404/precondition-checked before the asset-account fix, then
+succeeded up to an unrelated pre-existing demo-business data issue — an
+inactive AP account on this seed business, not a code bug); sales
+order create → get → void; shipping label create (linked to a sales
+order) → list (confirmed the `so_number`/`invoice_number` join) →
+delete (204). Two throwaway demo records (a test customer, one
+inventory item) were left on the demo business from this verification,
+consistent with every other chunk's demo-data footprint this session.
+
+This closes out the entire "continue until there are none" mandate for
+the Inventory group — the last unresearched area. Remaining disabled
+items app-wide: none identified in this session's research passes
+beyond the deliberately excluded Payroll, Client Overview, and
+Spreadsheet Sync.
+
+## Chunk: Create tab stubs — Invoice, Check, Journal Entry (2026-10-23)
+
+A final sweep of the app (not just the drawer — the Create tab's own
+`STUB_ITEMS` list) turned up three more disabled "new" forms: Invoice,
+Check, and Journal Entry. All three already had list/detail screens
+built in earlier chunks (`invoices.tsx`/`invoice/[id].tsx`,
+`checks.tsx` + `transaction/[id].tsx`'s `type=check` case,
+`journal-entries.tsx` + `transaction/[id].tsx`'s `type=journal` case)
+— only the creation form was missing in each case, which is exactly
+what the Create tab's disabled placeholders were marking.
+
+- **`app/check/new.tsx`**: payee (vendor/customer/free-text toggle),
+  bank account, date, an auto-fetched next check number, and a
+  multi-line category/description/amount editor (expense accounts
+  sorted first, matching web's `CheckPage.tsx` ordering — but not
+  restricted to expense-only, same as web). Posts immediately on save
+  (no separate draft step — confirmed by reading `checkService.ts`
+  directly), `staff`+.
+- **`app/invoice/new.tsx`**: customer, auto-fetched next invoice
+  number, issue/due dates (due date defaults to +30 days, matching the
+  net-30 fallback used elsewhere in this app), and a line editor
+  (description + revenue account + qty + price). Create is `staff`+
+  but **posting is `accountant`+ only** — matched to web's own
+  `useSaveAndPost` gate (`canPost = hasMinRole(role, 'accountant')`)
+  rather than assumed: a staff login only sees "Save draft," an
+  accountant+ login sees both "Save draft" and "Save & post."
+- **`app/journal-entry/new.tsx`**: date, auto-fetched next journal
+  number, and a debit/credit line editor (tap a chip to flip a line
+  between debit and credit) with a live balanced/out-of-balance
+  indicator — Save is disabled until debits equal credits, matching
+  the schema's own two-line-minimum and balance requirement. Gated
+  `accountant`+ end-to-end: hidden from the Create tab for lower
+  roles (matching the route's `requireMinRole('accountant')`) rather
+  than shown and left to 403.
+- `services/api.ts`: added `createCheck`/`getNextCheckNumber`,
+  `createInvoiceDraft`/`postInvoice`/`getNextInvoiceNumber`,
+  `createJournalEntry`/`getNextJournalNumber` + their types.
+- `app/(tabs)/create.tsx`: removed the `STUB_ITEMS` disabled-placeholder
+  array entirely and wired all three to real routes.
+
+**Two real bugs caught during live verification, not hypothetical:**
+1. `journal-entries/next-number` returns `{ journal_number }`, not
+   `{ next_number }` as first assumed — a live curl check caught the
+   mismatch before it shipped; fixed the type and accessor.
+2. `POST /invoices` (create draft) returns `{ invoice, lines }`, not
+   the invoice fields flat — unlike `postInvoice`, which does return
+   them flat. A live curl showed the real shape; `createInvoiceDraft`
+   now unwraps `.invoice` before returning, so the screen's existing
+   `created.id` usage needed no further change.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Full live round-trip for all three:
+check create (posted immediately, real `journal_entry_id` attached);
+invoice create → post → get (hit a pre-existing inactive-AR-account
+precondition on this demo business first, same category of issue as
+the inventory chunk's inactive-AP-account hit — temporarily reactivated
+the account to complete verification, confirming the request/response
+shapes rather than leaving the check incomplete); journal entry create
+→ get, confirmed balanced two-line entry posts and the auto-incrementing
+journal number is correct.
+
+This was the actual last remaining stub in the app — the Create tab's
+own placeholder list, not just the drawer. No further disabled/stub
+entry points are known as of this chunk.
+
+## Chunk: Spreadsheet Sync (2026-10-23)
+
+Previously excluded (2026-10-22 chunk) because it needed a file-
+download/share mechanism this app didn't have, and was the lowest-
+value item in that batch. Revisited on explicit user request — asked
+which of the three remaining "coming soon" items (Payroll, Client
+Overview, Spreadsheet Sync) to tackle, user chose this one specifically
+(smallest scope, the other two need either a new architecture decision
+or a full feature area).
+
+- Added `expo-sharing` (~58.0.20) and `expo-file-system` (~58.0.10) via
+  `npx expo install` (SDK-58-matched versions, not hand-picked).
+- **`app/spreadsheet-sync.tsx`**: a report-type chip row (Trial Balance
+  / Journal Entries / General Ledger — the same 3 reports web's
+  `SpreadsheetSyncPage.tsx` exports, confirmed by reading
+  `csvExportService.ts` directly) with the matching date filter(s) per
+  report (as-of date; or a from/to range, with an optional account
+  filter for General Ledger). "Export CSV" fetches the raw CSV text
+  from the existing `/csv-exports/*` routes (`responseType: 'text'`,
+  since these return `Content-Type: text/csv`, not JSON), writes it to
+  a cache file via the new `File`/`Paths` API (`expo-file-system`'s
+  SDK-58 class-based API, not the legacy `FileSystem.writeAsStringAsync`
+  function API), then opens the native share sheet
+  (`expo-sharing`'s `shareAsync`) — save to Files, AirDrop, mail, or
+  open directly in a spreadsheet app already on the device. Matches
+  what web actually does (a browser download), not a real two-way sync
+  — there's no Google Sheets/Excel Online connection anywhere in this
+  codebase, confirmed by the absence of any such integration.
+- `services/api.ts`: added `exportTrialBalanceCsv`/
+  `exportJournalEntriesCsv`/`exportGeneralLedgerCsv`, each returning
+  `{content, filename}` with the filename built client-side to match
+  `csvExportService.ts`'s own naming convention exactly.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB, both new native modules
+included). Hit all 3 export endpoints live and confirmed real CSV
+content with the exact headers and filename my code expects
+(`Content-Type: text/csv`, `Content-Disposition: attachment;
+filename="..."` matching byte-for-byte what the client constructs).
+**Not verified**: the on-device half (`File.write` to cache, then
+`Sharing.shareAsync`) — curl can exercise the HTTP fetch but not native
+file-system/share-sheet behavior; that needs an actual simulator or
+device run, which the user should do themselves per this app's
+established division of labor (localhost/device acceptance testing is
+the user's side of verification, not something a backend check can
+substitute for).
+
+All three deliberately-excluded "coming soon" items are now resolved
+or explicitly deferred: Spreadsheet Sync shipped; Payroll and Client
+Overview remain excluded, pending the user's call on whether to tackle
+either (Payroll is a full new feature area; Client Overview needs an
+architecture decision since it's firm-wide, not per-business).
+
+## Chunk: Estimates (2026-10-23) — closing a gap found via the capability guide
+
+User shared a "Mobile vs Web Capability Guide" doc (a feature-parity
+checklist across 12 areas, dated today) and asked to follow it to tweak
+up the mobile app. Cross-checked every row in the guide against the
+actual codebase (`ls app/`, `grep` for each named feature) rather than
+trusting it outright — it turned out to be accurate for essentially
+everything, including features shipped earlier in this very session
+(Checks' create-only scope, Invoice draft+post, Journal Entry's
+accountant-gating, the inventory item account pickers). **One real
+gap found**: the guide claims "Estimates list ✅ Read" on mobile, but
+no `estimate`/`estimates` file existed anywhere in `apps/mobile` — this
+was the single discrepancy between the guide and reality.
+
+- Confirmed the backend is real (`apps/api/src/routes/estimates.ts`,
+  spec at `docs/specs/2026-10-20-estimates-design.md`) before building:
+  list/get are open reads; create/edit/convert-to-invoice are `staff`+;
+  delete is `firm_admin`+. Scoped mobile to match the guide's own claim
+  exactly — read-only (list + detail), no create/edit/convert/accept/
+  delete actions.
+- **`app/estimates.tsx`**: status filter chips (pending/accepted/
+  rejected/closed) + list, same `invoices.tsx`/`bills.tsx` pattern.
+- **`app/estimate/[id].tsx`**: customer, dates, memo, line items,
+  subtotal/tax/total, and — when the estimate was converted — a tap-
+  through link to the resulting invoice (`estimate.invoice_id` +
+  `invoice_number`, both confirmed present on the real detail response).
+- `services/api.ts`: added `EstimateStatus`/`EstimateRow`/
+  `EstimateLine`/`EstimateDetail` types + `listEstimates`/`getEstimate`,
+  confirmed against `estimateService.ts`'s actual return shapes
+  directly — in particular that `getEstimate` returns a nested
+  `{estimate, lines, invoice_number}`, not the row flat, which isn't
+  obvious from the route file alone.
+- Wired into the drawer's AR group (next to Invoices) and the More
+  tab's AR section. No `CLIENT_PAGES` change — confirmed estimates
+  aren't in web's own client allow-list either, so the existing
+  default-deny for the `client` role already matches web's behavior
+  with no new code.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Live round-trip against the
+dev server: list (empty, `{estimates: []}`), then created a real
+throwaway estimate to exercise the full shape — list now showing it
+with `customer_name` joined, and `GET /estimates/:id` confirmed the
+exact `{estimate, lines, invoice_number}` nesting the mobile type
+expects, field-for-field. A delete attempt correctly 403'd for the
+accountant-role demo login (delete is `firm_admin`-only) — the leftover
+test estimate (`EST-0001`) couldn't be cleaned up under this login and
+was left on the demo business, same category as every other chunk's
+harmless demo-data footprint this session.
+
+With this, every claim in the user's capability guide now matches the
+actual mobile codebase — no further gaps found in that cross-check.

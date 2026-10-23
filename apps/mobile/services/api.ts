@@ -67,6 +67,29 @@ export async function listInvoices(businessId: string, params: { status?: string
   return r.data.invoices;
 }
 
+export async function getNextInvoiceNumber(businessId: string) {
+  const r = await api.get<{ next_number: string }>(`/businesses/${businessId}/invoices/next-number`);
+  return r.data.next_number;
+}
+
+export type InvoiceLineInput = { description: string; quantity: string; unit_price: string; revenue_account_id: string };
+export type InvoiceCreateResult = { id: string; invoice_number: string; total: string; status: string };
+
+export async function createInvoiceDraft(
+  businessId: string,
+  input: { customer_id: string; invoice_number: string; issue_date: string; due_date: string; memo?: string | null; terms?: string | null; lines: InvoiceLineInput[] },
+) {
+  // The route returns { invoice, lines }, not the invoice flat — confirmed
+  // against invoiceService.ts's createDraft, not guessed from the route file.
+  const r = await api.post<{ invoice: InvoiceCreateResult; lines: unknown[] }>(`/businesses/${businessId}/invoices`, input);
+  return r.data.invoice;
+}
+
+export async function postInvoice(businessId: string, id: string) {
+  const r = await api.post<InvoiceCreateResult>(`/businesses/${businessId}/invoices/${id}/post`);
+  return r.data;
+}
+
 // invoices.ts's list/detail routes return every InvoicesTable column — these
 // types only declare the subset the mobile screens actually use, same as
 // the web app's own InvoiceListPage/-DetailPage narrow their local types.
@@ -353,6 +376,27 @@ export async function getCheck(businessId: string, id: string) {
   return r.data;
 }
 
+export async function getNextCheckNumber(businessId: string, bankAccountId: string) {
+  const r = await api.get<{ check_number: string | null }>(`/businesses/${businessId}/checks/next-number`, { params: { bank_account_id: bankAccountId } });
+  return r.data.check_number;
+}
+
+export type CheckPayeeType = 'vendor' | 'customer' | 'other';
+export type CheckLineInput = { account_id: string; description?: string | null; amount: string };
+export type CheckCreateResult = { id: string; check_number: string; total_amount: string; status: string; journal_entry_id: string | null };
+
+export async function createCheck(
+  businessId: string,
+  input: {
+    payment_date: string; bank_account_id: string; check_number?: string | null;
+    payee_id?: string | null; payee_type?: CheckPayeeType | null; payee_text?: string | null;
+    memo?: string | null; lines: CheckLineInput[];
+  },
+) {
+  const r = await api.post<CheckCreateResult>(`/businesses/${businessId}/checks`, input);
+  return r.data;
+}
+
 export type JournalEntryDetail = {
   entry: {
     id: string; entry_date: string; journal_number: string; memo: string | null;
@@ -365,6 +409,22 @@ export type JournalEntryDetail = {
 };
 export async function getJournalEntry(businessId: string, id: string) {
   const r = await api.get<JournalEntryDetail>(`/businesses/${businessId}/journal-entries/${id}`);
+  return r.data;
+}
+
+export async function getNextJournalNumber(businessId: string) {
+  const r = await api.get<{ journal_number: string }>(`/businesses/${businessId}/journal-entries/next-number`);
+  return r.data.journal_number;
+}
+
+export type JournalLineInput = { account_id: string; debit: string; credit: string; memo?: string | null };
+export type JournalEntryCreateResult = { id: string; journal_number: string; entry_date: string; status: string };
+
+export async function createJournalEntry(
+  businessId: string,
+  input: { entry_date: string; journal_number?: string | null; memo?: string | null; reference?: string | null; lines: JournalLineInput[] },
+) {
+  const r = await api.post<JournalEntryCreateResult>(`/businesses/${businessId}/journal-entries`, input);
   return r.data;
 }
 
@@ -744,6 +804,197 @@ export async function postMessage(businessId: string, body: string) {
 
 export async function markMessagesRead(businessId: string) {
   await api.post(`/businesses/${businessId}/messages/read`);
+}
+
+// --- Inventory ---
+
+export type InventoryOverview = {
+  total_items_count: number; total_stock_value: string; unposted_stock_value: string;
+  recent_receipts: Array<{ id: string; receipt_date: string; po_number: string }>;
+  recent_sales: Array<{ id: string; order_date: string; so_number: string }>;
+};
+
+export async function getInventoryOverview(businessId: string) {
+  const r = await api.get<InventoryOverview>(`/businesses/${businessId}/inventory-overview`);
+  return r.data;
+}
+
+export async function postOpeningInventoryBalance(businessId: string, entry_date: string) {
+  const r = await api.post<{ journal_entry_id: string | null; movement_count: number; value: string }>(
+    `/businesses/${businessId}/inventory/post-opening-balance`, { entry_date },
+  );
+  return r.data;
+}
+
+export type StockMovementReason = 'adjustment' | 'opening_balance' | 'manual_in' | 'manual_out' | 'write_off';
+export type InventoryItem = {
+  id: string; business_id: string; sku: string; name: string; description: string | null;
+  unit_of_measure: string; purchase_cost: string | null; sale_price: string | null;
+  income_account_id: string | null; expense_account_id: string | null; inventory_asset_account_id: string | null;
+  is_active: boolean; created_at: string; updated_at: string; deleted_at: string | null;
+  quantity_on_hand: string;
+};
+export type StockMovement = {
+  id: string; inventory_item_id: string; movement_date: string; quantity_delta: string;
+  reason: StockMovementReason; memo: string | null; posted_by_user_id: string | null; created_at: string;
+  posted_by_name: string | null;
+};
+export type InventoryItemWithMovements = InventoryItem & { stock_movements: StockMovement[] };
+
+export async function listInventoryItems(businessId: string, params: { include_inactive?: boolean } = {}) {
+  const r = await api.get<{ items: InventoryItem[] }>(`/businesses/${businessId}/inventory-items`, {
+    params: params.include_inactive ? { include_inactive: 'true' } : undefined,
+  });
+  return r.data.items;
+}
+
+export async function getInventoryItem(businessId: string, id: string) {
+  const r = await api.get<InventoryItemWithMovements>(`/businesses/${businessId}/inventory-items/${id}`);
+  return r.data;
+}
+
+export type InventoryItemCreate = {
+  sku: string; name: string; description?: string | null; unit_of_measure?: string;
+  purchase_cost?: string | null; sale_price?: string | null;
+  income_account_id?: string | null; expense_account_id?: string | null; inventory_asset_account_id?: string | null;
+};
+
+export async function createInventoryItem(businessId: string, input: InventoryItemCreate) {
+  const r = await api.post<InventoryItem>(`/businesses/${businessId}/inventory-items`, input);
+  return r.data;
+}
+
+export async function updateInventoryItem(businessId: string, id: string, patch: Partial<InventoryItemCreate> & { is_active?: boolean }) {
+  const r = await api.patch<InventoryItem>(`/businesses/${businessId}/inventory-items/${id}`, patch);
+  return r.data;
+}
+
+export async function deleteInventoryItem(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/inventory-items/${id}`);
+}
+
+export async function adjustInventoryStock(
+  businessId: string, id: string,
+  input: { movement_date: string; quantity_delta: string; reason: StockMovementReason; memo?: string | null; unit_cost?: string },
+) {
+  const r = await api.post<StockMovement>(`/businesses/${businessId}/inventory-items/${id}/adjust-stock`, input);
+  return r.data;
+}
+
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'received' | 'closed' | 'void';
+export type PurchaseOrder = {
+  id: string; business_id: string; po_number: string; vendor_id: string; order_date: string;
+  expected_delivery_date: string | null; status: PurchaseOrderStatus; memo: string | null;
+  created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+export type PurchaseOrderLine = {
+  id: string; purchase_order_id: string; line_number: number; inventory_item_id: string;
+  description: string | null; quantity: string; unit_cost: string;
+};
+export type PurchaseOrderWithLines = PurchaseOrder & { lines: PurchaseOrderLine[] };
+
+export async function listPurchaseOrders(businessId: string, params: { status?: PurchaseOrderStatus } = {}) {
+  const r = await api.get<{ purchase_orders: PurchaseOrder[] }>(`/businesses/${businessId}/purchase-orders`, { params });
+  return r.data.purchase_orders;
+}
+
+export async function getPurchaseOrder(businessId: string, id: string) {
+  const r = await api.get<PurchaseOrderWithLines>(`/businesses/${businessId}/purchase-orders/${id}`);
+  return r.data;
+}
+
+export type PurchaseOrderLineInput = { inventory_item_id: string; quantity: string; unit_cost: string; description?: string | null };
+export async function createPurchaseOrder(
+  businessId: string,
+  input: { vendor_id: string; order_date: string; expected_delivery_date?: string | null; memo?: string | null; lines: PurchaseOrderLineInput[] },
+) {
+  const r = await api.post<PurchaseOrderWithLines>(`/businesses/${businessId}/purchase-orders`, input);
+  return r.data;
+}
+
+export async function voidPurchaseOrder(businessId: string, id: string) {
+  const r = await api.post<PurchaseOrder>(`/businesses/${businessId}/purchase-orders/${id}/void`);
+  return r.data;
+}
+
+export type ItemReceipt = {
+  id: string; business_id: string; purchase_order_id: string; receipt_date: string;
+  bill_id: string | null; memo: string | null; created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+
+export async function listItemReceipts(businessId: string) {
+  const r = await api.get<{ item_receipts: ItemReceipt[] }>(`/businesses/${businessId}/item-receipts`);
+  return r.data.item_receipts;
+}
+
+export async function createItemReceipt(businessId: string, input: { purchase_order_id: string; receipt_date: string; memo?: string | null }) {
+  const r = await api.post<ItemReceipt>(`/businesses/${businessId}/item-receipts`, input);
+  return r.data;
+}
+
+export type SalesOrderStatus = 'draft' | 'confirmed' | 'fulfilled' | 'void';
+export type SalesOrder = {
+  id: string; business_id: string; so_number: string; customer_id: string; order_date: string;
+  status: SalesOrderStatus; invoice_id: string | null; memo: string | null;
+  created_at: string; updated_at: string; created_by_user_id: string | null;
+};
+export type SalesOrderLine = {
+  id: string; sales_order_id: string; line_number: number; inventory_item_id: string;
+  description: string | null; quantity: string; unit_price: string;
+};
+export type SalesOrderWithLines = SalesOrder & { lines: SalesOrderLine[] };
+
+export async function listSalesOrders(businessId: string, params: { status?: SalesOrderStatus } = {}) {
+  const r = await api.get<{ sales_orders: SalesOrder[] }>(`/businesses/${businessId}/sales-orders`, { params });
+  return r.data.sales_orders;
+}
+
+export async function getSalesOrder(businessId: string, id: string) {
+  const r = await api.get<SalesOrderWithLines>(`/businesses/${businessId}/sales-orders/${id}`);
+  return r.data;
+}
+
+export type SalesOrderLineInput = { inventory_item_id: string; quantity: string; unit_price: string; description?: string | null };
+export async function createSalesOrder(
+  businessId: string,
+  input: { customer_id: string; order_date: string; memo?: string | null; lines: SalesOrderLineInput[] },
+) {
+  const r = await api.post<SalesOrderWithLines>(`/businesses/${businessId}/sales-orders`, input);
+  return r.data;
+}
+
+export async function fulfillSalesOrder(businessId: string, id: string) {
+  const r = await api.post<SalesOrder>(`/businesses/${businessId}/sales-orders/${id}/fulfill`);
+  return r.data;
+}
+
+export async function voidSalesOrder(businessId: string, id: string) {
+  const r = await api.post<SalesOrder>(`/businesses/${businessId}/sales-orders/${id}/void`);
+  return r.data;
+}
+
+export type ShippingLabel = {
+  id: string; business_id: string; invoice_id: string | null; sales_order_id: string | null;
+  carrier: string; tracking_number: string; shipped_at: string; cost: string | null;
+  label_file_id: string | null; notes: string | null; created_at: string; updated_at: string;
+  created_by_user_id: string | null; invoice_number: string | null; so_number: string | null;
+};
+
+export async function listShippingLabels(businessId: string, params: { invoice_id?: string; sales_order_id?: string } = {}) {
+  const r = await api.get<{ labels: ShippingLabel[] }>(`/businesses/${businessId}/shipping-labels`, { params });
+  return r.data.labels;
+}
+
+export async function createShippingLabel(
+  businessId: string,
+  input: { carrier: string; tracking_number: string; shipped_at: string; invoice_id?: string | null; sales_order_id?: string | null; cost?: string | null; notes?: string | null },
+) {
+  const r = await api.post<ShippingLabel>(`/businesses/${businessId}/shipping-labels`, input);
+  return r.data;
+}
+
+export async function deleteShippingLabel(businessId: string, id: string) {
+  await api.delete(`/businesses/${businessId}/shipping-labels/${id}`);
 }
 
 // --- AR/AP Aging — shape copied from agingBuckets.ts (shared by both
@@ -1618,5 +1869,61 @@ export async function updateReviewTask(
   patch: { status?: ReviewTaskStatus; notes?: string | null },
 ) {
   const r = await api.patch<ReviewTask>(`/businesses/${businessId}/review-tasks/${taskId}`, patch);
+  return r.data;
+}
+
+// --- CSV exports ("Spreadsheet Sync") — these routes return a raw CSV
+// file (Content-Type: text/csv, Content-Disposition: attachment), not
+// JSON; the filename matches csvExportService.ts's own convention so a
+// user who shares/saves it sees the same name web's download would give.
+
+export async function exportTrialBalanceCsv(businessId: string, asOf: string) {
+  const r = await api.get<string>(`/businesses/${businessId}/csv-exports/trial-balance`, {
+    params: { as_of: asOf }, responseType: 'text',
+  });
+  return { content: r.data, filename: `trial-balance-${asOf}.csv` };
+}
+
+export async function exportJournalEntriesCsv(businessId: string, from: string, to: string) {
+  const r = await api.get<string>(`/businesses/${businessId}/csv-exports/journal-entries`, {
+    params: { from, to }, responseType: 'text',
+  });
+  return { content: r.data, filename: `journal-entries-${from}-to-${to}.csv` };
+}
+
+export async function exportGeneralLedgerCsv(businessId: string, periodStart: string, periodEnd: string, accountId?: string) {
+  const r = await api.get<string>(`/businesses/${businessId}/csv-exports/general-ledger`, {
+    params: { period_start: periodStart, period_end: periodEnd, ...(accountId ? { account_id: accountId } : {}) }, responseType: 'text',
+  });
+  return { content: r.data, filename: `general-ledger-${periodStart}-to-${periodEnd}.csv` };
+}
+
+// --- Estimates (AR) — read-only on mobile; create/edit/convert/accept
+// stay web-only, matching the capability guide's scope for this entity.
+
+export type EstimateStatus = 'pending' | 'accepted' | 'rejected' | 'closed';
+export type EstimateRow = {
+  id: string; business_id: string; estimate_number: string; customer_id: string;
+  estimate_date: string; expiration_date: string | null; status: EstimateStatus; memo: string | null;
+  subtotal: string; tax_total: string; total: string; accepted_by: string | null; accepted_date: string | null;
+  invoice_id: string | null; closed_at: string | null; created_at: string; updated_at: string;
+  created_by_user_id: string | null; customer_name: string; invoice_number: string | null;
+};
+export type EstimateLine = {
+  id: string; estimate_id: string; line_number: number; inventory_item_id: string | null;
+  description: string; quantity: string; unit_price: string; revenue_account_id: string;
+  tax_code_id: string | null; line_subtotal: string; tax_amount: string; line_total: string;
+};
+export type EstimateDetail = {
+  estimate: Omit<EstimateRow, 'invoice_number'>; lines: EstimateLine[]; invoice_number: string | null;
+};
+
+export async function listEstimates(businessId: string, params: { status?: EstimateStatus; customer_id?: string } = {}) {
+  const r = await api.get<{ estimates: EstimateRow[] }>(`/businesses/${businessId}/estimates`, { params });
+  return r.data.estimates;
+}
+
+export async function getEstimate(businessId: string, id: string) {
+  const r = await api.get<EstimateDetail>(`/businesses/${businessId}/estimates/${id}`);
   return r.data;
 }

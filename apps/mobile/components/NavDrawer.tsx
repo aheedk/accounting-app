@@ -30,6 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Customers', path: '/clients', params: { tab: 'customers' } },
       { label: 'Invoices', path: '/invoices' },
+      { label: 'Estimates', path: '/estimates' },
       { label: 'Payments', path: '/payments' },
       { label: 'Credit Memos', path: '/credit-memos' },
       { label: 'Aging', path: '/ar-aging' },
@@ -78,14 +79,14 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'General Ledger', path: '/general-ledger' },
       { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity', path: '/cash-activity' }, { label: 'Custom Reports', path: '/custom-reports' },
       { label: 'Management Reports', path: '/management-reports' }, { label: 'Performance Center', path: '/performance-center' }, { label: 'Financial Planning', path: '/financial-planning' },
-      { label: 'Spreadsheet Sync' }, { label: 'Trial Balance', path: '/trial-balance' },
+      { label: 'Spreadsheet Sync', path: '/spreadsheet-sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },
   {
     id: 'inventory', label: 'Inventory', icon: 'package-variant-closed',
     children: [
-      { label: 'Overview' }, { label: 'Inventory' }, { label: 'Purchase Orders' },
-      { label: 'Item Receipts' }, { label: 'Sales Orders' }, { label: 'Shipping Labels' },
+      { label: 'Overview', path: '/inventory-overview' }, { label: 'Inventory', path: '/inventory-items' }, { label: 'Purchase Orders', path: '/purchase-orders' },
+      { label: 'Item Receipts', path: '/item-receipts' }, { label: 'Sales Orders', path: '/sales-orders' }, { label: 'Shipping Labels', path: '/shipping-labels' },
     ],
   },
   {

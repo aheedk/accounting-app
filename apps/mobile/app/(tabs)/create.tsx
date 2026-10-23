@@ -8,12 +8,6 @@ import { useCanOpen } from '../../lib/roleAccess';
 import type { AppTheme } from '../../theme';
 import { spacing } from '../../theme';
 
-const STUB_ITEMS = [
-  { icon: 'file-document-outline', label: 'Invoice', note: 'Available on desktop' },
-  { icon: 'checkbook', label: 'Check', note: 'Available on desktop' },
-  { icon: 'book-open-page-variant-outline', label: 'Journal Entry', note: 'Available on desktop' },
-] as const;
-
 export default function CreateScreen() {
   const theme = useTheme<AppTheme>();
   const canOpen = useCanOpen();
@@ -100,17 +94,34 @@ export default function CreateScreen() {
       ) : null}
       <Divider style={{ marginVertical: spacing.sm }} />
 
-      {STUB_ITEMS.map(item => (
+      <List.Item
+        title="Invoice"
+        description="Bill a customer for goods or services"
+        onPress={() => router.push('/invoice/new')}
+        left={props => <List.Icon {...props} icon="file-document-outline" color={theme.app.primary} />}
+        titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+        descriptionStyle={{ color: theme.app.mutedForeground }}
+      />
+      <List.Item
+        title="Check"
+        description="Write a check from a bank account"
+        onPress={() => router.push('/check/new')}
+        left={props => <List.Icon {...props} icon="checkbook" color={theme.app.primary} />}
+        titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+        descriptionStyle={{ color: theme.app.mutedForeground }}
+      />
+      {/* Journal Entry posts straight to the ledger — accountant+ only,
+          matching the route's own requireMinRole('accountant'). */}
+      {canCreateAtAccountantLevel ? (
         <List.Item
-          key={item.label}
-          title={item.label}
-          description={item.note}
-          left={props => <List.Icon {...props} icon={item.icon} color={theme.app.mutedForeground} />}
-          titleStyle={{ color: theme.app.mutedForeground }}
+          title="Journal Entry"
+          description="Post a manual debit/credit entry"
+          onPress={() => router.push('/journal-entry/new')}
+          left={props => <List.Icon {...props} icon="book-open-page-variant-outline" color={theme.app.primary} />}
+          titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
           descriptionStyle={{ color: theme.app.mutedForeground }}
-          disabled
         />
-      ))}
+      ) : null}
     </View>
   );
 }

@@ -36,12 +36,14 @@ const SECTIONS: Section[] = [
       { title: 'Cash Activity by Account', path: '/cash-activity', icon: 'bank-transfer' },
       { title: 'Custom Reports', path: '/custom-reports', icon: 'file-chart-outline' },
       { title: 'Financial Planning', path: '/financial-planning', icon: 'chart-box-outline' },
+      { title: 'Spreadsheet Sync', path: '/spreadsheet-sync', icon: 'file-export-outline' },
       { title: 'Management Reports', path: '/management-reports', icon: 'finance' },
       { title: 'Performance Center', path: '/performance-center', icon: 'trending-up' },
     ],
   },
   {
     label: 'Accounts Receivable', items: [
+      { title: 'Estimates', path: '/estimates', icon: 'file-document-edit-outline' },
       { title: 'Payments', path: '/payments', icon: 'cash-check' },
       { title: 'Credit Memos', path: '/credit-memos', icon: 'file-document-minus-outline' },
     ],
@@ -77,6 +79,16 @@ const SECTIONS: Section[] = [
       { title: 'AI Document Inbox', path: '/inbox', icon: 'inbox-arrow-down-outline' },
       { title: 'Suspense', path: '/suspense', icon: 'help-circle-outline' },
       { title: 'Coding Rules', path: '/coding-rules', icon: 'creation' },
+    ],
+  },
+  {
+    label: 'Inventory', items: [
+      { title: 'Overview', path: '/inventory-overview', icon: 'view-dashboard-outline' },
+      { title: 'Inventory', path: '/inventory-items', icon: 'package-variant-closed' },
+      { title: 'Purchase Orders', path: '/purchase-orders', icon: 'clipboard-list-outline' },
+      { title: 'Item Receipts', path: '/item-receipts', icon: 'package-down' },
+      { title: 'Sales Orders', path: '/sales-orders', icon: 'cart-outline' },
+      { title: 'Shipping Labels', path: '/shipping-labels', icon: 'truck-outline' },
     ],
   },
   {
