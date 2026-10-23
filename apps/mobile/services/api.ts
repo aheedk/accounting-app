@@ -1897,3 +1897,33 @@ export async function exportGeneralLedgerCsv(businessId: string, periodStart: st
   });
   return { content: r.data, filename: `general-ledger-${periodStart}-to-${periodEnd}.csv` };
 }
+
+// --- Estimates (AR) — read-only on mobile; create/edit/convert/accept
+// stay web-only, matching the capability guide's scope for this entity.
+
+export type EstimateStatus = 'pending' | 'accepted' | 'rejected' | 'closed';
+export type EstimateRow = {
+  id: string; business_id: string; estimate_number: string; customer_id: string;
+  estimate_date: string; expiration_date: string | null; status: EstimateStatus; memo: string | null;
+  subtotal: string; tax_total: string; total: string; accepted_by: string | null; accepted_date: string | null;
+  invoice_id: string | null; closed_at: string | null; created_at: string; updated_at: string;
+  created_by_user_id: string | null; customer_name: string; invoice_number: string | null;
+};
+export type EstimateLine = {
+  id: string; estimate_id: string; line_number: number; inventory_item_id: string | null;
+  description: string; quantity: string; unit_price: string; revenue_account_id: string;
+  tax_code_id: string | null; line_subtotal: string; tax_amount: string; line_total: string;
+};
+export type EstimateDetail = {
+  estimate: Omit<EstimateRow, 'invoice_number'>; lines: EstimateLine[]; invoice_number: string | null;
+};
+
+export async function listEstimates(businessId: string, params: { status?: EstimateStatus; customer_id?: string } = {}) {
+  const r = await api.get<{ estimates: EstimateRow[] }>(`/businesses/${businessId}/estimates`, { params });
+  return r.data.estimates;
+}
+
+export async function getEstimate(businessId: string, id: string) {
+  const r = await api.get<EstimateDetail>(`/businesses/${businessId}/estimates/${id}`);
+  return r.data;
+}

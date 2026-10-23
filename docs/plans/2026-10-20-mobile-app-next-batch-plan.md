@@ -2247,3 +2247,56 @@ or explicitly deferred: Spreadsheet Sync shipped; Payroll and Client
 Overview remain excluded, pending the user's call on whether to tackle
 either (Payroll is a full new feature area; Client Overview needs an
 architecture decision since it's firm-wide, not per-business).
+
+## Chunk: Estimates (2026-10-23) — closing a gap found via the capability guide
+
+User shared a "Mobile vs Web Capability Guide" doc (a feature-parity
+checklist across 12 areas, dated today) and asked to follow it to tweak
+up the mobile app. Cross-checked every row in the guide against the
+actual codebase (`ls app/`, `grep` for each named feature) rather than
+trusting it outright — it turned out to be accurate for essentially
+everything, including features shipped earlier in this very session
+(Checks' create-only scope, Invoice draft+post, Journal Entry's
+accountant-gating, the inventory item account pickers). **One real
+gap found**: the guide claims "Estimates list ✅ Read" on mobile, but
+no `estimate`/`estimates` file existed anywhere in `apps/mobile` — this
+was the single discrepancy between the guide and reality.
+
+- Confirmed the backend is real (`apps/api/src/routes/estimates.ts`,
+  spec at `docs/specs/2026-10-20-estimates-design.md`) before building:
+  list/get are open reads; create/edit/convert-to-invoice are `staff`+;
+  delete is `firm_admin`+. Scoped mobile to match the guide's own claim
+  exactly — read-only (list + detail), no create/edit/convert/accept/
+  delete actions.
+- **`app/estimates.tsx`**: status filter chips (pending/accepted/
+  rejected/closed) + list, same `invoices.tsx`/`bills.tsx` pattern.
+- **`app/estimate/[id].tsx`**: customer, dates, memo, line items,
+  subtotal/tax/total, and — when the estimate was converted — a tap-
+  through link to the resulting invoice (`estimate.invoice_id` +
+  `invoice_number`, both confirmed present on the real detail response).
+- `services/api.ts`: added `EstimateStatus`/`EstimateRow`/
+  `EstimateLine`/`EstimateDetail` types + `listEstimates`/`getEstimate`,
+  confirmed against `estimateService.ts`'s actual return shapes
+  directly — in particular that `getEstimate` returns a nested
+  `{estimate, lines, invoice_number}`, not the row flat, which isn't
+  obvious from the route file alone.
+- Wired into the drawer's AR group (next to Invoices) and the More
+  tab's AR section. No `CLIENT_PAGES` change — confirmed estimates
+  aren't in web's own client allow-list either, so the existing
+  default-deny for the `client` role already matches web's behavior
+  with no new code.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Live round-trip against the
+dev server: list (empty, `{estimates: []}`), then created a real
+throwaway estimate to exercise the full shape — list now showing it
+with `customer_name` joined, and `GET /estimates/:id` confirmed the
+exact `{estimate, lines, invoice_number}` nesting the mobile type
+expects, field-for-field. A delete attempt correctly 403'd for the
+accountant-role demo login (delete is `firm_admin`-only) — the leftover
+test estimate (`EST-0001`) couldn't be cleaned up under this login and
+was left on the demo business, same category as every other chunk's
+harmless demo-data footprint this session.
+
+With this, every claim in the user's capability guide now matches the
+actual mobile codebase — no further gaps found in that cross-check.

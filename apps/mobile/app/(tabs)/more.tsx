@@ -43,6 +43,7 @@ const SECTIONS: Section[] = [
   },
   {
     label: 'Accounts Receivable', items: [
+      { title: 'Estimates', path: '/estimates', icon: 'file-document-edit-outline' },
       { title: 'Payments', path: '/payments', icon: 'cash-check' },
       { title: 'Credit Memos', path: '/credit-memos', icon: 'file-document-minus-outline' },
     ],
