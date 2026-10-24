@@ -2,12 +2,18 @@ import { View } from 'react-native';
 import { List, Divider, Text, useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
 import { hasMinRole, type Role } from '@accounting/shared';
-import { AppHeader } from '../../components/AppHeader';
-import { useAuth } from '../../hooks/useAuth';
-import { useCanOpen } from '../../lib/roleAccess';
-import type { AppTheme } from '../../theme';
-import { spacing } from '../../theme';
+import { AppHeader } from '../components/AppHeader';
+import { useAuth } from '../hooks/useAuth';
+import { useCanOpen } from '../lib/roleAccess';
+import type { AppTheme } from '../theme';
+import { spacing } from '../theme';
 
+// Moved out of the (tabs) group — the center "+" tab is gone, replaced by
+// CreateFab floating above the 3 remaining tabs, so this is a normal pushed
+// screen now (leading="back"), not a tab destination. Kept as a top-level
+// route rather than a hidden tab inside (tabs): routing to a *hidden* tab in
+// this app has already been confirmed to unreliably fall back to Dashboard
+// (the same bug clients.tsx hit and was moved out for, in an earlier chunk).
 export default function CreateScreen() {
   const theme = useTheme<AppTheme>();
   const canOpen = useCanOpen();
@@ -26,7 +32,7 @@ export default function CreateScreen() {
   if (!canCreate) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <AppHeader title="Create" />
+        <AppHeader title="Create" leading="back" />
         <View style={{ padding: spacing.lg, alignItems: 'center' }}>
           <Text style={{ color: theme.app.mutedForeground, textAlign: 'center' }}>
             Your role doesn't have permission to create new transactions.
@@ -38,7 +44,7 @@ export default function CreateScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <AppHeader title="Create" />
+      <AppHeader title="Create" leading="back" />
 
       <List.Item
         title="Expense"

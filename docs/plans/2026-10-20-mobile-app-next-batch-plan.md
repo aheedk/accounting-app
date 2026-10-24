@@ -2300,3 +2300,219 @@ harmless demo-data footprint this session.
 
 With this, every claim in the user's capability guide now matches the
 actual mobile codebase — no further gaps found in that cross-check.
+
+## Chunk: Retire the nav drawer, fold it into the More tab (2026-10-24)
+
+User's own idea: drop the hamburger-triggered slide-out drawer entirely
+and have that same grouped-nav design appear as the body of the More
+tab instead. Also fixed a real drift this surfaced: the drawer's
+`NAV_GROUPS` (a structural port of web's `Sidebar.tsx`, with role
+filtering via `canOpen` and "Desktop only" disabled treatment) and the
+old More tab's separate hand-maintained `SECTIONS` array had fallen out
+of sync — the latter was missing items (Expense Transactions, Pay
+Bills, the disabled Client Overview placeholder) and had no role
+filtering at all.
+
+- **`app/(tabs)/more.tsx`**: now renders the drawer's exact former
+  content — same groups/icons/ordering, the same expand/collapse
+  accordion state, the same `canOpen`-based role filtering (a
+  role-denied item is dropped entirely, not shown disabled — that
+  treatment stays reserved for features this app hasn't built), the
+  same "Desktop only" disabled rows, the same dark sidebar-navy
+  styling — as a static page instead of an animated overlay. Dashboard
+  and Transactions are left out of the list (the bottom tab bar already
+  covers them); Create keeps its own button here instead of a duplicate
+  list row. Switched the color tokens from the drawer's hardcoded
+  `lightColors` to `theme.app.*` while doing this, so the panel now
+  actually follows dark mode instead of always rendering light-palette
+  navy regardless of the user's theme setting — a latent bug in the
+  original drawer, not something this chunk introduced.
+- **`components/AppHeader.tsx`**: removed the hamburger `IconButton`
+  and its `useNavDrawer` call — there's nothing left for it to open.
+  The business switcher that lived in that same row stays (it's
+  independent of the drawer, not something this chunk needed to move),
+  just re-padded now that it's the row's leading element instead of
+  sitting next to a hamburger.
+- **Deleted** `components/NavDrawer.tsx` and `hooks/useNavDrawer.tsx`
+  outright (confirmed via `grep` that nothing else referenced either
+  before removing them) and un-mounted `NavDrawerProvider`/`<NavDrawer
+  />` from `app/_layout.tsx`.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB, unchanged from before — the
+Reanimated dependency the drawer used for its slide animation is still
+pulled in by other screens, so removing the drawer didn't shrink the
+bundle, which is expected and fine). No live device/simulator check
+this chunk — a navigation-restructuring change like this is exactly the
+kind of thing worth a real tap-through pass before trusting it fully,
+same caveat as every other UI-only chunk this session with no
+screenshot or simulator session available.
+
+## Chunk: Drop the dark sidebar skin on the More tab (2026-10-24)
+
+The previous chunk's fold-the-drawer-into-More-tab design turned out to
+read as broken, not intentional — the user checked against QBO's actual
+mobile app (its Menu tab is a plain light page of grouped shortcuts;
+QBO deliberately drops the desktop dark sidebar skin for mobile
+entirely) and confirmed the suspicion raised at the end of the last
+chunk: a light `AppHeader` sitting directly above a dark-navy panel
+with no transition reads as a stalled/broken overlay animation, not a
+real design.
+
+- **`app/(tabs)/more.tsx`** rebuilt to match: no dark background
+  anywhere — the whole screen now uses the same `theme.colors.background`
+  every other tab uses. A compact user strip (name + a `StatusBadge`
+  role pill + email) replaces the old dark-panel user block. "+ Create"
+  is now the real `AppButton` (`default` variant — this app's actual
+  brand action color, blue, not the dark-sidebar-specific gold the
+  previous chunk used), `fullWidth`, gated the same `canOpen('/expense/
+  new')` check as before. Each group is a plain uppercase caption-style
+  header row (label + chevron-up/down, no icon — distinct from a leaf
+  item row on purpose, so a header doesn't read as just another
+  tappable destination) that expands to 48px item rows (icon + label +
+  trailing chevron-right, `surface` background, `border` bottom
+  separator, `muted` background on press) — independent per-section
+  expand state, same as before, all collapsed by default. Role-denied
+  items are still dropped entirely (not shown disabled) and features
+  this app hasn't built yet still show as a disabled row with a
+  "Desktop only" label in place of the chevron — both unchanged in
+  behavior, just restyled onto the new light row.
+- Same `NAV_GROUPS` data (items, ordering, role filtering via
+  `roleAccess.ts`) as the prior chunk — this was purely a visual
+  restyle, not a content change.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Still no live device/
+simulator pass — recommended again, same as the last chunk, before
+trusting this fully; this is now the second restyle of this same
+screen in two days, which is exactly the kind of churn a real look at
+a running simulator would have caught earlier.
+
+## Chunk: More tab — shortcut grid, third pass (2026-10-24)
+
+Third restyle of this one screen in two days. The light-theme row list
+from the last chunk was correct in spirit (no dark skin, matches QBO)
+but still read as a settings dump — every destination an equally-
+weighted small text row, nothing scannable at a glance. This pass adds
+a 2-column shortcut-tile grid (QBO mobile's own pattern) for the 6
+most-used destinations, so the common case needs no expanding at all.
+
+- **Shortcut grid**: Invoices, Expenses, Customers, Vendors, AI Inbox,
+  Messages — 80px tiles, `surface` background, `border` border, 8px
+  radius, a 24px icon above a 13px label, 2 per row with an 8px gap.
+  Each tile's path is the exact same route its group-accordion sibling
+  already used (e.g. the Invoices tile and AR's old "Invoices" row both
+  go to `/invoices`) — a dedicated shortcut, not a second screen.
+- **Removed the duplicates** from the accordion below: Invoices/
+  Customers out of Accounts Receivable, Expense Transactions/Vendors
+  out of Accounts Payable, Document Inbox out of AI, and the standalone
+  Messages row dropped entirely — all six now live only as tiles.
+- **Section headers** went from tiny uppercase caption text (read like
+  a form-field label, not a tappable row) to 56px rows at 15px medium
+  weight — same expand/collapse behavior, still collapsed by default.
+- **Child rows** grew from 48px to 52px and, this round, got real
+  per-item icons for the first time — `NavChild` never carried one in
+  any earlier version of this file (only the top-level/group entries
+  ever had icons), so these ~50 icon choices were pulled from the
+  original pre-drawer version of this same screen's own `SECTIONS`
+  array (still in scratch context from earlier this session) rather
+  than invented fresh — every icon here already meant that exact
+  feature somewhere in this app's history, not a new guess.
+- **Send documents** moved out of the grid/accordion entirely into its
+  own row at the bottom, next to Settings, matching the brief's "bottom
+  section" placement.
+- No changes to `AppHeader`, the bottom tab bar, routing, or any other
+  screen — purely this one screen's body content, as scoped.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Still no live device/
+simulator pass. Flagging plainly: three restyles of one screen without
+ever seeing it rendered is not a sustainable loop — a single real
+screenshot at this point would likely save more churn than another
+round of spec-from-memory changes. Recommend an actual simulator check
+before touching this screen again.
+
+## Chunk: More tab — QBO-matched Menu redesign, FAB replaces the Create tab (2026-10-24)
+
+Fourth and (per the user) hopefully final pass at this screen, this
+time against real QBO Menu-tab screenshots and a fully detailed spec
+rather than memory — the most concrete brief of the four. Also the
+first chunk this session to touch the bottom tab bar itself.
+
+- **`components/CreateFab.tsx`** (new): a 56px floating circle, bottom-
+  right, `insets.bottom + 49 (standard iOS tab bar height) + 24`px
+  above the tab bar, `primary` background, navigates to `/create`.
+  Rendered once as a sibling of `<Tabs>` in `app/(tabs)/_layout.tsx` so
+  it persists across all 3 remaining tabs without remounting per
+  screen, rather than being added to each tab screen individually.
+- **The Create tab is gone.** `app/(tabs)/create.tsx` moved to
+  `app/create.tsx` — a top-level route, not a hidden tab inside
+  `(tabs)` with `href: null`. That's deliberate: this app already hit
+  the exact bug a hidden-tab approach would reintroduce (confirmed in
+  an earlier chunk's bug-fix note — routing to a *hidden* tab inside
+  `(tabs)` unreliably fell back to Dashboard; `clients.tsx` was moved
+  out of the group for the same reason). `leading="back"` replaces the
+  bare tab header now that it's a pushed screen.
+- **`app/(tabs)/_layout.tsx`**: 3 tabs now (Dashboard, Transactions,
+  More), evenly spaced — the center "+" `Tabs.Screen` entry removed
+  entirely, `<CreateFab />` added as a sibling after `<Tabs>`.
+- **`app/(tabs)/more.tsx`** rebuilt a fourth time:
+  - Search bar below the header (`AppTextInput`, now with a new
+    optional `wrapperStyle` prop — the one addition to that shared
+    component, since every other search field in this app already
+    uses `AppTextInput`'s standard bordered look and this one needed a
+    muted borderless pill instead; adding `wrapperStyle` doesn't touch
+    any existing call site). Typing hides the shortcut row and tile
+    grid entirely and shows a flat, grouped-by-category results list
+    instead (confirmed against the brief's own "double-check" note:
+    results are a flat list, not the tile grid).
+  - **"Frequently used"**: 8 horizontal circular shortcuts (Invoices,
+    Expenses, Estimates, Customers, Vendors, AI Inbox, Messages,
+    Receipts) — each routes to the exact path its old accordion
+    sibling already used.
+  - **"All"**: 8 two-column category tiles (Accounts Receivable,
+    Accounts Payable, AI, Accounting, Reports, Inventory, Setup, and a
+    new **More** tile holding Send Documents/Messages/Spreadsheet
+    Sync/Settings — the brief named this exact fixed list, including
+    Messages even though it's also a shortcut above, so that
+    duplication is intentional per spec, not an oversight). Tapping a
+    tile gives it a 2px primary border and slides its sub-items in
+    directly below that tile's row (`LayoutAnimation`, ~200ms ease-
+    out) — only one category expanded at a time, collapsing it on a
+    second tap or when a different tile opens.
+  - **Dedup**: every item pulled into the shortcut row got removed
+    from its old category's sub-item list (Invoices/Customers/
+    Estimates out of AR, Vendors out of AP, AI Inbox out of AI,
+    Receipts out of Accounting; Spreadsheet Sync also moved out of
+    Reports into the new More tile, since the brief placed it there
+    explicitly) — confirmed nothing shows in two places at once except
+    the Messages case the spec called out by name.
+  - Per-item icons on every sub-item row (the brief asked for them
+    explicitly this round) — same source as the last chunk's icon
+    choices: reused rather than invented.
+  - The old user-info strip is gone from this screen — `settings.tsx`
+    already had a fuller ACCOUNT section (name, email, role) before
+    this chunk even started, so there was nothing to actually move.
+  - `paddingBottom: 80` on the ScrollView per the brief's own
+    double-check note, so the FAB never overlaps the last tile row.
+- Role filtering (`canOpen`) applies to both the shortcut row and every
+  category's children, same as every prior chunk; a category collapses
+  to zero visible children and hides its tile entirely (verified via
+  `lib/roleAccess.ts` directly: a `client` login's CLIENT_PAGES
+  allow-list doesn't include `/settings` or `/spreadsheet-sync`, so
+  that role's "More" tile correctly shows just Send Documents and
+  Messages — not a new rule, just confirming the existing logic produces
+  the right result here).
+
+**Verified**: `tsc --noEmit` clean (one real mistake caught here —
+`UIManager.setLayoutAnimationEnabledExperimentalAndroid` doesn't exist
+in this RN version's types; the real name is
+`setLayoutAnimationEnabledExperimental`, fixed before it could have
+silently no-opped on Android), a fresh `expo export --platform ios`
+bundle built with no errors (6.5MB), and a `grep` confirming no
+remaining reference anywhere to the old `(tabs)/create` path. Still no
+live device/simulator pass — this chunk touches the bottom tab bar
+itself (a FAB replacing a whole tab), which is exactly the kind of
+structural navigation change most worth a real tap-through before
+trusting, more so than the last three purely-cosmetic passes at this
+same screen.

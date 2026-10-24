@@ -12,10 +12,14 @@ import { radius, fontFamily, typeScale, spacing, type AppTheme } from '../../the
  * tappable icon) instead of Paper's `<TextInput.Affix>`/`<TextInput.Icon>`.
  * `containerStyle` is for outer layout (margin, flex) — `style` still means
  * what it means on RN's own TextInput (affects the text field itself).
+ * `wrapperStyle` overrides the bordered-field look itself (background,
+ * border, radius, height) for the rare case that needs a different field
+ * treatment entirely (e.g. a muted borderless search pill) rather than
+ * this app's standard input look.
  */
 export function AppTextInput({
-  label, error, style, containerStyle, onFocus, onBlur, left, right, ...rest
-}: TextInputProps & { label?: string; error?: string; left?: ReactNode; right?: ReactNode; containerStyle?: StyleProp<ViewStyle> }) {
+  label, error, style, containerStyle, wrapperStyle, onFocus, onBlur, left, right, ...rest
+}: TextInputProps & { label?: string; error?: string; left?: ReactNode; right?: ReactNode; containerStyle?: StyleProp<ViewStyle>; wrapperStyle?: StyleProp<ViewStyle> }) {
   const theme = useTheme<AppTheme>();
   const c = theme.app;
   const [focused, setFocused] = useState(false);
@@ -35,6 +39,7 @@ export function AppTextInput({
             borderWidth: focused ? 2 : 1,
             backgroundColor: c.surface,
           },
+          wrapperStyle,
         ]}
       >
         {left ? <View style={styles.affix}>{left}</View> : null}
