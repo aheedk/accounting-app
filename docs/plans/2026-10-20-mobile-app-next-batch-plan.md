@@ -2431,3 +2431,88 @@ ever seeing it rendered is not a sustainable loop — a single real
 screenshot at this point would likely save more churn than another
 round of spec-from-memory changes. Recommend an actual simulator check
 before touching this screen again.
+
+## Chunk: More tab — QBO-matched Menu redesign, FAB replaces the Create tab (2026-10-24)
+
+Fourth and (per the user) hopefully final pass at this screen, this
+time against real QBO Menu-tab screenshots and a fully detailed spec
+rather than memory — the most concrete brief of the four. Also the
+first chunk this session to touch the bottom tab bar itself.
+
+- **`components/CreateFab.tsx`** (new): a 56px floating circle, bottom-
+  right, `insets.bottom + 49 (standard iOS tab bar height) + 24`px
+  above the tab bar, `primary` background, navigates to `/create`.
+  Rendered once as a sibling of `<Tabs>` in `app/(tabs)/_layout.tsx` so
+  it persists across all 3 remaining tabs without remounting per
+  screen, rather than being added to each tab screen individually.
+- **The Create tab is gone.** `app/(tabs)/create.tsx` moved to
+  `app/create.tsx` — a top-level route, not a hidden tab inside
+  `(tabs)` with `href: null`. That's deliberate: this app already hit
+  the exact bug a hidden-tab approach would reintroduce (confirmed in
+  an earlier chunk's bug-fix note — routing to a *hidden* tab inside
+  `(tabs)` unreliably fell back to Dashboard; `clients.tsx` was moved
+  out of the group for the same reason). `leading="back"` replaces the
+  bare tab header now that it's a pushed screen.
+- **`app/(tabs)/_layout.tsx`**: 3 tabs now (Dashboard, Transactions,
+  More), evenly spaced — the center "+" `Tabs.Screen` entry removed
+  entirely, `<CreateFab />` added as a sibling after `<Tabs>`.
+- **`app/(tabs)/more.tsx`** rebuilt a fourth time:
+  - Search bar below the header (`AppTextInput`, now with a new
+    optional `wrapperStyle` prop — the one addition to that shared
+    component, since every other search field in this app already
+    uses `AppTextInput`'s standard bordered look and this one needed a
+    muted borderless pill instead; adding `wrapperStyle` doesn't touch
+    any existing call site). Typing hides the shortcut row and tile
+    grid entirely and shows a flat, grouped-by-category results list
+    instead (confirmed against the brief's own "double-check" note:
+    results are a flat list, not the tile grid).
+  - **"Frequently used"**: 8 horizontal circular shortcuts (Invoices,
+    Expenses, Estimates, Customers, Vendors, AI Inbox, Messages,
+    Receipts) — each routes to the exact path its old accordion
+    sibling already used.
+  - **"All"**: 8 two-column category tiles (Accounts Receivable,
+    Accounts Payable, AI, Accounting, Reports, Inventory, Setup, and a
+    new **More** tile holding Send Documents/Messages/Spreadsheet
+    Sync/Settings — the brief named this exact fixed list, including
+    Messages even though it's also a shortcut above, so that
+    duplication is intentional per spec, not an oversight). Tapping a
+    tile gives it a 2px primary border and slides its sub-items in
+    directly below that tile's row (`LayoutAnimation`, ~200ms ease-
+    out) — only one category expanded at a time, collapsing it on a
+    second tap or when a different tile opens.
+  - **Dedup**: every item pulled into the shortcut row got removed
+    from its old category's sub-item list (Invoices/Customers/
+    Estimates out of AR, Vendors out of AP, AI Inbox out of AI,
+    Receipts out of Accounting; Spreadsheet Sync also moved out of
+    Reports into the new More tile, since the brief placed it there
+    explicitly) — confirmed nothing shows in two places at once except
+    the Messages case the spec called out by name.
+  - Per-item icons on every sub-item row (the brief asked for them
+    explicitly this round) — same source as the last chunk's icon
+    choices: reused rather than invented.
+  - The old user-info strip is gone from this screen — `settings.tsx`
+    already had a fuller ACCOUNT section (name, email, role) before
+    this chunk even started, so there was nothing to actually move.
+  - `paddingBottom: 80` on the ScrollView per the brief's own
+    double-check note, so the FAB never overlaps the last tile row.
+- Role filtering (`canOpen`) applies to both the shortcut row and every
+  category's children, same as every prior chunk; a category collapses
+  to zero visible children and hides its tile entirely (verified via
+  `lib/roleAccess.ts` directly: a `client` login's CLIENT_PAGES
+  allow-list doesn't include `/settings` or `/spreadsheet-sync`, so
+  that role's "More" tile correctly shows just Send Documents and
+  Messages — not a new rule, just confirming the existing logic produces
+  the right result here).
+
+**Verified**: `tsc --noEmit` clean (one real mistake caught here —
+`UIManager.setLayoutAnimationEnabledExperimentalAndroid` doesn't exist
+in this RN version's types; the real name is
+`setLayoutAnimationEnabledExperimental`, fixed before it could have
+silently no-opped on Android), a fresh `expo export --platform ios`
+bundle built with no errors (6.5MB), and a `grep` confirming no
+remaining reference anywhere to the old `(tabs)/create` path. Still no
+live device/simulator pass — this chunk touches the bottom tab bar
+itself (a FAB replacing a whole tab), which is exactly the kind of
+structural navigation change most worth a real tap-through before
+trusting, more so than the last three purely-cosmetic passes at this
+same screen.
