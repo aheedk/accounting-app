@@ -2300,3 +2300,50 @@ harmless demo-data footprint this session.
 
 With this, every claim in the user's capability guide now matches the
 actual mobile codebase — no further gaps found in that cross-check.
+
+## Chunk: Retire the nav drawer, fold it into the More tab (2026-10-24)
+
+User's own idea: drop the hamburger-triggered slide-out drawer entirely
+and have that same grouped-nav design appear as the body of the More
+tab instead. Also fixed a real drift this surfaced: the drawer's
+`NAV_GROUPS` (a structural port of web's `Sidebar.tsx`, with role
+filtering via `canOpen` and "Desktop only" disabled treatment) and the
+old More tab's separate hand-maintained `SECTIONS` array had fallen out
+of sync — the latter was missing items (Expense Transactions, Pay
+Bills, the disabled Client Overview placeholder) and had no role
+filtering at all.
+
+- **`app/(tabs)/more.tsx`**: now renders the drawer's exact former
+  content — same groups/icons/ordering, the same expand/collapse
+  accordion state, the same `canOpen`-based role filtering (a
+  role-denied item is dropped entirely, not shown disabled — that
+  treatment stays reserved for features this app hasn't built), the
+  same "Desktop only" disabled rows, the same dark sidebar-navy
+  styling — as a static page instead of an animated overlay. Dashboard
+  and Transactions are left out of the list (the bottom tab bar already
+  covers them); Create keeps its own button here instead of a duplicate
+  list row. Switched the color tokens from the drawer's hardcoded
+  `lightColors` to `theme.app.*` while doing this, so the panel now
+  actually follows dark mode instead of always rendering light-palette
+  navy regardless of the user's theme setting — a latent bug in the
+  original drawer, not something this chunk introduced.
+- **`components/AppHeader.tsx`**: removed the hamburger `IconButton`
+  and its `useNavDrawer` call — there's nothing left for it to open.
+  The business switcher that lived in that same row stays (it's
+  independent of the drawer, not something this chunk needed to move),
+  just re-padded now that it's the row's leading element instead of
+  sitting next to a hamburger.
+- **Deleted** `components/NavDrawer.tsx` and `hooks/useNavDrawer.tsx`
+  outright (confirmed via `grep` that nothing else referenced either
+  before removing them) and un-mounted `NavDrawerProvider`/`<NavDrawer
+  />` from `app/_layout.tsx`.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB, unchanged from before — the
+Reanimated dependency the drawer used for its slide animation is still
+pulled in by other screens, so removing the drawer didn't shrink the
+bundle, which is expected and fine). No live device/simulator check
+this chunk — a navigation-restructuring change like this is exactly the
+kind of thing worth a real tap-through pass before trusting it fully,
+same caveat as every other UI-only chunk this session with no
+screenshot or simulator session available.

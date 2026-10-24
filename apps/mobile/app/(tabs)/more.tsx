@@ -1,159 +1,215 @@
-import { View, ScrollView } from 'react-native';
-import { Text, List, Divider, useTheme } from 'react-native-paper';
+import { useState } from 'react';
+import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { Text, Divider, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { useCanOpen } from '../../lib/roleAccess';
 import { AppHeader } from '../../components/AppHeader';
-import type { AppTheme } from '../../theme';
-import { spacing, fontFamily } from '../../theme';
+import { fontFamily, typeScale, spacing, minTouchTarget, type AppTheme } from '../../theme';
 
-type Item = { title: string; path: string; icon: string };
-type Section = { label: string; items: Item[] };
+// This screen used to be its own hand-maintained flat list, separate from
+// (and drifted from) the nav drawer's own grouping — two lists to keep in
+// sync, and they'd already fallen out of step (missing items, no role
+// filtering, no "Desktop only" treatment here). The drawer is gone now (per
+// request: no more hamburger/slide-out panel) and this tab is its
+// replacement, so it renders the drawer's own former structure directly —
+// same groups, icons, ordering, role filtering, and "Desktop only" disabled
+// treatment as the structural port of web's Sidebar.tsx ALL_GROUPS — just
+// as a static page instead of a sliding overlay. Dashboard/Transactions are
+// left out here since the bottom tab bar already covers them; Create has
+// its own tab too, so only its button survives, not a duplicate list entry.
+type NavChild = { label: string; path?: string; params?: Record<string, string> };
+type NavGroup = { id: string; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; path?: string; children?: NavChild[] };
 
-// Grouped the same way the drawer's own AR/AP/Accounting/Reports/AI
-// sections are, so this screen reads as an index of the same areas
-// rather than one long undifferentiated list — it was a flat 25+-item
-// list before this, with no ScrollView wrapping it (items past the fold
-// were clipped on a small screen, not just visually noisy).
-const SECTIONS: Section[] = [
+const NAV_GROUPS: NavGroup[] = [
+  { id: 'messages', label: 'Messages', icon: 'message-outline', path: '/messages' },
+  { id: 'send-documents', label: 'Send documents', icon: 'upload-outline', path: '/send-documents' },
   {
-    label: 'General', items: [
-      { title: 'Messages', path: '/messages', icon: 'message-outline' },
-      { title: 'Send Documents', path: '/send-documents', icon: 'upload-outline' },
+    id: 'ar', label: 'Accounts Receivable', icon: 'account-group-outline',
+    children: [
+      { label: 'Customers', path: '/clients', params: { tab: 'customers' } },
+      { label: 'Invoices', path: '/invoices' },
+      { label: 'Estimates', path: '/estimates' },
+      { label: 'Payments', path: '/payments' },
+      { label: 'Credit Memos', path: '/credit-memos' },
+      { label: 'Aging', path: '/ar-aging' },
+      { label: 'Statements', path: '/customer-statement' },
     ],
   },
   {
-    label: 'Reports', items: [
-      { title: 'Profit & Loss', path: '/pnl', icon: 'chart-line' },
-      { title: 'Balance Sheet', path: '/balance-sheet', icon: 'scale-balance' },
-      { title: 'Trial Balance', path: '/trial-balance', icon: 'table-check' },
-      { title: 'Statement of Cash Flows', path: '/cash-flow', icon: 'cash-sync' },
-      { title: 'General Ledger', path: '/general-ledger', icon: 'format-list-numbered' },
-      { title: 'AR Aging', path: '/ar-aging', icon: 'calendar-clock-outline' },
-      { title: 'AP Aging', path: '/ap-aging', icon: 'calendar-clock-outline' },
-      { title: 'Customer Statement', path: '/customer-statement', icon: 'file-account-outline' },
-      { title: '1099s', path: '/1099s', icon: 'file-document-outline' },
-      { title: 'Standard Reports', path: '/standard-reports', icon: 'view-list-outline' },
-      { title: 'Cash Activity by Account', path: '/cash-activity', icon: 'bank-transfer' },
-      { title: 'Custom Reports', path: '/custom-reports', icon: 'file-chart-outline' },
-      { title: 'Financial Planning', path: '/financial-planning', icon: 'chart-box-outline' },
-      { title: 'Spreadsheet Sync', path: '/spreadsheet-sync', icon: 'file-export-outline' },
-      { title: 'Management Reports', path: '/management-reports', icon: 'finance' },
-      { title: 'Performance Center', path: '/performance-center', icon: 'trending-up' },
+    id: 'ap', label: 'Accounts Payable', icon: 'wallet-outline',
+    children: [
+      { label: 'Overview', path: '/ap-overview' },
+      { label: 'Expense Transactions', path: '/(tabs)/transactions' },
+      { label: 'Checks', path: '/checks' },
+      { label: 'Vendors', path: '/clients', params: { tab: 'vendors' } },
+      { label: 'Bills', path: '/bills' },
+      { label: 'Pay Bills', path: '/bill-payment/new' },
+      { label: 'Bill Payments', path: '/bill-payments' },
+      { label: 'Vendor Credits', path: '/vendor-credits' },
+      { label: 'Contractors', path: '/contractors' },
+      { label: 'Aging', path: '/ap-aging' },
+      { label: '1099s', path: '/1099s' },
     ],
   },
   {
-    label: 'Accounts Receivable', items: [
-      { title: 'Estimates', path: '/estimates', icon: 'file-document-edit-outline' },
-      { title: 'Payments', path: '/payments', icon: 'cash-check' },
-      { title: 'Credit Memos', path: '/credit-memos', icon: 'file-document-minus-outline' },
+    id: 'ai', label: 'AI', icon: 'creation',
+    children: [
+      { label: 'Document Inbox', path: '/inbox' },
+      { label: 'Coding Rules', path: '/coding-rules' },
+      { label: 'Suspense', path: '/suspense' },
     ],
   },
   {
-    label: 'Accounts Payable', items: [
-      { title: 'AP Overview', path: '/ap-overview', icon: 'view-dashboard-outline' },
-      { title: 'Bills', path: '/bills', icon: 'file-document-outline' },
-      { title: 'Bill Payments', path: '/bill-payments', icon: 'cash-fast' },
-      { title: 'Vendor Credits', path: '/vendor-credits', icon: 'file-document-minus-outline' },
-      { title: 'Checks', path: '/checks', icon: 'checkbook' },
-      { title: 'Contractors', path: '/contractors', icon: 'account-hard-hat-outline' },
+    id: 'accounting', label: 'Accounting', icon: 'book-open-outline',
+    children: [
+      { label: 'Client Overview' }, { label: 'Books Review', path: '/books-review' }, { label: 'Approvals', path: '/approvals' },
+      { label: 'Bank Accounts', path: '/bank-accounts' }, { label: 'Bank Transactions', path: '/bank-transactions' }, { label: 'Integration Transactions', path: '/integration-transactions' },
+      { label: 'Receipts', path: '/receipts' }, { label: 'Reconcile', path: '/reconcile' }, { label: 'Rules', path: '/bank-rules' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
+      { label: 'Recurring Transactions', path: '/recurring-templates' }, { label: 'Fixed Assets', path: '/fixed-assets' }, { label: 'Journal', path: '/journal-entries' },
     ],
   },
   {
-    label: 'Accounting', items: [
-      { title: 'Chart of Accounts', path: '/chart-of-accounts', icon: 'book-open-variant' },
-      { title: 'Journal Entries', path: '/journal-entries', icon: 'book-open-page-variant-outline' },
-      { title: 'Bank Accounts', path: '/bank-accounts', icon: 'bank-outline' },
-      { title: 'Bank Transactions', path: '/bank-transactions', icon: 'bank-outline' },
-      { title: 'Reconcile', path: '/reconcile', icon: 'bank-check' },
-      { title: 'Receipts', path: '/receipts', icon: 'receipt' },
-      { title: 'Bank Rules', path: '/bank-rules', icon: 'filter-variant' },
-      { title: 'Fixed Assets', path: '/fixed-assets', icon: 'office-building-outline' },
-      { title: 'Books Review', path: '/books-review', icon: 'clipboard-check-outline' },
-      { title: 'Approvals', path: '/approvals', icon: 'check-decagram-outline' },
-      { title: 'Integration Transactions', path: '/integration-transactions', icon: 'swap-horizontal' },
-      { title: 'Recurring Transactions', path: '/recurring-templates', icon: 'autorenew' },
+    id: 'reports', label: 'Reports', icon: 'chart-bar',
+    children: [
+      { label: 'Standard Reports', path: '/standard-reports' },
+      { label: 'Profit & Loss', path: '/pnl' },
+      { label: 'Balance Sheet', path: '/balance-sheet' },
+      { label: 'General Ledger', path: '/general-ledger' },
+      { label: 'Cash Flows', path: '/cash-flow' }, { label: 'Cash Activity', path: '/cash-activity' }, { label: 'Custom Reports', path: '/custom-reports' },
+      { label: 'Management Reports', path: '/management-reports' }, { label: 'Performance Center', path: '/performance-center' }, { label: 'Financial Planning', path: '/financial-planning' },
+      { label: 'Spreadsheet Sync', path: '/spreadsheet-sync' }, { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },
   {
-    label: 'AI', items: [
-      { title: 'AI Document Inbox', path: '/inbox', icon: 'inbox-arrow-down-outline' },
-      { title: 'Suspense', path: '/suspense', icon: 'help-circle-outline' },
-      { title: 'Coding Rules', path: '/coding-rules', icon: 'creation' },
+    id: 'inventory', label: 'Inventory', icon: 'package-variant-closed',
+    children: [
+      { label: 'Overview', path: '/inventory-overview' }, { label: 'Inventory', path: '/inventory-items' }, { label: 'Purchase Orders', path: '/purchase-orders' },
+      { label: 'Item Receipts', path: '/item-receipts' }, { label: 'Sales Orders', path: '/sales-orders' }, { label: 'Shipping Labels', path: '/shipping-labels' },
     ],
   },
   {
-    label: 'Inventory', items: [
-      { title: 'Overview', path: '/inventory-overview', icon: 'view-dashboard-outline' },
-      { title: 'Inventory', path: '/inventory-items', icon: 'package-variant-closed' },
-      { title: 'Purchase Orders', path: '/purchase-orders', icon: 'clipboard-list-outline' },
-      { title: 'Item Receipts', path: '/item-receipts', icon: 'package-down' },
-      { title: 'Sales Orders', path: '/sales-orders', icon: 'cart-outline' },
-      { title: 'Shipping Labels', path: '/shipping-labels', icon: 'truck-outline' },
-    ],
-  },
-  {
-    label: 'Setup', items: [
-      { title: 'Entity', path: '/entity', icon: 'domain' },
-      { title: 'Company Settings', path: '/company-settings', icon: 'cog-outline' },
-      { title: 'Cost Centers', path: '/cost-centers', icon: 'tag-outline' },
-      { title: 'Users', path: '/users', icon: 'account-group-outline' },
-      { title: 'Activity Log', path: '/activity-log', icon: 'history' },
-      { title: 'Tax Codes', path: '/tax-codes', icon: 'percent-outline' },
-      { title: 'Fiscal Periods', path: '/fiscal-periods', icon: 'calendar-blank-outline' },
+    id: 'setup', label: 'Setup', icon: 'cog-outline',
+    children: [
+      { label: 'Entity', path: '/entity' }, { label: 'Company Settings', path: '/company-settings' }, { label: 'Chart of Accounts', path: '/chart-of-accounts' },
+      { label: 'Cost Centers', path: '/cost-centers' }, { label: 'Users', path: '/users' }, { label: 'Activity Log', path: '/activity-log' },
+      { label: 'Tax Codes', path: '/tax-codes' }, { label: 'Fiscal Periods', path: '/fiscal-periods' },
     ],
   },
 ];
 
 export default function MoreScreen() {
   const theme = useTheme<AppTheme>();
+  const c = theme.app;
   const { user } = useAuth();
+  const canOpen = useCanOpen();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function go(child: NavChild | NavGroup) {
+    if (!child.path) return;
+    router.push({ pathname: child.path as never, params: 'params' in child ? child.params : undefined } as never);
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <AppHeader title="More" />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        {user && (
-          <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.md }}>
-            <Text style={{ color: theme.app.foreground, fontFamily: fontFamily.semibold }}>{user.full_name}</Text>
-            <Text style={{ color: theme.app.mutedForeground, marginTop: 2 }}>{user.email}</Text>
+      <ScrollView style={{ backgroundColor: c.sidebar }} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+        {user ? (
+          <View style={styles.userRow}>
+            <Text style={{ color: c.sidebarForeground, fontFamily: fontFamily.semibold }}>{user.full_name}</Text>
+            <Text style={{ color: c.sidebarMuted, marginTop: 2, fontSize: typeScale.caption }}>{user.email}</Text>
           </View>
+        ) : null}
+
+        {canOpen('/expense/new') && (
+          <Pressable style={[styles.createButton, { backgroundColor: c.gold }]} onPress={() => router.push('/(tabs)/create')}>
+            <MaterialCommunityIcons name="plus" size={18} color={c.sidebar} />
+            <Text style={{ color: c.sidebar, fontFamily: fontFamily.semibold, fontSize: typeScale.body }}>Create</Text>
+          </Pressable>
         )}
-        <Divider />
 
-        {SECTIONS.map(section => (
-          <View key={section.label}>
-            <SectionLabel theme={theme} text={section.label} />
-            {section.items.map(item => (
-              <List.Item
-                key={item.path}
-                title={item.title}
-                onPress={() => router.push(item.path as never)}
-                left={props => <List.Icon {...props} icon={item.icon} color={theme.app.foreground} />}
-                titleStyle={{ color: theme.app.foreground }}
-              />
-            ))}
-            <Divider />
-          </View>
-        ))}
+        <Divider style={{ backgroundColor: 'rgba(255,255,255,0.1)', marginTop: spacing.md }} />
 
-        <List.Item
-          title="Settings"
-          description="Account, security, notifications, appearance"
-          onPress={() => router.push('/settings')}
-          left={props => <List.Icon {...props} icon="cog-outline" color={theme.app.foreground} />}
-          titleStyle={{ color: theme.app.foreground }}
-          descriptionStyle={{ color: theme.app.mutedForeground }}
-        />
+        {NAV_GROUPS.map(group => {
+          // A role that can't open this path doesn't see it at all — same as
+          // web's Sidebar.tsx, which drops role-denied items rather than
+          // showing them disabled (that treatment is reserved for features
+          // this app hasn't built yet, a different kind of gap).
+          if (group.path && !canOpen(group.path)) return null;
+          if (!group.children) {
+            const disabled = !group.path;
+            return (
+              <Pressable
+                key={group.id}
+                disabled={disabled}
+                onPress={() => go(group)}
+                style={[styles.row, disabled && styles.rowDisabled]}
+              >
+                <MaterialCommunityIcons name={group.icon} size={20} color={disabled ? '#5a6382' : c.sidebarForeground} />
+                <Text style={[styles.rowText, { color: c.sidebarForeground }, disabled && styles.rowTextDisabled]}>{group.label}</Text>
+                {disabled ? <Text style={styles.availableNote}>Desktop only</Text> : null}
+              </Pressable>
+            );
+          }
+          const visibleChildren = group.children.filter(child => !child.path || canOpen(child.path));
+          if (visibleChildren.length === 0) return null;
+          const isExpanded = expanded.has(group.id);
+          return (
+            <View key={group.id}>
+              <Pressable
+                style={styles.row}
+                onPress={() => setExpanded(prev => {
+                  const next = new Set(prev);
+                  if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+                  return next;
+                })}
+              >
+                <MaterialCommunityIcons name={group.icon} size={20} color={c.sidebarForeground} />
+                <Text style={[styles.rowText, { color: c.sidebarForeground }]}>{group.label}</Text>
+                <MaterialCommunityIcons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={c.sidebarMuted} />
+              </Pressable>
+              {isExpanded && visibleChildren.map(child => {
+                const disabled = !child.path;
+                return (
+                  <Pressable
+                    key={child.label}
+                    disabled={disabled}
+                    onPress={() => go(child)}
+                    style={[styles.childRow, disabled && styles.rowDisabled]}
+                  >
+                    <Text style={[styles.childRowText, { color: c.sidebarMuted }, disabled && styles.rowTextDisabled]} numberOfLines={1}>{child.label}</Text>
+                    {disabled ? <Text style={styles.availableNote}>Desktop only</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          );
+        })}
+
+        <Divider style={{ backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: spacing.sm }} />
+
+        <Pressable style={styles.row} onPress={() => router.push('/settings')}>
+          <MaterialCommunityIcons name="cog-outline" size={20} color={c.sidebarForeground} />
+          <Text style={[styles.rowText, { color: c.sidebarForeground }]}>Settings</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
 }
 
-function SectionLabel({ theme, text }: { theme: AppTheme; text: string }) {
-  return (
-    <Text style={{ color: theme.app.mutedForeground, fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, padding: spacing.md, paddingBottom: spacing.xs }}>
-      {text.toUpperCase()}
-    </Text>
-  );
-}
+const styles = StyleSheet.create({
+  userRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  createButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginHorizontal: spacing.md, marginTop: spacing.sm, minHeight: 40, borderRadius: 6,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: minTouchTarget, paddingHorizontal: spacing.md },
+  rowDisabled: { opacity: 0.55 },
+  rowText: { flex: 1, fontFamily: fontFamily.medium, fontSize: typeScale.body },
+  childRow: { minHeight: minTouchTarget - 8, paddingLeft: spacing.md + 32, paddingRight: spacing.md, flexDirection: 'row', alignItems: 'center' },
+  childRowText: { flex: 1, fontFamily: fontFamily.regular, fontSize: typeScale.body },
+  rowTextDisabled: { color: '#5a6382' },
+  availableNote: { color: '#5a6382', fontFamily: fontFamily.regular, fontSize: typeScale.caption },
+});
