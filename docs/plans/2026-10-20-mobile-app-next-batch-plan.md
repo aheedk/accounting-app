@@ -2347,3 +2347,43 @@ this chunk — a navigation-restructuring change like this is exactly the
 kind of thing worth a real tap-through pass before trusting it fully,
 same caveat as every other UI-only chunk this session with no
 screenshot or simulator session available.
+
+## Chunk: Drop the dark sidebar skin on the More tab (2026-10-24)
+
+The previous chunk's fold-the-drawer-into-More-tab design turned out to
+read as broken, not intentional — the user checked against QBO's actual
+mobile app (its Menu tab is a plain light page of grouped shortcuts;
+QBO deliberately drops the desktop dark sidebar skin for mobile
+entirely) and confirmed the suspicion raised at the end of the last
+chunk: a light `AppHeader` sitting directly above a dark-navy panel
+with no transition reads as a stalled/broken overlay animation, not a
+real design.
+
+- **`app/(tabs)/more.tsx`** rebuilt to match: no dark background
+  anywhere — the whole screen now uses the same `theme.colors.background`
+  every other tab uses. A compact user strip (name + a `StatusBadge`
+  role pill + email) replaces the old dark-panel user block. "+ Create"
+  is now the real `AppButton` (`default` variant — this app's actual
+  brand action color, blue, not the dark-sidebar-specific gold the
+  previous chunk used), `fullWidth`, gated the same `canOpen('/expense/
+  new')` check as before. Each group is a plain uppercase caption-style
+  header row (label + chevron-up/down, no icon — distinct from a leaf
+  item row on purpose, so a header doesn't read as just another
+  tappable destination) that expands to 48px item rows (icon + label +
+  trailing chevron-right, `surface` background, `border` bottom
+  separator, `muted` background on press) — independent per-section
+  expand state, same as before, all collapsed by default. Role-denied
+  items are still dropped entirely (not shown disabled) and features
+  this app hasn't built yet still show as a disabled row with a
+  "Desktop only" label in place of the chevron — both unchanged in
+  behavior, just restyled onto the new light row.
+- Same `NAV_GROUPS` data (items, ordering, role filtering via
+  `roleAccess.ts`) as the prior chunk — this was purely a visual
+  restyle, not a content change.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Still no live device/
+simulator pass — recommended again, same as the last chunk, before
+trusting this fully; this is now the second restyle of this same
+screen in two days, which is exactly the kind of churn a real look at
+a running simulator would have caught earlier.

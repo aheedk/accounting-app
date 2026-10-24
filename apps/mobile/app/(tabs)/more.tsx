@@ -1,24 +1,23 @@
 import { useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { Text, Divider, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useCanOpen } from '../../lib/roleAccess';
 import { AppHeader } from '../../components/AppHeader';
-import { fontFamily, typeScale, spacing, minTouchTarget, type AppTheme } from '../../theme';
+import { AppButton } from '../../components/ui/AppButton';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { fontFamily, typeScale, spacing, type AppTheme } from '../../theme';
 
-// This screen used to be its own hand-maintained flat list, separate from
-// (and drifted from) the nav drawer's own grouping — two lists to keep in
-// sync, and they'd already fallen out of step (missing items, no role
-// filtering, no "Desktop only" treatment here). The drawer is gone now (per
-// request: no more hamburger/slide-out panel) and this tab is its
-// replacement, so it renders the drawer's own former structure directly —
-// same groups, icons, ordering, role filtering, and "Desktop only" disabled
-// treatment as the structural port of web's Sidebar.tsx ALL_GROUPS — just
-// as a static page instead of a sliding overlay. Dashboard/Transactions are
-// left out here since the bottom tab bar already covers them; Create has
-// its own tab too, so only its button survives, not a duplicate list entry.
+// QBO's own mobile app drops the desktop dark sidebar skin entirely for its
+// Menu tab — a plain light-themed page of grouped shortcuts, not a ported
+// sidebar. This screen follows that: no dark-navy panel, no slide animation
+// (there's nothing to slide any more — this tab IS the destination). Same
+// groups/items/ordering/role-filtering as before, restyled as a native
+// "More menu" list. Dashboard/Transactions stay off this list since the
+// bottom tab bar already covers them; Create keeps its own button instead
+// of a duplicate row.
 type NavChild = { label: string; path?: string; params?: Record<string, string> };
 type NavGroup = { id: string; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; path?: string; children?: NavChild[] };
 
@@ -99,6 +98,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+function formatRole(role: string): string {
+  return role.split('_').map(w => w[0]!.toUpperCase() + w.slice(1)).join(' ');
+}
+
 export default function MoreScreen() {
   const theme = useTheme<AppTheme>();
   const c = theme.app;
@@ -115,22 +118,28 @@ export default function MoreScreen() {
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <AppHeader title="More" />
 
-      <ScrollView style={{ backgroundColor: c.sidebar }} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
         {user ? (
-          <View style={styles.userRow}>
-            <Text style={{ color: c.sidebarForeground, fontFamily: fontFamily.semibold }}>{user.full_name}</Text>
-            <Text style={{ color: c.sidebarMuted, marginTop: 2, fontSize: typeScale.caption }}>{user.email}</Text>
+          <View style={[styles.userStrip, { backgroundColor: c.surface }]}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Text style={{ color: c.foreground, fontFamily: fontFamily.semibold, fontSize: typeScale.body }} numberOfLines={1}>
+                  {user.full_name}
+                </Text>
+                <StatusBadge status="blue" label={formatRole(user.role)} />
+              </View>
+              <Text style={{ color: c.mutedForeground, fontSize: typeScale.caption, marginTop: 2 }} numberOfLines={1}>
+                {user.email}
+              </Text>
+            </View>
           </View>
         ) : null}
 
-        {canOpen('/expense/new') && (
-          <Pressable style={[styles.createButton, { backgroundColor: c.gold }]} onPress={() => router.push('/(tabs)/create')}>
-            <MaterialCommunityIcons name="plus" size={18} color={c.sidebar} />
-            <Text style={{ color: c.sidebar, fontFamily: fontFamily.semibold, fontSize: typeScale.body }}>Create</Text>
-          </Pressable>
-        )}
-
-        <Divider style={{ backgroundColor: 'rgba(255,255,255,0.1)', marginTop: spacing.md }} />
+        {canOpen('/expense/new') ? (
+          <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+            <AppButton onPress={() => router.push('/(tabs)/create')} fullWidth>+ Create</AppButton>
+          </View>
+        ) : null}
 
         {NAV_GROUPS.map(group => {
           // A role that can't open this path doesn't see it at all — same as
@@ -138,78 +147,96 @@ export default function MoreScreen() {
           // showing them disabled (that treatment is reserved for features
           // this app hasn't built yet, a different kind of gap).
           if (group.path && !canOpen(group.path)) return null;
+
           if (!group.children) {
-            const disabled = !group.path;
-            return (
-              <Pressable
-                key={group.id}
-                disabled={disabled}
-                onPress={() => go(group)}
-                style={[styles.row, disabled && styles.rowDisabled]}
-              >
-                <MaterialCommunityIcons name={group.icon} size={20} color={disabled ? '#5a6382' : c.sidebarForeground} />
-                <Text style={[styles.rowText, { color: c.sidebarForeground }, disabled && styles.rowTextDisabled]}>{group.label}</Text>
-                {disabled ? <Text style={styles.availableNote}>Desktop only</Text> : null}
-              </Pressable>
-            );
+            return <MenuItemRow key={group.id} label={group.label} icon={group.icon} onPress={() => go(group)} theme={theme} />;
           }
+
           const visibleChildren = group.children.filter(child => !child.path || canOpen(child.path));
           if (visibleChildren.length === 0) return null;
           const isExpanded = expanded.has(group.id);
+
           return (
             <View key={group.id}>
               <Pressable
-                style={styles.row}
+                style={styles.sectionHeader}
                 onPress={() => setExpanded(prev => {
                   const next = new Set(prev);
                   if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
                   return next;
                 })}
               >
-                <MaterialCommunityIcons name={group.icon} size={20} color={c.sidebarForeground} />
-                <Text style={[styles.rowText, { color: c.sidebarForeground }]}>{group.label}</Text>
-                <MaterialCommunityIcons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={c.sidebarMuted} />
+                <Text style={{ flex: 1, color: c.mutedForeground, fontSize: typeScale.caption, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {group.label}
+                </Text>
+                <MaterialCommunityIcons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={c.mutedForeground} />
               </Pressable>
+
               {isExpanded && visibleChildren.map(child => {
                 const disabled = !child.path;
                 return (
-                  <Pressable
+                  <MenuItemRow
                     key={child.label}
+                    label={child.label}
                     disabled={disabled}
                     onPress={() => go(child)}
-                    style={[styles.childRow, disabled && styles.rowDisabled]}
-                  >
-                    <Text style={[styles.childRowText, { color: c.sidebarMuted }, disabled && styles.rowTextDisabled]} numberOfLines={1}>{child.label}</Text>
-                    {disabled ? <Text style={styles.availableNote}>Desktop only</Text> : null}
-                  </Pressable>
+                    theme={theme}
+                  />
                 );
               })}
             </View>
           );
         })}
 
-        <Divider style={{ backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: spacing.sm }} />
-
-        <Pressable style={styles.row} onPress={() => router.push('/settings')}>
-          <MaterialCommunityIcons name="cog-outline" size={20} color={c.sidebarForeground} />
-          <Text style={[styles.rowText, { color: c.sidebarForeground }]}>Settings</Text>
-        </Pressable>
+        <View style={{ marginTop: spacing.md }}>
+          <MenuItemRow label="Settings" icon="cog-outline" onPress={() => router.push('/settings')} theme={theme} />
+        </View>
       </ScrollView>
     </View>
   );
 }
 
+function MenuItemRow({
+  label, icon, disabled, onPress, theme,
+}: { label: string; icon?: keyof typeof MaterialCommunityIcons.glyphMap; disabled?: boolean; onPress: () => void; theme: AppTheme }) {
+  const c = theme.app;
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.itemRow,
+        { backgroundColor: pressed ? c.muted : c.surface, borderBottomColor: c.border },
+      ]}
+    >
+      {icon ? <MaterialCommunityIcons name={icon} size={20} color={disabled ? c.border : c.mutedForeground} /> : null}
+      <Text
+        style={[
+          styles.itemLabel,
+          { color: disabled ? c.mutedForeground : c.foreground, marginLeft: icon ? 0 : spacing.md + 20 + spacing.sm },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      {disabled ? (
+        <Text style={{ color: c.mutedForeground, fontSize: typeScale.caption }}>Desktop only</Text>
+      ) : (
+        <MaterialCommunityIcons name="chevron-right" size={18} color={c.mutedForeground} />
+      )}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  userRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  createButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    marginHorizontal: spacing.md, marginTop: spacing.sm, minHeight: 40, borderRadius: 6,
+  userStrip: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm, paddingBottom: spacing.xs, marginTop: spacing.xs,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: minTouchTarget, paddingHorizontal: spacing.md },
-  rowDisabled: { opacity: 0.55 },
-  rowText: { flex: 1, fontFamily: fontFamily.medium, fontSize: typeScale.body },
-  childRow: { minHeight: minTouchTarget - 8, paddingLeft: spacing.md + 32, paddingRight: spacing.md, flexDirection: 'row', alignItems: 'center' },
-  childRowText: { flex: 1, fontFamily: fontFamily.regular, fontSize: typeScale.body },
-  rowTextDisabled: { color: '#5a6382' },
-  availableNote: { color: '#5a6382', fontFamily: fontFamily.regular, fontSize: typeScale.caption },
+  itemRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    height: 48, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  itemLabel: { flex: 1, fontFamily: fontFamily.regular, fontSize: typeScale.body },
 });
