@@ -2387,3 +2387,47 @@ simulator pass — recommended again, same as the last chunk, before
 trusting this fully; this is now the second restyle of this same
 screen in two days, which is exactly the kind of churn a real look at
 a running simulator would have caught earlier.
+
+## Chunk: More tab — shortcut grid, third pass (2026-10-24)
+
+Third restyle of this one screen in two days. The light-theme row list
+from the last chunk was correct in spirit (no dark skin, matches QBO)
+but still read as a settings dump — every destination an equally-
+weighted small text row, nothing scannable at a glance. This pass adds
+a 2-column shortcut-tile grid (QBO mobile's own pattern) for the 6
+most-used destinations, so the common case needs no expanding at all.
+
+- **Shortcut grid**: Invoices, Expenses, Customers, Vendors, AI Inbox,
+  Messages — 80px tiles, `surface` background, `border` border, 8px
+  radius, a 24px icon above a 13px label, 2 per row with an 8px gap.
+  Each tile's path is the exact same route its group-accordion sibling
+  already used (e.g. the Invoices tile and AR's old "Invoices" row both
+  go to `/invoices`) — a dedicated shortcut, not a second screen.
+- **Removed the duplicates** from the accordion below: Invoices/
+  Customers out of Accounts Receivable, Expense Transactions/Vendors
+  out of Accounts Payable, Document Inbox out of AI, and the standalone
+  Messages row dropped entirely — all six now live only as tiles.
+- **Section headers** went from tiny uppercase caption text (read like
+  a form-field label, not a tappable row) to 56px rows at 15px medium
+  weight — same expand/collapse behavior, still collapsed by default.
+- **Child rows** grew from 48px to 52px and, this round, got real
+  per-item icons for the first time — `NavChild` never carried one in
+  any earlier version of this file (only the top-level/group entries
+  ever had icons), so these ~50 icon choices were pulled from the
+  original pre-drawer version of this same screen's own `SECTIONS`
+  array (still in scratch context from earlier this session) rather
+  than invented fresh — every icon here already meant that exact
+  feature somewhere in this app's history, not a new guess.
+- **Send documents** moved out of the grid/accordion entirely into its
+  own row at the bottom, next to Settings, matching the brief's "bottom
+  section" placement.
+- No changes to `AppHeader`, the bottom tab bar, routing, or any other
+  screen — purely this one screen's body content, as scoped.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Still no live device/
+simulator pass. Flagging plainly: three restyles of one screen without
+ever seeing it rendered is not a sustainable loop — a single real
+screenshot at this point would likely save more churn than another
+round of spec-from-memory changes. Recommend an actual simulator check
+before touching this screen again.
