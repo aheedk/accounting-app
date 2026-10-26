@@ -1,0 +1,22 @@
+# What .gitignore leaves out stays out of the image too: the image must build
+# from what is in git, as CI builds it.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/*.tsbuildinfo
+**/*.log
+**/coverage
+.git
+.worktrees
+.claude
+.local-data
+backups
+secrets
+uploads
+docs
+# Only their package.json, so npm ci agrees with the lockfile.
+apps/web/*
+!apps/web/package.json
+apps/mobile/*
+!apps/mobile/package.json

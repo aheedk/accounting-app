@@ -50,6 +50,25 @@ async function main() {
     }
   }
 
+  // Supabase's Data API reaches the tables in public as the roles anon and
+  // authenticated, and the key it takes is public. The app never uses it, so
+  // those roles get nothing here; on every run, so new tables are covered too.
+  // Where the roles do not exist (local, CI) this does nothing.
+  const supabaseRoles = await pool.query(
+    "SELECT 1 FROM pg_roles WHERE rolname IN ('anon', 'authenticated')",
+  );
+  if (supabaseRoles.rowCount === 2) {
+    await pool.query(`
+      REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+      REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+      REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
+    `);
+    console.log('Supabase roles anon and authenticated: no access to public.');
+  }
+
   await pool.end();
   console.log('Migrations complete.');
 }

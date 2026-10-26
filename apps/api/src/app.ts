@@ -3,6 +3,7 @@ import express, { type Express } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { config, corsOrigins } from './config.js';
+import { stripForwardedPorts } from './lib/forwardedFor.js';
 import { requestId } from './middleware/requestId.js';
 import { requestTiming } from './middleware/requestTiming.js';
 import { errorHandler } from './middleware/error.js';
@@ -84,11 +85,17 @@ export function makeApp(): Express {
   const app = express();
   // Not saying what the API runs on saves an attacker a step.
   app.disable('x-powered-by');
-  // Railway's proxy is the one hop in front of the API: req.ip is then the
-  // visitor's address, for the sign-in limit and the Activity Log, instead of
-  // the proxy's. Express takes the last X-Forwarded-For entry, which the proxy
-  // writes, so a visitor cannot choose it.
+  // The host's proxy (Railway's, or Azure App Service's front end) is the one
+  // hop in front of the API: req.ip is then the visitor's address, for the
+  // sign-in limit and the Activity Log, instead of the proxy's. Express takes
+  // the last X-Forwarded-For entry, which the proxy writes, so a visitor cannot
+  // choose it. Azure adds the port to it, which is taken off first.
   app.set('trust proxy', 1);
+  app.use((req, _res, next) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string') req.headers['x-forwarded-for'] = stripForwardedPorts(forwarded);
+    next();
+  });
   app.use(requestId);
   // Browsers take the declared type of everything the API sends, never a guess.
   // Nothing it sends is kept in a browser's or a proxy's cache (it is clients'
