@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
+import { chatToJournalForm } from '@/lib/chatActionMappers';
+import type { ChatDraftState } from '@/components/chat/ChatPanel';
 import JournalEntryEditor from './JournalEntryEditor';
 import type { JournalEntryDetail } from './journalEntryTypes';
 
 export default function JournalNewPage() {
   const [businessId] = useActiveBusinessId();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const chatDraft = (location.state as ChatDraftState | null)?.chatDraft;
   const copyId = searchParams.get('copy');
   // ?reverse=<id>: the form opens as that entry's reversal, to be changed and then posted.
   const reverseId = searchParams.get('reverse');
@@ -51,5 +55,6 @@ export default function JournalNewPage() {
   if (reverseSource) return <JournalEntryEditor key={`${businessId}-reverse-${reverseId ?? ''}`} reverseSource={reverseSource} />;
   if (copyId && !copySource) return <div>Loading journal entry copy...</div>;
   if (copySource) return <JournalEntryEditor key={`${businessId}-${copyId ?? 'copy'}`} copySource={copySource} />;
+  if (chatDraft?.type === 'journal_entry') return <JournalEntryEditor key={`${businessId ?? 'none'}-chat`} draftPrefill={chatToJournalForm(chatDraft)} />;
   return <JournalEntryEditor key={`${businessId ?? 'none'}-new`} />;
 }

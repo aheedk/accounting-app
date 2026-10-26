@@ -69,6 +69,7 @@ import gmailAuthRouter from './routes/gmailAuth.js';
 import emailImportsRouter from './routes/emailImports.js';
 import invoiceImportsRouter from './routes/invoiceImports.js';
 import aiRouter from './routes/ai.js';
+import chatRouter from './routes/chat.js';
 import bankDepositsRouter from './routes/bankDeposits.js';
 import searchRouter from './routes/search.js';
 import transfersRouter from './routes/transfers.js';
@@ -182,6 +183,7 @@ export function makeApp(): Express {
   app.use(emailImportsRouter);
   app.use(invoiceImportsRouter);
   app.use(aiRouter);
+  app.use(chatRouter);
   app.use(bankDepositsRouter);
 app.use(searchRouter);
 app.use(transfersRouter);

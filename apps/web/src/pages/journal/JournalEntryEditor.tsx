@@ -53,6 +53,8 @@ type JournalEntryEditorProps = {
   copySource?: JournalEntryDetail;
   /** The entry being reversed: the form opens as its reversal and saves through /reverse. */
   reverseSource?: JournalEntryDetail;
+  /** A chat-drafted journal entry, already in form shape — see chatToJournalForm. */
+  draftPrefill?: JournalEntryFormValues;
 };
 
 type FiscalPeriod = {
@@ -68,7 +70,7 @@ function fmtJournalDate(iso: string) {
   return `${Number(month)}/${Number(day)}/${year}`;
 }
 
-export default function JournalEntryEditor({ existing, copySource, reverseSource }: JournalEntryEditorProps) {
+export default function JournalEntryEditor({ existing, copySource, reverseSource, draftPrefill }: JournalEntryEditorProps) {
   const [businessId] = useActiveBusinessId();
   // The role on the open company, which is the one the API checks.
   const role = useEffectiveRole();
@@ -91,7 +93,9 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
         ? reverseJournalEntryToForm(reverseSource)
         : copySource
           ? copyJournalEntryToForm(copySource, '')
-          : newJournalEntryForm(todayLocal())
+          : draftPrefill
+            ? draftPrefill
+            : newJournalEntryForm(todayLocal())
   ));
   // A reversal's number is fixed (the original's, with an R), like a saved entry's.
   const numberIsFixed = existing !== undefined || reverseSource !== undefined;
