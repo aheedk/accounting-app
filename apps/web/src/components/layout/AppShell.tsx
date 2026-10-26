@@ -3,8 +3,9 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { TopBar } from './TopBar';
+import { CompanySwitchedScreen } from './CompanySwitchedScreen';
 import { PdfPreviewHost } from '@/components/PdfPreviewHost';
-import { useActiveBusinessId, useNewTabsStartHere } from '@/lib/business';
+import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business';
 import { setExportCompany } from '@/lib/reportExport';
 import { documentTitle } from '@/lib/pageTitle';
 import { useAuth } from '@/auth/useAuth';
@@ -30,9 +31,8 @@ export function AppShell() {
   const activeBusinessName = businesses.find(b => b.id === activeBusinessId)?.name ?? '';
   useEffect(() => { setExportCompany(activeBusinessName); }, [activeBusinessName]);
 
-  // Each tab keeps its own company; a tab opened from this one starts on it.
-  useNewTabsStartHere();
-
+  // Another tab switched company: replace the page outright, so nothing from
+  // the old company stays on screen or stays clickable.
   // A page the role cannot use is not opened, however it was reached (a typed
   // address, a bookmark, an old link). The API refuses the data either way.
   const role = useEffectiveRole();
@@ -42,6 +42,9 @@ export function AppShell() {
 
   // The browser tab is named after the page that is open, then the company.
   useEffect(() => { document.title = documentTitle(pathname, activeBusinessName); }, [pathname, activeBusinessName]);
+
+  const switchedTo = useCompanySwitchedElsewhere();
+  if (switchedTo) return <CompanySwitchedScreen businessId={switchedTo} />;
 
   return (
     // print:* — on paper there is no sidebar or top bar, and the page is as tall as its content.
