@@ -1,12 +1,32 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/auth/useAuth';
 
+// Each tab has its own company open (sessionStorage), so a firm can work on two
+// clients side by side. Every API path names the company, so nothing depends on
+// a browser-wide "current" one. localStorage keeps the company last open in the
+// browser: a new tab, which starts with no company of its own, opens on it.
+// (Until 10-26 the company was one per browser and other tabs were shut on a
+// switch, as QuickBooks does; that stopped Faizan working in tabs.)
 const STORAGE_KEY = 'acct_active_business';
 const BIZ_CHANGE_EVENT = 'acct_business_change';
 
+/** This tab's company. A tab's first read takes the browser's last one and keeps it. */
+function readTabCompany(): string | null {
+  const mine = sessionStorage.getItem(STORAGE_KEY);
+  if (mine) return mine;
+  const last = localStorage.getItem(STORAGE_KEY);
+  if (last) sessionStorage.setItem(STORAGE_KEY, last);
+  return last;
+}
+
+function saveCompany(id: string) {
+  sessionStorage.setItem(STORAGE_KEY, id);
+  localStorage.setItem(STORAGE_KEY, id);
+}
+
 export function useActiveBusinessId(): [string | null, (id: string) => void] {
   const { businesses } = useAuth();
-  const [active, setActive] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
+  const [active, setActive] = useState<string | null>(readTabCompany);
 
   // Listen for business switches made by any other component using this hook
   useEffect(() => {
@@ -22,40 +42,36 @@ export function useActiveBusinessId(): [string | null, (id: string) => void] {
     if (!active || !businesses.find(b => b.id === active)) {
       const first = businesses[0]!.id;
       setActive(first);
-      localStorage.setItem(STORAGE_KEY, first);
+      saveCompany(first);
     }
   }, [businesses, active]);
 
   function pick(id: string) {
     setActive(id);
-    localStorage.setItem(STORAGE_KEY, id);
+    saveCompany(id);
     window.dispatchEvent(new CustomEvent(BIZ_CHANGE_EVENT, { detail: id }));
   }
   return [active, pick];
 }
 
 /**
- * The company another tab of this browser switched to, or null while this tab
- * is still in step. The active company lives in localStorage, which every tab
- * shares, so once another tab switches, this one is showing one company while
- * the browser's "current" company is another -- the cue to stop and ask
- * (QuickBooks does the same) rather than let work land in the wrong books.
+ * While this tab is in front, it is the company a new tab opens on, so an
+ * entry opened in a new tab (Ctrl+click on + New, Add new item) is for the
+ * client it was opened from, not one last picked in some other tab.
  */
-export function useCompanySwitchedElsewhere(): string | null {
-  const [mine] = useActiveBusinessId();
-  const [stored, setStored] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
-
-  // `storage` only fires in the *other* tabs, which is exactly the signal wanted.
+export function useNewTabsStartHere(): void {
+  const [active] = useActiveBusinessId();
   useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY || e.key === null) setStored(localStorage.getItem(STORAGE_KEY));
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-
-  // A switch made in this tab writes localStorage itself; stay in step with it.
-  useEffect(() => { setStored(localStorage.getItem(STORAGE_KEY)); }, [mine]);
-
-  return stored && mine && stored !== mine ? stored : null;
+    if (!active) return;
+    const mark = () => {
+      if (document.visibilityState === 'visible') localStorage.setItem(STORAGE_KEY, active);
+    };
+    if (document.hasFocus()) mark();
+    window.addEventListener('focus', mark);
+    document.addEventListener('visibilitychange', mark);
+    return () => {
+      window.removeEventListener('focus', mark);
+      document.removeEventListener('visibilitychange', mark);
+    };
+  }, [active]);
 }

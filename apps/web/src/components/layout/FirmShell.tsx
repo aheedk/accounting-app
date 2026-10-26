@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
 import { roleLabel } from '@/lib/roleAccess';
 import { setExportCompany } from '@/lib/reportExport';
+import { useNewTabsStartHere } from '@/lib/business';
 import { Sidebar } from './Sidebar';
 import { SidebarToggle } from './SidebarToggle';
 import { MobileNav } from './MobileNav';
@@ -23,6 +24,8 @@ export function FirmShell() {
   // Nothing printed or exported from here is headed with a client's name.
   useEffect(() => { setExportCompany(''); }, []);
   useEffect(() => { document.title = 'All clients - Accounting App'; }, []);
+  // A sidebar page opened in a new tab from here starts on this tab's company, as it would here.
+  useNewTabsStartHere();
 
   if (user && user.role !== 'firm_admin') return <Navigate to="/" replace />;
 
