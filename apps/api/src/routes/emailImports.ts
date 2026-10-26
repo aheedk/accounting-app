@@ -22,6 +22,7 @@ import {
 } from '../services/ai/statementImportService.js';
 import { matchStubsToLines, stubCategory } from '../services/ai/checkStubService.js';
 import { findSuspenseAccount, getOrCreateSuspenseAccount } from '../services/core/chartOfAccountsService.js';
+import { NotFoundError } from '../lib/errors.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import type { Request } from 'express';
 
@@ -207,6 +208,44 @@ router.get('/businesses/:businessId/email-imports/statement-balances', async (re
   try {
     const accountId = z.string().uuid().parse(req.query['account_id']);
     res.json({ statements: await listStatementBalances(db, req.tenancy!.business_id, accountId) });
+  } catch (e) { next(e); }
+});
+
+// A single staged import, with the same AI suggestions/check-stub/card
+// context the inbox list already attaches to a pending row — used by the
+// Reconcile page's inline review (no separate trip to AI → Document Inbox
+// just to see what one just-uploaded statement parsed to). Registered after
+// the literal /pending-count and /statement-balances routes above — both
+// would otherwise be shadowed by this route's own :importId wildcard.
+router.get('/businesses/:businessId/email-imports/:importId', async (req, res, next) => {
+  try {
+    const bizId = req.tenancy!.business_id;
+    const row = await db
+      .selectFrom('email_import_staging')
+      .select(['id', 'business_id', 'gmail_message_id', 'email_from', 'email_subject',
+               'received_at', 'extracted_transactions', 'status', 'addressed_to',
+               'rejection_reason', 'approved_by_user_id', 'approved_at', 'created_at', 'source',
+               'statement_kind', 'account_hint',
+               'period_start', 'period_end', 'beginning_balance', 'ending_balance', 'account_id'])
+      .where('id', '=', req.params['importId']!)
+      .where('business_id', '=', bizId)
+      .executeTakeFirst();
+    if (!row) throw new NotFoundError('email_import_staging', req.params['importId']!);
+    const imp: StagedImportRow = {
+      ...row,
+      extracted_transactions: (typeof row.extracted_transactions === 'string'
+        ? JSON.parse(row.extracted_transactions) as unknown
+        : row.extracted_transactions) as StagedTransaction[],
+      suggested_statement_account_id: null,
+    };
+    if (row.status === 'pending') {
+      const imports = [imp];
+      await attachSuggestions(ctx(req), imports);
+      await attachCardContext(bizId, imports);
+      await attachCheckStubs(ctx(req), bizId, imports);
+      await attachSuspense(ctx(req), bizId, imports);
+    }
+    res.json({ import: imp });
   } catch (e) { next(e); }
 });
 

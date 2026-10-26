@@ -6,11 +6,15 @@ import { useActiveBusinessId } from '@/lib/business';
 type Props = {
   /** Called after a successful upload so the inbox can refresh. */
   onUploaded: () => void | Promise<void>;
+  /** Called once per file right after it's processed, with that file's own
+   * result — for a caller that needs the `staging_id` itself (Reconcile's
+   * inline review), not just a "something changed, go refetch" signal. */
+  onResult?: (result: UploadResult) => void;
 };
 
 type UploadState = { busy: boolean; error: string | null; done: string | null };
 
-type UploadResult =
+export type UploadResult =
   | { kind: 'bank_statement' | 'credit_card_statement'; staging_id: string; statement_count: number }
   | { kind: 'invoice'; staging_id: string; invoice_type?: 'ap' | 'ar' | 'po' }
   | { kind: 'check_stubs'; check_count: number };
@@ -33,7 +37,7 @@ function describeResult(result: UploadResult): string {
  * Runs the same extraction path as the email route and lands in the same
  * review queue.
  */
-export default function DocumentUpload({ onUploaded }: Props) {
+export default function DocumentUpload({ onUploaded, onResult }: Props) {
   const [bizId] = useActiveBusinessId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -60,6 +64,7 @@ export default function DocumentUpload({ onUploaded }: Props) {
         // eslint-disable-next-line no-await-in-loop
         const res = await api.post<UploadResult>(`/businesses/${bizId}/ai/documents`, body);
         kinds.push(describeResult(res.data));
+        onResult?.(res.data);
         uploaded += 1;
       }
       setState({

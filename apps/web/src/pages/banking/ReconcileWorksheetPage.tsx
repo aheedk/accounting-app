@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileSearch } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { fmtMoney, fmtSigned } from '@/lib/money';
 import { pickErr } from '@/lib/apiErrors';
+import { chatActionRoute, statementLineToCreateDraft } from '@/lib/chatActionMappers';
+import type { ChatDraftState } from '@/components/chat/ChatPanel';
 import { AppSelect } from '../../components/ui/select';
 import { ReconcileNav } from './ReconcileNav';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
@@ -46,6 +48,35 @@ type Worksheet = {
   summary: Summary;
 };
 
+type StatementMatchLine = {
+  lineIndex: number;
+  date: string;
+  description: string;
+  payeeName: string | null;
+  amount: string;
+  checkNumber: string | null;
+  matched: {
+    transaction_type: ItemType;
+    transaction_id: string;
+    transaction_date: string;
+    name: string | null;
+    description: string | null;
+    amount: string;
+    is_cleared: boolean;
+  } | null;
+  reason: 'exact_reference' | 'amount_and_date' | 'fuzzy_description' | null;
+  confidence: number | null;
+};
+
+type StatementMatch = {
+  statementId: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  openingBalance: string | null;
+  closingBalance: string | null;
+  lines: StatementMatchLine[];
+};
+
 function fmtShortDate(iso: string) {
   const [y, m, d] = iso.split('-');
   if (!y || !m || !d) return iso;
@@ -59,6 +90,9 @@ export default function ReconcileWorksheetPage() {
 
   const [data, setData] = useState<Worksheet | null>(null);
   const [cleared, setCleared] = useState<Map<string, boolean>>(new Map());
+  const [statementMatch, setStatementMatch] = useState<StatementMatch | null>(null);
+  const [matchTab, setMatchTab] = useState<'matched' | 'unmatched_statement' | 'unmatched_book'>('matched');
+  const [findMatchFor, setFindMatchFor] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -79,6 +113,9 @@ export default function ReconcileWorksheetPage() {
         setCleared(new Map(w.items.map(i => [key(i), i.is_cleared])));
       })
       .catch((e: unknown) => setErr(pickErr(e)));
+    api.get<{ match: StatementMatch | null }>(`/businesses/${bizId}/bank-rec/${id}/statement-match`)
+      .then(r => setStatementMatch(r.data.match))
+      .catch(() => setStatementMatch(null));
   }, [bizId, id]);
 
   useEffect(() => { load(); }, [load]);
@@ -145,6 +182,41 @@ export default function ReconcileWorksheetPage() {
       for (const i of visible) next.set(key(i), nextValue);
       return next;
     });
+  }
+
+  // The statement-side review (item 72's upload-from-Reconcile piece): split
+  // the resolved statement's own lines by whether their detected match is
+  // currently cleared, reading live from `cleared` (not the snapshot's own
+  // `matched.is_cleared`) so confirming/rejecting here updates the same tabs
+  // immediately, the same state the plain checklist below already shares.
+  const matchedLines = useMemo(() => (statementMatch?.lines ?? [])
+    .filter(l => l.matched && cleared.get(key(l.matched))), [statementMatch, cleared]);
+  const unmatchedStatementLines = useMemo(() => (statementMatch?.lines ?? [])
+    .filter(l => !l.matched || !cleared.get(key(l.matched))), [statementMatch, cleared]);
+  const unmatchedBookItems = useMemo(() => items.filter(i => !cleared.get(key(i))), [items, cleared]);
+
+  function confirmAllHighConfidence() {
+    setCleared(prev => {
+      const next = new Map(prev);
+      for (const l of statementMatch?.lines ?? []) {
+        if (l.matched && (l.confidence ?? 0) >= 0.9) next.set(key(l.matched), true);
+      }
+      return next;
+    });
+  }
+
+  function setLineCleared(item: { transaction_type: ItemType; transaction_id: string }, value: boolean) {
+    setCleared(prev => {
+      const next = new Map(prev);
+      next.set(key(item), value);
+      return next;
+    });
+  }
+
+  function createTransactionFromLine(line: StatementMatchLine) {
+    if (!data) return;
+    const draft = statementLineToCreateDraft(line, data.account);
+    navigate(chatActionRoute(draft), { state: { chatDraft: draft } satisfies ChatDraftState });
   }
 
   async function saveForLater() {
@@ -230,6 +302,192 @@ export default function ReconcileWorksheetPage() {
             ? ` ${liveSummary.total_count - liveSummary.auto_matched_count} item${liveSummary.total_count - liveSummary.auto_matched_count === 1 ? '' : 's'} need${liveSummary.total_count - liveSummary.auto_matched_count === 1 ? 's' : ''} your review.`
             : ' Everything matched.'}
         </div>
+      )}
+
+      {statementMatch && (
+        <Card className="p-0">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+            <div>
+              <div className="text-sm font-medium">
+                {matchedLines.length} of {statementMatch.lines.length} statement transactions matched
+              </div>
+              <div className="mt-1 h-1.5 w-56 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: `${statementMatch.lines.length === 0 ? 0 : Math.round((matchedLines.length / statementMatch.lines.length) * 100)}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-right text-xs text-muted-foreground">
+              {statementMatch.periodStart && statementMatch.periodEnd && (
+                <div>Statement period: {fmtShortDate(statementMatch.periodStart)} – {fmtShortDate(statementMatch.periodEnd)}</div>
+              )}
+              {statementMatch.openingBalance && statementMatch.closingBalance && (
+                <div>{fmtMoney(statementMatch.openingBalance)} → {fmtMoney(statementMatch.closingBalance)}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 border-b px-4 pt-2">
+            {([
+              ['matched', `Matched (${matchedLines.length})`],
+              ['unmatched_statement', `Unmatched Statement Lines (${unmatchedStatementLines.length})`],
+              ['unmatched_book', `Unmatched Book Transactions (${unmatchedBookItems.length})`],
+            ] as const).map(([tabKey, label]) => (
+              <button
+                key={tabKey}
+                type="button"
+                onClick={() => setMatchTab(tabKey)}
+                className={`rounded-t-md px-3 py-1.5 text-sm ${matchTab === tabKey ? 'border-b-2 border-primary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4">
+            {matchTab === 'matched' && (
+              <div className="space-y-2">
+                <div className="flex justify-end">
+                  <Button type="button" variant="outline" size="sm" onClick={confirmAllHighConfidence}>
+                    Confirm All High-Confidence Matches
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/40">
+                      <tr>
+                        <th className="p-2 text-left">Date</th>
+                        <th className="p-2 text-left">Statement Description</th>
+                        <th className="p-2 text-right">Amount</th>
+                        <th className="p-2 text-center" />
+                        <th className="p-2 text-left">Book Description</th>
+                        <th className="p-2 text-right">Book Amount</th>
+                        <th className="p-2 text-left">Confidence</th>
+                        <th className="p-2 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matchedLines.length === 0 && (
+                        <tr><td colSpan={8} className="p-4 text-center text-muted-foreground">Nothing confirmed yet.</td></tr>
+                      )}
+                      {matchedLines.map(l => {
+                        const confidence = l.confidence ?? 0;
+                        const badgeColor = confidence > 0.9 ? 'bg-emerald-100 text-emerald-700' : confidence >= 0.7 ? 'bg-amber-100 text-amber-700' : 'bg-orange-100 text-orange-700';
+                        return (
+                          <tr key={l.lineIndex} className="border-b last:border-b-0">
+                            <td className="p-2 whitespace-nowrap">{fmtShortDate(l.date)}</td>
+                            <td className="p-2">{l.description}</td>
+                            <td className="p-2 text-right font-mono">{fmtMoney(l.amount)}</td>
+                            <td className="p-2 text-center text-muted-foreground">→</td>
+                            <td className="p-2">{l.matched!.name ?? l.matched!.description ?? '—'}</td>
+                            <td className="p-2 text-right font-mono">{fmtMoney(l.matched!.amount)}</td>
+                            <td className="p-2">
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeColor}`}>{Math.round(confidence * 100)}%</span>
+                            </td>
+                            <td className="p-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button type="button" aria-label="Confirm match" className="text-emerald-600 hover:text-emerald-700" onClick={() => setLineCleared(l.matched!, true)}>✓</button>
+                                <button type="button" aria-label="Reject match" className="text-destructive hover:text-destructive/80" onClick={() => setLineCleared(l.matched!, false)}>✗</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {matchTab === 'unmatched_statement' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/40">
+                    <tr>
+                      <th className="p-2 text-left">Date</th>
+                      <th className="p-2 text-left">Description</th>
+                      <th className="p-2 text-right">Amount</th>
+                      <th className="p-2 text-left">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unmatchedStatementLines.length === 0 && (
+                      <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Every statement line matched.</td></tr>
+                    )}
+                    {unmatchedStatementLines.map(l => (
+                      <tr key={l.lineIndex} className="border-b last:border-b-0 align-top">
+                        <td className="p-2 whitespace-nowrap">{fmtShortDate(l.date)}</td>
+                        <td className="p-2">{l.description}</td>
+                        <td className="p-2 text-right font-mono">{fmtMoney(l.amount)}</td>
+                        <td className="p-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => setFindMatchFor(findMatchFor === l.lineIndex ? null : l.lineIndex)}>
+                              Find Match
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => createTransactionFromLine(l)}>
+                              Create Transaction
+                            </Button>
+                          </div>
+                          {findMatchFor === l.lineIndex && (
+                            <AppSelect
+                              className="mt-2 h-8 w-full max-w-sm rounded-md border bg-background px-2 text-xs"
+                              value=""
+                              onChange={e => {
+                                const picked = unmatchedBookItems.find(i => key(i) === e.target.value);
+                                if (picked) setLineCleared(picked, true);
+                                setFindMatchFor(null);
+                              }}
+                            >
+                              <option value="">Pick an unreconciled book transaction…</option>
+                              {unmatchedBookItems.map(i => (
+                                <option key={key(i)} value={key(i)}>
+                                  {fmtShortDate(i.transaction_date)} · {i.name ?? i.description ?? i.type_label} · {fmtMoney(Math.abs(parseFloat(i.amount)))}
+                                </option>
+                              ))}
+                            </AppSelect>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {matchTab === 'unmatched_book' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/40">
+                    <tr>
+                      <th className="p-2 text-left">Date</th>
+                      <th className="p-2 text-left">Type</th>
+                      <th className="p-2 text-left">Name</th>
+                      <th className="p-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unmatchedBookItems.length === 0 && (
+                      <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Nothing left unaccounted for.</td></tr>
+                    )}
+                    {unmatchedBookItems.map(i => (
+                      <tr key={key(i)} className="border-b last:border-b-0">
+                        <td className="p-2 whitespace-nowrap">{fmtShortDate(i.transaction_date)}</td>
+                        <td className="p-2">{i.type_label}</td>
+                        <td className="p-2">{i.name ?? <span className="text-muted-foreground">—</span>}</td>
+                        <td className="p-2 text-right font-mono">{fmtMoney(Math.abs(parseFloat(i.amount)))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="px-2 pt-2 text-xs text-muted-foreground">
+                  <FileSearch className="mr-1 inline h-3.5 w-3.5 align-text-bottom" />
+                  These might be errors, timing differences, or outstanding items — nothing is decided here.
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
       )}
 
       <Card>

@@ -55,6 +55,12 @@ router.get('/businesses/:businessId/bank-rec/:id/worksheet', async (req, res, ne
   } catch (e) { next(e); }
 });
 
+router.get('/businesses/:businessId/bank-rec/:id/statement-match', async (req, res, next) => {
+  try {
+    res.json({ match: await reconSvc.getStatementMatch(db, ctxFromReq(req), req.params['id']!) });
+  } catch (e) { next(e); }
+});
+
 router.post('/businesses/:businessId/bank-rec/start', requireMinRole('accountant'), async (req, res, next) => {
   try {
     const body = schemas.reconciliationStartSchema.parse(req.body) as reconSvc.StartReconciliationInput;

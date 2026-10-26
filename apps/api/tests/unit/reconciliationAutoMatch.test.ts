@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  businessDaysBetween, matchStatementLines, type MatchCandidateItem, type MatchStatementLine,
+  businessDaysBetween, matchStatementLines, matchStatementLinesDetailed, type MatchCandidateItem, type MatchStatementLine,
 } from '../../src/services/banking/reconciliationAutoMatch.js';
 
 function item(key: string, date: string, amount: string, overrides: Partial<MatchCandidateItem> = {}): MatchCandidateItem {
@@ -88,5 +88,60 @@ describe('matchStatementLines', () => {
     ];
     const lines = [line('2026-03-06', '100.00', 'CHECK')];
     expect(matchStatementLines(items, lines)).toEqual(new Set(['check:c2']));
+  });
+});
+
+describe('matchStatementLinesDetailed', () => {
+  it('returns one result per input line, in order, matched or not', () => {
+    const items = [item('deposit:d1', '2026-03-06', '500.0000')];
+    const lines = [
+      line('2026-03-06', '500.00', 'DEPOSIT', { isInflow: true }),
+      line('2026-03-06', '999.00', 'NO MATCH', { isInflow: true }),
+    ];
+    const detail = matchStatementLinesDetailed(items, lines);
+    expect(detail).toHaveLength(2);
+    expect(detail[0]).toMatchObject({ lineIndex: 0, matchedKey: 'deposit:d1', reason: 'amount_and_date' });
+    expect(detail[0]!.confidence).toBeGreaterThan(0);
+    expect(detail[1]).toMatchObject({ lineIndex: 1, matchedKey: null, reason: null, confidence: null });
+  });
+
+  it('reasons exact_reference when the check number matches too, even though amount+date alone was already unique', () => {
+    const items = [item('check:c1', '2026-03-06', '-100.0000', { ref_no: '1024' })];
+    const lines = [line('2026-03-06', '100.00', 'CHECK 1024', { checkNumber: '1024' })];
+    const detail = matchStatementLinesDetailed(items, lines);
+    expect(detail[0]).toMatchObject({ matchedKey: 'check:c1', reason: 'exact_reference' });
+    expect(detail[0]!.confidence).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it('ignores a check number that does not match — stays amount_and_date', () => {
+    const items = [item('check:c1', '2026-03-06', '-100.0000', { ref_no: '1024' })];
+    const lines = [line('2026-03-06', '100.00', 'CHECK 2048', { checkNumber: '2048' })];
+    const detail = matchStatementLinesDetailed(items, lines);
+    expect(detail[0]).toMatchObject({ matchedKey: 'check:c1', reason: 'amount_and_date' });
+  });
+
+  it('reasons fuzzy_description when a shared word broke a same-amount, same-date tie', () => {
+    const items = [
+      item('check:c1', '2026-03-06', '-100.0000', { name: 'Regions Bank' }),
+      item('check:c2', '2026-03-06', '-100.0000', { name: 'Office Depot' }),
+    ];
+    const lines = [line('2026-03-06', '100.00', 'REGIONS ONLINE PMT')];
+    const detail = matchStatementLinesDetailed(items, lines);
+    expect(detail[0]).toMatchObject({ matchedKey: 'check:c1', reason: 'fuzzy_description' });
+    expect(detail[0]!.confidence).toBeLessThan(0.8);
+  });
+
+  it('matchStatementLines stays consistent with the detailed matched keys', () => {
+    const items = [
+      item('check:c1', '2026-03-06', '-100.0000', { name: 'Regions Bank' }),
+      item('deposit:d1', '2026-03-06', '500.0000'),
+    ];
+    const lines = [
+      line('2026-03-06', '100.00', 'REGIONS ONLINE PMT'),
+      line('2026-03-06', '500.00', 'DEPOSIT', { isInflow: true }),
+    ];
+    const detailed = matchStatementLinesDetailed(items, lines);
+    const fromDetailed = new Set(detailed.filter(d => d.matchedKey).map(d => d.matchedKey!));
+    expect(matchStatementLines(items, lines)).toEqual(fromDetailed);
   });
 });
