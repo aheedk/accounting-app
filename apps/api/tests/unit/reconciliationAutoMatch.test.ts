@@ -29,14 +29,14 @@ describe('matchStatementLines', () => {
     expect(matchStatementLines(items, lines)).toEqual(new Set(['deposit:d1']));
   });
 
-  it('matches a check within 3 business days, not exact-day', () => {
-    const items = [item('check:c1', '2026-03-09', '-450.0000')]; // posted 3 business days after
+  it('matches a check within 4 business days, not exact-day', () => {
+    const items = [item('check:c1', '2026-03-10', '-450.0000')]; // posted 4 business days after
     const lines = [line('2026-03-04', '450.00', 'CHECK 1024')]; // check cleared the bank a few days later
     expect(matchStatementLines(items, lines)).toEqual(new Set(['check:c1']));
   });
 
   it('refuses a date outside the business-day window', () => {
-    const items = [item('check:c1', '2026-03-12', '-450.0000')]; // 6 business days out
+    const items = [item('check:c1', '2026-03-11', '-450.0000')]; // 5 business days out
     const lines = [line('2026-03-04', '450.00', 'CHECK 1024')];
     expect(matchStatementLines(items, lines).size).toBe(0);
   });

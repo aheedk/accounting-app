@@ -233,14 +233,14 @@ export default function ReconcileWorksheetPage() {
     }
   }
 
-  async function doFinish(acceptDifference: boolean) {
+  async function doFinish() {
     if (!bizId || !id) return;
     setBusy(true); setErr(null);
     try {
       // Save the current checked state first, so Finish reconciles exactly what's on screen.
       const body = { items: items.map(i => ({ transaction_type: i.transaction_type, transaction_id: i.transaction_id, is_cleared: cleared.get(key(i)) ?? false })) };
       await api.patch(`/businesses/${bizId}/bank-rec/${id}/items`, body);
-      await api.post(`/businesses/${bizId}/bank-rec/${id}/finish`, { accept_difference: acceptDifference });
+      await api.post(`/businesses/${bizId}/bank-rec/${id}/finish`, {});
       setFinishWarning(null);
       navigate('/accounting/reconcile/history');
     } catch (e: unknown) {
@@ -253,11 +253,12 @@ export default function ReconcileWorksheetPage() {
 
   function clickFinish() {
     if (!liveSummary) return;
+    // Only at a zero difference: there is no accepting one (item 94).
     if (parseFloat(liveSummary.difference) !== 0) {
       setFinishWarning(liveSummary.difference);
       return;
     }
-    void doFinish(false);
+    void doFinish();
   }
 
   async function doCancel() {
@@ -607,11 +608,11 @@ export default function ReconcileWorksheetPage() {
               <h2 className="text-lg font-semibold">There's a difference</h2>
               <p className="text-sm text-muted-foreground">
                 There is a {fmtSigned(finishWarning)} difference between your books and the bank statement.
-                Accepting it will create an adjusting journal entry for this amount. Talk to your accountant before proceeding.
+                A reconciliation can only be finished when the difference is zero. Check the ticked items and the
+                statement's ending balance, or save it for later.
               </p>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setFinishWarning(null)}>Cancel</Button>
-                <Button disabled={busy} onClick={() => void doFinish(true)}>Accept difference and finish</Button>
+                <Button onClick={() => setFinishWarning(null)}>Back to the worksheet</Button>
               </div>
             </CardContent>
           </Card>

@@ -1415,8 +1415,8 @@ export async function saveReconciliationProgress(
   return r.data;
 }
 
-export async function finishReconciliation(businessId: string, id: string, accept_difference?: boolean) {
-  const r = await api.post<ReconciliationRow>(`/businesses/${businessId}/bank-rec/${id}/finish`, { accept_difference });
+export async function finishReconciliation(businessId: string, id: string) {
+  const r = await api.post<ReconciliationRow>(`/businesses/${businessId}/bank-rec/${id}/finish`, {});
   return r.data;
 }
 

@@ -68,7 +68,7 @@ describe('bank reconciliation worksheet', () => {
     const afterSave = await recon.getWorksheet(t.db, d.ctx, started.id);
     expect(afterSave.summary.difference).toBe('0.0000');
 
-    const completed = await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+    const completed = await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id));
     expect(completed.status).toBe('completed');
     expect(completed.adjustment_journal_entry_id).toBeNull();
 
@@ -91,7 +91,7 @@ describe('bank reconciliation worksheet', () => {
     expect(voided.status).toBe('void');
   });
 
-  it('refuses to finish out of balance unless the difference is accepted, then books an adjusting entry', async () => {
+  it('refuses to finish out of balance, and posts no adjusting entry to force it (item 94)', async () => {
     const d = await setup(t);
     await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
       transaction_date: '2026-03-05', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
@@ -106,16 +106,15 @@ describe('bank reconciliation worksheet', () => {
     // To force a real difference, claim a higher statement balance than anything clears to.
     await t.db.updateTable('reconciliations').set({ statement_ending_balance: '50.00' }).where('id', '=', started.id).execute();
 
-    await expect(t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {})))
-      .rejects.toThrow(/difference/i);
+    await expect(t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id)))
+      .rejects.toThrow(/difference is zero/i);
 
-    const completed = await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, { accept_difference: true }));
-    expect(completed.status).toBe('completed');
-    expect(completed.adjustment_journal_entry_id).not.toBeNull();
-    const adjustment = await t.db.selectFrom('journal_entries').selectAll()
-      .where('id', '=', completed.adjustment_journal_entry_id!).executeTakeFirstOrThrow();
-    expect(adjustment.source_type).toBe('reconciliation_adjustment');
-    expect(adjustment.status).toBe('posted');
+    const still = await t.db.selectFrom('reconciliations').selectAll().where('id', '=', started.id).executeTakeFirstOrThrow();
+    expect(still.status).toBe('in_progress');
+    expect(still.adjustment_journal_entry_id).toBeNull();
+    const adjustments = await t.db.selectFrom('journal_entries').select('id')
+      .where('business_id', '=', d.ctx.business_id!).where('source_type', '=', 'reconciliation_adjustment').execute();
+    expect(adjustments).toHaveLength(0);
   });
 
   it('creates a pre-checked service charge and interest line at Start, and Cancel removes them entirely', async () => {
@@ -158,7 +157,7 @@ describe('bank reconciliation worksheet', () => {
     await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
       { transaction_type: 'deposit', transaction_id: deposit.id, is_cleared: true },
     ]));
-    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id));
 
     await expect(t.db.transaction().execute(trx => recon.undoReconciliation(trx, d.ctx, started.id)))
       .rejects.toThrow(/firm admin/i);
@@ -226,7 +225,7 @@ describe('bank reconciliation worksheet', () => {
       { transaction_type: 'expense', transaction_id: purchase.id, is_cleared: true },
       { transaction_type: 'journal_entry', transaction_id: payment.journal_entry_id!, is_cleared: true },
     ]));
-    const completed = await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+    const completed = await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id));
     expect(completed.status).toBe('completed');
 
     const purchaseRow = await t.db.selectFrom('expense_transactions').selectAll().where('id', '=', purchase.id).executeTakeFirstOrThrow();
@@ -252,7 +251,7 @@ describe('bank reconciliation worksheet', () => {
     await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
       { transaction_type: 'expense', transaction_id: expense.id, is_cleared: true },
     ]));
-    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id));
 
     const beforeEdit = await recon.listHistory(t.db, d.ctx, {});
     const row = beforeEdit.find(r => r.id === started.id)!;
@@ -458,7 +457,7 @@ describe('bank reconciliation worksheet', () => {
     await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
       { transaction_type: 'expense', transaction_id: expense.id, is_cleared: true },
     ]));
-    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id, {}));
+    await t.db.transaction().execute(trx => recon.finishReconciliation(trx, d.ctx, started.id));
 
     const detail = await recon.getReconciliationDetail(t.db, d.ctx, started.id);
     expect(detail.category).toBe('Bank');

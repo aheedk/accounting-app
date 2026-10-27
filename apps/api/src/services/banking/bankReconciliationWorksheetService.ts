@@ -7,7 +7,6 @@ import { record as auditRecord } from '../audit/auditService.js';
 import * as ledger from '../core/ledgerService.js';
 import * as expenseSvc from '../ap/expenseTransactionService.js';
 import * as depositSvc from './bankDepositService.js';
-import { getOrCreateOpeningBalanceEquity } from '../core/chartOfAccountsService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { isInflow, statementDateToIso, type StatementLine } from '../ai/statementImportService.js';
 import {
@@ -805,55 +804,22 @@ const ENTITY_TYPE_FOR_TABLE: Record<'bank_deposits' | 'expense_transactions' | '
 };
 const UPDATE_ACTIONS = ['expense_transaction.update', 'check.update', 'bank_deposit.update', 'journal_entry.update'];
 
-export async function finishReconciliation(
-  trx: Transaction<DB>, ctx: ServiceCtx,
-  id: string,
-  input: { accept_difference?: boolean; discrepancy_account_id?: string | null },
-) {
+export async function finishReconciliation(trx: Transaction<DB>, ctx: ServiceCtx, id: string) {
   const bizId = ctx.business_id!;
   const recon = await trx.selectFrom('reconciliations').selectAll()
     .where('id', '=', id).where('business_id', '=', bizId).forUpdate().executeTakeFirst();
   if (!recon) throw new NotFoundError('reconciliation', id);
   if (recon.status !== 'in_progress') throw new PreconditionError('This reconciliation is no longer in progress');
 
-  const { items, account, summary } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, id);
+  const { items, summary } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, id);
 
-  if (!isZero(summary.difference) && !input.accept_difference) {
+  // Finished only at a zero difference. There is no adjusting entry to force
+  // it through (Faizan, 10-25 meeting, item 94).
+  if (!isZero(summary.difference)) {
     throw new PreconditionError(
-      `There is a ${summary.difference} difference between the books and the statement`,
+      `There is a ${summary.difference} difference between the books and the statement. A reconciliation can only be finished when the difference is zero`,
       { difference: summary.difference },
     );
-  }
-
-  let adjustmentJeId: string | null = null;
-  if (!isZero(summary.difference) && input.accept_difference) {
-    const discrepancyAccount = input.discrepancy_account_id
-      ? await trx.selectFrom('chart_of_accounts').selectAll()
-        .where('id', '=', input.discrepancy_account_id).where('business_id', '=', bizId).executeTakeFirst()
-      : await getOrCreateOpeningBalanceEquity(trx, ctx, bizId);
-    if (!discrepancyAccount) throw new NotFoundError('chart_of_accounts', input.discrepancy_account_id!);
-
-    const diff = parseFloat(summary.difference);
-    const absDiff = Math.abs(diff).toFixed(2);
-    const adjustment = await ledger.postJournalEntry(trx, ctx, {
-      business_id: bizId,
-      entry_date: recon.statement_ending_date,
-      source_type: 'reconciliation_adjustment',
-      source_id: recon.id,
-      transaction_type: 'reconciliation_adjustment',
-      memo: `Reconciliation adjustment — ${account.name} through ${recon.statement_ending_date}`,
-      reference: null,
-      lines: diff > 0
-        ? [
-            { account_id: account.id, debit: absDiff, credit: '0', memo: 'Reconciliation adjustment' },
-            { account_id: discrepancyAccount.id, debit: '0', credit: absDiff, memo: 'Reconciliation adjustment' },
-          ]
-        : [
-            { account_id: discrepancyAccount.id, debit: absDiff, credit: '0', memo: 'Reconciliation adjustment' },
-            { account_id: account.id, debit: '0', credit: absDiff, memo: 'Reconciliation adjustment' },
-          ],
-    });
-    adjustmentJeId = adjustment.id;
   }
 
   // Lock every cleared item's source row as reconciled.
@@ -885,8 +851,7 @@ export async function finishReconciliation(
   const completed = await trx.updateTable('reconciliations')
     .set({
       status: 'completed',
-      difference: isZero(summary.difference) ? '0' : summary.difference,
-      adjustment_journal_entry_id: adjustmentJeId,
+      difference: '0',
       completed_at: sql`now()`,
       completed_by_user_id: ctx.user_id,
     })

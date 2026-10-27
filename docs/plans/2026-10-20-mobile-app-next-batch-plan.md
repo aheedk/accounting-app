@@ -1295,10 +1295,9 @@ is what every `Reconcile*Page.tsx` on web actually calls. Built against
   list.** Deliberately not built: Undo (`firm_admin`-only, rare — "I
   finished a reconciliation by mistake" is not a common mobile moment),
   Cancel wired into the UI (exists server-side, used only for this
-  chunk's own live-API cleanup, see below), and a discrepancy-account
-  picker on Finish (the server already defaults to Opening Balance
-  Equity when `accept_difference: true` is sent with no account —
-  covers the common case without an extra picker).
+  chunk's own live-API cleanup, see below). A discrepancy-account
+  picker on Finish is moot since 10-26: a reconciliation is only
+  finished at a zero difference (item 94).
 - **Beginning balance is never user-entered** — confirmed the server
   always computes it from the prior completed reconciliation's ending
   balance (0.00 if none), so the Start form only asks for the statement
@@ -1313,13 +1312,12 @@ is what every `Reconcile*Page.tsx` on web actually calls. Built against
   contract: idempotent upsert keyed on `transaction_type`+
   `transaction_id`), and Finish auto-saves once more right before
   calling finish, so a forgotten Save tap can't lose ticks.
-- **Finish handles the non-zero-difference case explicitly**: confirmed
-  the server does *not* require an exact match — a nonzero difference
-  without `accept_difference: true` throws a precondition error naming
-  the amount, so the mobile Finish button checks the local difference
-  first and, if nonzero, shows an alert ("$X difference... Finish
-  anyway posts an adjusting entry") before calling finish with
-  `accept_difference: true`.
+- **Finish handles the non-zero-difference case explicitly**: the
+  server refuses to finish at any nonzero difference (10-26, item 94;
+  an `accept_difference` that posted an adjusting entry is gone), so
+  the mobile Finish button checks the local difference first and, if
+  nonzero, shows an alert ("$X difference... can only be finished when
+  the difference is zero") with only "Keep reviewing".
 - `services/api.ts`: added `ReconcilableAccount`/`ReconciliationRow`/
   `WorksheetItem`/`ReconciliationSummary`/`Worksheet`/
   `ReconciliationHistoryRow` types + `listReconcilableAccounts`/

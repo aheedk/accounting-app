@@ -87,13 +87,14 @@ function sameRefNo(a: string | null | undefined, b: string | null | undefined): 
   return an !== '' && an === bn;
 }
 
-const MAX_DATE_WINDOW_BUSINESS_DAYS = 3;
+// 4, not 3: Faizan, 10-25 meeting (item 93).
+const MAX_DATE_WINDOW_BUSINESS_DAYS = 4;
 
 /**
  * The real matching pass, run once over every statement line. Exact amount
  * (sign-normalized, so a positive statement line only ever considers a
  * deposit-shaped item and a negative one only a payment-shaped item) + a date
- * within 3 business days is the baseline; where more than one candidate ties
+ * within 4 business days is the baseline; where more than one candidate ties
  * on that, description word-overlap breaks the tie, then closest date. A tie
  * that survives both is left unmatched on purpose — matching the wrong one
  * silently is worse than leaving it manual. Each item and each statement line

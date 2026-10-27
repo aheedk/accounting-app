@@ -112,13 +112,13 @@ export default function ReconciliationWorksheetScreen() {
     }
   }
 
-  async function doFinish(acceptDifference: boolean) {
+  async function doFinish() {
     setFinishing(true);
     setServerError(null);
     try {
       const saved = await saveProgress();
       if (!saved) return;
-      await finishReconciliation(activeBusinessId!, id!, acceptDifference);
+      await finishReconciliation(activeBusinessId!, id!);
       await queryClient.invalidateQueries({ queryKey: ['reconciliation-status'] });
       await queryClient.invalidateQueries({ queryKey: ['reconciliation-history'] });
       Alert.alert('Reconciliation complete', 'This account is reconciled through the statement date.');
@@ -132,18 +132,16 @@ export default function ReconciliationWorksheetScreen() {
 
   function handleFinish() {
     if (!summary) return;
+    // Only at a zero difference: there is no accepting one (item 94).
     if (Math.abs(summary.difference) > 0.005) {
       Alert.alert(
         `$${fmtMoney(Math.abs(summary.difference))} difference`,
-        'The cleared balance doesn\'t match the statement. Finishing anyway posts an adjusting entry for the difference.',
-        [
-          { text: 'Keep reviewing', style: 'cancel' },
-          { text: 'Finish anyway', style: 'destructive', onPress: () => void doFinish(true) },
-        ],
+        'The cleared balance doesn\'t match the statement. A reconciliation can only be finished when the difference is zero.',
+        [{ text: 'Keep reviewing', style: 'cancel' }],
       );
       return;
     }
-    void doFinish(false);
+    void doFinish();
   }
 
   if (query.isLoading) {

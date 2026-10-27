@@ -81,9 +81,9 @@ router.patch('/businesses/:businessId/bank-rec/:id/items', requireMinRole('accou
 
 router.post('/businesses/:businessId/bank-rec/:id/finish', requireMinRole('accountant'), async (req, res, next) => {
   try {
-    const body = schemas.reconciliationFinishSchema.parse(req.body) as { accept_difference?: boolean; discrepancy_account_id?: string | null };
+    // Nothing to send: it finishes only at a zero difference (item 94).
     const ctx = ctxFromReq(req);
-    const result = await db.transaction().execute(trx => reconSvc.finishReconciliation(trx, ctx, req.params['id']!, body));
+    const result = await db.transaction().execute(trx => reconSvc.finishReconciliation(trx, ctx, req.params['id']!));
     res.json(result);
   } catch (e) { next(e); }
 });

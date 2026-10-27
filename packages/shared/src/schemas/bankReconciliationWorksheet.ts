@@ -25,8 +25,3 @@ export const reconciliationSaveItemsSchema = z.object({
 });
 export type ReconciliationSaveItems = z.infer<typeof reconciliationSaveItemsSchema>;
 
-export const reconciliationFinishSchema = z.object({
-  accept_difference: z.boolean().optional(),
-  discrepancy_account_id: z.string().uuid().nullable().optional(),
-});
-export type ReconciliationFinish = z.infer<typeof reconciliationFinishSchema>;

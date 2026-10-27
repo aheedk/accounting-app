@@ -69,8 +69,6 @@ the reconciliation and the phone app.
 | 18 | **All of QuickBooks' standard reports**, then a review of them with the firm. Ten were on Reports → Standard Reports. See "Reports" below **(10-05)** | Aheed |
 | 96 | Go through the second security pass on the live site, as demo steps 1 to 3 have it: a new login choosing its own password, a role taken away, requiring the second step. Aheed: "I didn't fully test this" | Aheed |
 | 95 | Test the reconciliation (the matching, and item 72's statement upload) on a client whose books are complete for the period. Riham's test data has gaps, so its difference cannot reach zero | Faizan |
-| 93 | Reconciliation matching: a book transaction and a statement line may be up to 4 business days apart, not 3 | Riham |
-| 94 | A reconciliation can only be finished at a zero difference. The worksheet offered "Accept difference and finish", which posted an adjustment to Opening Balance Equity | Riham |
 | 34 | Faizan's PDF and the check stubs from the Teams chat are still to go through. Both videos are written up **(10-10)** | Aheed |
 | 36 | Pay bills prints checks (built 10-13). Left: Faizan confirms the check stock the firm prints on, and a test print is lined up against it **(10-10)** | Aheed, Faizan |
 | 37 | Year end (built 10-13). Left: ask Faizan whether he wants a posted closing entry as well **(10-10)** | Aheed, Faizan |
@@ -113,7 +111,7 @@ it.
 - only approved statements are used;
 - a statement counts when it ends within 10 days of the reconciliation's date.
 
-Faizan's only change was 3 business days to 4. Riham said the rest of the logic
+Faizan's only change was 3 business days to 4 (done 10-26). Riham said the rest of the logic
 needs Faizan to test it (95). Riham also said the slow start (75) is fixed.
 
 **Reports (18).** Reports → Standard Reports listed ten:
@@ -209,6 +207,8 @@ Reported in the meeting:
 |---|---|---|
 | 48 | **The AI assistant** (10-25). "Ask Accmatica", a button in the corner of the app. It answers questions about the client's numbers, read only. It drafts a journal entry, expense, invoice or deposit and opens it in the usual form to check and save, and never saves anything itself. It answers how-to questions | Riham |
 | 72 | **Reconciliation, from the statement** (10-26). A statement can be uploaded on the reconciliation page, then reviewed and approved there without going to the AI inbox. The ending balance and date are filled from the latest approved statement. The worksheet shows each statement line as matched or not. A fix: items ticked at Start were left out when the matching ran again on reload. Riham shows it at the next meeting; Faizan tests it (95) **(10-16)** | Riham |
+| 93 | **Matching window: 4 business days** (10-26). A book transaction and a statement line can now be up to 4 business days apart, not 3 | Aheed |
+| 94 | **Finished only at a zero difference** (10-26), on the web, in the phone app and in the API. "Accept difference and finish" posted an adjusting entry to Opening Balance Equity; it is gone, and the message says to check the ticked items and the ending balance, or save for later. A reconciliation already finished that way keeps its entry, and undoing it still voids the entry | Aheed |
 | — | **"What happened to this page?" with one tab open** (10-26). On any client but the first, the screen came up after a reload or sign-in. The assistant's button, added 10-25, loads before sign-in finishes, and it saved the first client over the one open. Live on Netlify 10-26. The screen still comes up when another tab really does switch client, as Faizan asked on 10-01 | Aheed |
 
 ## Decided — no work
