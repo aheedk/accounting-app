@@ -12,7 +12,14 @@ export type AgingRow = {
   total: string;
 };
 
-type Bucket = 'current' | 'days_1_30' | 'days_31_60' | 'days_61_90' | 'days_over_90';
+export type Bucket = 'current' | 'days_1_30' | 'days_31_60' | 'days_61_90' | 'days_over_90';
+
+/** In bucket order — what the Aging Detail report groups its documents
+ * under, same boundaries the summary's own columns use. */
+export const BUCKET_LABELS: Record<Bucket, string> = {
+  current: 'Current', days_1_30: '1 - 30', days_31_60: '31 - 60', days_61_90: '61 - 90', days_over_90: '91 and over',
+};
+export const BUCKET_ORDER: Bucket[] = ['current', 'days_1_30', 'days_31_60', 'days_61_90', 'days_over_90'];
 
 const ONE_DAY = 24 * 3600 * 1000;
 
@@ -23,7 +30,7 @@ export function daysBetween(asOf: string, date: string): number {
   return Math.floor((to - from) / ONE_DAY);
 }
 
-function bucketFor(daysPast: number): Bucket {
+export function bucketFor(daysPast: number): Bucket {
   if (daysPast <= 0) return 'current';
   if (daysPast <= 30) return 'days_1_30';
   if (daysPast <= 60) return 'days_31_60';

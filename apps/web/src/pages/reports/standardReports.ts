@@ -392,6 +392,16 @@ export function partyBalanceTable(rows: PartyBalance[], heading: 'Customer' | 'V
   return { columns, rows: lines };
 }
 
+/** Mirrors apps/api/src/services/reports/agingBuckets.ts's own Bucket type
+ * and order — the bucket key is part of the Aging endpoints' wire shape, so
+ * this is the display-only half (label + order), not a re-derivation of
+ * which bucket a document falls in (the API already decides that). */
+export type AgingBucket = 'current' | 'days_1_30' | 'days_31_60' | 'days_61_90' | 'days_over_90';
+const AGING_BUCKET_LABELS: Record<AgingBucket, string> = {
+  current: 'Current', days_1_30: '1 - 30', days_31_60: '31 - 60', days_61_90: '61 - 90', days_over_90: '91 and over',
+};
+const AGING_BUCKET_ORDER: AgingBucket[] = ['current', 'days_1_30', 'days_31_60', 'days_61_90', 'days_over_90'];
+
 /** One open invoice or unpaid bill, as the Aging reports' own per-document
  * detail already carries it. */
 export type OpenDocument = {
@@ -401,6 +411,7 @@ export type OpenDocument = {
   due_date: string;
   total: string;
   open: string;
+  bucket: AgingBucket;
 };
 
 /**
@@ -425,6 +436,33 @@ export function openDocumentsTable(
   }));
   lines.push(totalRow(columns.length, 'TOTAL', [sum(rows.map(r => r.open))]));
   return { columns, rows: lines };
+}
+
+/**
+ * A/R or A/P Aging Detail: the same open documents as Open Invoices/Unpaid
+ * Bills, grouped under their aging bucket instead of listed flat — one line
+ * per invoice or bill, a subtotal per bucket, a grand total. Reads the same
+ * `OpenDocument[]` (now carrying its own `bucket`, decided by the API the
+ * same way the summary's buckets are) rather than re-bucketing anything.
+ */
+export function agingDetailTable(rows: OpenDocument[], kind: 'invoice' | 'bill'): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: kind === 'invoice' ? 'Invoice #' : 'Bill #', kind: 'text' },
+    { label: kind === 'invoice' ? 'Customer' : 'Vendor', kind: 'text' },
+    { label: 'Due Date', kind: 'date' },
+    { label: 'Open Balance', kind: 'money' },
+  ];
+  const width = columns.length;
+  const reportRows: ReportRow[] = [];
+  for (const bucket of AGING_BUCKET_ORDER) {
+    const inBucket = rows.filter(r => r.bucket === bucket);
+    if (inBucket.length === 0) continue;
+    reportRows.push({ kind: 'heading', label: AGING_BUCKET_LABELS[bucket], depth: 0 });
+    for (const r of inBucket) reportRows.push({ kind: 'line', depth: 1, cells: [r.number, r.party_name, r.due_date, r.open] });
+    reportRows.push(totalRow(width, `Total ${AGING_BUCKET_LABELS[bucket]}`, [sum(inBucket.map(r => r.open))]));
+  }
+  reportRows.push(totalRow(width, 'TOTAL', [sum(rows.map(r => r.open))]));
+  return { columns, rows: reportRows };
 }
 
 /**

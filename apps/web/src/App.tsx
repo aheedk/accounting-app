@@ -24,9 +24,9 @@ import GeneralLedgerPage from '@/pages/reports/GeneralLedgerPage';
 import AgingReportPage from '@/pages/reports/AgingReportPage';
 import StandardReportsPage from '@/pages/reports/StandardReportsPage';
 import {
-  AccountListPage, BalanceSheetComparisonPage, BalanceSheetDetailPage, CustomerBalanceSummaryPage, ExpensesByVendorSummaryPage,
-  JournalReportPage, OpenInvoicesPage, ProfitLossByMonthPage, ProfitLossComparisonPage, ProfitLossDetailPage, SalesByCustomerSummaryPage,
-  TransactionListByDatePage, UnpaidBillsPage, VendorBalanceSummaryPage,
+  AccountListPage, ApAgingDetailPage, ArAgingDetailPage, BalanceSheetComparisonPage, BalanceSheetDetailPage, CustomerBalanceSummaryPage,
+  ExpensesByVendorSummaryPage, JournalReportPage, OpenInvoicesPage, ProfitLossByMonthPage, ProfitLossComparisonPage, ProfitLossDetailPage,
+  SalesByCustomerSummaryPage, TransactionListByDatePage, UnpaidBillsPage, VendorBalanceSummaryPage,
 } from '@/pages/reports/StandardReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
@@ -184,6 +184,8 @@ export default function App() {
             <Route path="/reports/vendor-balances" element={<VendorBalanceSummaryPage />} />
             <Route path="/reports/open-invoices" element={<OpenInvoicesPage />} />
             <Route path="/reports/unpaid-bills" element={<UnpaidBillsPage />} />
+            <Route path="/reports/ar-aging-detail" element={<ArAgingDetailPage />} />
+            <Route path="/reports/ap-aging-detail" element={<ApAgingDetailPage />} />
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/pnl-detail" element={<ProfitLossDetailPage />} />
             <Route path="/reports/pnl-by-month" element={<ProfitLossByMonthPage />} />

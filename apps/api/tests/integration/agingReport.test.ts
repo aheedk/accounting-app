@@ -120,7 +120,7 @@ describe('aging report', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       invoice_number: 'B-1', customer_name: 'OpenInv Co', issue_date: '2026-04-01', due_date: '2026-05-01',
-      total: '75.0000', open: '75.0000',
+      total: '75.0000', open: '75.0000', bucket: 'current',
     });
   });
 });

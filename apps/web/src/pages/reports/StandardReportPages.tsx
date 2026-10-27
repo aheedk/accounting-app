@@ -2,8 +2,8 @@ import { api } from '@/lib/apiClient';
 import { fmtDateText } from '@/lib/dates';
 import { StandardReport, type ReportDates } from './StandardReport';
 import {
-  accountListTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, journalTable, monthRanges,
-  openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
+  accountListTable, agingDetailTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, journalTable,
+  monthRanges, openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
   type BalanceSheetReport, type GlReport, type OpenDocument, type PartyBalance, type ReportTable,
 } from './standardReports';
 import { LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
@@ -66,20 +66,22 @@ const fetchPartyBalances = (bizId: string, endpoint: 'aging' | 'ap-aging', asOf:
 const loadCustomerBalances = async (bizId: string, range: ReportDates) => partyBalanceTable(await fetchPartyBalances(bizId, 'aging', range.end), 'Customer');
 const loadVendorBalances = async (bizId: string, range: ReportDates) => partyBalanceTable(await fetchPartyBalances(bizId, 'ap-aging', range.end), 'Vendor');
 
-type OpenInvoiceRow = { invoice_number: string; customer_name: string; issue_date: string; due_date: string; total: string; open: string };
-type UnpaidBillRow = { bill_number: string; vendor_name: string; bill_date: string; due_date: string; total: string; open: string };
+type OpenInvoiceRow = { invoice_number: string; customer_name: string; issue_date: string; due_date: string; total: string; open: string; bucket: OpenDocument['bucket'] };
+type UnpaidBillRow = { bill_number: string; vendor_name: string; bill_date: string; due_date: string; total: string; open: string; bucket: OpenDocument['bucket'] };
 
-async function loadOpenInvoices(bizId: string, range: ReportDates): Promise<ReportTable> {
-  const rows = await api.get<{ rows: OpenInvoiceRow[] }>(`/businesses/${bizId}/reports/open-invoices`, { params: { as_of: range.end } }).then(r => r.data.rows);
-  const documents: OpenDocument[] = rows.map(r => ({ number: r.invoice_number, party_name: r.customer_name, issue_date: r.issue_date, due_date: r.due_date, total: r.total, open: r.open }));
-  return openDocumentsTable(documents, 'invoice');
-}
+const fetchOpenInvoices = (bizId: string, asOf: string): Promise<OpenDocument[]> =>
+  api.get<{ rows: OpenInvoiceRow[] }>(`/businesses/${bizId}/reports/open-invoices`, { params: { as_of: asOf } }).then(r => r.data.rows.map(row => ({
+    number: row.invoice_number, party_name: row.customer_name, issue_date: row.issue_date, due_date: row.due_date, total: row.total, open: row.open, bucket: row.bucket,
+  })));
+const fetchUnpaidBills = (bizId: string, asOf: string): Promise<OpenDocument[]> =>
+  api.get<{ rows: UnpaidBillRow[] }>(`/businesses/${bizId}/reports/unpaid-bills`, { params: { as_of: asOf } }).then(r => r.data.rows.map(row => ({
+    number: row.bill_number, party_name: row.vendor_name, issue_date: row.bill_date, due_date: row.due_date, total: row.total, open: row.open, bucket: row.bucket,
+  })));
 
-async function loadUnpaidBills(bizId: string, range: ReportDates): Promise<ReportTable> {
-  const rows = await api.get<{ rows: UnpaidBillRow[] }>(`/businesses/${bizId}/reports/unpaid-bills`, { params: { as_of: range.end } }).then(r => r.data.rows);
-  const documents: OpenDocument[] = rows.map(r => ({ number: r.bill_number, party_name: r.vendor_name, issue_date: r.bill_date, due_date: r.due_date, total: r.total, open: r.open }));
-  return openDocumentsTable(documents, 'bill');
-}
+const loadOpenInvoices = async (bizId: string, range: ReportDates) => openDocumentsTable(await fetchOpenInvoices(bizId, range.end), 'invoice');
+const loadUnpaidBills = async (bizId: string, range: ReportDates) => openDocumentsTable(await fetchUnpaidBills(bizId, range.end), 'bill');
+const loadArAgingDetail = async (bizId: string, range: ReportDates) => agingDetailTable(await fetchOpenInvoices(bizId, range.end), 'invoice');
+const loadApAgingDetail = async (bizId: string, range: ReportDates) => agingDetailTable(await fetchUnpaidBills(bizId, range.end), 'bill');
 const loadJournal = async (bizId: string, range: ReportDates) => journalTable(await fetchLedger(bizId, range));
 const loadTransactionList = async (bizId: string, range: ReportDates) => transactionListTable(await fetchLedger(bizId, range));
 const loadSalesByCustomer = async (bizId: string, range: ReportDates) => salesByCustomerTable(await fetchLedger(bizId, range));
@@ -123,6 +125,14 @@ export function OpenInvoicesPage() {
 
 export function UnpaidBillsPage() {
   return <StandardReport title="Unpaid Bills" dates="asOf" fileStem="unpaid-bills" load={loadUnpaidBills} />;
+}
+
+export function ArAgingDetailPage() {
+  return <StandardReport title="A/R Aging Detail" dates="asOf" fileStem="ar-aging-detail" load={loadArAgingDetail} />;
+}
+
+export function ApAgingDetailPage() {
+  return <StandardReport title="A/P Aging Detail" dates="asOf" fileStem="ap-aging-detail" load={loadApAgingDetail} />;
 }
 
 export function JournalReportPage() {

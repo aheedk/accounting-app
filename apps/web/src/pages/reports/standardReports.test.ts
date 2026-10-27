@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountListTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, exportRows, journalTable, monthRanges,
-  openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
+  accountListTable, agingDetailTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, exportRows,
+  journalTable, monthRanges, openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable,
+  transactionListTable, yearEarlier,
   type BalanceSheetReport, type GlAccount, type GlLine, type GlReport, type ReportRow,
 } from './standardReports';
 import type { PnlReport } from './pnlLayout';
@@ -142,8 +143,8 @@ describe('partyBalanceTable', () => {
 describe('openDocumentsTable', () => {
   it('shows one row per document with its open balance, and totals them', () => {
     const table = openDocumentsTable([
-      { number: 'INV-2', party_name: 'Acme Co', issue_date: '2026-03-01', due_date: '2026-04-01', total: '100.0000', open: '40.0000' },
-      { number: 'INV-1', party_name: 'Birch Co', issue_date: '2026-02-01', due_date: '2026-03-01', total: '60.0000', open: '60.0000' },
+      { number: 'INV-2', party_name: 'Acme Co', issue_date: '2026-03-01', due_date: '2026-04-01', total: '100.0000', open: '40.0000', bucket: 'current' },
+      { number: 'INV-1', party_name: 'Birch Co', issue_date: '2026-02-01', due_date: '2026-03-01', total: '60.0000', open: '60.0000', bucket: 'days_1_30' },
     ], 'invoice');
     expect(table.columns.map(c => c.label)).toEqual(['Invoice #', 'Customer', 'Issue Date', 'Due Date', 'Amount', 'Open Balance']);
     expect(table.rows[0]).toMatchObject({ cells: ['INV-2', 'Acme Co', '2026-03-01', '2026-04-01', '100.0000', '40.0000'] });
@@ -153,6 +154,27 @@ describe('openDocumentsTable', () => {
   it('labels a bill table for the AP side', () => {
     const table = openDocumentsTable([], 'bill');
     expect(table.columns.map(c => c.label)).toEqual(['Bill #', 'Vendor', 'Bill Date', 'Due Date', 'Amount', 'Open Balance']);
+  });
+});
+
+describe('agingDetailTable', () => {
+  const docs: Parameters<typeof agingDetailTable>[0] = [
+    { number: 'INV-2', party_name: 'Acme Co', issue_date: '2026-03-01', due_date: '2026-04-01', total: '40.0000', open: '40.0000', bucket: 'current' },
+    { number: 'INV-1', party_name: 'Birch Co', issue_date: '2026-01-01', due_date: '2026-02-01', total: '60.0000', open: '60.0000', bucket: 'days_31_60' },
+    { number: 'INV-3', party_name: 'Acme Co', issue_date: '2026-02-15', due_date: '2026-03-15', total: '10.0000', open: '10.0000', bucket: 'current' },
+  ];
+
+  it('groups documents under their bucket, in bucket order, with a subtotal and a grand total', () => {
+    const table = agingDetailTable(docs, 'invoice');
+    expect(table.rows.filter(r => r.kind === 'heading').map(r => r.kind === 'heading' ? r.label : '')).toEqual(['Current', '31 - 60']);
+    expect(totalOf(table.rows, 'Total Current')).toEqual(['50.0000']);
+    expect(totalOf(table.rows, 'Total 31 - 60')).toEqual(['60.0000']);
+    expect(totalOf(table.rows, 'TOTAL')).toEqual(['110.0000']);
+  });
+
+  it('skips a bucket with nothing in it', () => {
+    const table = agingDetailTable(docs, 'invoice');
+    expect(table.rows.some(r => r.kind === 'heading' && r.label === '61 - 90')).toBe(false);
   });
 });
 

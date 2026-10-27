@@ -1,14 +1,14 @@
 import { type Kysely } from 'kysely';
 import { addMoney, subMoney, toMoneyString } from '@accounting/shared';
 import type { DB } from '../../../db/types.js';
-import { AgingTable, daysBetween, type AgingRow } from '../../reports/agingBuckets.js';
+import { AgingTable, bucketFor, daysBetween, type AgingRow, type Bucket } from '../../reports/agingBuckets.js';
 
 export type { AgingRow };
 
 /** One invoice with a balance still owed — the Aging report's own per-invoice
  * figures, before they're summed into a customer's buckets. What the Open
- * Invoices report reads directly, so it ties out to Aging the same way every
- * other standard report ties out to what it's built from. */
+ * Invoices and Aging Detail reports read directly, so they tie out to Aging
+ * the same way every other standard report ties out to what it's built from. */
 export type OpenInvoice = {
   id: string;
   invoice_number: string;
@@ -18,6 +18,7 @@ export type OpenInvoice = {
   due_date: string;
   total: string;
   open: string;
+  bucket: Bucket;
 };
 
 /** Every posted invoice with a balance still owed, as of a date — no business
@@ -48,6 +49,7 @@ export async function openInvoices(db: Kysely<DB>, q: { business_id: string; as_
   return invoices
     .map(inv => ({ ...inv, open: toMoneyString(subMoney(inv.total, applied.get(inv.id) ?? '0')) }))
     .filter(inv => parseFloat(inv.open) > 0)
+    .map(inv => ({ ...inv, bucket: bucketFor(daysBetween(q.as_of, inv.due_date)) }))
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 }
 
