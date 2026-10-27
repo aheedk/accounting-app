@@ -57,8 +57,48 @@ of one bank account; it is kept and renamed **Cash Activity**.
   (`period_start`, `period_end`); Reports → Cash Flows. Each line drills into the
   General Ledger for that account and period.
 
-## 3. Not built
+## 3. Standard reports from the ledger (10-26)
 
-Left for the review with the firm to choose from: comparative columns (this period
-against last), P&L by month, aging detail (one line per invoice or bill), customer and
-vendor balance summaries, sales by customer, expenses by vendor.
+### Goal
+
+More of QuickBooks' standard reports, asked for in the 10-25 meeting (item 18), for
+November 1.
+
+### Decisions
+
+- **Built from reports the app already has**, in the web app
+  (`pages/reports/standardReports.ts`), with no new endpoint. Each one reads the
+  General Ledger, the P&L or the Balance Sheet, and counts the same entries they do,
+  so it ties out to them.
+- **One page for all of them** (`StandardReport.tsx`): the dates, Refresh, Excel and
+  Print as on the P&L, in the QuickBooks frame. A row opens its transaction, or the
+  account's General Ledger, when the role can open it.
+- **The reports:**
+  - **Profit and Loss Detail:** the General Ledger's lines for income and expense
+    accounts, in the P&L's sections. The balance runs from zero within the period.
+  - **Profit and Loss by Month:** a P&L per month and one for the whole period
+    (Total). The first and last months are cut at the dates chosen; at most 24.
+  - **Profit and Loss Comparison:** the period against the same dates a year
+    earlier, with the $ and % change. A % change against zero is left blank.
+  - **Balance Sheet Detail:** each balance sheet account from its beginning
+    balance, through the period's lines, to its ending balance. This year's net
+    income is not in an account (year end is not posted), so it is a line of its
+    own under Equity, as on the Balance Sheet.
+  - **Balance Sheet Comparison:** as of the date and a year earlier, laid out as
+    the Balance Sheet, with the $ and % change.
+  - **Journal:** each transaction with all its debits and credits, debits first.
+  - **Transaction List by Date:** one row per transaction; its amount is the sum
+    of its debits.
+  - **Sales by Customer Summary:** income from invoices, credit memos and deposits,
+    by the name on the transaction. Journal entries are not sales, as in
+    QuickBooks.
+  - **Expenses by Vendor Summary:** all expense accounts, by the name on the
+    transaction. A stock movement names the item, not who was paid, so it goes
+    under Not Specified.
+- **Closed to a client login**, like the General Ledger they read.
+
+## 4. Not built
+
+Left for the review with the firm to choose from: aging detail (one line per invoice
+or bill), open invoices and unpaid bills, customer and vendor balance summaries and
+detail, the account list, and sales by product or service.

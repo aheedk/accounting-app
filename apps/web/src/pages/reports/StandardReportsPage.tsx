@@ -10,7 +10,12 @@ const groups: ReportGroup[] = [
     heading: 'Business overview',
     reports: [
       { to: '/reports/pnl', name: 'Profit and Loss', description: 'Revenue and expenses for a period, with gross profit and net income.' },
+      { to: '/reports/pnl-detail', name: 'Profit and Loss Detail', description: 'Every transaction behind the Profit and Loss, under its account.' },
+      { to: '/reports/pnl-by-month', name: 'Profit and Loss by Month', description: 'The Profit and Loss with a column for each month, and the total.' },
+      { to: '/reports/pnl-comparison', name: 'Profit and Loss Comparison', description: 'This period against the same period a year earlier, with the change in dollars and percent.' },
       { to: '/reports/balance-sheet', name: 'Balance Sheet', description: 'Assets, liabilities, and equity as of a point in time.' },
+      { to: '/reports/balance-sheet-detail', name: 'Balance Sheet Detail', description: 'Each balance sheet account from its beginning balance, through the transactions in the period, to where it ends.' },
+      { to: '/reports/balance-sheet-comparison', name: 'Balance Sheet Comparison', description: 'The Balance Sheet against the same date a year earlier, with the change in dollars and percent.' },
       { to: '/reports/statement-of-cash-flows', name: 'Statement of Cash Flows', description: 'The change in cash for a period, explained as operating, investing and financing activities.' },
     ],
   },
@@ -18,6 +23,8 @@ const groups: ReportGroup[] = [
     heading: 'For my accountant',
     reports: [
       { to: '/reports/general-ledger', name: 'General Ledger', description: 'Detailed transactions, opening balances, and running balances grouped by account.' },
+      { to: '/reports/journal', name: 'Journal', description: 'Every transaction in the period with all of its debits and credits.' },
+      { to: '/reports/transaction-list-by-date', name: 'Transaction List by Date', description: 'One line for each transaction in the period, by date.' },
       { to: '/reports/trial-balance', name: 'Trial Balance', description: 'Debit and credit balances for every account as of a chosen date.' },
       { to: '/reports/cash-flow', name: 'Cash Activity by Account', description: 'Every movement in one bank account over a period, with a running balance.' },
       { to: '/reports/reconciliation', name: 'Reconciliation Reports', description: 'Every completed reconciliation, fixed as it was the day it was finished — the balances, the cleared transactions, and a PDF copy.' },
@@ -30,6 +37,12 @@ const groups: ReportGroup[] = [
     ],
   },
   {
+    heading: 'Sales and customers',
+    reports: [
+      { to: '/reports/sales-by-customer', name: 'Sales by Customer Summary', description: 'Income from invoices, credit memos and deposits, for each customer.' },
+    ],
+  },
+  {
     heading: 'What you owe',
     reports: [
       { to: '/reports/ap-aging', name: 'Accounts Payable Aging Summary', description: 'Unpaid vendor bills bucketed by days past due, less unused vendor credits.' },
@@ -38,6 +51,7 @@ const groups: ReportGroup[] = [
   {
     heading: 'Expenses and vendors',
     reports: [
+      { to: '/reports/expenses-by-vendor', name: 'Expenses by Vendor Summary', description: 'Everything spent in the period, for each vendor or payee.' },
       { to: '/reports/1099', name: '1099 Transaction Detail Report', description: 'Annual payments to 1099 vendors, grouped by vendor and tax ID.' },
     ],
   },

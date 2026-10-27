@@ -23,6 +23,10 @@ import TrialBalancePage from '@/pages/reports/TrialBalancePage';
 import GeneralLedgerPage from '@/pages/reports/GeneralLedgerPage';
 import AgingReportPage from '@/pages/reports/AgingReportPage';
 import StandardReportsPage from '@/pages/reports/StandardReportsPage';
+import {
+  BalanceSheetComparisonPage, BalanceSheetDetailPage, ExpensesByVendorSummaryPage, JournalReportPage, ProfitLossByMonthPage,
+  ProfitLossComparisonPage, ProfitLossDetailPage, SalesByCustomerSummaryPage, TransactionListByDatePage,
+} from '@/pages/reports/StandardReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
 import CustomerDetailPage from '@/pages/customers/CustomerDetailPage';
@@ -176,6 +180,15 @@ export default function App() {
             <Route path="/reports/aging" element={<AgingReportPage />} />
             <Route path="/reports/ap-aging" element={<AgingReportPage kind="ap" />} />
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
+            <Route path="/reports/pnl-detail" element={<ProfitLossDetailPage />} />
+            <Route path="/reports/pnl-by-month" element={<ProfitLossByMonthPage />} />
+            <Route path="/reports/pnl-comparison" element={<ProfitLossComparisonPage />} />
+            <Route path="/reports/balance-sheet-detail" element={<BalanceSheetDetailPage />} />
+            <Route path="/reports/balance-sheet-comparison" element={<BalanceSheetComparisonPage />} />
+            <Route path="/reports/journal" element={<JournalReportPage />} />
+            <Route path="/reports/transaction-list-by-date" element={<TransactionListByDatePage />} />
+            <Route path="/reports/sales-by-customer" element={<SalesByCustomerSummaryPage />} />
+            <Route path="/reports/expenses-by-vendor" element={<ExpensesByVendorSummaryPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />

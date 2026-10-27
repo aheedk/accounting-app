@@ -29,7 +29,7 @@ to run the app.
 | [Printing checks from Pay Bills](./specs/2026-10-13-pay-bills-print-checks-design.md) | Paying bills by check: one numbered check per vendor, printed on check stock or plain paper, and how check numbers are kept in one sequence. |
 | [Year end and Retained Earnings](./specs/2026-10-13-year-end-retained-earnings-design.md) | Nothing is posted at year end: income and expense start each fiscal year at zero and earlier years are carried in Retained Earnings, the same on the Balance Sheet, Trial Balance and General Ledger. |
 | [Accounts and roles](./specs/2026-10-08-accounts-and-roles-design.md) | Signing in (switching a login off, passwords, two-step, sessions), the five roles, payroll access, the approval step, the activity log, and what a client login can do. |
-| [Report set](./specs/2026-10-07-report-set-design.md) | A/R and A/P aging that tie to the ledger, and the Statement of Cash Flows. |
+| [Report set](./specs/2026-10-07-report-set-design.md) | A/R and A/P aging that tie to the ledger, the Statement of Cash Flows, and the standard reports worked out from the ledger (P&L Detail, by Month, Comparison, Journal and more). |
 | [Company settings](./specs/2026-10-20-company-settings-design.md) | Setup → Company Settings: invoice numbering (one rule for every invoice), default terms, sales tax and expense payment method. |
 | [Estimates](./specs/2026-10-20-estimates-design.md) | Quotes to customers: pending, accepted, rejected, expired, and made into a draft invoice in one step. |
 | [Inventory in the ledger](./specs/2026-10-07-inventory-ledger-design.md) | How stock reaches the books: cost of goods sold on a sale, opening stock, adjustments. Built; three choices in it are marked "to confirm" for the firm. |
