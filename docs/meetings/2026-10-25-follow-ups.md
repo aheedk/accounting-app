@@ -1,7 +1,7 @@
 # Meeting follow-ups — 2026-10-25
 
 What was asked for in the meeting (Faizan, Riham, Aheed), taken from the
-recording transcript and checked against the code on 2026-10-26. Item numbers
+recording transcript and checked against the code on 2026-10-27. Item numbers
 carry on from [`2026-10-21-faizan-video-2.md`](./2026-10-21-faizan-video-2.md)
 (which ended at 91). Everything still open there and in
 [`2026-10-16-follow-ups.md`](./2026-10-16-follow-ups.md) is carried into this
@@ -66,7 +66,7 @@ the reconciliation and the phone app.
 | # | What | Owner |
 |---|---|---|
 | 92 | **Hosting.** The database (and uploaded files) to Supabase, as soon as possible; the API and the web app to Azure. Faizan creates both accounts in the firm's name and gives Aheed access. Aheed sets them up and does a trial run while Railway stays live, then switches over one evening. The repo side is ready: [`../plans/2026-10-25-azure-supabase-move.md`](../plans/2026-10-25-azure-supabase-move.md). Covers what is left of 43 | Faizan (accounts), Aheed |
-| 18 | **All of QuickBooks' standard reports**, then a review of them with the firm. Ten were on Reports → Standard Reports; nine more were added 10-26 (below). Next: aging detail, open invoices and unpaid bills, customer and vendor balances. See "Reports" below **(10-05)** | Aheed |
+| 18 | **All of QuickBooks' standard reports**, then a review of them with the firm. Ten were on Reports → Standard Reports; nine more were added 10-26, and Account List, Customer/Vendor Balance Summary, Open Invoices and Unpaid Bills on 10-27 (below). Left: aging detail, sales by product/service, customer and vendor balance detail. See "Reports" below **(10-05)** | Riham |
 | 96 | Go through the second security pass on the live site, as demo steps 1 to 3 have it: a new login choosing its own password, a role taken away, requiring the second step. Aheed: "I didn't fully test this" | Aheed |
 | 95 | Test the reconciliation (the matching, and item 72's statement upload) on a client whose books are complete for the period. Riham's test data has gaps, so its difference cannot reach zero | Faizan |
 | 34 | Faizan's PDF and the check stubs from the Teams chat are still to go through. Both videos are written up **(10-10)** | Aheed |
@@ -211,6 +211,7 @@ Reported in the meeting:
 | 94 | **Finished only at a zero difference** (10-26), on the web, in the phone app and in the API. "Accept difference and finish" posted an adjusting entry to Opening Balance Equity; it is gone, and the message says to check the ticked items and the ending balance, or save for later. A reconciliation already finished that way keeps its entry, and undoing it still voids the entry | Aheed |
 | 18 (part) | **Nine more standard reports** (10-26), on Reports → Standard Reports: Profit and Loss Detail, by Month and Comparison; Balance Sheet Detail and Comparison; Journal; Transaction List by Date; Sales by Customer Summary; Expenses by Vendor Summary. Each is worked out from the General Ledger, the P&L or the Balance Sheet, so it ties out to them, and each has Excel and Print. Spec: [`../specs/2026-10-07-report-set-design.md`](../specs/2026-10-07-report-set-design.md), section 3 | Aheed |
 | — | **"What happened to this page?" with one tab open** (10-26). On any client but the first, the screen came up after a reload or sign-in. The assistant's button, added 10-25, loads before sign-in finishes, and it saved the first client over the one open. Live on Netlify 10-26. The screen still comes up when another tab really does switch client, as Faizan asked on 10-01 | Aheed |
+| 18 (part) | **Five more standard reports** (10-27): Account List (every account, grouped by type, with its detail type and balance); Customer and Vendor Balance Summary (each party's current balance, no aging buckets); Open Invoices and Unpaid Bills (one row per document still owed). The balance and open-document reports read the Aging reports' own per-party and per-document figures rather than re-deriving them, so they tie out the same way. Left of item 18: aging detail, sales by product/service, customer and vendor balance detail | Riham |
 
 ## Decided — no work
 

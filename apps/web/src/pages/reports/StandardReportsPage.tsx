@@ -23,6 +23,7 @@ const groups: ReportGroup[] = [
     heading: 'For my accountant',
     reports: [
       { to: '/reports/general-ledger', name: 'General Ledger', description: 'Detailed transactions, opening balances, and running balances grouped by account.' },
+      { to: '/reports/account-list', name: 'Account List', description: 'Every account in the chart, grouped by type, with its detail type and balance.' },
       { to: '/reports/journal', name: 'Journal', description: 'Every transaction in the period with all of its debits and credits.' },
       { to: '/reports/transaction-list-by-date', name: 'Transaction List by Date', description: 'One line for each transaction in the period, by date.' },
       { to: '/reports/trial-balance', name: 'Trial Balance', description: 'Debit and credit balances for every account as of a chosen date.' },
@@ -34,6 +35,8 @@ const groups: ReportGroup[] = [
     heading: 'Who owes you',
     reports: [
       { to: '/reports/aging', name: 'Accounts Receivable Aging Summary', description: 'Outstanding customer invoices bucketed by days past due, less unapplied payments and credits.' },
+      { to: '/reports/customer-balances', name: 'Customer Balance Summary', description: 'Each customer\'s current open balance, with no bucket breakdown.' },
+      { to: '/reports/open-invoices', name: 'Open Invoices', description: 'Every invoice still carrying a balance, one row each, due soonest first.' },
     ],
   },
   {
@@ -46,6 +49,8 @@ const groups: ReportGroup[] = [
     heading: 'What you owe',
     reports: [
       { to: '/reports/ap-aging', name: 'Accounts Payable Aging Summary', description: 'Unpaid vendor bills bucketed by days past due, less unused vendor credits.' },
+      { to: '/reports/vendor-balances', name: 'Vendor Balance Summary', description: 'Each vendor\'s current open balance, with no bucket breakdown.' },
+      { to: '/reports/unpaid-bills', name: 'Unpaid Bills', description: 'Every bill still carrying a balance, one row each, due soonest first.' },
     ],
   },
   {

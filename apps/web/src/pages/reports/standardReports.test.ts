@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, exportRows, journalTable, monthRanges,
-  pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
+  accountListTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, exportRows, journalTable, monthRanges,
+  openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
   type BalanceSheetReport, type GlAccount, type GlLine, type GlReport, type ReportRow,
 } from './standardReports';
 import type { PnlReport } from './pnlLayout';
@@ -15,7 +15,7 @@ function line(je: string, date: string, overrides: Partial<GlLine> = {}): GlLine
 }
 
 function account(id: string, code: string, name: string, type: string, lines: GlLine[], balances: Partial<GlAccount> = {}): GlAccount {
-  return { account_id: id, account_code: code, account_name: name, account_type: type, beginning_balance: '0.0000', ending_balance: '0.0000', lines, ...balances };
+  return { account_id: id, account_code: code, account_name: name, account_type: type, detail_type: null, beginning_balance: '0.0000', ending_balance: '0.0000', lines, ...balances };
 }
 
 const sales = account('inc', '4000', 'Sales', 'revenue', [
@@ -90,6 +90,69 @@ describe('balanceSheetDetailTable', () => {
   it('shows this year\'s net income under Equity, as the Balance Sheet does', () => {
     expect(totalOf(table.rows, 'Total Equity')).toEqual(['0.0000', '117.0000']);
     expect(totalOf(table.rows, 'Total Liabilities and Equity')).toEqual(['117.0000']);
+  });
+});
+
+describe('accountListTable', () => {
+  const table = accountListTable(gl);
+
+  it('groups every account under its type heading, in order, with no grand total', () => {
+    expect(table.rows.filter(r => r.kind === 'heading').map(r => r.kind === 'heading' ? r.label : '')).toEqual(['Assets', 'Income', 'Expenses']);
+    expect(table.rows.some(r => r.kind === 'total')).toBe(false);
+  });
+
+  it('shows each account\'s ending balance, not its activity for the period', () => {
+    const row = table.rows.find(r => r.kind === 'line' && r.cells[0] === '1000 Checking');
+    expect(row).toMatchObject({ cells: ['1000 Checking', '', '570.0000'] });
+  });
+
+  it('carries the detail type through for display', () => {
+    const withDetail = accountListTable({
+      ...gl,
+      accounts: gl.accounts.map(a => (a.account_id === 'bank' ? { ...a, detail_type: 'Checking' } : a)),
+    });
+    const row = withDetail.rows.find(r => r.kind === 'line' && r.cells[0] === '1000 Checking');
+    expect(row).toMatchObject({ cells: ['1000 Checking', 'Checking', '570.0000'] });
+  });
+
+  it('skips a type with no accounts in it', () => {
+    expect(table.rows.some(r => r.kind === 'heading' && r.label === 'Liabilities')).toBe(false);
+  });
+});
+
+describe('partyBalanceTable', () => {
+  const table = partyBalanceTable([
+    { id: 'c2', name: 'Birch Co', total: '50.0000' },
+    { id: 'c1', name: 'Acme Co', total: '100.0000' },
+  ], 'Customer');
+
+  it('sorts by name and totals the balances', () => {
+    expect(table.columns.map(c => c.label)).toEqual(['Customer', 'Balance']);
+    expect(table.rows[0]).toMatchObject({ kind: 'line', cells: ['Acme Co', '100.0000'] });
+    expect(table.rows[1]).toMatchObject({ kind: 'line', cells: ['Birch Co', '50.0000'] });
+    expect(totalOf(table.rows, 'TOTAL')).toEqual(['150.0000']);
+  });
+
+  it('is empty but valid with no parties', () => {
+    const empty = partyBalanceTable([], 'Vendor');
+    expect(totalOf(empty.rows, 'TOTAL')).toEqual(['0.0000']);
+  });
+});
+
+describe('openDocumentsTable', () => {
+  it('shows one row per document with its open balance, and totals them', () => {
+    const table = openDocumentsTable([
+      { number: 'INV-2', party_name: 'Acme Co', issue_date: '2026-03-01', due_date: '2026-04-01', total: '100.0000', open: '40.0000' },
+      { number: 'INV-1', party_name: 'Birch Co', issue_date: '2026-02-01', due_date: '2026-03-01', total: '60.0000', open: '60.0000' },
+    ], 'invoice');
+    expect(table.columns.map(c => c.label)).toEqual(['Invoice #', 'Customer', 'Issue Date', 'Due Date', 'Amount', 'Open Balance']);
+    expect(table.rows[0]).toMatchObject({ cells: ['INV-2', 'Acme Co', '2026-03-01', '2026-04-01', '100.0000', '40.0000'] });
+    expect(totalOf(table.rows, 'TOTAL')).toEqual(['100.0000']);
+  });
+
+  it('labels a bill table for the AP side', () => {
+    const table = openDocumentsTable([], 'bill');
+    expect(table.columns.map(c => c.label)).toEqual(['Bill #', 'Vendor', 'Bill Date', 'Due Date', 'Amount', 'Open Balance']);
   });
 });
 

@@ -84,4 +84,43 @@ describe('aging report', () => {
       .executeTakeFirstOrThrow();
     expect(Number(ar.debit) - Number(ar.credit)).toBe(140);
   });
+
+  it('openInvoices: the per-invoice detail behind the aging buckets, fully paid ones left out', async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id);
+    const user = await makeUser(t.db, firm.id, { role: 'accountant' });
+    const ctx: ServiceCtx = { user_id: user.id, firm_id: firm.id, business_id: biz.id, effective_role: 'accountant', ...meta };
+    await seedYearPeriods(t.db, biz.id, 2026);
+    await seedCoa(t.db, biz.id);
+    const revenue = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '4010').executeTakeFirstOrThrow();
+    const customer = await makeCustomer(t.db, biz.id, { name: 'OpenInv Co' });
+
+    const open = await t.db.transaction().execute(trx => invoiceSvc.createDraft(trx, ctx, {
+      business_id: biz.id, customer_id: customer.id, invoice_number: 'B-1',
+      issue_date: '2026-04-01', due_date: '2026-05-01', memo: null, terms: null,
+      lines: [{ description: 'X', quantity: '1', unit_price: '75', revenue_account_id: revenue.id, tax_code_id: null }],
+    }));
+    await t.db.transaction().execute(trx => invoiceSvc.postInvoice(trx, ctx, { invoice_id: open.invoice.id }));
+
+    const paid = await t.db.transaction().execute(trx => invoiceSvc.createDraft(trx, ctx, {
+      business_id: biz.id, customer_id: customer.id, invoice_number: 'B-2',
+      issue_date: '2026-03-01', due_date: '2026-04-01', memo: null, terms: null,
+      lines: [{ description: 'Y', quantity: '1', unit_price: '25', revenue_account_id: revenue.id, tax_code_id: null }],
+    }));
+    await t.db.transaction().execute(trx => invoiceSvc.postInvoice(trx, ctx, { invoice_id: paid.invoice.id }));
+    const cash = await t.db.selectFrom('chart_of_accounts').selectAll().where('business_id', '=', biz.id).where('code', '=', '1020').executeTakeFirstOrThrow();
+    const payment = await t.db.transaction().execute(trx => paymentSvc.createDraft(trx, ctx, {
+      business_id: biz.id, customer_id: customer.id, payment_date: '2026-04-05', payment_method: 'check',
+      reference: null, amount: '25.00', cash_account_id: cash.id, memo: null,
+      initial_applications: [{ invoice_id: paid.invoice.id, applied_amount: '25.00' }],
+    }));
+    await t.db.transaction().execute(trx => paymentSvc.postPayment(trx, ctx, { payment_id: payment.payment.id }));
+
+    const rows = await aging.openInvoices(t.db, { business_id: biz.id, as_of: '2026-04-20' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      invoice_number: 'B-1', customer_name: 'OpenInv Co', issue_date: '2026-04-01', due_date: '2026-05-01',
+      total: '75.0000', open: '75.0000',
+    });
+  });
 });

@@ -57,6 +57,8 @@ export type GlAccount = {
   account_code: string;
   account_name: string;
   account_type: string;
+  /** For the Account List report — every other report groups by account_type alone. */
+  detail_type: string | null;
   beginning_balance: string;
   ending_balance: string;
   lines: GlLine[];
@@ -212,6 +214,44 @@ export function balanceSheetDetailTable(gl: GlReport, netIncomeYtd: string): Rep
   return { columns: DETAIL_COLUMNS, rows };
 }
 
+const ACCOUNT_TYPE_SECTIONS: { type: string; label: string }[] = [
+  { type: 'asset', label: 'Assets' },
+  { type: 'liability', label: 'Liabilities' },
+  { type: 'equity', label: 'Equity' },
+  { type: 'revenue', label: 'Income' },
+  { type: 'expense', label: 'Expenses' },
+];
+
+/**
+ * Account List: every account in the chart, grouped by type, with its detail
+ * type and its balance as of the date chosen — not a period activity report
+ * like the others here, so `lines` and `beginning_balance` are unused; only
+ * `ending_balance` (as of the General Ledger's own `period_end`) matters.
+ * No grand total: assets/expenses and liabilities/equity/income run in
+ * opposite natural directions, so summing every balance wouldn't mean
+ * anything, the same reason QuickBooks' own Account List has none.
+ */
+export function accountListTable(gl: GlReport): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Account', kind: 'text' },
+    { label: 'Detail Type', kind: 'text' },
+    { label: 'Balance', kind: 'money' },
+  ];
+  const rows: ReportRow[] = [];
+  for (const section of ACCOUNT_TYPE_SECTIONS) {
+    const accounts = gl.accounts.filter(a => a.account_type === section.type).sort(byLabel);
+    if (accounts.length === 0) continue;
+    rows.push({ kind: 'heading', label: section.label, depth: 0 });
+    for (const account of accounts) {
+      rows.push({
+        kind: 'line', depth: 1, to: generalLedgerDrilldownUrl({ accountId: account.account_id, periodStart: LEDGER_HISTORY_START, periodEnd: gl.period_end }),
+        cells: [accountLabel(account), account.detail_type ?? '', account.ending_balance],
+      });
+    }
+  }
+  return { columns, rows };
+}
+
 type JournalLine = GlLine & { account: string; account_code: string };
 type Transaction = { id: string; date: string; num: string; lines: JournalLine[] };
 
@@ -330,6 +370,61 @@ export function expensesByVendorTable(gl: GlReport): ReportTable {
   const lines = gl.accounts.filter(a => a.account_type === 'expense').flatMap(a => a.lines);
   // A stock movement names the item, not who was paid.
   return byName(lines, line => (line.transaction_label === 'Inventory' ? null : line.name), 'Vendor');
+}
+
+/** A party's current balance, as the Aging Summary reports already compute it. */
+export type PartyBalance = { id: string; name: string; total: string };
+
+/**
+ * Customer/Vendor Balance Summary: each party's current open balance, with no
+ * bucket breakdown — the Aging Summary report's own `total` column, read
+ * straight off its rows rather than re-derived from the ledger. Unlike the
+ * other reports here this isn't built from the General Ledger, the P&L or
+ * the Balance Sheet; it's the same "built from a report the app already has"
+ * principle applied to Aging instead, since that's exactly what this figure
+ * already is there.
+ */
+export function partyBalanceTable(rows: PartyBalance[], heading: 'Customer' | 'Vendor'): ReportTable {
+  const columns: ReportColumn[] = [{ label: heading, kind: 'text' }, { label: 'Balance', kind: 'money' }];
+  const sorted = [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  const lines: ReportRow[] = sorted.map(r => ({ kind: 'line', depth: 0, cells: [r.name, r.total] }));
+  lines.push(totalRow(2, 'TOTAL', [sum(sorted.map(r => r.total))]));
+  return { columns, rows: lines };
+}
+
+/** One open invoice or unpaid bill, as the Aging reports' own per-document
+ * detail already carries it. */
+export type OpenDocument = {
+  number: string;
+  party_name: string;
+  issue_date: string;
+  due_date: string;
+  total: string;
+  open: string;
+};
+
+/**
+ * Open Invoices / Unpaid Bills: every document still carrying a balance, due
+ * soonest first, reading the Aging reports' own per-document figures instead
+ * of re-deriving them — the same principle as the balance summaries above.
+ */
+export function openDocumentsTable(
+  rows: OpenDocument[], kind: 'invoice' | 'bill',
+): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: kind === 'invoice' ? 'Invoice #' : 'Bill #', kind: 'text' },
+    { label: kind === 'invoice' ? 'Customer' : 'Vendor', kind: 'text' },
+    { label: kind === 'invoice' ? 'Issue Date' : 'Bill Date', kind: 'date' },
+    { label: 'Due Date', kind: 'date' },
+    { label: 'Amount', kind: 'money' },
+    { label: 'Open Balance', kind: 'money' },
+  ];
+  const lines: ReportRow[] = rows.map(r => ({
+    kind: 'line', depth: 0,
+    cells: [r.number, r.party_name, r.issue_date, r.due_date, r.total, r.open],
+  }));
+  lines.push(totalRow(columns.length, 'TOTAL', [sum(rows.map(r => r.open))]));
+  return { columns, rows: lines };
 }
 
 /**

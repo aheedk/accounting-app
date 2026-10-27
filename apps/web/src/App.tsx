@@ -24,8 +24,9 @@ import GeneralLedgerPage from '@/pages/reports/GeneralLedgerPage';
 import AgingReportPage from '@/pages/reports/AgingReportPage';
 import StandardReportsPage from '@/pages/reports/StandardReportsPage';
 import {
-  BalanceSheetComparisonPage, BalanceSheetDetailPage, ExpensesByVendorSummaryPage, JournalReportPage, ProfitLossByMonthPage,
-  ProfitLossComparisonPage, ProfitLossDetailPage, SalesByCustomerSummaryPage, TransactionListByDatePage,
+  AccountListPage, BalanceSheetComparisonPage, BalanceSheetDetailPage, CustomerBalanceSummaryPage, ExpensesByVendorSummaryPage,
+  JournalReportPage, OpenInvoicesPage, ProfitLossByMonthPage, ProfitLossComparisonPage, ProfitLossDetailPage, SalesByCustomerSummaryPage,
+  TransactionListByDatePage, UnpaidBillsPage, VendorBalanceSummaryPage,
 } from '@/pages/reports/StandardReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
@@ -179,12 +180,17 @@ export default function App() {
             <Route path="/reports/general-ledger" element={<GeneralLedgerPage />} />
             <Route path="/reports/aging" element={<AgingReportPage />} />
             <Route path="/reports/ap-aging" element={<AgingReportPage kind="ap" />} />
+            <Route path="/reports/customer-balances" element={<CustomerBalanceSummaryPage />} />
+            <Route path="/reports/vendor-balances" element={<VendorBalanceSummaryPage />} />
+            <Route path="/reports/open-invoices" element={<OpenInvoicesPage />} />
+            <Route path="/reports/unpaid-bills" element={<UnpaidBillsPage />} />
             <Route path="/reports/pnl" element={<ProfitLossPage />} />
             <Route path="/reports/pnl-detail" element={<ProfitLossDetailPage />} />
             <Route path="/reports/pnl-by-month" element={<ProfitLossByMonthPage />} />
             <Route path="/reports/pnl-comparison" element={<ProfitLossComparisonPage />} />
             <Route path="/reports/balance-sheet-detail" element={<BalanceSheetDetailPage />} />
             <Route path="/reports/balance-sheet-comparison" element={<BalanceSheetComparisonPage />} />
+            <Route path="/reports/account-list" element={<AccountListPage />} />
             <Route path="/reports/journal" element={<JournalReportPage />} />
             <Route path="/reports/transaction-list-by-date" element={<TransactionListByDatePage />} />
             <Route path="/reports/sales-by-customer" element={<SalesByCustomerSummaryPage />} />

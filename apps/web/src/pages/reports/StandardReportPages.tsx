@@ -2,10 +2,11 @@ import { api } from '@/lib/apiClient';
 import { fmtDateText } from '@/lib/dates';
 import { StandardReport, type ReportDates } from './StandardReport';
 import {
-  balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, journalTable, monthRanges,
-  pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
-  type BalanceSheetReport, type GlReport, type ReportTable,
+  accountListTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, journalTable, monthRanges,
+  openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
+  type BalanceSheetReport, type GlReport, type OpenDocument, type PartyBalance, type ReportTable,
 } from './standardReports';
+import { LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
 import type { PnlReport } from './pnlLayout';
 
 // Standard reports added for the 10-25 meeting (item 18). Each reads reports the
@@ -58,6 +59,27 @@ async function loadBalanceSheetComparison(bizId: string, range: ReportDates): Pr
   return balanceSheetComparisonTable(now, before, [fmtDateText(range.end), fmtDateText(earlier)]);
 }
 
+const loadAccountList = async (bizId: string, range: ReportDates) => accountListTable(await fetchLedger(bizId, { start: LEDGER_HISTORY_START, end: range.end }));
+
+const fetchPartyBalances = (bizId: string, endpoint: 'aging' | 'ap-aging', asOf: string): Promise<PartyBalance[]> =>
+  api.get<{ rows: PartyBalance[] }>(`/businesses/${bizId}/reports/${endpoint}`, { params: { as_of: asOf } }).then(r => r.data.rows);
+const loadCustomerBalances = async (bizId: string, range: ReportDates) => partyBalanceTable(await fetchPartyBalances(bizId, 'aging', range.end), 'Customer');
+const loadVendorBalances = async (bizId: string, range: ReportDates) => partyBalanceTable(await fetchPartyBalances(bizId, 'ap-aging', range.end), 'Vendor');
+
+type OpenInvoiceRow = { invoice_number: string; customer_name: string; issue_date: string; due_date: string; total: string; open: string };
+type UnpaidBillRow = { bill_number: string; vendor_name: string; bill_date: string; due_date: string; total: string; open: string };
+
+async function loadOpenInvoices(bizId: string, range: ReportDates): Promise<ReportTable> {
+  const rows = await api.get<{ rows: OpenInvoiceRow[] }>(`/businesses/${bizId}/reports/open-invoices`, { params: { as_of: range.end } }).then(r => r.data.rows);
+  const documents: OpenDocument[] = rows.map(r => ({ number: r.invoice_number, party_name: r.customer_name, issue_date: r.issue_date, due_date: r.due_date, total: r.total, open: r.open }));
+  return openDocumentsTable(documents, 'invoice');
+}
+
+async function loadUnpaidBills(bizId: string, range: ReportDates): Promise<ReportTable> {
+  const rows = await api.get<{ rows: UnpaidBillRow[] }>(`/businesses/${bizId}/reports/unpaid-bills`, { params: { as_of: range.end } }).then(r => r.data.rows);
+  const documents: OpenDocument[] = rows.map(r => ({ number: r.bill_number, party_name: r.vendor_name, issue_date: r.bill_date, due_date: r.due_date, total: r.total, open: r.open }));
+  return openDocumentsTable(documents, 'bill');
+}
 const loadJournal = async (bizId: string, range: ReportDates) => journalTable(await fetchLedger(bizId, range));
 const loadTransactionList = async (bizId: string, range: ReportDates) => transactionListTable(await fetchLedger(bizId, range));
 const loadSalesByCustomer = async (bizId: string, range: ReportDates) => salesByCustomerTable(await fetchLedger(bizId, range));
@@ -81,6 +103,26 @@ export function BalanceSheetDetailPage() {
 
 export function BalanceSheetComparisonPage() {
   return <StandardReport title="Balance Sheet Comparison" dates="asOf" fileStem="balance-sheet-comparison" load={loadBalanceSheetComparison} />;
+}
+
+export function AccountListPage() {
+  return <StandardReport title="Account List" dates="asOf" fileStem="account-list" load={loadAccountList} />;
+}
+
+export function CustomerBalanceSummaryPage() {
+  return <StandardReport title="Customer Balance Summary" dates="asOf" fileStem="customer-balances" load={loadCustomerBalances} />;
+}
+
+export function VendorBalanceSummaryPage() {
+  return <StandardReport title="Vendor Balance Summary" dates="asOf" fileStem="vendor-balances" load={loadVendorBalances} />;
+}
+
+export function OpenInvoicesPage() {
+  return <StandardReport title="Open Invoices" dates="asOf" fileStem="open-invoices" load={loadOpenInvoices} />;
+}
+
+export function UnpaidBillsPage() {
+  return <StandardReport title="Unpaid Bills" dates="asOf" fileStem="unpaid-bills" load={loadUnpaidBills} />;
 }
 
 export function JournalReportPage() {

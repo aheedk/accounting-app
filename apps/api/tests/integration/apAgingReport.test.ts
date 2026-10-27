@@ -74,5 +74,14 @@ describe('A/P aging report', () => {
     const total = rows.reduce((sum, r) => sum + Number(r.total), 0);
     expect(total).toBe(1130);
     expect(Number(ap.credit) - Number(ap.debit)).toBe(total);
+
+    // unpaidBills: the per-bill detail behind the buckets above. R-1 (the
+    // landlord's bill) is fully paid — the 250 overpayment is a separate
+    // credit with the vendor, not part of the bill's own open balance, so it
+    // doesn't appear here even though vendorAging still shows that vendor.
+    const detail = await apAging.unpaidBills(t.db, { business_id: biz.id, as_of: '2026-06-20' });
+    expect(detail.map(b => b.bill_number)).toEqual(['P-5', 'P-4', 'P-3', 'P-2', 'P-1']);
+    expect(detail.find(b => b.bill_number === 'P-5')).toMatchObject({ vendor_name: 'Paper Supply Co', total: '500.0000', open: '380.0000' });
+    expect(detail.reduce((sum, b) => sum + Number(b.open), 0)).toBe(1380);
   });
 });

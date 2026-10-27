@@ -50,6 +50,8 @@ export type GeneralLedgerAccount = {
   account_code: string;
   account_name: string;
   account_type: AccountType;
+  /** For the Account List report — every other report groups by account_type alone. */
+  detail_type: string | null;
   normal_balance: 'debit' | 'credit';
   beginning_balance: string;
   total_debit: string;
@@ -87,7 +89,7 @@ export async function generalLedger(
   q: { business_id: string; period_start: string; period_end: string; account_id?: string },
 ): Promise<GeneralLedgerReport> {
   let accountQuery = db.selectFrom('chart_of_accounts')
-    .select(['id', 'code', 'name', 'account_type', 'system_key'])
+    .select(['id', 'code', 'name', 'account_type', 'system_key', 'detail_type'])
     .where('business_id', '=', q.business_id);
   if (q.account_id !== undefined) accountQuery = accountQuery.where('id', '=', q.account_id);
 
@@ -313,6 +315,7 @@ export async function generalLedger(
       account_code: account.code,
       account_name: account.name,
       account_type: account.account_type,
+      detail_type: account.detail_type,
       normal_balance: isDebitNormal(account.account_type) ? 'debit' : 'credit',
       beginning_balance: beginning,
       total_debit: totalDebit,
