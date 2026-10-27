@@ -17,12 +17,18 @@ export function useActiveBusinessId(): [string | null, (id: string) => void] {
     return () => window.removeEventListener(BIZ_CHANGE_EVENT, onSwitch);
   }, []);
 
+  // No company yet (sign-in still loading) or one this login lacks: take the
+  // company last open if this login has it, and only then the first. A hook
+  // mounted before sign-in loaded (the chat button, at the app root) would
+  // otherwise save the first company over the one open, and the tab would
+  // read that as another tab switching (Faizan, 10-26).
   useEffect(() => {
     if (businesses.length === 0) { setActive(null); return; }
     if (!active || !businesses.find(b => b.id === active)) {
-      const first = businesses[0]!.id;
-      setActive(first);
-      localStorage.setItem(STORAGE_KEY, first);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const next = stored && businesses.some(b => b.id === stored) ? stored : businesses[0]!.id;
+      setActive(next);
+      localStorage.setItem(STORAGE_KEY, next);
     }
   }, [businesses, active]);
 
