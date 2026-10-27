@@ -82,6 +82,7 @@ const STAFF_MAY_WRITE = [
   'POST ~/bill-payments',
   'POST ~/bill-payments/:id/applications',
   'POST ~/bills',
+  'POST ~/chat',
   'POST ~/checks',
   'POST ~/custom-reports',
   'POST ~/custom-reports/:id/run',

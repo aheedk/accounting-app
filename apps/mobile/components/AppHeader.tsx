@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
-import { useNavDrawer } from '../hooks/useNavDrawer';
 import { AppMenu, AppMenuItem } from './ui/AppMenu';
 import { fontFamily, typeScale, spacing, type AppTheme } from '../theme';
 
@@ -20,16 +19,16 @@ import { fontFamily, typeScale, spacing, type AppTheme } from '../theme';
  * name row up top, a bigger page-title row below, so each reads as its own
  * thing instead of blurring into "Green Gadget..General Ledger".
  *
- * `leading="menu"` is the primary nav entry point (opens the drawer);
- * `leading="back"` is for screens pushed from somewhere else (a detail
- * screen), which keep normal back-navigation instead of re-opening the
- * drawer.
+ * `leading="menu"` is for top-level/tab destinations, which show the
+ * business switcher in this row; `leading="back"` is for screens pushed
+ * from somewhere else (a detail screen), which show normal back-navigation
+ * instead. There's no hamburger/drawer any more — the old slide-out nav
+ * panel's content now lives as the body of the More tab instead.
  */
 export function AppHeader({ title, leading = 'menu' }: { title: string; leading?: 'menu' | 'back' }) {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
   const { businesses, activeBusinessId, setActiveBusinessId, user } = useAuth();
-  const { open: openDrawer } = useNavDrawer();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const activeBusiness = businesses.find(b => b.id === activeBusinessId);
   const initials = (user?.full_name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -38,33 +37,30 @@ export function AppHeader({ title, leading = 'menu' }: { title: string; leading?
     <View style={[styles.header, { paddingTop: insets.top, backgroundColor: theme.app.surface, borderBottomColor: theme.app.border }]}>
       <View style={styles.topRow}>
         {leading === 'menu' ? (
-          <>
-            <IconButton icon="menu" size={20} onPress={openDrawer} iconColor={theme.app.mutedForeground} style={styles.menuBtn} />
-            <AppMenu
-              visible={switcherOpen}
-              onDismiss={() => setSwitcherOpen(false)}
-              anchor={
-                <Pressable onPress={() => setSwitcherOpen(true)} style={styles.businessPress}>
-                  <Text
-                    style={{ color: theme.app.mutedForeground, fontFamily: fontFamily.semibold, fontSize: typeScale.caption, textTransform: 'uppercase', letterSpacing: 0.3 }}
-                    numberOfLines={1}
-                  >
-                    {activeBusiness?.name ?? 'Pick business'}
-                  </Text>
-                  <Text style={{ color: theme.app.mutedForeground, fontSize: 10 }}>▾</Text>
-                </Pressable>
-              }
-            >
-              {businesses.map(b => (
-                <AppMenuItem
-                  key={b.id}
-                  title={b.name}
-                  onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }}
-                  trailingIcon={b.id === activeBusinessId ? 'check' : undefined}
-                />
-              ))}
-            </AppMenu>
-          </>
+          <AppMenu
+            visible={switcherOpen}
+            onDismiss={() => setSwitcherOpen(false)}
+            anchor={
+              <Pressable onPress={() => setSwitcherOpen(true)} style={styles.businessPress}>
+                <Text
+                  style={{ color: theme.app.mutedForeground, fontFamily: fontFamily.semibold, fontSize: typeScale.caption, textTransform: 'uppercase', letterSpacing: 0.3 }}
+                  numberOfLines={1}
+                >
+                  {activeBusiness?.name ?? 'Pick business'}
+                </Text>
+                <Text style={{ color: theme.app.mutedForeground, fontSize: 10 }}>▾</Text>
+              </Pressable>
+            }
+          >
+            {businesses.map(b => (
+              <AppMenuItem
+                key={b.id}
+                title={b.name}
+                onPress={() => { setActiveBusinessId(b.id); setSwitcherOpen(false); }}
+                trailingIcon={b.id === activeBusinessId ? 'check' : undefined}
+              />
+            ))}
+          </AppMenu>
         ) : (
           <Text style={{ color: theme.app.mutedForeground, fontFamily: fontFamily.semibold, fontSize: typeScale.caption, textTransform: 'uppercase', letterSpacing: 0.3, paddingLeft: spacing.md }} numberOfLines={1}>
             {activeBusiness?.name ?? ''}
@@ -97,9 +93,8 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs },
   titleText: { fontFamily: fontFamily.bold, fontSize: typeScale.h1 },
   spacer: { flex: 1 },
-  menuBtn: { margin: 0, marginLeft: 2 },
   backBtn: { margin: 0 },
   smallBtn: { margin: 0 },
-  businessPress: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1, paddingVertical: 4, paddingRight: spacing.xs },
+  businessPress: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1, paddingVertical: 4, paddingLeft: spacing.md, paddingRight: spacing.xs },
   avatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
 });

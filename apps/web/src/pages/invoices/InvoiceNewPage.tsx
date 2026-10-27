@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import type { ChatDraftState } from '@/components/chat/ChatPanel';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,9 @@ function InvoiceNewPage() {
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const [params] = useSearchParams();
+  const location = useLocation();
+  const chatDraft = (location.state as ChatDraftState | null)?.chatDraft;
+  const chatDraftInvoice = chatDraft?.type === 'invoice' ? chatDraft : undefined;
   const replacesId = params.get('replaces');
   const [source, setSource] = useState<SourceInvoice | null>(null);
   const save = useSaveAndPost();
@@ -131,6 +135,25 @@ function InvoiceNewPage() {
       }));
     }).catch(() => setErr('Could not load the invoice to correct.'));
   }, [bizId, replacesId]);
+
+  // From the chat assistant's "Open prefilled invoice form" button. This
+  // form has no raw account field on a line — only a product/service, whose
+  // income account is implicit — so a line's `revenue_account_id` is used
+  // only to guess which product/service to preselect; the user still picks
+  // one themselves for any line that guess misses (same as a required line
+  // always has been). Nothing here is saved until the user submits the form.
+  const chatDraftApplied = useRef(false);
+  useEffect(() => {
+    if (!bizId || replacesId || !chatDraftInvoice || items.length === 0 || chatDraftApplied.current) return;
+    chatDraftApplied.current = true;
+    const d = chatDraftInvoice.data;
+    if (d.customer_id) setHdr(h => ({ ...h, customer_id: d.customer_id ?? h.customer_id }));
+    setHdr(h => ({ ...h, issue_date: d.date, due_date: d.due_date, memo: d.memo ?? h.memo }));
+    setLines(d.lines.map(l => {
+      const item = l.revenue_account_id ? items.find(it => it.income_account_id === l.revenue_account_id) : undefined;
+      return { description: l.description, inventory_item_id: item?.id ?? '', amount: (Number(l.quantity) * Number(l.unit_price)).toFixed(2) };
+    }));
+  }, [bizId, replacesId, chatDraftInvoice, items]);
 
   useEffect(() => {
     function onFocus() { refetchItems(); }

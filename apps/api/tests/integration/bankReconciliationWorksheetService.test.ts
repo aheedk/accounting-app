@@ -372,6 +372,80 @@ describe('bank reconciliation worksheet', () => {
     expect(worksheet.summary.auto_matched_count).toBe(0);
   });
 
+  it('getStatementMatch: the statement-side view the plain worksheet never had — matched/unmatched lines, confidence, and a rejected match recomputing as unmatched', async () => {
+    const d = await setup(t);
+
+    const matchedCheck = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {
+      transaction_date: '2026-03-06', payee_text: 'Staples', payment_account_id: d.checking.id, payment_method: 'check',
+      lines: [{ category_account_id: d.supplies.id, amount: '450.00' }],
+    }));
+    const matchedDeposit = await t.db.transaction().execute(trx => depositSvc.createDeposit(trx, d.ctx, {
+      bank_account_id: d.bankAccount.id, deposit_date: '2026-03-06',
+      lines: [{ line_type: 'other_funds', received_from: 'A Customer', account_id: d.salesIncome.id, amount: '1535.00' }],
+    }));
+
+    await t.db.insertInto('email_import_staging').values({
+      business_id: d.business.id,
+      gmail_message_id: 'test-march-statement-match',
+      received_at: new Date(),
+      statement_kind: 'bank',
+      status: 'approved',
+      period_start: '2026-03-01',
+      period_end: '2026-03-31',
+      beginning_balance: '1000.00',
+      ending_balance: '1008.00',
+      extracted_transactions: JSON.stringify([
+        { date: '03/06/2026', type: 'check', amount: '450.00', description: 'CHECK 1024 STAPLES' },
+        { date: '03/06/2026', type: 'deposit', amount: '1535.00', description: 'DEPOSIT' },
+        { date: '03/28/2026', type: 'check', amount: '999.00', description: 'CHECK UNRELATED' },
+      ]),
+    }).execute();
+
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '1008.00', statement_ending_date: '2026-03-31',
+    }));
+
+    const match = await recon.getStatementMatch(t.db, d.ctx, started.id);
+    expect(match).not.toBeNull();
+    expect(match!.periodStart).toBe('2026-03-01');
+    expect(match!.periodEnd).toBe('2026-03-31');
+    expect(match!.openingBalance).toBe('1000.0000');
+    expect(match!.closingBalance).toBe('1008.0000');
+    expect(match!.lines).toHaveLength(3);
+
+    const checkLine = match!.lines.find(l => l.description === 'CHECK 1024 STAPLES')!;
+    expect(checkLine.matched).toMatchObject({ transaction_id: matchedCheck.id, is_cleared: true });
+    expect(checkLine.reason).toBe('amount_and_date');
+    expect(checkLine.confidence).toBeGreaterThanOrEqual(0.8);
+
+    const depositLine = match!.lines.find(l => l.description === 'DEPOSIT')!;
+    expect(depositLine.matched).toMatchObject({ transaction_id: matchedDeposit.id, is_cleared: true });
+
+    const unrelatedLine = match!.lines.find(l => l.description === 'CHECK UNRELATED')!;
+    expect(unrelatedLine.matched).toBeNull();
+    expect(unrelatedLine.reason).toBeNull();
+    expect(unrelatedLine.confidence).toBeNull();
+
+    // Rejecting the auto-matched check (unticking it in the worksheet) still
+    // shows the detected pairing on the next read — just no longer cleared,
+    // which is what tells the review UI to treat it as unconfirmed rather
+    // than quietly re-confirming a match the user just turned down.
+    await t.db.transaction().execute(trx => recon.saveProgress(trx, d.ctx, started.id, [
+      { transaction_type: 'expense', transaction_id: matchedCheck.id, is_cleared: false },
+    ]));
+    const rematch = await recon.getStatementMatch(t.db, d.ctx, started.id);
+    const checkLineAfterReject = rematch!.lines.find(l => l.description === 'CHECK 1024 STAPLES')!;
+    expect(checkLineAfterReject.matched).toMatchObject({ transaction_id: matchedCheck.id, is_cleared: false });
+  });
+
+  it('getStatementMatch returns null when no approved statement overlaps the period — the worksheet still works fully manually', async () => {
+    const d = await setup(t);
+    const started = await t.db.transaction().execute(trx => recon.startReconciliation(trx, d.ctx, {
+      account_id: d.checking.id, statement_ending_balance: '0.00', statement_ending_date: '2026-03-31',
+    }));
+    expect(await recon.getStatementMatch(t.db, d.ctx, started.id)).toBeNull();
+  });
+
   it('getReconciliationDetail carries the account and completed-by name a standalone report needs, not just the raw row', async () => {
     const d = await setup(t);
     const expense = await t.db.transaction().execute(trx => expenseSvc.createExpense(trx, d.ctx, {

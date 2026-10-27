@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import type { schemas } from '@accounting/shared';
+import type { ChatDraftState } from '@/components/chat/ChatPanel';
 import { hasMinRole } from '@accounting/shared';
 import { BookOpen, ChevronDown, Clock, Copy, History, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -315,6 +317,9 @@ export default function ExpensePage() {
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const chatDraft = (location.state as ChatDraftState | null)?.chatDraft;
+  const chatDraftExpense: schemas.ExpenseAction | undefined = chatDraft?.type === 'expense' ? chatDraft : undefined;
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
   const { user, businesses } = useAuth();
@@ -407,6 +412,16 @@ export default function ExpensePage() {
       setLines(e.lines.length > 0
         ? e.lines.map(l => ({ id: l.id, category_account_id: l.category_account_id, description: l.description ?? '', amount: l.amount }))
         : [emptyLine(0), emptyLine(1)]);
+    } else if (chatDraftExpense) {
+      // From the chat assistant's "Open prefilled expense form" button — a
+      // draft the user still has to review here before anything is saved.
+      const d = chatDraftExpense.data;
+      if (d.vendor_id) { setPayeeId(d.vendor_id); setPayeeType('vendor'); setPayeeText(''); }
+      else if (d.vendor_name) { setPayeeId(''); setPayeeType(''); setPayeeText(d.vendor_name); }
+      if (d.payment_account_id) setPaymentAccountId(d.payment_account_id);
+      setTransactionDate(d.date);
+      setMemo(d.memo ?? '');
+      setLines(d.lines.map((l, i) => ({ id: `chat-${i}`, category_account_id: l.account_id ?? '', description: l.description ?? l.account_name, amount: l.amount.toFixed(2) })));
     } else {
       // From a vendor's "Create expense" action: pre-select them as payee.
       const vendorId = searchParams.get('vendor_id');

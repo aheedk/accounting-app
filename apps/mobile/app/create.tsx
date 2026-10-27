@@ -2,18 +2,18 @@ import { View } from 'react-native';
 import { List, Divider, Text, useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
 import { hasMinRole, type Role } from '@accounting/shared';
-import { AppHeader } from '../../components/AppHeader';
-import { useAuth } from '../../hooks/useAuth';
-import { useCanOpen } from '../../lib/roleAccess';
-import type { AppTheme } from '../../theme';
-import { spacing } from '../../theme';
+import { AppHeader } from '../components/AppHeader';
+import { useAuth } from '../hooks/useAuth';
+import { useCanOpen } from '../lib/roleAccess';
+import type { AppTheme } from '../theme';
+import { spacing } from '../theme';
 
-const STUB_ITEMS = [
-  { icon: 'file-document-outline', label: 'Invoice', note: 'Available on desktop' },
-  { icon: 'checkbook', label: 'Check', note: 'Available on desktop' },
-  { icon: 'book-open-page-variant-outline', label: 'Journal Entry', note: 'Available on desktop' },
-] as const;
-
+// Moved out of the (tabs) group — the center "+" tab is gone, replaced by
+// CreateFab floating above the 3 remaining tabs, so this is a normal pushed
+// screen now (leading="back"), not a tab destination. Kept as a top-level
+// route rather than a hidden tab inside (tabs): routing to a *hidden* tab in
+// this app has already been confirmed to unreliably fall back to Dashboard
+// (the same bug clients.tsx hit and was moved out for, in an earlier chunk).
 export default function CreateScreen() {
   const theme = useTheme<AppTheme>();
   const canOpen = useCanOpen();
@@ -32,7 +32,7 @@ export default function CreateScreen() {
   if (!canCreate) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <AppHeader title="Create" />
+        <AppHeader title="Create" leading="back" />
         <View style={{ padding: spacing.lg, alignItems: 'center' }}>
           <Text style={{ color: theme.app.mutedForeground, textAlign: 'center' }}>
             Your role doesn't have permission to create new transactions.
@@ -44,7 +44,7 @@ export default function CreateScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <AppHeader title="Create" />
+      <AppHeader title="Create" leading="back" />
 
       <List.Item
         title="Expense"
@@ -100,17 +100,34 @@ export default function CreateScreen() {
       ) : null}
       <Divider style={{ marginVertical: spacing.sm }} />
 
-      {STUB_ITEMS.map(item => (
+      <List.Item
+        title="Invoice"
+        description="Bill a customer for goods or services"
+        onPress={() => router.push('/invoice/new')}
+        left={props => <List.Icon {...props} icon="file-document-outline" color={theme.app.primary} />}
+        titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+        descriptionStyle={{ color: theme.app.mutedForeground }}
+      />
+      <List.Item
+        title="Check"
+        description="Write a check from a bank account"
+        onPress={() => router.push('/check/new')}
+        left={props => <List.Icon {...props} icon="checkbook" color={theme.app.primary} />}
+        titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
+        descriptionStyle={{ color: theme.app.mutedForeground }}
+      />
+      {/* Journal Entry posts straight to the ledger — accountant+ only,
+          matching the route's own requireMinRole('accountant'). */}
+      {canCreateAtAccountantLevel ? (
         <List.Item
-          key={item.label}
-          title={item.label}
-          description={item.note}
-          left={props => <List.Icon {...props} icon={item.icon} color={theme.app.mutedForeground} />}
-          titleStyle={{ color: theme.app.mutedForeground }}
+          title="Journal Entry"
+          description="Post a manual debit/credit entry"
+          onPress={() => router.push('/journal-entry/new')}
+          left={props => <List.Icon {...props} icon="book-open-page-variant-outline" color={theme.app.primary} />}
+          titleStyle={{ color: theme.app.foreground, fontWeight: '600' }}
           descriptionStyle={{ color: theme.app.mutedForeground }}
-          disabled
         />
-      ))}
+      ) : null}
     </View>
   );
 }

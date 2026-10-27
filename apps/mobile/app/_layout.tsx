@@ -13,11 +13,9 @@ import 'react-native-reanimated';
 import { AuthProvider } from '../hooks/useAuth';
 import { ThemePreferenceProvider, useThemePreference } from '../hooks/useThemePreference';
 import { PushPreferenceProvider } from '../hooks/usePushPreference';
-import { NavDrawerProvider } from '../hooks/useNavDrawer';
 import { addNotificationResponseHandler } from '../services/pushNotifications';
 import { appLightTheme, appDarkTheme, fontFamily } from '../theme';
 import { NoConnectionBanner } from '../components/NoConnectionBanner';
-import { NavDrawer } from '../components/NavDrawer';
 
 export { ErrorBoundary } from 'expo-router';
 export const unstable_settings = { anchor: '(tabs)' };
@@ -101,11 +99,8 @@ function ThemedApp() {
     <PaperProvider theme={theme}>
       <AuthProvider>
         <PushPreferenceProvider>
-          <NavDrawerProvider>
-            <NoConnectionBanner />
-            <Stack screenOptions={{ headerShown: false }} />
-            <NavDrawer />
-          </NavDrawerProvider>
+          <NoConnectionBanner />
+          <Stack screenOptions={{ headerShown: false }} />
         </PushPreferenceProvider>
       </AuthProvider>
     </PaperProvider>

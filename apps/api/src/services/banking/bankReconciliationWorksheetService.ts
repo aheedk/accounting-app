@@ -10,7 +10,10 @@ import * as depositSvc from './bankDepositService.js';
 import { getOrCreateOpeningBalanceEquity } from '../core/chartOfAccountsService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { isInflow, statementDateToIso, type StatementLine } from '../ai/statementImportService.js';
-import { matchStatementLines, type MatchCandidateItem, type MatchStatementLine } from './reconciliationAutoMatch.js';
+import {
+  matchStatementLines, matchStatementLinesDetailed,
+  type MatchCandidateItem, type MatchDetail, type MatchStatementLine,
+} from './reconciliationAutoMatch.js';
 
 export type StartReconciliationInput = {
   account_id: string;
@@ -162,20 +165,29 @@ function calendarDaysBetween(aIso: string, bIso: string): number {
  * down to exactly one, or this returns null and the worksheet opens fully
  * manual — never guessing which account a statement belongs to.
  */
+export type MatchingStatement = {
+  stagingId: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  openingBalance: string | null;
+  closingBalance: string | null;
+  lines: StatementLine[];
+};
+
 async function resolveMatchingStatement(
-  trx: Transaction<DB>, bizId: string,
+  db: Kysely<DB> | Transaction<DB>, bizId: string,
   account: { name: string }, bankRow: { name: string; institution: string | null } | undefined,
   statementEndingDate: string,
-): Promise<StatementLine[] | null> {
-  const staged = await trx.selectFrom('email_import_staging')
-    .select(['id', 'account_hint', 'extracted_transactions'])
+): Promise<MatchingStatement | null> {
+  const staged = await db.selectFrom('email_import_staging')
+    .select(['id', 'account_hint', 'extracted_transactions', 'period_start', 'period_end', 'beginning_balance', 'ending_balance'])
     .where('business_id', '=', bizId)
     .where('statement_kind', '=', 'bank')
     .where('status', '=', 'approved')
     .execute();
   if (staged.length === 0) return null;
 
-  const candidates: { account_hint: string | null; lines: StatementLine[] }[] = [];
+  const candidates: { stagingId: string; account_hint: string | null; lines: StatementLine[]; periodStart: string | null; periodEnd: string | null; openingBalance: string | null; closingBalance: string | null }[] = [];
   for (const s of staged) {
     let lines: StatementLine[] = [];
     try {
@@ -187,29 +199,61 @@ async function resolveMatchingStatement(
     const isoDates = lines.map(l => statementDateToIso(l.date)).sort();
     const maxDate = isoDates[isoDates.length - 1]!;
     if (calendarDaysBetween(maxDate, statementEndingDate) > 10) continue;
-    candidates.push({ account_hint: s.account_hint, lines });
+    candidates.push({
+      stagingId: s.id, account_hint: s.account_hint, lines,
+      periodStart: s.period_start as string | null, periodEnd: s.period_end as string | null,
+      openingBalance: s.beginning_balance === null ? null : toMoneyString(s.beginning_balance),
+      closingBalance: s.ending_balance === null ? null : toMoneyString(s.ending_balance),
+    });
   }
   if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0]!.lines;
+
+  const toResult = (c: (typeof candidates)[number]): MatchingStatement => ({
+    stagingId: c.stagingId, periodStart: c.periodStart, periodEnd: c.periodEnd,
+    openingBalance: c.openingBalance, closingBalance: c.closingBalance, lines: c.lines,
+  });
+  if (candidates.length === 1) return toResult(candidates[0]!);
 
   const hintTargets = [bankRow?.name, bankRow?.institution, account.name]
     .filter((v): v is string => !!v).map(v => v.toLowerCase());
   const byHint = candidates.filter(c => c.account_hint
     && hintTargets.some(t => c.account_hint!.toLowerCase().includes(t) || t.includes(c.account_hint!.toLowerCase())));
-  return byHint.length === 1 ? byHint[0]!.lines : null;
+  return byHint.length === 1 ? toResult(byHint[0]!) : null;
 }
 
 /** The candidate ledger items a statement line could account for: everything
  * not already ticked some other way (service charge, interest, a bank-feed
  * match) — those stay as they are, untouched by statement matching. */
-function matchCandidatesFrom(items: WorksheetItem[]): MatchCandidateItem[] {
+/**
+ * `recompute: true` (getStatementMatch only) treats an item that's cleared
+ * *only* because a prior run of this same statement-matching already
+ * claimed it (`auto_matched`) as still available — otherwise a line that
+ * matched at Start could never be rediscovered on a later call, since its
+ * own earlier match would look identical to "already accounted for some
+ * other way" (a service charge, interest, a bank-feed match) and get
+ * filtered out before matching even runs. An item cleared by one of those
+ * other means (auto_matched false) still stays off-limits either way.
+ */
+function matchCandidatesFrom(items: WorksheetItem[], opts: { recompute?: boolean } = {}): MatchCandidateItem[] {
   return items.map(i => ({
     key: `${i.transaction_type}:${i.transaction_id}`,
     transaction_date: i.transaction_date,
     amount: i.amount,
     name: i.name,
     description: i.description,
-    already_cleared: i.is_cleared,
+    ref_no: i.ref_no,
+    already_cleared: opts.recompute ? (i.is_cleared && !i.auto_matched) : i.is_cleared,
+  }));
+}
+
+function matchLinesFrom(statementLines: StatementLine[]): MatchStatementLine[] {
+  return statementLines.map(l => ({
+    date: statementDateToIso(l.date),
+    amount: l.amount,
+    description: l.description,
+    ...(l.payee_name !== undefined ? { payee_name: l.payee_name } : {}),
+    isInflow: isInflow(l),
+    ...(l.check_number !== undefined ? { checkNumber: l.check_number } : {}),
   }));
 }
 
@@ -334,18 +378,12 @@ export async function startReconciliation(
   // reconciliationAutoMatch.ts for the actual matching rules). No statement
   // for this account/period simply means no auto-ticks; the worksheet still
   // opens, fully manual, same as it always has.
-  const statementLines = await resolveMatchingStatement(trx, bizId, account, bankRow, input.statement_ending_date);
+  const matchingStatement = await resolveMatchingStatement(trx, bizId, account, bankRow, input.statement_ending_date);
   let autoMatchedCount = 0;
-  if (statementLines && statementLines.length > 0) {
+  if (matchingStatement && matchingStatement.lines.length > 0) {
     const worksheetSoFar = await getWorksheet(trx as unknown as Kysely<DB>, ctx, recon.id);
     const candidateItems = matchCandidatesFrom(worksheetSoFar.items);
-    const matchLines: MatchStatementLine[] = statementLines.map(l => ({
-      date: statementDateToIso(l.date),
-      amount: l.amount,
-      description: l.description,
-      ...(l.payee_name !== undefined ? { payee_name: l.payee_name } : {}),
-      isInflow: isInflow(l),
-    }));
+    const matchLines = matchLinesFrom(matchingStatement.lines);
     const matchedKeys = matchStatementLines(candidateItems, matchLines);
     const byKey = new Map(worksheetSoFar.items.map(i => [`${i.transaction_type}:${i.transaction_id}`, i]));
     for (const key of matchedKeys) {
@@ -577,6 +615,100 @@ export async function getWorksheet(db: Kysely<DB>, ctx: ServiceCtx, id: string) 
       total_count: items.length,
       auto_matched_count: autoMatchedCount,
     },
+  };
+}
+
+export type StatementMatchLine = {
+  lineIndex: number;
+  date: string;
+  description: string;
+  payeeName: string | null;
+  /** Signed, same convention as WorksheetItem.amount: deposit positive, outflow negative. */
+  amount: string;
+  checkNumber: string | null;
+  matched: {
+    transaction_type: ReconciliationItemType;
+    transaction_id: string;
+    transaction_date: string;
+    name: string | null;
+    description: string | null;
+    amount: string;
+    /** Whether it's currently ticked — a match the user has since rejected
+     * (unchecked in the worksheet) still shows here as the detected pairing,
+     * just not confirmed. */
+    is_cleared: boolean;
+  } | null;
+  reason: MatchDetail['reason'];
+  confidence: number | null;
+};
+
+/**
+ * The statement-side view the plain worksheet never had: every line of the
+ * bank statement matched against this reconciliation's period, not just
+ * which book rows got pre-ticked. Recomputed fresh on every call against the
+ * worksheet's current cleared state — nothing new is persisted — so a
+ * rejected match (unticked in the worksheet) simply stops showing as matched
+ * here next time, and a manually-ticked item becomes ineligible for a
+ * *different* statement line the same way auto-matching already respects
+ * `already_cleared`. Returns null when no approved statement resolves to
+ * this reconciliation's account/period (see resolveMatchingStatement) — the
+ * worksheet still works fully manually in that case, same as always.
+ */
+export async function getStatementMatch(db: Kysely<DB>, ctx: ServiceCtx, id: string): Promise<{
+  statementId: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  openingBalance: string | null;
+  closingBalance: string | null;
+  lines: StatementMatchLine[];
+} | null> {
+  const bizId = ctx.business_id!;
+  const recon = await db.selectFrom('reconciliations').selectAll()
+    .where('id', '=', id).where('business_id', '=', bizId).executeTakeFirst();
+  if (!recon) throw new NotFoundError('reconciliation', id);
+  const account = await resolveAccount(db, bizId, recon.account_id);
+  const bankRow = await bankAccountFor(db, bizId, account.id);
+
+  const matchingStatement = await resolveMatchingStatement(db, bizId, account, bankRow, recon.statement_ending_date);
+  if (!matchingStatement) return null;
+
+  const { items } = await getWorksheet(db, ctx, id);
+  const candidateItems = matchCandidatesFrom(items, { recompute: true });
+  const matchLines = matchLinesFrom(matchingStatement.lines);
+  const detail = matchStatementLinesDetailed(candidateItems, matchLines);
+  const itemByKey = new Map(items.map(i => [`${i.transaction_type}:${i.transaction_id}`, i]));
+
+  const lines: StatementMatchLine[] = matchingStatement.lines.map((l, lineIndex) => {
+    const d = detail[lineIndex]!;
+    const matchedItem = d.matchedKey ? itemByKey.get(d.matchedKey) : undefined;
+    return {
+      lineIndex,
+      date: statementDateToIso(l.date),
+      description: l.description,
+      payeeName: l.payee_name ?? null,
+      amount: toMoneyString(isInflow(l) ? l.amount : `-${l.amount}`),
+      checkNumber: l.check_number ?? null,
+      matched: matchedItem ? {
+        transaction_type: matchedItem.transaction_type,
+        transaction_id: matchedItem.transaction_id,
+        transaction_date: matchedItem.transaction_date,
+        name: matchedItem.name,
+        description: matchedItem.description,
+        amount: matchedItem.amount,
+        is_cleared: matchedItem.is_cleared,
+      } : null,
+      reason: d.reason,
+      confidence: d.confidence,
+    };
+  });
+
+  return {
+    statementId: matchingStatement.stagingId,
+    periodStart: matchingStatement.periodStart,
+    periodEnd: matchingStatement.periodEnd,
+    openingBalance: matchingStatement.openingBalance,
+    closingBalance: matchingStatement.closingBalance,
+    lines,
   };
 }
 

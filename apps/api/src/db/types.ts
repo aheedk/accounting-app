@@ -1251,6 +1251,8 @@ export interface DB {
   invoice_import_staging: InvoiceImportStagingTable;
   bank_deposits: BankDepositsTable;
   bank_deposit_lines: BankDepositLinesTable;
+  chat_conversations: ChatConversationsTable;
+  chat_messages: ChatMessagesTable;
   messages: MessagesTable;
   message_reads: MessageReadsTable;
   approval_requests: ApprovalRequestsTable;
@@ -1381,5 +1383,26 @@ export interface BankDepositLinesTable {
   ref_no: string | null;
   amount: ColumnType<string, string | number, string | number>;
   sort_order: Generated<number>;
+  created_at: Generated<Timestamp>;
+}
+
+export type ChatMessageRole = 'user' | 'assistant';
+
+export interface ChatConversationsTable {
+  id: Generated<string>;
+  business_id: string;
+  user_id: string;
+  title: string | null;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ChatMessagesTable {
+  id: Generated<string>;
+  conversation_id: string;
+  role: ChatMessageRole;
+  content: string;
+  action_payload: ColumnType<unknown, unknown, unknown> | null;
+  sql_query: string | null;
   created_at: Generated<Timestamp>;
 }

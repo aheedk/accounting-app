@@ -126,6 +126,27 @@ describe('statement balances', () => {
     expect((await get(`/email-imports/statement-balances?account_id=${suppliesId}`)).body.statements).toEqual([]);
   });
 
+  it('GET /email-imports/:importId returns one staged statement in full, without shadowing the literal routes beside it', async () => {
+    const importId = await stageMarchStatement();
+
+    // The literal-segment routes registered around the new :importId route
+    // still resolve to themselves, not get swallowed by its wildcard.
+    expect((await get('/email-imports/pending-count')).status).toBe(200);
+    expect((await get(`/email-imports/statement-balances?account_id=${checkingId}`)).status).toBe(200);
+
+    const single = await get(`/email-imports/${importId}`);
+    expect(single.status).toBe(200);
+    expect(single.body.import).toMatchObject({
+      id: importId, statement_kind: 'bank', account_hint: 'Business Checking 2553',
+      period_start: '2026-03-01', period_end: '2026-03-31',
+      beginning_balance: '5000.0000', ending_balance: '5590.0100',
+    });
+    expect(single.body.import.extracted_transactions).toHaveLength(2);
+    expect(single.body.import.extracted_transactions[0]).toMatchObject({ description: 'DEPOSIT', amount: '1000.00' });
+
+    expect((await get('/email-imports/00000000-0000-0000-0000-000000000000')).status).toBe(404);
+  });
+
   it('refuses a period that ends before it starts, and an amount that is not one', async () => {
     const importId = await stageMarchStatement();
     const body = (summary: object) => ({

@@ -2039,3 +2039,480 @@ list (empty thread), unread-count, post (real row persisted), mark-read
 — all matching the hand-written types.
 
 Remaining disabled items overall: Inventory (6 items).
+
+## Chunk: Inventory group (2026-10-23)
+
+Researched all 6 items before building — confirmed real, distinct,
+buildable features (the backend has a full `services/inventory/`
+surface: items, stock movements, purchase orders, item receipts, sales
+orders, shipping labels). No scope exclusions this chunk; every item
+shipped.
+
+What shipped:
+
+- **`app/inventory-overview.tsx`**: KPI dashboard (`GET
+  /inventory-overview` — item count, stock value, unposted value) +
+  recent receipts/fulfilled sales + a "Post opening balance"
+  action (`accountant`+, optional entry date) for whatever unposted
+  stock value exists.
+- **`app/inventory-items.tsx`**: list + detail, in the established
+  list/detail-toggle-in-one-screen pattern. Create/edit `staff`+,
+  delete `accountant`+. Detail view adds an "Adjust stock" action
+  (date + signed quantity + reason + memo) and a stock-movement history
+  list. **Caught during live verification**: the create form originally
+  had no income/expense/inventory-asset account fields — without an
+  asset account, `POST .../item-receipts` refuses with
+  `PRECONDITION_FAILED` ("item has no inventory_asset_account_id"), a
+  real blocker, not a hypothetical. Added all 3 account pickers to
+  create, plus a "Set/Change asset account" action on the detail view
+  for items created before this fix.
+- **`app/purchase-orders.tsx`** + **`app/purchase-order/new.tsx`** +
+  **`app/purchase-order/[id].tsx`**: status-filtered list, a line-item
+  builder (item picker + qty + unit cost, add/remove lines, running
+  total), and a detail view with a "Receive" shortcut (`staff`+, jumps
+  into Item Receipts with the PO pre-selected) and void (`accountant`+).
+  **Caught during live verification**: initially gated "Receive"/the
+  Item Receipts PO picker to `sent`/`received` status only — reading
+  web's `PurchaseOrderDetailPage.tsx` `canReceive` gate directly showed
+  a `draft` PO can be received too (there's no separate "send" step at
+  all); fixed both the picker filter and matched web's exact
+  void-exclusion set (`void`/`received`, not just `void`).
+- **`app/item-receipts.tsx`**: list + inline create (PO picker + date +
+  memo) — no detail page, matching the backend (list-and-create only,
+  no GET /:id route). Accepts an optional `poId` route param so the PO
+  detail screen's "Receive" button can pre-select it.
+- **`app/sales-orders.tsx`** + **`app/sales-order/new.tsx`** +
+  **`app/sales-order/[id].tsx`**: same shape as purchase orders
+  (status-filtered list, line-item builder with customer + items), plus
+  fulfill (`accountant`+, creates the linked invoice) and void.
+- **`app/shipping-labels.tsx`**: list + inline create + delete
+  (`accountant`+). **Caught during live verification**: the backend's
+  `shippingLabelCreateSchema` has a `.refine()` requiring either
+  `invoice_id` or `sales_order_id` — a live `VALIDATION_FAILED` with
+  empty `field_errors` (refinement errors don't map to a field) surfaced
+  this. Fixed by adding an Invoice/Sales order segmented toggle (the
+  form originally only offered sales order, and treated it as
+  optional) so a label can link to either, matching what the schema
+  actually requires.
+- `services/api.ts`: added the full inventory type/function surface —
+  `InventoryOverview`, `InventoryItem`/`InventoryItemWithMovements`/
+  `StockMovement`, `PurchaseOrder(WithLines)`, `ItemReceipt`,
+  `SalesOrder(WithLines)`, `ShippingLabel` + every list/get/create/
+  update/delete/action function — all confirmed against the actual
+  route and service files (`inventoryItems.ts`, `inventoryOverview.ts`,
+  `purchaseOrders.ts`, `itemReceipts.ts`, `salesOrders.ts`,
+  `shippingLabels.ts`, `inventoryItemService.ts`,
+  `inventoryOverviewService.ts`, `purchaseOrderService.ts`,
+  `itemReceiptService.ts`, `salesOrderService.ts`,
+  `shippingLabelService.ts`) and the matching `apps/api/src/db/types.ts`
+  tables, not guessed.
+- Wired all 6 into the drawer's Inventory group and a new Inventory
+  section on the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.4MB). Full live round-trip against
+the dev server for every entity: inventory item create → get →
+adjust-stock → update (including the asset-account fix); purchase
+order create → get → void; item receipt create against a draft PO
+(correctly 404/precondition-checked before the asset-account fix, then
+succeeded up to an unrelated pre-existing demo-business data issue — an
+inactive AP account on this seed business, not a code bug); sales
+order create → get → void; shipping label create (linked to a sales
+order) → list (confirmed the `so_number`/`invoice_number` join) →
+delete (204). Two throwaway demo records (a test customer, one
+inventory item) were left on the demo business from this verification,
+consistent with every other chunk's demo-data footprint this session.
+
+This closes out the entire "continue until there are none" mandate for
+the Inventory group — the last unresearched area. Remaining disabled
+items app-wide: none identified in this session's research passes
+beyond the deliberately excluded Payroll, Client Overview, and
+Spreadsheet Sync.
+
+## Chunk: Create tab stubs — Invoice, Check, Journal Entry (2026-10-23)
+
+A final sweep of the app (not just the drawer — the Create tab's own
+`STUB_ITEMS` list) turned up three more disabled "new" forms: Invoice,
+Check, and Journal Entry. All three already had list/detail screens
+built in earlier chunks (`invoices.tsx`/`invoice/[id].tsx`,
+`checks.tsx` + `transaction/[id].tsx`'s `type=check` case,
+`journal-entries.tsx` + `transaction/[id].tsx`'s `type=journal` case)
+— only the creation form was missing in each case, which is exactly
+what the Create tab's disabled placeholders were marking.
+
+- **`app/check/new.tsx`**: payee (vendor/customer/free-text toggle),
+  bank account, date, an auto-fetched next check number, and a
+  multi-line category/description/amount editor (expense accounts
+  sorted first, matching web's `CheckPage.tsx` ordering — but not
+  restricted to expense-only, same as web). Posts immediately on save
+  (no separate draft step — confirmed by reading `checkService.ts`
+  directly), `staff`+.
+- **`app/invoice/new.tsx`**: customer, auto-fetched next invoice
+  number, issue/due dates (due date defaults to +30 days, matching the
+  net-30 fallback used elsewhere in this app), and a line editor
+  (description + revenue account + qty + price). Create is `staff`+
+  but **posting is `accountant`+ only** — matched to web's own
+  `useSaveAndPost` gate (`canPost = hasMinRole(role, 'accountant')`)
+  rather than assumed: a staff login only sees "Save draft," an
+  accountant+ login sees both "Save draft" and "Save & post."
+- **`app/journal-entry/new.tsx`**: date, auto-fetched next journal
+  number, and a debit/credit line editor (tap a chip to flip a line
+  between debit and credit) with a live balanced/out-of-balance
+  indicator — Save is disabled until debits equal credits, matching
+  the schema's own two-line-minimum and balance requirement. Gated
+  `accountant`+ end-to-end: hidden from the Create tab for lower
+  roles (matching the route's `requireMinRole('accountant')`) rather
+  than shown and left to 403.
+- `services/api.ts`: added `createCheck`/`getNextCheckNumber`,
+  `createInvoiceDraft`/`postInvoice`/`getNextInvoiceNumber`,
+  `createJournalEntry`/`getNextJournalNumber` + their types.
+- `app/(tabs)/create.tsx`: removed the `STUB_ITEMS` disabled-placeholder
+  array entirely and wired all three to real routes.
+
+**Two real bugs caught during live verification, not hypothetical:**
+1. `journal-entries/next-number` returns `{ journal_number }`, not
+   `{ next_number }` as first assumed — a live curl check caught the
+   mismatch before it shipped; fixed the type and accessor.
+2. `POST /invoices` (create draft) returns `{ invoice, lines }`, not
+   the invoice fields flat — unlike `postInvoice`, which does return
+   them flat. A live curl showed the real shape; `createInvoiceDraft`
+   now unwraps `.invoice` before returning, so the screen's existing
+   `created.id` usage needed no further change.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors. Full live round-trip for all three:
+check create (posted immediately, real `journal_entry_id` attached);
+invoice create → post → get (hit a pre-existing inactive-AR-account
+precondition on this demo business first, same category of issue as
+the inventory chunk's inactive-AP-account hit — temporarily reactivated
+the account to complete verification, confirming the request/response
+shapes rather than leaving the check incomplete); journal entry create
+→ get, confirmed balanced two-line entry posts and the auto-incrementing
+journal number is correct.
+
+This was the actual last remaining stub in the app — the Create tab's
+own placeholder list, not just the drawer. No further disabled/stub
+entry points are known as of this chunk.
+
+## Chunk: Spreadsheet Sync (2026-10-23)
+
+Previously excluded (2026-10-22 chunk) because it needed a file-
+download/share mechanism this app didn't have, and was the lowest-
+value item in that batch. Revisited on explicit user request — asked
+which of the three remaining "coming soon" items (Payroll, Client
+Overview, Spreadsheet Sync) to tackle, user chose this one specifically
+(smallest scope, the other two need either a new architecture decision
+or a full feature area).
+
+- Added `expo-sharing` (~58.0.20) and `expo-file-system` (~58.0.10) via
+  `npx expo install` (SDK-58-matched versions, not hand-picked).
+- **`app/spreadsheet-sync.tsx`**: a report-type chip row (Trial Balance
+  / Journal Entries / General Ledger — the same 3 reports web's
+  `SpreadsheetSyncPage.tsx` exports, confirmed by reading
+  `csvExportService.ts` directly) with the matching date filter(s) per
+  report (as-of date; or a from/to range, with an optional account
+  filter for General Ledger). "Export CSV" fetches the raw CSV text
+  from the existing `/csv-exports/*` routes (`responseType: 'text'`,
+  since these return `Content-Type: text/csv`, not JSON), writes it to
+  a cache file via the new `File`/`Paths` API (`expo-file-system`'s
+  SDK-58 class-based API, not the legacy `FileSystem.writeAsStringAsync`
+  function API), then opens the native share sheet
+  (`expo-sharing`'s `shareAsync`) — save to Files, AirDrop, mail, or
+  open directly in a spreadsheet app already on the device. Matches
+  what web actually does (a browser download), not a real two-way sync
+  — there's no Google Sheets/Excel Online connection anywhere in this
+  codebase, confirmed by the absence of any such integration.
+- `services/api.ts`: added `exportTrialBalanceCsv`/
+  `exportJournalEntriesCsv`/`exportGeneralLedgerCsv`, each returning
+  `{content, filename}` with the filename built client-side to match
+  `csvExportService.ts`'s own naming convention exactly.
+- Wired into the drawer's Reports group and the More tab.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB, both new native modules
+included). Hit all 3 export endpoints live and confirmed real CSV
+content with the exact headers and filename my code expects
+(`Content-Type: text/csv`, `Content-Disposition: attachment;
+filename="..."` matching byte-for-byte what the client constructs).
+**Not verified**: the on-device half (`File.write` to cache, then
+`Sharing.shareAsync`) — curl can exercise the HTTP fetch but not native
+file-system/share-sheet behavior; that needs an actual simulator or
+device run, which the user should do themselves per this app's
+established division of labor (localhost/device acceptance testing is
+the user's side of verification, not something a backend check can
+substitute for).
+
+All three deliberately-excluded "coming soon" items are now resolved
+or explicitly deferred: Spreadsheet Sync shipped; Payroll and Client
+Overview remain excluded, pending the user's call on whether to tackle
+either (Payroll is a full new feature area; Client Overview needs an
+architecture decision since it's firm-wide, not per-business).
+
+## Chunk: Estimates (2026-10-23) — closing a gap found via the capability guide
+
+User shared a "Mobile vs Web Capability Guide" doc (a feature-parity
+checklist across 12 areas, dated today) and asked to follow it to tweak
+up the mobile app. Cross-checked every row in the guide against the
+actual codebase (`ls app/`, `grep` for each named feature) rather than
+trusting it outright — it turned out to be accurate for essentially
+everything, including features shipped earlier in this very session
+(Checks' create-only scope, Invoice draft+post, Journal Entry's
+accountant-gating, the inventory item account pickers). **One real
+gap found**: the guide claims "Estimates list ✅ Read" on mobile, but
+no `estimate`/`estimates` file existed anywhere in `apps/mobile` — this
+was the single discrepancy between the guide and reality.
+
+- Confirmed the backend is real (`apps/api/src/routes/estimates.ts`,
+  spec at `docs/specs/2026-10-20-estimates-design.md`) before building:
+  list/get are open reads; create/edit/convert-to-invoice are `staff`+;
+  delete is `firm_admin`+. Scoped mobile to match the guide's own claim
+  exactly — read-only (list + detail), no create/edit/convert/accept/
+  delete actions.
+- **`app/estimates.tsx`**: status filter chips (pending/accepted/
+  rejected/closed) + list, same `invoices.tsx`/`bills.tsx` pattern.
+- **`app/estimate/[id].tsx`**: customer, dates, memo, line items,
+  subtotal/tax/total, and — when the estimate was converted — a tap-
+  through link to the resulting invoice (`estimate.invoice_id` +
+  `invoice_number`, both confirmed present on the real detail response).
+- `services/api.ts`: added `EstimateStatus`/`EstimateRow`/
+  `EstimateLine`/`EstimateDetail` types + `listEstimates`/`getEstimate`,
+  confirmed against `estimateService.ts`'s actual return shapes
+  directly — in particular that `getEstimate` returns a nested
+  `{estimate, lines, invoice_number}`, not the row flat, which isn't
+  obvious from the route file alone.
+- Wired into the drawer's AR group (next to Invoices) and the More
+  tab's AR section. No `CLIENT_PAGES` change — confirmed estimates
+  aren't in web's own client allow-list either, so the existing
+  default-deny for the `client` role already matches web's behavior
+  with no new code.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Live round-trip against the
+dev server: list (empty, `{estimates: []}`), then created a real
+throwaway estimate to exercise the full shape — list now showing it
+with `customer_name` joined, and `GET /estimates/:id` confirmed the
+exact `{estimate, lines, invoice_number}` nesting the mobile type
+expects, field-for-field. A delete attempt correctly 403'd for the
+accountant-role demo login (delete is `firm_admin`-only) — the leftover
+test estimate (`EST-0001`) couldn't be cleaned up under this login and
+was left on the demo business, same category as every other chunk's
+harmless demo-data footprint this session.
+
+With this, every claim in the user's capability guide now matches the
+actual mobile codebase — no further gaps found in that cross-check.
+
+## Chunk: Retire the nav drawer, fold it into the More tab (2026-10-24)
+
+User's own idea: drop the hamburger-triggered slide-out drawer entirely
+and have that same grouped-nav design appear as the body of the More
+tab instead. Also fixed a real drift this surfaced: the drawer's
+`NAV_GROUPS` (a structural port of web's `Sidebar.tsx`, with role
+filtering via `canOpen` and "Desktop only" disabled treatment) and the
+old More tab's separate hand-maintained `SECTIONS` array had fallen out
+of sync — the latter was missing items (Expense Transactions, Pay
+Bills, the disabled Client Overview placeholder) and had no role
+filtering at all.
+
+- **`app/(tabs)/more.tsx`**: now renders the drawer's exact former
+  content — same groups/icons/ordering, the same expand/collapse
+  accordion state, the same `canOpen`-based role filtering (a
+  role-denied item is dropped entirely, not shown disabled — that
+  treatment stays reserved for features this app hasn't built), the
+  same "Desktop only" disabled rows, the same dark sidebar-navy
+  styling — as a static page instead of an animated overlay. Dashboard
+  and Transactions are left out of the list (the bottom tab bar already
+  covers them); Create keeps its own button here instead of a duplicate
+  list row. Switched the color tokens from the drawer's hardcoded
+  `lightColors` to `theme.app.*` while doing this, so the panel now
+  actually follows dark mode instead of always rendering light-palette
+  navy regardless of the user's theme setting — a latent bug in the
+  original drawer, not something this chunk introduced.
+- **`components/AppHeader.tsx`**: removed the hamburger `IconButton`
+  and its `useNavDrawer` call — there's nothing left for it to open.
+  The business switcher that lived in that same row stays (it's
+  independent of the drawer, not something this chunk needed to move),
+  just re-padded now that it's the row's leading element instead of
+  sitting next to a hamburger.
+- **Deleted** `components/NavDrawer.tsx` and `hooks/useNavDrawer.tsx`
+  outright (confirmed via `grep` that nothing else referenced either
+  before removing them) and un-mounted `NavDrawerProvider`/`<NavDrawer
+  />` from `app/_layout.tsx`.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB, unchanged from before — the
+Reanimated dependency the drawer used for its slide animation is still
+pulled in by other screens, so removing the drawer didn't shrink the
+bundle, which is expected and fine). No live device/simulator check
+this chunk — a navigation-restructuring change like this is exactly the
+kind of thing worth a real tap-through pass before trusting it fully,
+same caveat as every other UI-only chunk this session with no
+screenshot or simulator session available.
+
+## Chunk: Drop the dark sidebar skin on the More tab (2026-10-24)
+
+The previous chunk's fold-the-drawer-into-More-tab design turned out to
+read as broken, not intentional — the user checked against QBO's actual
+mobile app (its Menu tab is a plain light page of grouped shortcuts;
+QBO deliberately drops the desktop dark sidebar skin for mobile
+entirely) and confirmed the suspicion raised at the end of the last
+chunk: a light `AppHeader` sitting directly above a dark-navy panel
+with no transition reads as a stalled/broken overlay animation, not a
+real design.
+
+- **`app/(tabs)/more.tsx`** rebuilt to match: no dark background
+  anywhere — the whole screen now uses the same `theme.colors.background`
+  every other tab uses. A compact user strip (name + a `StatusBadge`
+  role pill + email) replaces the old dark-panel user block. "+ Create"
+  is now the real `AppButton` (`default` variant — this app's actual
+  brand action color, blue, not the dark-sidebar-specific gold the
+  previous chunk used), `fullWidth`, gated the same `canOpen('/expense/
+  new')` check as before. Each group is a plain uppercase caption-style
+  header row (label + chevron-up/down, no icon — distinct from a leaf
+  item row on purpose, so a header doesn't read as just another
+  tappable destination) that expands to 48px item rows (icon + label +
+  trailing chevron-right, `surface` background, `border` bottom
+  separator, `muted` background on press) — independent per-section
+  expand state, same as before, all collapsed by default. Role-denied
+  items are still dropped entirely (not shown disabled) and features
+  this app hasn't built yet still show as a disabled row with a
+  "Desktop only" label in place of the chevron — both unchanged in
+  behavior, just restyled onto the new light row.
+- Same `NAV_GROUPS` data (items, ordering, role filtering via
+  `roleAccess.ts`) as the prior chunk — this was purely a visual
+  restyle, not a content change.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Still no live device/
+simulator pass — recommended again, same as the last chunk, before
+trusting this fully; this is now the second restyle of this same
+screen in two days, which is exactly the kind of churn a real look at
+a running simulator would have caught earlier.
+
+## Chunk: More tab — shortcut grid, third pass (2026-10-24)
+
+Third restyle of this one screen in two days. The light-theme row list
+from the last chunk was correct in spirit (no dark skin, matches QBO)
+but still read as a settings dump — every destination an equally-
+weighted small text row, nothing scannable at a glance. This pass adds
+a 2-column shortcut-tile grid (QBO mobile's own pattern) for the 6
+most-used destinations, so the common case needs no expanding at all.
+
+- **Shortcut grid**: Invoices, Expenses, Customers, Vendors, AI Inbox,
+  Messages — 80px tiles, `surface` background, `border` border, 8px
+  radius, a 24px icon above a 13px label, 2 per row with an 8px gap.
+  Each tile's path is the exact same route its group-accordion sibling
+  already used (e.g. the Invoices tile and AR's old "Invoices" row both
+  go to `/invoices`) — a dedicated shortcut, not a second screen.
+- **Removed the duplicates** from the accordion below: Invoices/
+  Customers out of Accounts Receivable, Expense Transactions/Vendors
+  out of Accounts Payable, Document Inbox out of AI, and the standalone
+  Messages row dropped entirely — all six now live only as tiles.
+- **Section headers** went from tiny uppercase caption text (read like
+  a form-field label, not a tappable row) to 56px rows at 15px medium
+  weight — same expand/collapse behavior, still collapsed by default.
+- **Child rows** grew from 48px to 52px and, this round, got real
+  per-item icons for the first time — `NavChild` never carried one in
+  any earlier version of this file (only the top-level/group entries
+  ever had icons), so these ~50 icon choices were pulled from the
+  original pre-drawer version of this same screen's own `SECTIONS`
+  array (still in scratch context from earlier this session) rather
+  than invented fresh — every icon here already meant that exact
+  feature somewhere in this app's history, not a new guess.
+- **Send documents** moved out of the grid/accordion entirely into its
+  own row at the bottom, next to Settings, matching the brief's "bottom
+  section" placement.
+- No changes to `AppHeader`, the bottom tab bar, routing, or any other
+  screen — purely this one screen's body content, as scoped.
+
+**Verified**: `tsc --noEmit` clean, a fresh `expo export --platform
+ios` bundle built with no errors (6.5MB). Still no live device/
+simulator pass. Flagging plainly: three restyles of one screen without
+ever seeing it rendered is not a sustainable loop — a single real
+screenshot at this point would likely save more churn than another
+round of spec-from-memory changes. Recommend an actual simulator check
+before touching this screen again.
+
+## Chunk: More tab — QBO-matched Menu redesign, FAB replaces the Create tab (2026-10-24)
+
+Fourth and (per the user) hopefully final pass at this screen, this
+time against real QBO Menu-tab screenshots and a fully detailed spec
+rather than memory — the most concrete brief of the four. Also the
+first chunk this session to touch the bottom tab bar itself.
+
+- **`components/CreateFab.tsx`** (new): a 56px floating circle, bottom-
+  right, `insets.bottom + 49 (standard iOS tab bar height) + 24`px
+  above the tab bar, `primary` background, navigates to `/create`.
+  Rendered once as a sibling of `<Tabs>` in `app/(tabs)/_layout.tsx` so
+  it persists across all 3 remaining tabs without remounting per
+  screen, rather than being added to each tab screen individually.
+- **The Create tab is gone.** `app/(tabs)/create.tsx` moved to
+  `app/create.tsx` — a top-level route, not a hidden tab inside
+  `(tabs)` with `href: null`. That's deliberate: this app already hit
+  the exact bug a hidden-tab approach would reintroduce (confirmed in
+  an earlier chunk's bug-fix note — routing to a *hidden* tab inside
+  `(tabs)` unreliably fell back to Dashboard; `clients.tsx` was moved
+  out of the group for the same reason). `leading="back"` replaces the
+  bare tab header now that it's a pushed screen.
+- **`app/(tabs)/_layout.tsx`**: 3 tabs now (Dashboard, Transactions,
+  More), evenly spaced — the center "+" `Tabs.Screen` entry removed
+  entirely, `<CreateFab />` added as a sibling after `<Tabs>`.
+- **`app/(tabs)/more.tsx`** rebuilt a fourth time:
+  - Search bar below the header (`AppTextInput`, now with a new
+    optional `wrapperStyle` prop — the one addition to that shared
+    component, since every other search field in this app already
+    uses `AppTextInput`'s standard bordered look and this one needed a
+    muted borderless pill instead; adding `wrapperStyle` doesn't touch
+    any existing call site). Typing hides the shortcut row and tile
+    grid entirely and shows a flat, grouped-by-category results list
+    instead (confirmed against the brief's own "double-check" note:
+    results are a flat list, not the tile grid).
+  - **"Frequently used"**: 8 horizontal circular shortcuts (Invoices,
+    Expenses, Estimates, Customers, Vendors, AI Inbox, Messages,
+    Receipts) — each routes to the exact path its old accordion
+    sibling already used.
+  - **"All"**: 8 two-column category tiles (Accounts Receivable,
+    Accounts Payable, AI, Accounting, Reports, Inventory, Setup, and a
+    new **More** tile holding Send Documents/Messages/Spreadsheet
+    Sync/Settings — the brief named this exact fixed list, including
+    Messages even though it's also a shortcut above, so that
+    duplication is intentional per spec, not an oversight). Tapping a
+    tile gives it a 2px primary border and slides its sub-items in
+    directly below that tile's row (`LayoutAnimation`, ~200ms ease-
+    out) — only one category expanded at a time, collapsing it on a
+    second tap or when a different tile opens.
+  - **Dedup**: every item pulled into the shortcut row got removed
+    from its old category's sub-item list (Invoices/Customers/
+    Estimates out of AR, Vendors out of AP, AI Inbox out of AI,
+    Receipts out of Accounting; Spreadsheet Sync also moved out of
+    Reports into the new More tile, since the brief placed it there
+    explicitly) — confirmed nothing shows in two places at once except
+    the Messages case the spec called out by name.
+  - Per-item icons on every sub-item row (the brief asked for them
+    explicitly this round) — same source as the last chunk's icon
+    choices: reused rather than invented.
+  - The old user-info strip is gone from this screen — `settings.tsx`
+    already had a fuller ACCOUNT section (name, email, role) before
+    this chunk even started, so there was nothing to actually move.
+  - `paddingBottom: 80` on the ScrollView per the brief's own
+    double-check note, so the FAB never overlaps the last tile row.
+- Role filtering (`canOpen`) applies to both the shortcut row and every
+  category's children, same as every prior chunk; a category collapses
+  to zero visible children and hides its tile entirely (verified via
+  `lib/roleAccess.ts` directly: a `client` login's CLIENT_PAGES
+  allow-list doesn't include `/settings` or `/spreadsheet-sync`, so
+  that role's "More" tile correctly shows just Send Documents and
+  Messages — not a new rule, just confirming the existing logic produces
+  the right result here).
+
+**Verified**: `tsc --noEmit` clean (one real mistake caught here —
+`UIManager.setLayoutAnimationEnabledExperimentalAndroid` doesn't exist
+in this RN version's types; the real name is
+`setLayoutAnimationEnabledExperimental`, fixed before it could have
+silently no-opped on Android), a fresh `expo export --platform ios`
+bundle built with no errors (6.5MB), and a `grep` confirming no
+remaining reference anywhere to the old `(tabs)/create` path. Still no
+live device/simulator pass — this chunk touches the bottom tab bar
+itself (a FAB replacing a whole tab), which is exactly the kind of
+structural navigation change most worth a real tap-through before
+trusting, more so than the last three purely-cosmetic passes at this
+same screen.

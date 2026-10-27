@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/auth/AuthContext';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
+import { ChatPanelHost } from '@/components/chat/ChatPanelHost';
 import { FirmShell } from '@/components/layout/FirmShell';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
@@ -127,6 +128,7 @@ import CompliancePage from '@/pages/payroll/CompliancePage';
 export default function App() {
   return (
     <AuthProvider>
+      <ChatPanelHost />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>

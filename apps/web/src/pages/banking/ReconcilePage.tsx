@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Upload } from 'lucide-react';
 import { hideUnless, useCan } from '@/lib/roleAccess';
 import { DateInput } from '@/components/ui/date-input';
 import { api } from '@/lib/apiClient';
@@ -13,10 +14,27 @@ import { pickErr } from '@/lib/apiErrors';
 import { AppSelect } from '../../components/ui/select';
 import { ReconcileNav } from './ReconcileNav';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import DocumentUpload, { type UploadResult } from '@/pages/ai/DocumentUpload';
+import { ReconcileStatementReview } from './ReconcileStatementReview';
 
 type ReconcilableAccount = { id: string; code: string; name: string; category: string };
 
 type CoaAccount = { id: string; code: string; name: string; account_type: string };
+
+type StatementBalance = {
+  id: string;
+  period_start: string | null;
+  period_end: string | null;
+  beginning_balance: string | null;
+  ending_balance: string | null;
+  approved_at: string | null;
+};
+
+function fmtShortDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+}
 
 export default function ReconcilePage() {
   // Starting a reconciliation is for an accountant — same bar as finishing one.
@@ -48,6 +66,11 @@ export default function ReconcilePage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [stagedId, setStagedId] = useState<string | null>(null);
+  const [appliedNote, setAppliedNote] = useState<string | null>(null);
+  const [latestStatement, setLatestStatement] = useState<StatementBalance | null>(null);
+
   useEffect(() => {
     if (!bizId) return;
     api.get(`/businesses/${bizId}/bank-rec/accounts`).then(r => {
@@ -70,6 +93,55 @@ export default function ReconcilePage() {
       .then(r => { setBeginningBalance(r.data.beginning_balance); setInProgressId(r.data.in_progress_id); })
       .catch((e: unknown) => setErr(pickErr(e)));
   }, [bizId, accountId]);
+
+  // Item 72's still-open piece: offer to fill the ending balance/date from an
+  // already-approved statement for this account, instead of only typing them.
+  // Never overwrites what's already in the form — just offers a one-click fill.
+  useEffect(() => {
+    setLatestStatement(null);
+    if (!bizId || !accountId) return;
+    api.get<{ statements: StatementBalance[] }>(`/businesses/${bizId}/email-imports/statement-balances`, { params: { account_id: accountId } })
+      .then(r => setLatestStatement(r.data.statements[0] ?? null))
+      .catch(() => setLatestStatement(null));
+  }, [bizId, accountId]);
+
+  function useLatestStatement() {
+    if (!latestStatement) return;
+    setForm(f => ({
+      ...f,
+      ...(latestStatement.ending_balance ? { statement_ending_balance: latestStatement.ending_balance } : {}),
+      ...(latestStatement.period_end ? { statement_ending_date: latestStatement.period_end } : {}),
+    }));
+  }
+
+  function handleUploadResult(result: UploadResult) {
+    if (result.kind === 'bank_statement' || result.kind === 'credit_card_statement') {
+      setStagedId(result.staging_id);
+      setAppliedNote(null);
+    }
+    // Anything else (an invoice, check stubs) isn't a statement — leave
+    // stagedId alone; DocumentUpload's own "processed: ..." line already
+    // says what it recognised instead, so there's nothing more to show here.
+  }
+
+  function handleStatementApproved(summary: { period_end: string | null; ending_balance: string | null; transactionCount: number }) {
+    const count = summary.transactionCount;
+    setStagedId(null);
+    setUploadOpen(false);
+    setAppliedNote(`Statement applied — ${count} transaction${count === 1 ? '' : 's'} ready for matching.`);
+    setForm(f => ({
+      ...f,
+      ...(summary.ending_balance ? { statement_ending_balance: summary.ending_balance } : {}),
+      ...(summary.period_end ? { statement_ending_date: summary.period_end } : {}),
+    }));
+    // The approved statement is in the books now; re-check whether it fills
+    // anything new (also keeps the "Use this" suggestion banner in sync).
+    if (bizId && accountId) {
+      api.get<{ statements: StatementBalance[] }>(`/businesses/${bizId}/email-imports/statement-balances`, { params: { account_id: accountId } })
+        .then(r => setLatestStatement(r.data.statements[0] ?? null))
+        .catch(() => undefined);
+    }
+  }
 
   const expenseAccounts = accounts.filter(a => a.account_type === 'expense');
   const incomeAccounts = accounts.filter(a => a.account_type === 'revenue' || a.account_type === 'income');
@@ -110,12 +182,64 @@ export default function ReconcilePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reconcile</h1>
-        <ReconcileNav active="setup" accountId={accountId} />
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="outline" size="sm" onClick={() => setUploadOpen(o => !o)}>
+            <Upload className="mr-1.5 h-4 w-4" /> Upload Statement
+          </Button>
+          <ReconcileNav active="setup" accountId={accountId} />
+        </div>
       </div>
 
       {err && (
         <div className="max-w-xl rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {err}
+        </div>
+      )}
+
+      {appliedNote && (
+        <div className="max-w-2xl rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">
+          {appliedNote}
+          {inProgressId && (
+            <>
+              {' '}<button type="button" className="font-medium underline" onClick={() => navigate(`/accounting/reconcile/${inProgressId}`)}>
+                Go to the worksheet
+              </button> to see the matches.
+            </>
+          )}
+        </div>
+      )}
+
+      {uploadOpen && !accountId && (
+        <p className="max-w-xl text-sm text-muted-foreground">Pick an account above first.</p>
+      )}
+
+      {uploadOpen && accountId && !stagedId && (
+        <div className="max-w-2xl space-y-2">
+          <DocumentUpload onUploaded={() => Promise.resolve()} onResult={handleUploadResult} />
+          <p className="text-xs text-muted-foreground">
+            Also reachable from{' '}
+            <Link to="/ai/inbox" className="text-link underline">AI → Document Inbox</Link>
+            {' '}— for statements that arrive by email, or a bulk upload.
+          </p>
+        </div>
+      )}
+
+      {uploadOpen && accountId && stagedId && (
+        <div className="max-w-2xl">
+          <ReconcileStatementReview
+            stagingId={stagedId}
+            accountId={accountId}
+            onApproved={handleStatementApproved}
+            onDiscard={() => setStagedId(null)}
+          />
+        </div>
+      )}
+
+      {latestStatement?.ending_balance && latestStatement.period_end && (
+        <div className="max-w-xl rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
+          An approved statement through {fmtShortDate(latestStatement.period_end)} shows an ending balance of{' '}
+          {fmtMoney(latestStatement.ending_balance)}.{' '}
+          <button type="button" className="font-medium underline" onClick={useLatestStatement}>Use this</button>
         </div>
       )}
 

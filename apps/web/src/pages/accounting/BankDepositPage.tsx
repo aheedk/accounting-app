@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { ChatDraftState } from '@/components/chat/ChatPanel';
 import { hasMinRole } from '@accounting/shared';
 import { BookOpen, ChevronDown, Clock, Copy, History, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/apiClient';
@@ -328,6 +329,9 @@ export default function BankDepositPage() {
   const isNew = !id || id === 'new';
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
+  const location = useLocation();
+  const chatDraft = (location.state as ChatDraftState | null)?.chatDraft;
+  const chatDraftDeposit = chatDraft?.type === 'deposit' ? chatDraft : undefined;
   const close = useCloseForm('/accounting/bank-deposits');
   const { user, businesses } = useAuth();
   const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
@@ -404,6 +408,18 @@ export default function BankDepositPage() {
       setCashBackAccountId(d.cash_back_account_id ?? '');
       setCashBackMemo(d.cash_back_memo ?? '');
       setCashBackAmount(d.cash_back_amount ?? '');
+    } else if (chatDraftDeposit && !copiedFrom.current) {
+      // From the chat assistant's "Open prefilled deposit form" button —
+      // still just a draft the user reviews and submits here themselves.
+      copiedFrom.current = true;
+      const d = chatDraftDeposit.data;
+      if (d.deposit_to_account_id) setBankAccountId(d.deposit_to_account_id);
+      setDepositDate(d.date);
+      setMemo(d.memo ?? '');
+      setOtherLines(d.lines.map((l, i) => ({
+        id: `chat-${i}`, received_from: '', account_id: l.account_id ?? '',
+        description: l.description ?? l.account_name, payment_method: '', ref_no: '', amount: l.amount.toFixed(2),
+      })));
     }
   }, [bizId, id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
