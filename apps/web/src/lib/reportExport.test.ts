@@ -3,6 +3,15 @@ import * as XLSX from 'xlsx';
 import { buildPdf, downloadAsExcel } from './download';
 import { amountColumns, buildPrintHtml, parseAmount, rowKind, setExportCompany } from './reportExport';
 
+// SheetJS 0.20's module namespace exports `writeFile` as non-configurable,
+// so `vi.spyOn(XLSX, 'writeFile')` fails ("Cannot redefine property").
+// `vi.mock` replaces the module at resolution time instead, before that
+// descriptor exists, so `writeFile` is a plain, reconfigurable vi.fn() here.
+vi.mock('xlsx', async importOriginal => {
+  const actual = await importOriginal<typeof import('xlsx')>();
+  return { ...actual, writeFile: vi.fn() };
+});
+
 const headers = ['Code', 'Account', 'Invoice No.', 'Amount'];
 const rows = [
   ['', 'Revenue', '', ''],
@@ -94,7 +103,7 @@ describe('report export layout', () => {
   it('writes Excel with a title block, numeric amounts and a generated line', () => {
     let sheet: XLSX.WorkSheet | undefined;
     let file = '';
-    vi.spyOn(XLSX, 'writeFile').mockImplementation((workbook, name) => {
+    vi.mocked(XLSX.writeFile).mockImplementation((workbook, name) => {
       sheet = workbook.Sheets[workbook.SheetNames[0]!];
       file = String(name);
     });
@@ -117,7 +126,7 @@ describe('report export layout', () => {
 
   it('writes an import template with nothing but headings and rows', () => {
     let sheet: XLSX.WorkSheet | undefined;
-    vi.spyOn(XLSX, 'writeFile').mockImplementation(workbook => { sheet = workbook.Sheets[workbook.SheetNames[0]!]; });
+    vi.mocked(XLSX.writeFile).mockImplementation(workbook => { sheet = workbook.Sheets[workbook.SheetNames[0]!]; });
 
     downloadAsExcel(['Name', 'Code'], [['Cash', '1000']], 'coa-template', { bare: true });
 

@@ -154,7 +154,7 @@ permissions instead, so this needs a spec first.
 | 46 | Custom roles: add a role, and change what any role can do, including the five there now. See "Roles" above **(10-10)** | Aheed |
 | 48 | The AI assistant. **Built 10-25** (below). Left: Faizan's sample questions, which Riham asked for, and Faizan tries it **(10-10)** | Riham, Faizan |
 | 97 | A marketing plan: ask AI how best to market an accounting app like QuickBooks. To go through in a meeting or two | Aheed, Riham |
-| 28 | Security before outside customers: enforce the web app's script policy, replace the `xlsx` spreadsheet reader, a standby database, and an outside security test **(10-05)** | Aheed |
+| 28 | Security before outside customers: enforce the web app's script policy, a standby database, and an outside security test. The `xlsx` spreadsheet reader is replaced (10-27, below) **(10-05)** | Aheed |
 | 29 | Phone app. Not needed for November 1. Left: a way for Faizan to test it, the same design on iPhone and Android, and how QuickBooks' phone app handles journal entries (debits and credits may not fit a phone) **(10-05)** | Riham |
 
 ## Needs something from the firm first
@@ -212,6 +212,7 @@ Reported in the meeting:
 | 18 (part) | **Nine more standard reports** (10-26), on Reports → Standard Reports: Profit and Loss Detail, by Month and Comparison; Balance Sheet Detail and Comparison; Journal; Transaction List by Date; Sales by Customer Summary; Expenses by Vendor Summary. Each is worked out from the General Ledger, the P&L or the Balance Sheet, so it ties out to them, and each has Excel and Print. Spec: [`../specs/2026-10-07-report-set-design.md`](../specs/2026-10-07-report-set-design.md), section 3 | Aheed |
 | — | **"What happened to this page?" with one tab open** (10-26). On any client but the first, the screen came up after a reload or sign-in. The assistant's button, added 10-25, loads before sign-in finishes, and it saved the first client over the one open. Live on Netlify 10-26. The screen still comes up when another tab really does switch client, as Faizan asked on 10-01 | Aheed |
 | 18 (part) | **Nine more standard reports** (10-27): Account List (every account, grouped by type, with its detail type and balance); Customer and Vendor Balance Summary (each party's current balance, no aging buckets); Open Invoices and Unpaid Bills (one row per document still owed); A/R and A/P Aging Detail (the same open documents, grouped under their aging bucket instead of listed flat); Customer and Vendor Balance Detail (the same open documents, grouped under the party instead). All but Account List read the Aging reports' own per-party and per-document figures rather than re-deriving them, so they tie out the same way. Left of item 18: sales by product/service | Riham |
+| 28 (part) | **The `xlsx` spreadsheet reader replaced** (10-27). The web app's "Upload Excel" import (Chart of Accounts, Trial Balance, Spreadsheet Sync) read `.xlsx` files with a version of the `xlsx` package carrying known bugs (a crafted file could corrupt the page's own data, or hang the tab) — the npm registry's own copy of the package was never patched; SheetJS only published the fix on their own site. Same library, now installed from there at the fixed version (0.20.3) instead of npm's stuck one (0.18.5); nothing else in the app changed | Riham |
 
 ## Decided — no work
 
