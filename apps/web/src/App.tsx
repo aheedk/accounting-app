@@ -29,6 +29,12 @@ import {
   ProfitLossComparisonPage, ProfitLossDetailPage, SalesByCustomerSummaryPage, TransactionListByDatePage, UnpaidBillsPage,
   VendorBalanceDetailPage, VendorBalanceSummaryPage,
 } from '@/pages/reports/StandardReportPages';
+import {
+  AdjustedTrialBalancePage, BalanceSheetSummaryPage, BillPaymentListReportPage, CheckDetailPage, DepositDetailPage, IncomeByCustomerSummaryPage,
+  ProfitLossByCustomerPage, ProfitLossPercentOfIncomePage, ProfitLossYtdComparisonPage, PurchasesByVendorDetailPage, QuarterlyProfitLossPage,
+  RecentTransactionsPage, SalesByCustomerDetailPage, TransactionDetailByAccountPage, TransactionListByCustomerPage, TransactionListByVendorPage,
+  TransactionListWithSplitsPage,
+} from '@/pages/reports/LedgerReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
 import CustomerDetailPage from '@/pages/customers/CustomerDetailPage';
@@ -200,6 +206,23 @@ export default function App() {
             <Route path="/reports/transaction-list-by-date" element={<TransactionListByDatePage />} />
             <Route path="/reports/sales-by-customer" element={<SalesByCustomerSummaryPage />} />
             <Route path="/reports/expenses-by-vendor" element={<ExpensesByVendorSummaryPage />} />
+            <Route path="/reports/pnl-percent-of-income" element={<ProfitLossPercentOfIncomePage />} />
+            <Route path="/reports/pnl-quarterly" element={<QuarterlyProfitLossPage />} />
+            <Route path="/reports/pnl-ytd-comparison" element={<ProfitLossYtdComparisonPage />} />
+            <Route path="/reports/pnl-by-customer" element={<ProfitLossByCustomerPage />} />
+            <Route path="/reports/balance-sheet-summary" element={<BalanceSheetSummaryPage />} />
+            <Route path="/reports/adjusted-trial-balance" element={<AdjustedTrialBalancePage />} />
+            <Route path="/reports/recent-transactions" element={<RecentTransactionsPage />} />
+            <Route path="/reports/transaction-detail-by-account" element={<TransactionDetailByAccountPage />} />
+            <Route path="/reports/transaction-list-with-splits" element={<TransactionListWithSplitsPage />} />
+            <Route path="/reports/transaction-list-by-customer" element={<TransactionListByCustomerPage />} />
+            <Route path="/reports/transaction-list-by-vendor" element={<TransactionListByVendorPage />} />
+            <Route path="/reports/sales-by-customer-detail" element={<SalesByCustomerDetailPage />} />
+            <Route path="/reports/income-by-customer" element={<IncomeByCustomerSummaryPage />} />
+            <Route path="/reports/deposit-detail" element={<DepositDetailPage />} />
+            <Route path="/reports/check-detail" element={<CheckDetailPage />} />
+            <Route path="/reports/bill-payment-list" element={<BillPaymentListReportPage />} />
+            <Route path="/reports/purchases-by-vendor-detail" element={<PurchasesByVendorDetailPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />

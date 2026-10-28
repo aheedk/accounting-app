@@ -50,6 +50,12 @@ export type GlLine = {
   amount: string;
   running_balance: string;
   transaction_path: string;
+  /** True only for a real adjusting entry: the Adjusted Trial Balance's adjustments. */
+  is_adjusting?: boolean;
+  /** When it was entered (an ISO timestamp): Recent Transactions. */
+  created_at?: string;
+  /** Cleared by a finished bank reconciliation: the Clr column. */
+  is_reconciled?: boolean;
 };
 
 export type GlAccount = {
@@ -82,23 +88,23 @@ export type BalanceSheetReport = {
   net_income_ytd: string;
 };
 
-const sum = (values: string[]): string => values.reduce((total, v) => total.plus(v || '0'), new Decimal(0)).toFixed(4);
-const minus = (a: string, b: string): string => new Decimal(a || '0').minus(b || '0').toFixed(4);
-const isZero = (v: string): boolean => new Decimal(v || '0').isZero();
-const accountLabel = (a: { account_code: string; account_name: string }): string =>
+export const sum = (values: string[]): string => values.reduce((total, v) => total.plus(v || '0'), new Decimal(0)).toFixed(4);
+export const minus = (a: string, b: string): string => new Decimal(a || '0').minus(b || '0').toFixed(4);
+export const isZero = (v: string): boolean => new Decimal(v || '0').isZero();
+export const accountLabel = (a: { account_code: string; account_name: string }): string =>
   a.account_code ? `${a.account_code} ${a.account_name}` : a.account_name;
 const byLabel = (a: { account_code: string; account_name: string }, b: { account_code: string; account_name: string }): number =>
   a.account_code.localeCompare(b.account_code) || a.account_name.localeCompare(b.account_name);
 
 /** A total row: the label first, then the given amounts in the last columns. */
-function totalRow(width: number, label: string, amounts: string[], depth = 0): ReportRow {
+export function totalRow(width: number, label: string, amounts: string[], depth = 0): ReportRow {
   const cells = Array<string>(width).fill('');
   cells[0] = label;
   amounts.forEach((amount, i) => { cells[width - amounts.length + i] = amount; });
   return { kind: 'total', cells, depth };
 }
 
-const DETAIL_COLUMNS: ReportColumn[] = [
+export const DETAIL_COLUMNS: ReportColumn[] = [
   { label: 'Date', kind: 'date' },
   { label: 'Transaction Type', kind: 'text' },
   { label: 'Num', kind: 'text' },
@@ -109,14 +115,14 @@ const DETAIL_COLUMNS: ReportColumn[] = [
   { label: 'Balance', kind: 'money' },
 ];
 
-function detailRow(line: GlLine, balance: string): ReportRow {
+export function detailRow(line: GlLine, balance: string, depth = 2): ReportRow {
   return {
-    kind: 'line', depth: 2, to: line.transaction_path,
+    kind: 'line', depth, to: line.transaction_path,
     cells: [line.entry_date, line.transaction_label, line.num ?? '', line.name ?? '', line.memo ?? '', line.split_account ?? '', line.amount, balance],
   };
 }
 
-function pnlSections(pnl: PnlReport): Map<string, PnlSection> {
+export function pnlSections(pnl: PnlReport): Map<string, PnlSection> {
   const sections = new Map<string, PnlSection>();
   for (const line of pnl.revenue_lines) sections.set(line.account_id, line.section ?? 'income');
   for (const line of pnl.expense_lines) sections.set(line.account_id, line.section ?? 'operating');
@@ -252,11 +258,12 @@ export function accountListTable(gl: GlReport): ReportTable {
   return { columns, rows };
 }
 
-type JournalLine = GlLine & { account: string; account_code: string };
-type Transaction = { id: string; date: string; num: string; lines: JournalLine[] };
+/** A ledger line with its account: the label, and the type and detail type that say what kind of account it is. */
+export type JournalLine = GlLine & { account_id: string; account: string; account_code: string; account_type: string; detail_type: string | null };
+export type Transaction = { id: string; date: string; num: string; lines: JournalLine[] };
 
 /** The General Ledger's lines put back together into their transactions, by date. */
-function transactions(gl: GlReport): Transaction[] {
+export function transactions(gl: GlReport): Transaction[] {
   const byId = new Map<string, Transaction>();
   for (const account of gl.accounts) {
     for (const line of account.lines) {
@@ -266,7 +273,10 @@ function transactions(gl: GlReport): Transaction[] {
         byId.set(line.journal_entry_id, tx);
       }
       if (!tx.num && line.num) tx.num = line.num;
-      tx.lines.push({ ...line, account: accountLabel(account), account_code: account.account_code });
+      tx.lines.push({
+        ...line, account_id: account.account_id, account: accountLabel(account), account_code: account.account_code,
+        account_type: account.account_type, detail_type: account.detail_type,
+      });
     }
   }
   return [...byId.values()].sort((a, b) =>
@@ -339,8 +349,8 @@ export function transactionListTable(gl: GlReport): ReportTable {
 
 // What QuickBooks counts as a sale: invoices and credit memos, and deposits
 // straight to an income account.
-const SALES_TYPES = new Set(['Invoice', 'Credit Memo', 'Deposit']);
-const NOT_SPECIFIED = 'Not Specified';
+export const SALES_TYPES = new Set(['Invoice', 'Credit Memo', 'Deposit']);
+export const NOT_SPECIFIED = 'Not Specified';
 
 function byName(lines: GlLine[], nameOf: (line: GlLine) => string | null, heading: string): ReportTable {
   const totals = new Map<string, string[]>();
@@ -519,6 +529,13 @@ function percentChange(current: string, earlier: string): string {
   return `${new Decimal(current || '0').minus(base).dividedBy(base.abs()).times(100).toFixed(2)}%`;
 }
 
+/** "40.00%": `part` as a share of `whole`, or blank when that is zero. */
+function percentOf(part: string, whole: string): string {
+  const base = new Decimal(whole || '0');
+  if (base.isZero()) return '';
+  return `${new Decimal(part || '0').dividedBy(base.abs()).times(100).toFixed(2)}%`;
+}
+
 function withChange(amounts: string[], compare: boolean): string[] {
   if (!compare) return amounts;
   const [current = '0', earlier = '0'] = amounts;
@@ -536,13 +553,15 @@ function columnsFor(first: string, labels: string[], compare: boolean): ReportCo
 /**
  * The P&L with a column per period: by month, or this period against an
  * earlier one (`compare` adds the $ and % change of the first column against
- * the second). Laid out as the P&L page is.
+ * the second). `percentOfIncome` adds each first-column amount as a share of
+ * that column's total income instead. Laid out as the P&L page is.
  */
 export function pnlColumnsTable(
   periods: { label: string; report: PnlReport }[],
-  options: { compare?: boolean; drill?: { start: string; end: string } } = {},
+  options: { compare?: boolean; percentOfIncome?: boolean; drill?: { start: string; end: string } } = {},
 ): ReportTable {
   const compare = options.compare ?? false;
+  const percentOfIncome = !compare && (options.percentOfIncome ?? false);
   type Account = { id: string; code: string; name: string; section: PnlSection; amounts: string[] };
   const accounts = new Map<string, Account>();
   periods.forEach((period, column) => {
@@ -560,13 +579,19 @@ export function pnlColumnsTable(
     }
   });
 
-  const columns = columnsFor('Account', periods.map(p => p.label), compare);
+  const columns = [
+    ...columnsFor('Account', periods.map(p => p.label), compare),
+    ...(percentOfIncome ? [{ label: '% of Income', kind: 'percent' as const }] : []),
+  ];
   const width = columns.length;
   const rows: ReportRow[] = [];
   const zeros = periods.map(() => '0');
   const columnTotals = (list: Account[]): string[] => periods.map((_, c) => sum(list.map(a => a.amounts[c]!)));
   const combine = (a: string[], b: string[], op: (x: string, y: string) => string): string[] => a.map((x, i) => op(x, b[i]!));
-  const result = (label: string, amounts: string[]) => rows.push(totalRow(width, label, withChange(amounts, compare)));
+  const totalIncome = sum([...accounts.values()].filter(a => a.section === 'income').map(a => a.amounts[0] ?? '0'));
+  const extra = (amounts: string[]): string[] =>
+    (percentOfIncome ? [...amounts, percentOf(amounts[0] ?? '0', totalIncome)] : withChange(amounts, compare));
+  const result = (label: string, amounts: string[]) => rows.push(totalRow(width, label, extra(amounts)));
 
   const block = (section: PnlSection, label: string, always: boolean): string[] | null => {
     const list = [...accounts.values()]
@@ -578,7 +603,7 @@ export function pnlColumnsTable(
       rows.push({
         kind: 'line', depth: 1,
         ...(options.drill ? { to: generalLedgerDrilldownUrl({ accountId: account.id, periodStart: options.drill.start, periodEnd: options.drill.end }) } : {}),
-        cells: [accountLabel({ account_code: account.code, account_name: account.name }), ...withChange(account.amounts, compare)],
+        cells: [accountLabel({ account_code: account.code, account_name: account.name }), ...extra(account.amounts)],
       });
     }
     const totals = columnTotals(list);

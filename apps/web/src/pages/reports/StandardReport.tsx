@@ -8,7 +8,7 @@ import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 import { useActiveBusinessId } from '@/lib/business';
 import { useAuth } from '@/auth/useAuth';
 import { useFiscalYear } from '@/lib/fiscalYear';
-import { fmtDateText, fmtLongDate, todayLocal } from '@/lib/dates';
+import { daysAgoLocal, fmtDateText, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import { downloadAsExcel } from '@/lib/download';
 import { printReport } from '@/lib/reportExport';
@@ -19,6 +19,8 @@ import { exportRows, ISO_DATE, type ReportColumn, type ReportRow, type ReportTab
 // Excel and Print, as on the P&L, and the report itself in the QuickBooks frame.
 
 export type ReportDates = { start: string; end: string };
+/** What a report may need besides its dates: where the company's fiscal year starts (1 to 12). */
+export type ReportContext = { fiscalYearStartMonth: number };
 
 function pickErr(e: unknown): string {
   const message = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
@@ -75,20 +77,25 @@ export function StandardReport({
   dates,
   fileStem,
   load,
+  opens = 'fiscalYear',
 }: {
   title: string;
   /** A period (start and end), or one date (as of). */
   dates: 'period' | 'asOf';
   fileStem: string;
   /** Kept at module level by the caller, so the page does not reload on every render. */
-  load: (bizId: string, range: ReportDates) => Promise<ReportTable>;
+  load: (bizId: string, range: ReportDates, context: ReportContext) => Promise<ReportTable>;
+  /** Where a period starts when the page opens: the fiscal year, this month, or four days ago. */
+  opens?: 'fiscalYear' | 'thisMonth' | 'recent';
 }) {
   const [bizId] = useActiveBusinessId();
   const { businesses } = useAuth();
   const bizName = businesses.find(b => b.id === bizId)?.name ?? '';
   // A period opens on the client's fiscal year to date, as the P&L does.
   const fiscalYear = useFiscalYear();
-  const [start, setStart] = useState(fiscalYear.start);
+  const fiscalYearStartMonth = fiscalYear.startMonth;
+  const [start, setStart] = useState(() =>
+    (opens === 'thisMonth' ? `${todayLocal().slice(0, 7)}-01` : opens === 'recent' ? daysAgoLocal(3) : fiscalYear.start));
   const [end, setEnd] = useState(todayLocal());
   const [table, setTable] = useState<ReportTable | null>(null);
   const [loading, setLoading] = useState(false);
@@ -99,14 +106,14 @@ export function StandardReport({
     setLoading(true);
     setErr(null);
     try {
-      setTable(await load(bizId, { start, end }));
+      setTable(await load(bizId, { start, end }, { fiscalYearStartMonth }));
     } catch (e: unknown) {
       setErr(pickErr(e));
       setTable(null);
     } finally {
       setLoading(false);
     }
-  }, [bizId, start, end, load]);
+  }, [bizId, start, end, load, fiscalYearStartMonth]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 

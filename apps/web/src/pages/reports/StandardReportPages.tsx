@@ -5,26 +5,14 @@ import {
   accountListTable, agingDetailTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, journalTable,
   monthRanges, openDocumentsTable, partyBalanceDetailTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable,
   transactionListTable, yearEarlier,
-  type BalanceSheetReport, type GlReport, type OpenDocument, type PartyBalance, type ReportTable,
+  type OpenDocument, type PartyBalance, type ReportTable,
 } from './standardReports';
 import { LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
-import type { PnlReport } from './pnlLayout';
+import { fetchBalanceSheet, fetchLedger, fetchPnl } from './reportApi';
 
 // Standard reports added for the 10-25 meeting (item 18). Each reads reports the
 // app already has, so it ties out to them. The loaders stay at module level: the
 // page reloads when its `load` changes.
-
-const fetchLedger = (bizId: string, range: ReportDates): Promise<GlReport> =>
-  api.get<GlReport>(`/businesses/${bizId}/reports/general-ledger`, { params: { period_start: range.start, period_end: range.end } })
-    .then(r => r.data);
-
-const fetchPnl = (bizId: string, range: ReportDates): Promise<PnlReport> =>
-  api.get<PnlReport>(`/businesses/${bizId}/reports/pnl`, { params: { period_start: range.start, period_end: range.end } })
-    .then(r => r.data);
-
-const fetchBalanceSheet = (bizId: string, asOf: string): Promise<BalanceSheetReport> =>
-  api.get<BalanceSheetReport>(`/businesses/${bizId}/reports/balance-sheet`, { params: { as_of: asOf } })
-    .then(r => r.data);
 
 const rangeLabel = (range: ReportDates): string => `${fmtDateText(range.start)} – ${fmtDateText(range.end)}`;
 

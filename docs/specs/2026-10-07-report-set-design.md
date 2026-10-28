@@ -96,9 +96,62 @@ November 1.
     transaction. A stock movement names the item, not who was paid, so it goes
     under Not Specified.
 - **Closed to a client login**, like the General Ledger they read.
+- **Added 10-27 (Riham), from the aging reports' own figures:** Account List,
+  Customer and Vendor Balance Summary, Open Invoices, Unpaid Bills, and A/R and A/P
+  Aging Detail.
+- **Added 10-27 (Aheed), in `ledgerReports.ts` and `LedgerReportPages.tsx`:**
+  - **The account a transaction is "in"**, for the reports that show one line per
+    transaction: the bank or credit card it went through, else Undeposited Funds,
+    else A/R or A/P; a journal entry, which has none of those, by its first debit.
+    An account set up under Banking is a bank account whatever its detail type, as
+    on the Balance Sheet. The Split column is the one other account, or –Split–.
+  - **Customers and vendors** are told apart by name: a report that goes by
+    customer matches the ledger's Name column against the customer list (inactive
+    customers too), and the same for vendors.
+  - **Profit and Loss as % of Total Income:** each amount as a share of total
+    income; blank when there is no income.
+  - **Quarterly Profit and Loss Summary:** quarters of the fiscal year, the first
+    and last cut at the dates; at most 12.
+  - **Profit and Loss Year-to-Date Comparison:** the period beside the fiscal year
+    to its end. Opens on this month.
+  - **Profit and Loss by Customer:** a column per customer, lines naming no
+    customer under Not Specified, and the P&L itself as Total.
+  - **Balance Sheet Summary:** one line per account type, laid out as the Balance
+    Sheet.
+  - **Adjusted Trial Balance:** the Trial Balance as of the end date is the
+    adjusted balance; the period's adjusting entries (`is_adjusting`) are the
+    adjustments; the unadjusted balance is the one less the other.
+  - **Recent Transactions:** by the day each transaction was entered, not its
+    date, under its type. Opens on the last four days.
+  - **Transaction Detail by Account:** each account's lines in the period, the
+    balance running from zero.
+  - **Transaction List with Splits:** each transaction, its account first, every
+    other line under it; debits plus, credits minus.
+  - **Transaction List by Customer / by Vendor:** the transactions naming each one.
+  - **Sales by Customer Detail:** the lines behind Sales by Customer Summary;
+    ties out to it.
+  - **Income by Customer Summary:** income and the costs that name the customer
+    (the cost of goods on their invoices).
+  - **Deposit Detail:** deposits and payments into each bank account, with where
+    the money came from under each. An account set up under Banking is a bank
+    account whatever its detail type, as on the Balance Sheet.
+  - **Check Detail:** checks and bill payments by check, with what each paid for.
+  - **Bill Payment List:** bill payments under the account they were paid from.
+  - **Purchases by Vendor Detail:** the lines bills, checks, expenses and card
+    charges charge, less vendor credits; not the account that paid them.
+  - The loaders also get the company's fiscal year start month, and a page can
+    open on this month or the last four days instead of the fiscal year.
+- **Links to pages the app already has:** Budget vs. Actuals opens Financial
+  Planning, and Audit Log opens the Activity Log (accountant and up). The Standard
+  Reports list leaves off what the role cannot open.
 
 ## 4. Not built
 
-Left for the review with the firm to choose from: aging detail (one line per invoice
-or bill), open invoices and unpaid bills, customer and vendor balance summaries and
-detail, the account list, and sales by product or service.
+- **Riham's next:** customer and vendor balance detail, and sales by product or
+  service.
+- **From the lists rather than the ledger, next:** customer and vendor contact
+  lists, the product/service list, inventory valuation, estimates by customer, open
+  purchase orders, the invoice list and the collections report.
+- **Needs more than the app keeps today:** the sales tax reports (tax by agency),
+  exceptions to closing date, statement list, terms and payment method lists, and
+  purchases by product or service.
