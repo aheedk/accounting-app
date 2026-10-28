@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addressText, collectionsReportTable, customerContactListTable, estimatesByCustomerTable, invoiceListTable, openPurchaseOrderListTable,
-  productServiceListTable, vendorContactListTable,
-  type Contact, type EstimateRow, type InvoiceRow, type OpenInvoiceRow, type PurchaseOrderRow,
+  addressText, collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable,
+  inventoryValuationSummaryTable, invoiceListTable, openPurchaseOrderListTable, productServiceListTable, vendorContactListTable,
+  type Contact, type EstimateRow, type InvoiceRow, type OpenInvoiceRow, type PurchaseOrderRow, type ValuationItem,
 } from './listReports';
 import type { ReportRow } from './standardReports';
 
@@ -153,6 +153,38 @@ describe('collectionsReportTable', () => {
       ['2026-02-01', 'INV2', '2026-03-25', '6', '80.0000', '80.0000'],
       ['Total for Birch', '', '', '', '80.0000', '80.0000'],
       ['TOTAL', '', '', '', '180.0000', '120.0000'],
+    ]);
+  });
+});
+
+describe('inventory valuation', () => {
+  const widget: ValuationItem = {
+    item_id: 'w', sku: 'W-1', name: 'Widget', quantity: '12.0000', value: '66.0000', opening_quantity: '10.0000', opening_value: '50.0000',
+    movements: [
+      { id: 'm1', movement_date: '2026-02-10', reason: 'manual_out', memo: 'Fulfillment of SO-1', quantity: '-4.0000', unit_cost: '5.0000', value: '-20.0000' },
+      { id: 'm2', movement_date: '2026-03-15', reason: 'manual_in', memo: 'Item receipt for PO-1', quantity: '6.0000', unit_cost: '6.0000', value: '36.0000' },
+    ],
+  };
+  const gadget: ValuationItem = {
+    item_id: 'g', sku: 'G-1', name: 'Gadget', quantity: '0.0000', value: '0.0000', opening_quantity: '0.0000', opening_value: '0.0000', movements: [],
+  };
+
+  it('sums each item up as of the date, with the average cost', () => {
+    expect(cells(inventoryValuationSummaryTable([widget, gadget]).rows)).toEqual([
+      ['Gadget', 'G-1', '0', '0.0000', ''],
+      ['Widget', 'W-1', '12', '66.0000', '5.5000'],
+      ['TOTAL', '', '12', '66.0000', ''],
+    ]);
+  });
+
+  it('runs each item from where it stood through every movement, and leaves out one that never moved', () => {
+    expect(cells(inventoryValuationDetailTable([widget, gadget]).rows)).toEqual([
+      ['# Widget'],
+      ['Beginning Balance', '', '', '', '', '', '10', '50.0000'],
+      ['2026-02-10', 'Stock Out', 'Fulfillment of SO-1', '-4', '5.0000', '-20.0000', '6', '30.0000'],
+      ['2026-03-15', 'Stock In', 'Item receipt for PO-1', '6', '6.0000', '36.0000', '12', '66.0000'],
+      ['Total for Widget', '', '', '2', '', '16.0000', '12', '66.0000'],
+      ['TOTAL', '', '', '', '', '', '', '66.0000'],
     ]);
   });
 });

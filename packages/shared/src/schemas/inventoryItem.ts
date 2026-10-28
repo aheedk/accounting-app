@@ -37,3 +37,11 @@ export const postOpeningInventorySchema = z.object({
   entry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 export type StockAdjust = z.infer<typeof stockAdjustSchema>;
+
+/** The Inventory Valuation reports: stock as of a date, and its movements from `period_start` when given. */
+export const inventoryValuationQuerySchema = z.object({
+  as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).refine(q => q.period_start === undefined || q.period_start <= q.as_of, {
+  message: 'period_start must be on or before as_of', path: ['period_start'],
+});

@@ -90,7 +90,7 @@ export type Item = {
 };
 
 /** "12" for 12.0000, "2.5" for 2.5000. */
-const quantity = (value: string): string => new Decimal(value || '0').toString();
+const quantity = (value: string | Decimal): string => new Decimal(value || '0').toString();
 
 /** Product/Service List: every active item with its price, cost and the quantity on hand. */
 export function productServiceListTable(items: Item[]): ReportTable {
@@ -305,5 +305,96 @@ export function collectionsReportTable(invoices: OpenInvoiceRow[], phones: Reado
     list => [sum(list.map(i => i.total)), sum(list.map(i => i.open))],
     columns.length,
   );
+  return { columns, rows };
+}
+
+/** An item's stock as the Inventory Valuation endpoint returns it. */
+export type ValuationItem = {
+  item_id: string;
+  sku: string;
+  name: string;
+  quantity: string;
+  value: string;
+  opening_quantity: string;
+  opening_value: string;
+  movements: {
+    id: string;
+    movement_date: string;
+    reason: string;
+    memo: string | null;
+    quantity: string;
+    unit_cost: string | null;
+    value: string;
+  }[];
+};
+
+/** Inventory Valuation Summary: each item's quantity on hand as of the date, what it cost, and the average. */
+export function inventoryValuationSummaryTable(items: ValuationItem[]): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Product/Service', kind: 'text' },
+    { label: 'SKU', kind: 'text' },
+    { label: 'Qty', kind: 'number' },
+    { label: 'Asset Value', kind: 'money' },
+    { label: 'Calc. Avg', kind: 'money' },
+  ];
+  const rows = byName(items).map((item): ReportRow => {
+    const onHand = new Decimal(item.quantity || '0');
+    return {
+      kind: 'line', depth: 0, to: `/inventory/items/${item.item_id}`,
+      cells: [item.name, item.sku, quantity(onHand), item.value, onHand.isZero() ? '' : new Decimal(item.value).dividedBy(onHand).toFixed(4)],
+    };
+  });
+  rows.push(totalRow(columns.length, 'TOTAL', [quantity(sum(items.map(item => item.quantity))), sum(items.map(item => item.value)), '']));
+  return { columns, rows };
+}
+
+const MOVEMENT_TYPES: Record<string, string> = {
+  opening_balance: 'Opening Inventory',
+  manual_in: 'Stock In',
+  manual_out: 'Stock Out',
+  adjustment: 'Inventory Qty Adjust',
+  write_off: 'Write-off',
+};
+
+/**
+ * Inventory Valuation Detail: each item from where it stood at the start of
+ * the period, through every movement, with the quantity and value running.
+ */
+export function inventoryValuationDetailTable(items: ValuationItem[]): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Date', kind: 'date' },
+    { label: 'Transaction Type', kind: 'text' },
+    { label: 'Memo/Description', kind: 'text' },
+    { label: 'Qty', kind: 'number' },
+    { label: 'Rate', kind: 'money' },
+    { label: 'Value', kind: 'money' },
+    { label: 'Qty On Hand', kind: 'number' },
+    { label: 'Asset Value', kind: 'money' },
+  ];
+  const width = columns.length;
+  const rows: ReportRow[] = [];
+  const shown = byName(items).filter(item => item.movements.length > 0
+    || !new Decimal(item.opening_quantity || '0').isZero() || !new Decimal(item.opening_value || '0').isZero());
+  for (const item of shown) {
+    rows.push({ kind: 'heading', label: item.name, depth: 0 });
+    rows.push({ kind: 'line', depth: 1, cells: ['Beginning Balance', '', '', '', '', '', quantity(item.opening_quantity), item.opening_value] });
+    let onHand = new Decimal(item.opening_quantity || '0');
+    let value = new Decimal(item.opening_value || '0');
+    for (const movement of item.movements) {
+      onHand = onHand.plus(movement.quantity);
+      value = value.plus(movement.value);
+      rows.push({
+        kind: 'line', depth: 1, to: `/inventory/items/${item.item_id}`,
+        cells: [
+          day(movement.movement_date), MOVEMENT_TYPES[movement.reason] ?? capitalized(movement.reason), movement.memo ?? '',
+          quantity(movement.quantity), movement.unit_cost ?? '', movement.value, quantity(onHand), value.toFixed(4),
+        ],
+      });
+    }
+    rows.push(totalRow(width, `Total for ${item.name}`, [
+      quantity(onHand.minus(item.opening_quantity || '0')), '', value.minus(item.opening_value || '0').toFixed(4), quantity(onHand), value.toFixed(4),
+    ]));
+  }
+  rows.push(totalRow(width, 'TOTAL', [sum(shown.map(item => item.value))]));
   return { columns, rows };
 }

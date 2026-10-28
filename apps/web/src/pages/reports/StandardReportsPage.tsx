@@ -66,6 +66,8 @@ const groups: ReportGroup[] = [
       { to: '/reports/estimates-by-customer', name: 'Estimates by Customer', description: 'The estimates dated in the period, under each customer, with their status.' },
       { to: '/reports/customer-contact-list', name: 'Customer Contact List', description: 'Each active customer\'s phone numbers, email, contact name and addresses.' },
       { to: '/reports/product-service-list', name: 'Product/Service List', description: 'Every active item with its price, cost and quantity on hand.' },
+      { to: '/reports/inventory-valuation-summary', name: 'Inventory Valuation Summary', description: 'Each item\'s quantity on hand as of a date, what it cost, and the average cost.' },
+      { to: '/reports/inventory-valuation-detail', name: 'Inventory Valuation Detail', description: 'Each item\'s stock from the start of the period, through every movement, with the quantity and value running.' },
     ],
   },
   {

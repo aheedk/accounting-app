@@ -160,6 +160,13 @@ November 1.
     A/R Aging; the status (Open, Partially paid, Paid, Voided) follows from it.
   - **Collections Report:** invoices past due as of the date, under each customer
     with their phone number, and how many days late each is.
+  - **Inventory Valuation Summary and Detail:** from a new read-only endpoint,
+    `GET /businesses/:id/reports/inventory-valuation?as_of=&period_start=`
+    (`services/inventory/inventoryValuationService.ts`). Each item's quantity and
+    cost as of the date, from its stock movements, which is what the ledger carries
+    for an item that posts. The detail starts where each item stood at the period
+    start and runs through every movement. An inactive item is left out unless it
+    still holds stock or moved in the period.
   - A page can have no dates at all (a list, as it stands today), and a column
     can be a plain number (a quantity, a count of days).
 
@@ -167,9 +174,8 @@ November 1.
 
 - **Riham's next:** customer and vendor balance detail, and sales by product or
   service.
-- **Needs a small endpoint:** inventory valuation summary and detail (what each
-  item's stock cost, which the item list does not give), invoices and received
-  payments, and open purchase order detail.
+- **Needs a small endpoint:** invoices and received payments, and open purchase
+  order detail.
 - **Needs more than the app keeps today:** the sales tax reports (tax by agency),
   exceptions to closing date, statement list, terms and payment method lists, and
   purchases by product or service.

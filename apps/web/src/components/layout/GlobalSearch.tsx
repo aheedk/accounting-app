@@ -101,6 +101,8 @@ const ALL_PAGES: Page[] = [
   { label: 'Open Purchase Order List', group: 'Reports', to: '/reports/open-purchase-orders' },
   { label: 'Invoice List', group: 'Reports', to: '/reports/invoice-list' },
   { label: 'Collections Report', group: 'Reports', to: '/reports/collections' },
+  { label: 'Inventory Valuation Summary', group: 'Reports', to: '/reports/inventory-valuation-summary' },
+  { label: 'Inventory Valuation Detail', group: 'Reports', to: '/reports/inventory-valuation-detail' },
   // Inventory
   { label: 'Inventory Overview', group: 'Inventory', to: '/inventory/overview' },
   { label: 'Inventory Items', group: 'Inventory', to: '/inventory/items' },

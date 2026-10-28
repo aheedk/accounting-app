@@ -7,6 +7,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as itemSvc from '../services/inventory/inventoryItemService.js';
 import * as stockSvc from '../services/inventory/stockMovementService.js';
+import * as valuationSvc from '../services/inventory/inventoryValuationService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -27,6 +28,23 @@ router.get('/businesses/:businessId/inventory-items', async (req, res, next) => 
     const include_inactive = req.query['include_inactive'] === 'true';
     const items = await itemSvc.listItems(db, req.tenancy!.business_id, { include_inactive });
     res.json({ items });
+  } catch (e) { next(e); }
+});
+
+// The Inventory Valuation reports: each item's stock and its cost as of a date,
+// and its movements from period_start when that is given.
+router.get('/businesses/:businessId/reports/inventory-valuation', async (req, res, next) => {
+  try {
+    const q = schemas.inventoryValuationQuerySchema.parse({
+      as_of: req.query['as_of'] ?? new Date().toISOString().slice(0, 10),
+      ...(typeof req.query['period_start'] === 'string' ? { period_start: req.query['period_start'] } : {}),
+    });
+    const items = await valuationSvc.inventoryValuation(db, {
+      business_id: req.tenancy!.business_id,
+      as_of: q.as_of,
+      ...(q.period_start !== undefined ? { period_start: q.period_start } : {}),
+    });
+    res.json({ as_of: q.as_of, items });
   } catch (e) { next(e); }
 });
 

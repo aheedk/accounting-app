@@ -36,8 +36,8 @@ import {
   TransactionListWithSplitsPage,
 } from '@/pages/reports/LedgerReportPages';
 import {
-  CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InvoiceListReportPage, OpenPurchaseOrderListPage,
-  ProductServiceListPage, VendorContactListPage,
+  CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InventoryValuationDetailPage, InventoryValuationSummaryPage,
+  InvoiceListReportPage, OpenPurchaseOrderListPage, ProductServiceListPage, VendorContactListPage,
 } from '@/pages/reports/ListReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
@@ -234,6 +234,8 @@ export default function App() {
             <Route path="/reports/open-purchase-orders" element={<OpenPurchaseOrderListPage />} />
             <Route path="/reports/invoice-list" element={<InvoiceListReportPage />} />
             <Route path="/reports/collections" element={<CollectionsReportPage />} />
+            <Route path="/reports/inventory-valuation-summary" element={<InventoryValuationSummaryPage />} />
+            <Route path="/reports/inventory-valuation-detail" element={<InventoryValuationDetailPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />

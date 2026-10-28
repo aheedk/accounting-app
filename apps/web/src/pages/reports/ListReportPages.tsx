@@ -1,9 +1,9 @@
 import { api } from '@/lib/apiClient';
 import { StandardReport, type ReportDates } from './StandardReport';
 import {
-  collectionsReportTable, customerContactListTable, estimatesByCustomerTable, invoiceListTable, isOpenOrder, openPurchaseOrderListTable,
-  productServiceListTable, vendorContactListTable,
-  type Contact, type EstimateRow, type InvoiceRow, type Item, type OpenInvoiceRow, type PurchaseOrderRow,
+  collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable, inventoryValuationSummaryTable,
+  invoiceListTable, isOpenOrder, openPurchaseOrderListTable, productServiceListTable, vendorContactListTable,
+  type Contact, type EstimateRow, type InvoiceRow, type Item, type OpenInvoiceRow, type PurchaseOrderRow, type ValuationItem,
 } from './listReports';
 import type { ReportTable } from './standardReports';
 
@@ -72,6 +72,24 @@ async function loadCollections(bizId: string, range: ReportDates): Promise<Repor
     if (phone) phones.set(customer.id, phone);
   }
   return collectionsReportTable(open, phones, range.end);
+}
+
+/** Each item's stock as of the date; with `periodStart`, where it stood then and every movement since. */
+const fetchValuation = (bizId: string, asOf: string, periodStart?: string): Promise<ValuationItem[]> =>
+  api.get<{ items: ValuationItem[] }>(`/businesses/${bizId}/reports/inventory-valuation`, {
+    params: { as_of: asOf, ...(periodStart ? { period_start: periodStart } : {}) },
+  }).then(r => r.data.items);
+
+const loadValuationSummary = async (bizId: string, range: ReportDates) => inventoryValuationSummaryTable(await fetchValuation(bizId, range.end));
+const loadValuationDetail = async (bizId: string, range: ReportDates) =>
+  inventoryValuationDetailTable(await fetchValuation(bizId, range.end, range.start));
+
+export function InventoryValuationSummaryPage() {
+  return <StandardReport title="Inventory Valuation Summary" dates="asOf" fileStem="inventory-valuation-summary" load={loadValuationSummary} />;
+}
+
+export function InventoryValuationDetailPage() {
+  return <StandardReport title="Inventory Valuation Detail" dates="period" fileStem="inventory-valuation-detail" load={loadValuationDetail} />;
 }
 
 export function CustomerContactListPage() {
