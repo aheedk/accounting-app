@@ -9,7 +9,10 @@ providers = ["node"]
 cmds = ["npm install --no-audit --prefer-offline --include=dev"]
 
 [phases.build]
-cmds = ["npm run build"]
+# The API and the shared package it is built with; Netlify builds the web app.
+# .dockerignore (for the Azure image) leaves the web app's sources out of
+# this build too, so building it here failed every deploy from 10-26 on.
+cmds = ["npm -w @accounting/api run build"]
 
 [start]
 cmd = "npm run migrate:prod && npm run start:api"
