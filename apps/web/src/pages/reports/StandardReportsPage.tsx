@@ -38,6 +38,7 @@ const groups: ReportGroup[] = [
       { to: '/reports/customer-balances', name: 'Customer Balance Summary', description: 'Each customer\'s current open balance, with no bucket breakdown.' },
       { to: '/reports/open-invoices', name: 'Open Invoices', description: 'Every invoice still carrying a balance, one row each, due soonest first.' },
       { to: '/reports/ar-aging-detail', name: 'A/R Aging Detail', description: 'Open invoices grouped under their aging bucket, one row each.' },
+      { to: '/reports/customer-balance-detail', name: 'Customer Balance Detail', description: 'Open invoices grouped under each customer, one row each.' },
     ],
   },
   {
@@ -53,6 +54,7 @@ const groups: ReportGroup[] = [
       { to: '/reports/vendor-balances', name: 'Vendor Balance Summary', description: 'Each vendor\'s current open balance, with no bucket breakdown.' },
       { to: '/reports/unpaid-bills', name: 'Unpaid Bills', description: 'Every bill still carrying a balance, one row each, due soonest first.' },
       { to: '/reports/ap-aging-detail', name: 'A/P Aging Detail', description: 'Unpaid bills grouped under their aging bucket, one row each.' },
+      { to: '/reports/vendor-balance-detail', name: 'Vendor Balance Detail', description: 'Unpaid bills grouped under each vendor, one row each.' },
     ],
   },
   {

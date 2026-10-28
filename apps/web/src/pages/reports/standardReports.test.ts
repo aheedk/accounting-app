@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   accountListTable, agingDetailTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, exportRows,
-  journalTable, monthRanges, openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable,
-  transactionListTable, yearEarlier,
+  journalTable, monthRanges, openDocumentsTable, partyBalanceDetailTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable,
+  salesByCustomerTable, transactionListTable, yearEarlier,
   type BalanceSheetReport, type GlAccount, type GlLine, type GlReport, type ReportRow,
 } from './standardReports';
 import type { PnlReport } from './pnlLayout';
@@ -175,6 +175,29 @@ describe('agingDetailTable', () => {
   it('skips a bucket with nothing in it', () => {
     const table = agingDetailTable(docs, 'invoice');
     expect(table.rows.some(r => r.kind === 'heading' && r.label === '61 - 90')).toBe(false);
+  });
+});
+
+describe('partyBalanceDetailTable', () => {
+  const docs: Parameters<typeof agingDetailTable>[0] = [
+    { number: 'INV-2', party_name: 'Acme Co', issue_date: '2026-03-01', due_date: '2026-04-01', total: '40.0000', open: '40.0000', bucket: 'current' },
+    { number: 'INV-1', party_name: 'Birch Co', issue_date: '2026-01-01', due_date: '2026-02-01', total: '60.0000', open: '60.0000', bucket: 'days_31_60' },
+    { number: 'INV-3', party_name: 'Acme Co', issue_date: '2026-02-15', due_date: '2026-03-15', total: '10.0000', open: '10.0000', bucket: 'current' },
+  ];
+
+  it('groups documents under their party, alphabetically, with a subtotal and a grand total', () => {
+    const table = partyBalanceDetailTable(docs, 'invoice');
+    expect(table.rows.filter(r => r.kind === 'heading').map(r => r.kind === 'heading' ? r.label : '')).toEqual(['Acme Co', 'Birch Co']);
+    expect(totalOf(table.rows, 'Total for Acme Co')).toEqual(['50.0000']);
+    expect(totalOf(table.rows, 'Total for Birch Co')).toEqual(['60.0000']);
+    expect(totalOf(table.rows, 'TOTAL')).toEqual(['110.0000']);
+  });
+
+  it('lists each party\'s own documents under its heading', () => {
+    const table = partyBalanceDetailTable(docs, 'invoice');
+    const acmeIndex = table.rows.findIndex(r => r.kind === 'heading' && r.label === 'Acme Co');
+    const acmeLines = table.rows.slice(acmeIndex + 1, acmeIndex + 3);
+    expect(acmeLines.map(r => r.kind === 'line' ? r.cells[0] : '')).toEqual(['INV-2', 'INV-3']);
   });
 });
 

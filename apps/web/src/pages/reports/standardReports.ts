@@ -466,6 +466,32 @@ export function agingDetailTable(rows: OpenDocument[], kind: 'invoice' | 'bill')
 }
 
 /**
+ * Customer or Vendor Balance Detail: the same open documents as Open
+ * Invoices/Unpaid Bills, grouped under the party that owes (or is owed)
+ * them instead of listed flat — one line per invoice or bill, a subtotal
+ * per party, a grand total. The companion to the Balance Summary reports
+ * above, which show only each party's total; this shows what makes it up.
+ */
+export function partyBalanceDetailTable(rows: OpenDocument[], kind: 'invoice' | 'bill'): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: kind === 'invoice' ? 'Invoice #' : 'Bill #', kind: 'text' },
+    { label: 'Due Date', kind: 'date' },
+    { label: 'Open Balance', kind: 'money' },
+  ];
+  const width = columns.length;
+  const reportRows: ReportRow[] = [];
+  const parties = [...new Set(rows.map(r => r.party_name))].sort((a, b) => a.localeCompare(b));
+  for (const party of parties) {
+    const theirs = rows.filter(r => r.party_name === party);
+    reportRows.push({ kind: 'heading', label: party, depth: 0 });
+    for (const r of theirs) reportRows.push({ kind: 'line', depth: 1, cells: [r.number, r.due_date, r.open] });
+    reportRows.push(totalRow(width, `Total for ${party}`, [sum(theirs.map(r => r.open))]));
+  }
+  reportRows.push(totalRow(width, 'TOTAL', [sum(rows.map(r => r.open))]));
+  return { columns, rows: reportRows };
+}
+
+/**
  * The months from `start` to `end`, the first and last cut at those dates; null
  * when there are more than `max`.
  */

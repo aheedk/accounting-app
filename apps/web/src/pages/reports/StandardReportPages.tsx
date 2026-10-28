@@ -3,7 +3,8 @@ import { fmtDateText } from '@/lib/dates';
 import { StandardReport, type ReportDates } from './StandardReport';
 import {
   accountListTable, agingDetailTable, balanceSheetComparisonTable, balanceSheetDetailTable, expensesByVendorTable, journalTable,
-  monthRanges, openDocumentsTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable, transactionListTable, yearEarlier,
+  monthRanges, openDocumentsTable, partyBalanceDetailTable, partyBalanceTable, pnlColumnsTable, pnlDetailTable, salesByCustomerTable,
+  transactionListTable, yearEarlier,
   type BalanceSheetReport, type GlReport, type OpenDocument, type PartyBalance, type ReportTable,
 } from './standardReports';
 import { LEDGER_HISTORY_START } from '@/lib/reportDrilldown';
@@ -82,6 +83,8 @@ const loadOpenInvoices = async (bizId: string, range: ReportDates) => openDocume
 const loadUnpaidBills = async (bizId: string, range: ReportDates) => openDocumentsTable(await fetchUnpaidBills(bizId, range.end), 'bill');
 const loadArAgingDetail = async (bizId: string, range: ReportDates) => agingDetailTable(await fetchOpenInvoices(bizId, range.end), 'invoice');
 const loadApAgingDetail = async (bizId: string, range: ReportDates) => agingDetailTable(await fetchUnpaidBills(bizId, range.end), 'bill');
+const loadCustomerBalanceDetail = async (bizId: string, range: ReportDates) => partyBalanceDetailTable(await fetchOpenInvoices(bizId, range.end), 'invoice');
+const loadVendorBalanceDetail = async (bizId: string, range: ReportDates) => partyBalanceDetailTable(await fetchUnpaidBills(bizId, range.end), 'bill');
 const loadJournal = async (bizId: string, range: ReportDates) => journalTable(await fetchLedger(bizId, range));
 const loadTransactionList = async (bizId: string, range: ReportDates) => transactionListTable(await fetchLedger(bizId, range));
 const loadSalesByCustomer = async (bizId: string, range: ReportDates) => salesByCustomerTable(await fetchLedger(bizId, range));
@@ -133,6 +136,14 @@ export function ArAgingDetailPage() {
 
 export function ApAgingDetailPage() {
   return <StandardReport title="A/P Aging Detail" dates="asOf" fileStem="ap-aging-detail" load={loadApAgingDetail} />;
+}
+
+export function CustomerBalanceDetailPage() {
+  return <StandardReport title="Customer Balance Detail" dates="asOf" fileStem="customer-balance-detail" load={loadCustomerBalanceDetail} />;
+}
+
+export function VendorBalanceDetailPage() {
+  return <StandardReport title="Vendor Balance Detail" dates="asOf" fileStem="vendor-balance-detail" load={loadVendorBalanceDetail} />;
 }
 
 export function JournalReportPage() {
