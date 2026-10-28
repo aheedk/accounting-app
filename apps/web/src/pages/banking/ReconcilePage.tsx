@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import { hideUnless, useCan } from '@/lib/roleAccess';
 import { DateInput } from '@/components/ui/date-input';
@@ -216,11 +216,6 @@ export default function ReconcilePage() {
       {uploadOpen && accountId && !stagedId && (
         <div className="max-w-2xl space-y-2">
           <DocumentUpload onUploaded={() => Promise.resolve()} onResult={handleUploadResult} />
-          <p className="text-xs text-muted-foreground">
-            Also reachable from{' '}
-            <Link to="/ai/inbox" className="text-link underline">AI → Document Inbox</Link>
-            {' '}— for statements that arrive by email, or a bulk upload.
-          </p>
         </div>
       )}
 

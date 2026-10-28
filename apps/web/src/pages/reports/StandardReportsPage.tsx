@@ -1,6 +1,10 @@
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown, MoreVertical, Star } from 'lucide-react';
 import { useCanOpen } from '@/lib/roleAccess';
+import { useActiveBusinessId } from '@/lib/business';
+import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 type ReportLink = { to: string; name: string; description: string };
 type ReportGroup = { heading: string; reports: ReportLink[] };
@@ -108,15 +112,123 @@ const groups: ReportGroup[] = [
   },
 ];
 
+const allReports: ReportLink[] = groups.flatMap(g => g.reports);
+
+function favoritesKey(businessId: string | null): string {
+  return `report-favorites-${businessId ?? 'none'}`;
+}
+
+function loadFavorites(businessId: string | null): Set<string> {
+  try {
+    const raw = localStorage.getItem(favoritesKey(businessId));
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Left column first, then right — like a newspaper, not row by row. */
+function twoColumns<T>(items: T[]): [T[], T[]] {
+  const mid = Math.ceil(items.length / 2);
+  return [items.slice(0, mid), items.slice(mid)];
+}
+
+function ReportRow({ report, favorite, onToggleFavorite }: { report: ReportLink; favorite: boolean; onToggleFavorite: () => void }) {
+  return (
+    <div className="group flex items-center justify-between gap-2 py-1.5 sm:py-1">
+      <Link to={report.to} className="truncate text-sm text-foreground hover:text-primary hover:underline">
+        {report.name}
+      </Link>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onToggleFavorite}
+          aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+          className="rounded p-0.5 text-muted-foreground hover:text-primary"
+        >
+          <Star className={`h-4 w-4 ${favorite ? 'fill-primary text-primary' : ''}`} />
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label="Report options" className="rounded p-0.5 text-muted-foreground hover:text-primary">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={onToggleFavorite}>
+              {favorite ? 'Remove from favorites' : 'Add to favorites'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+function ReportSection({
+  heading, reports, favorites, onToggleFavorite,
+}: {
+  heading: string; reports: ReportLink[]; favorites: Set<string>; onToggleFavorite: (to: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const [left, right] = twoColumns(reports);
+  return (
+    <section className="border-b pb-4 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 py-2 text-lg font-semibold text-foreground"
+      >
+        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
+        {heading}
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-2">
+          <div className="divide-y">
+            {left.map(r => <ReportRow key={r.to} report={r} favorite={favorites.has(r.to)} onToggleFavorite={() => onToggleFavorite(r.to)} />)}
+          </div>
+          <div className="divide-y">
+            {right.map(r => <ReportRow key={r.to} report={r} favorite={favorites.has(r.to)} onToggleFavorite={() => onToggleFavorite(r.to)} />)}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function StandardReportsPage() {
   // A report the role cannot open is left off, as in the sidebar and search.
   const canOpen = useCanOpen();
-  const visible = groups
-    .map(group => ({ ...group, reports: group.reports.filter(r => canOpen(r.to)) }))
-    .filter(group => group.reports.length > 0);
+  const [businessId] = useActiveBusinessId();
+  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites(businessId));
+  const [query, setQuery] = useState('');
+
+  const visible = useMemo(
+    () => groups
+      .map(group => ({ ...group, reports: group.reports.filter(r => canOpen(r.to)) }))
+      .filter(group => group.reports.length > 0),
+    [canOpen],
+  );
+  const visibleReports = useMemo(() => visible.flatMap(g => g.reports), [visible]);
+  const favoriteReports = useMemo(() => visibleReports.filter(r => favorites.has(r.to)), [visibleReports, favorites]);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return allReports.filter(r => canOpen(r.to) && r.name.toLowerCase().includes(q));
+  }, [query, canOpen]);
+
+  function toggleFavorite(to: string) {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(to)) next.delete(to); else next.add(to);
+      try { localStorage.setItem(favoritesKey(businessId), JSON.stringify([...next])); } catch { /* best effort */ }
+      return next;
+    });
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Standard Reports</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -124,26 +236,41 @@ export default function StandardReportsPage() {
         </p>
       </div>
 
-      {visible.map(group => (
-        <section key={group.heading} className="space-y-1">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group.heading}</h2>
-          <div className="divide-y rounded-xl border bg-card shadow-card">
-            {group.reports.map(r => (
+      <div className="relative max-w-md">
+        <Input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Type report name here"
+        />
+        {query.trim() && (
+          <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-md">
+            {matches.length === 0 && <div className="px-3 py-2 text-sm text-muted-foreground">No reports match.</div>}
+            {matches.map(r => (
               <Link
                 key={r.to}
                 to={r.to}
-                className="group flex items-center justify-between gap-4 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-muted/40"
+                className="block px-3 py-2 text-sm text-foreground hover:bg-muted/40 hover:text-primary"
+                onClick={() => setQuery('')}
               >
-                <div>
-                  <div className="font-medium text-link">{r.name}</div>
-                  <div className="text-sm text-muted-foreground">{r.description}</div>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                {r.name}
               </Link>
             ))}
           </div>
-        </section>
-      ))}
+        )}
+      </div>
+
+      {!query.trim() && (
+        <div className="space-y-4">
+          {favoriteReports.length > 0 && (
+            <ReportSection heading="Favorites" reports={favoriteReports} favorites={favorites} onToggleFavorite={toggleFavorite} />
+          )}
+          {visible.map(group => (
+            <ReportSection
+              key={group.heading} heading={group.heading} reports={group.reports} favorites={favorites} onToggleFavorite={toggleFavorite}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
