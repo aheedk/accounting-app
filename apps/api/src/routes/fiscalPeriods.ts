@@ -7,6 +7,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as periods from '../services/core/fiscalPeriodService.js';
 import * as periodClose from '../services/core/periodCloseService.js';
+import { closingDateExceptions } from '../services/core/closingDateExceptionService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -26,6 +27,14 @@ router.get('/businesses/:businessId/periods', async (req, res, next) => {
   try {
     const list = await periods.listPeriods(db, req.tenancy!.business_id);
     res.json({ periods: list });
+  } catch (e) { next(e); }
+});
+
+// Closing Date Exception Report: what posted or was voided in a closed
+// period after it closed — only reachable through a firm admin's override.
+router.get('/businesses/:businessId/reports/closing-date-exceptions', async (req, res, next) => {
+  try {
+    res.json({ exceptions: await closingDateExceptions(db, req.tenancy!.business_id) });
   } catch (e) { next(e); }
 });
 

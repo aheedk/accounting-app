@@ -42,6 +42,7 @@ const groups: ReportGroup[] = [
       { to: '/reports/cash-flow', name: 'Cash Activity by Account', description: 'Every movement in one bank account over a period, with a running balance.' },
       { to: '/accounting/recurring', name: 'Recurring Template List', description: 'Every recurring transaction template, how often it runs and when it runs next.' },
       { to: '/reports/reconciliation', name: 'Reconciliation Reports', description: 'Every completed reconciliation, fixed as it was the day it was finished — the balances, the cleared transactions, and a PDF copy.' },
+      { to: '/reports/closing-date-exceptions', name: 'Closing Date Exception Report', description: 'Every transaction that changed a closed period\'s own numbers after it closed.' },
     ],
   },
   {

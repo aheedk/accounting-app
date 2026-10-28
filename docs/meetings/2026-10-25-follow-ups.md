@@ -1,7 +1,7 @@
 # Meeting follow-ups — 2026-10-25
 
 What was asked for in the meeting (Faizan, Riham, Aheed), taken from the
-recording transcript and checked against the code on 2026-10-27. Item numbers
+recording transcript and checked against the code on 2026-10-28. Item numbers
 carry on from [`2026-10-21-faizan-video-2.md`](./2026-10-21-faizan-video-2.md)
 (which ended at 91). Everything still open there and in
 [`2026-10-16-follow-ups.md`](./2026-10-16-follow-ups.md) is carried into this
@@ -66,7 +66,7 @@ the reconciliation and the phone app.
 | # | What | Owner |
 |---|---|---|
 | 92 | **Hosting.** The database (and uploaded files) to Supabase, as soon as possible; the API and the web app to Azure. Faizan creates both accounts in the firm's name and gives Aheed access. Aheed sets them up and does a trial run while Railway stays live, then switches over one evening. The repo side is ready: [`../plans/2026-10-25-azure-supabase-move.md`](../plans/2026-10-25-azure-supabase-move.md). Covers what is left of 43 | Faizan (accounts), Aheed |
-| 18 | **All of QuickBooks' standard reports**, then a review of them with the firm. Ten were on Reports → Standard Reports; nine more were added 10-26, and Account List, Customer/Vendor Balance Summary, Open Invoices, Unpaid Bills, A/R and A/P Aging Detail, Customer/Vendor Balance Detail and twenty-six more from the ledger and the lists on 10-27, and four on 10-28 (below). Left: sales by product/service — needs line-item data the General Ledger doesn't carry, so it isn't a quick one (Riham); exceptions to closing date; and those that need data the app doesn't keep (sales tax by agency, taxable sales by product, statement list, terms and payment method lists). See "Reports" below **(10-05)** | Riham |
+| 18 | **All of QuickBooks' standard reports**, then a review of them with the firm. Ten were on Reports → Standard Reports; nine more were added 10-26, Account List, Customer/Vendor Balance Summary, Open Invoices, Unpaid Bills, A/R and A/P Aging Detail, Customer/Vendor Balance Detail and twenty-six more from the ledger and the lists on 10-27, four on 10-28, and the Closing Date Exception Report on 10-28 (below). Left: sales by product/service — needs line-item data the General Ledger doesn't carry, so it isn't a quick one; and those that need data the app doesn't keep (sales tax by agency, taxable sales by product, statement list, terms and payment method lists). See "Reports" below **(10-05)** | Riham |
 | 96 | Go through the second security pass on the live site, as demo steps 1 to 3 have it: a new login choosing its own password, a role taken away, requiring the second step. Aheed: "I didn't fully test this" | Aheed |
 | 95 | Test the reconciliation (the matching, and item 72's statement upload) on a client whose books are complete for the period. Riham's test data has gaps, so its difference cannot reach zero | Faizan |
 | 34 | Faizan's PDF and the check stubs from the Teams chat are still to go through. Both videos are written up **(10-10)** | Aheed |
@@ -217,6 +217,7 @@ Reported in the meeting:
 | 18 (part) | **Nine from the lists** (10-27): Customer and Vendor Contact List, Product/Service List, Estimates by Customer, Open Purchase Order List, Invoice List, Collections Report, and Inventory Valuation Summary and Detail (from a new read-only endpoint). The invoice list's open balances are the Open Invoices report's, so they tie to A/R Aging. Left: a few that need a small endpoint, and sales tax. Spec section 3 and 4 | Aheed |
 | 18 (part) | **Four more standard reports** (10-28): Invoices and Received Payments, and the Sales Tax Liability Report, each from a new read-only endpoint; Open Purchase Order Detail; and a Physical Inventory Worksheet. The invoices' open balances count what Open Invoices counts, so they tie out to it, and each tax code's tax is what its invoices posted to its tax payable account. Spec section 3 | Aheed |
 | — | **Railway deploys again** (10-28). No API deploy had started since the 10-26 evening push: the Azure Dockerfile added at the repo root made Railway build with it instead of Nixpacks, and built that way Railway ran only the migrations half of the start command, so the new API never answered its health check and the 10-26 one stayed live. Until then the live API lacked items 93 and 94 and the endpoints behind Open Invoices, Unpaid Bills, the Aging and Balance Detail reports, Invoice List, Collections and Inventory Valuation. The Dockerfile is in `deploy/azure/` now | Aheed |
+| 18 (part) | **Closing Date Exception Report** (10-28), on Reports → Standard Reports → For my accountant. Every transaction that changed a closed period's own numbers after it closed — this app has no in-place editing of a posted entry, so the only two ways that can happen are an entry posted into the period after close, or one voided after close, both only reachable through a firm admin's closed-period override. Each `journal_entries` row already knows its own fiscal period (`period_id`), so no date-range guessing was needed. No date filter, same as QuickBooks' own version | Riham |
 
 ## Decided — no work
 

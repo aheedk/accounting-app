@@ -1,11 +1,11 @@
 import { api } from '@/lib/apiClient';
 import { StandardReport, type ReportDates } from './StandardReport';
 import {
-  collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable, inventoryValuationSummaryTable,
-  invoiceListTable, invoicesAndPaymentsTable, isOpenOrder, openPurchaseOrderDetailTable, openPurchaseOrderListTable,
-  physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
-  type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type Item, type OpenInvoiceRow, type PurchaseOrderRow,
-  type SalesTaxReport, type ValuationItem,
+  closingDateExceptionTable, collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable,
+  inventoryValuationSummaryTable, invoiceListTable, invoicesAndPaymentsTable, isOpenOrder, openPurchaseOrderDetailTable,
+  openPurchaseOrderListTable, physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
+  type ClosingDateExceptionRow, type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type Item, type OpenInvoiceRow,
+  type PurchaseOrderRow, type SalesTaxReport, type ValuationItem,
 } from './listReports';
 import type { ReportTable } from './standardReports';
 
@@ -163,4 +163,12 @@ export function InvoicesAndPaymentsPage() {
 
 export function SalesTaxLiabilityPage() {
   return <StandardReport title="Sales Tax Liability Report" dates="period" fileStem="sales-tax-liability" load={loadSalesTaxLiability} />;
+}
+
+const loadClosingDateExceptions = async (bizId: string) => closingDateExceptionTable(
+  await api.get<{ exceptions: ClosingDateExceptionRow[] }>(`/businesses/${bizId}/reports/closing-date-exceptions`).then(r => r.data.exceptions),
+);
+
+export function ClosingDateExceptionPage() {
+  return <StandardReport title="Closing Date Exception Report" dates="none" fileStem="closing-date-exceptions" load={loadClosingDateExceptions} />;
 }

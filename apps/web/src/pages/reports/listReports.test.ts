@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addressText, collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable,
-  inventoryValuationSummaryTable, invoiceListTable, invoicesAndPaymentsTable, openPurchaseOrderDetailTable, openPurchaseOrderListTable,
-  physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
-  type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type OpenInvoiceRow, type PurchaseOrderRow, type ValuationItem,
+  addressText, closingDateExceptionTable, collectionsReportTable, customerContactListTable, estimatesByCustomerTable,
+  inventoryValuationDetailTable, inventoryValuationSummaryTable, invoiceListTable, invoicesAndPaymentsTable, openPurchaseOrderDetailTable,
+  openPurchaseOrderListTable, physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
+  type ClosingDateExceptionRow, type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type OpenInvoiceRow,
+  type PurchaseOrderRow, type ValuationItem,
 } from './listReports';
 import type { ReportRow } from './standardReports';
 
@@ -272,5 +273,30 @@ describe('inventory valuation', () => {
       ['Total for Widget', '', '', '2', '', '16.0000', '12', '66.0000'],
       ['TOTAL', '', '', '', '', '', '', '66.0000'],
     ]);
+  });
+});
+
+describe('closingDateExceptionTable', () => {
+  const posted: ClosingDateExceptionRow = {
+    journal_entry_id: 'je1', entry_date: '2026-04-15', label: 'Journal Entry', num: '42', name: null,
+    memo: 'Late tax true-up', path: '/accounting/journal-entries/je1', amount: '50.0000',
+    reason: 'posted_after_close', when: '2026-05-02T10:00:00.000Z', who: 'Pat Admin',
+  };
+  const voided: ClosingDateExceptionRow = {
+    journal_entry_id: 'je2', entry_date: '2026-04-10', label: 'Journal Entry', num: '40', name: 'Acme Co',
+    memo: null, path: '/accounting/journal-entries/je2', amount: '75.0000',
+    reason: 'voided_after_close', when: '2026-05-03T10:00:00.000Z', who: 'Sam Admin',
+  };
+
+  it('shows each exception with a plain-language reason and who did it', () => {
+    expect(cells(closingDateExceptionTable([posted, voided]).rows)).toEqual([
+      ['2026-04-15', 'Journal Entry', '42', '', 'Posted after closing', '50.0000', '2026-05-02', 'Pat Admin'],
+      ['2026-04-10', 'Journal Entry', '40', 'Acme Co', 'Voided after closing', '75.0000', '2026-05-03', 'Sam Admin'],
+    ]);
+  });
+
+  it('links a row to its transaction when the service gave one', () => {
+    const table = closingDateExceptionTable([posted]);
+    expect(table.rows[0]).toMatchObject({ to: '/accounting/journal-entries/je1' });
   });
 });

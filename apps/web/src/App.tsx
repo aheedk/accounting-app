@@ -36,9 +36,9 @@ import {
   TransactionListWithSplitsPage,
 } from '@/pages/reports/LedgerReportPages';
 import {
-  CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InventoryValuationDetailPage, InventoryValuationSummaryPage,
-  InvoiceListReportPage, InvoicesAndPaymentsPage, OpenPurchaseOrderDetailPage, OpenPurchaseOrderListPage, PhysicalInventoryWorksheetPage,
-  ProductServiceListPage, SalesTaxLiabilityPage, VendorContactListPage,
+  ClosingDateExceptionPage, CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InventoryValuationDetailPage,
+  InventoryValuationSummaryPage, InvoiceListReportPage, InvoicesAndPaymentsPage, OpenPurchaseOrderDetailPage, OpenPurchaseOrderListPage,
+  PhysicalInventoryWorksheetPage, ProductServiceListPage, SalesTaxLiabilityPage, VendorContactListPage,
 } from '@/pages/reports/ListReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
@@ -241,6 +241,7 @@ export default function App() {
             <Route path="/reports/physical-inventory-worksheet" element={<PhysicalInventoryWorksheetPage />} />
             <Route path="/reports/invoices-and-payments" element={<InvoicesAndPaymentsPage />} />
             <Route path="/reports/sales-tax-liability" element={<SalesTaxLiabilityPage />} />
+            <Route path="/reports/closing-date-exceptions" element={<ClosingDateExceptionPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />

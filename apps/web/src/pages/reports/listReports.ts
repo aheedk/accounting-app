@@ -571,3 +571,46 @@ export function salesTaxLiabilityTable(report: SalesTaxReport, range: { start: s
   rows.push(totalRow(width, 'Gross total sales', [report.gross_sales, '']));
   return { columns, rows };
 }
+
+export type ClosingDateExceptionRow = {
+  journal_entry_id: string;
+  entry_date: string;
+  label: string;
+  num: string | null;
+  name: string | null;
+  memo: string | null;
+  path: string | null;
+  amount: string;
+  reason: 'posted_after_close' | 'voided_after_close';
+  when: string;
+  who: string | null;
+};
+
+const REASON_LABEL: Record<ClosingDateExceptionRow['reason'], string> = {
+  posted_after_close: 'Posted after closing',
+  voided_after_close: 'Voided after closing',
+};
+
+/**
+ * Closing Date Exception Report: every transaction that changed a closed
+ * period's own numbers after it closed — only reachable through a firm
+ * admin's closed-period override. No date range: it is what it is, same as
+ * QuickBooks' own version.
+ */
+export function closingDateExceptionTable(rows: ClosingDateExceptionRow[]): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Date', kind: 'date' },
+    { label: 'Transaction Type', kind: 'text' },
+    { label: 'Num', kind: 'text' },
+    { label: 'Name', kind: 'text' },
+    { label: 'Reason', kind: 'text' },
+    { label: 'Amount', kind: 'money' },
+    { label: 'Changed On', kind: 'date' },
+    { label: 'By', kind: 'text' },
+  ];
+  const reportRows: ReportRow[] = rows.map(r => ({
+    kind: 'line', depth: 0, ...(r.path ? { to: r.path } : {}),
+    cells: [r.entry_date, r.label, r.num ?? '', r.name ?? '', REASON_LABEL[r.reason], r.amount, day(r.when), r.who ?? ''],
+  }));
+  return { columns, rows: reportRows };
+}
