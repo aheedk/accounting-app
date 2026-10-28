@@ -97,8 +97,9 @@ November 1.
     under Not Specified.
 - **Closed to a client login**, like the General Ledger they read.
 - **Added 10-27 (Riham), from the aging reports' own figures:** Account List,
-  Customer and Vendor Balance Summary, Open Invoices, Unpaid Bills, and A/R and A/P
-  Aging Detail.
+  Customer and Vendor Balance Summary, Open Invoices, Unpaid Bills, A/R and A/P
+  Aging Detail, and Customer and Vendor Balance Detail (the open invoices or bills
+  under each customer or vendor).
 - **Added 10-27 (Aheed), in `ledgerReports.ts` and `LedgerReportPages.tsx`:**
   - **The account a transaction is "in"**, for the reports that show one line per
     transaction: the bank or credit card it went through, else Undeposited Funds,
@@ -172,8 +173,7 @@ November 1.
 
 ## 4. Not built
 
-- **Riham's next:** customer and vendor balance detail, and sales by product or
-  service.
+- **Riham's next:** sales by product or service.
 - **Needs a small endpoint:** invoices and received payments, and open purchase
   order detail.
 - **Needs more than the app keeps today:** the sales tax reports (tax by agency),

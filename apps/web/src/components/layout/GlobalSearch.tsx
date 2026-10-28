@@ -77,6 +77,8 @@ const ALL_PAGES: Page[] = [
   { label: 'Unpaid Bills', group: 'Reports', to: '/reports/unpaid-bills' },
   { label: 'A/R Aging Detail', group: 'Reports', to: '/reports/ar-aging-detail' },
   { label: 'A/P Aging Detail', group: 'Reports', to: '/reports/ap-aging-detail' },
+  { label: 'Customer Balance Detail', group: 'Reports', to: '/reports/customer-balance-detail' },
+  { label: 'Vendor Balance Detail', group: 'Reports', to: '/reports/vendor-balance-detail' },
   { label: 'Profit & Loss as % of Income', group: 'Reports', to: '/reports/pnl-percent-of-income' },
   { label: 'Quarterly Profit & Loss', group: 'Reports', to: '/reports/pnl-quarterly' },
   { label: 'Profit & Loss YTD Comparison', group: 'Reports', to: '/reports/pnl-ytd-comparison' },

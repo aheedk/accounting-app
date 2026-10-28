@@ -59,6 +59,8 @@ export const PAGE_NAMES: Record<string, string> = {
   '/reports/ap-aging-detail': 'A/P Aging Detail',
   '/reports/customer-balances': 'Customer Balance Summary',
   '/reports/vendor-balances': 'Vendor Balance Summary',
+  '/reports/customer-balance-detail': 'Customer Balance Detail',
+  '/reports/vendor-balance-detail': 'Vendor Balance Detail',
   '/reports/pnl-percent-of-income': 'Profit & Loss as % of Income',
   '/reports/pnl-quarterly': 'Quarterly Profit & Loss',
   '/reports/pnl-ytd-comparison': 'Profit & Loss YTD Comparison',
