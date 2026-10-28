@@ -143,8 +143,10 @@ November 1.
   - The loaders also get the company's fiscal year start month, and a page can
     open on this month or the last four days instead of the fiscal year.
 - **Links to pages the app already has:** Budget vs. Actuals opens Financial
-  Planning, and Audit Log opens the Activity Log (accountant and up). The Standard
-  Reports list leaves off what the role cannot open.
+  Planning, Audit Log opens the Activity Log (accountant and up), and Recurring
+  Template List opens Recurring Transactions, which lists the templates with
+  Excel and Print. The Standard Reports list leaves off what the role cannot
+  open.
 - **Added 10-27 (Aheed), from the lists, in `listReports.ts` and
   `ListReportPages.tsx`:**
   - **Customer and Vendor Contact List:** active ones only, as in QuickBooks; phone
