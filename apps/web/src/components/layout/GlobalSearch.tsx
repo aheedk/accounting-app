@@ -94,6 +94,13 @@ const ALL_PAGES: Page[] = [
   { label: 'Check Detail', group: 'Reports', to: '/reports/check-detail' },
   { label: 'Bill Payment List', group: 'Reports', to: '/reports/bill-payment-list' },
   { label: 'Purchases by Vendor Detail', group: 'Reports', to: '/reports/purchases-by-vendor-detail' },
+  { label: 'Customer Contact List', group: 'Reports', to: '/reports/customer-contact-list' },
+  { label: 'Vendor Contact List', group: 'Reports', to: '/reports/vendor-contact-list' },
+  { label: 'Product/Service List', group: 'Reports', to: '/reports/product-service-list' },
+  { label: 'Estimates by Customer', group: 'Reports', to: '/reports/estimates-by-customer' },
+  { label: 'Open Purchase Order List', group: 'Reports', to: '/reports/open-purchase-orders' },
+  { label: 'Invoice List', group: 'Reports', to: '/reports/invoice-list' },
+  { label: 'Collections Report', group: 'Reports', to: '/reports/collections' },
   // Inventory
   { label: 'Inventory Overview', group: 'Inventory', to: '/inventory/overview' },
   { label: 'Inventory Items', group: 'Inventory', to: '/inventory/items' },

@@ -40,7 +40,7 @@ function cellText(column: ReportColumn, value: string): string {
   return value;
 }
 
-const alignOf = (column: ReportColumn): string => (column.kind === 'money' || column.kind === 'percent' ? 'text-right' : 'text-left');
+const alignOf = (column: ReportColumn): string => (column.kind === 'text' || column.kind === 'date' ? 'text-left' : 'text-right');
 
 function RowView({ row, columns }: { row: ReportRow; columns: ReportColumn[] }) {
   const canOpen = useCanOpen();
@@ -80,8 +80,8 @@ export function StandardReport({
   opens = 'fiscalYear',
 }: {
   title: string;
-  /** A period (start and end), or one date (as of). */
-  dates: 'period' | 'asOf';
+  /** A period (start and end), one date (as of), or none: a list, as it stands today. */
+  dates: 'period' | 'asOf' | 'none';
   fileStem: string;
   /** Kept at module level by the caller, so the page does not reload on every render. */
   load: (bizId: string, range: ReportDates, context: ReportContext) => Promise<ReportTable>;
@@ -119,7 +119,7 @@ export function StandardReport({
 
   if (!bizId) return <div>Pick a business.</div>;
 
-  const subtitle = dates === 'period' ? `${fmtLongDate(start)} – ${fmtLongDate(end)}` : `As of ${fmtLongDate(end)}`;
+  const subtitle = dates === 'period' ? `${fmtLongDate(start)} – ${fmtLongDate(end)}` : dates === 'asOf' ? `As of ${fmtLongDate(end)}` : '';
   const headers = table?.columns.map(column => column.label) ?? [];
 
   function handleExport() {
@@ -143,10 +143,12 @@ export function StandardReport({
               <DateInput value={start} onChange={e => setStart(e.target.value)} />
             </div>
           )}
-          <div>
-            <div className="mb-1 text-xs text-muted-foreground">{dates === 'period' ? 'Period end' : 'as of'}</div>
-            <DateInput value={end} onChange={e => setEnd(e.target.value)} />
-          </div>
+          {dates !== 'none' && (
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">{dates === 'period' ? 'Period end' : 'as of'}</div>
+              <DateInput value={end} onChange={e => setEnd(e.target.value)} />
+            </div>
+          )}
           <Button variant="outline" onClick={() => { void refresh(); }} disabled={loading}>
             {loading ? <span className="inline-flex items-center gap-2"><LoadingIndicator size="sm" /> Loading…</span> : 'Refresh'}
           </Button>

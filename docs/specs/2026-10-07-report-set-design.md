@@ -144,14 +144,32 @@ November 1.
 - **Links to pages the app already has:** Budget vs. Actuals opens Financial
   Planning, and Audit Log opens the Activity Log (accountant and up). The Standard
   Reports list leaves off what the role cannot open.
+- **Added 10-27 (Aheed), from the lists, in `listReports.ts` and
+  `ListReportPages.tsx`:**
+  - **Customer and Vendor Contact List:** active ones only, as in QuickBooks; phone
+    and mobile, email, contact name, and the address on one line. A vendor's
+    account number too.
+  - **Product/Service List:** the inventory items, the app's only product list,
+    with price, cost and quantity on hand.
+  - **Estimates by Customer:** the estimates dated in the period, with their status.
+  - **Open Purchase Order List:** drafts and orders sent, not received, closed or
+    voided, priced from their lines. The list has no lines, so each open order is
+    read for them.
+  - **Invoice List:** the invoices dated in the period, not drafts. A voided one is
+    shown at nothing. The open balance is the Open Invoices report's, so it ties to
+    A/R Aging; the status (Open, Partially paid, Paid, Voided) follows from it.
+  - **Collections Report:** invoices past due as of the date, under each customer
+    with their phone number, and how many days late each is.
+  - A page can have no dates at all (a list, as it stands today), and a column
+    can be a plain number (a quantity, a count of days).
 
 ## 4. Not built
 
 - **Riham's next:** customer and vendor balance detail, and sales by product or
   service.
-- **From the lists rather than the ledger, next:** customer and vendor contact
-  lists, the product/service list, inventory valuation, estimates by customer, open
-  purchase orders, the invoice list and the collections report.
+- **Needs a small endpoint:** inventory valuation summary and detail (what each
+  item's stock cost, which the item list does not give), invoices and received
+  payments, and open purchase order detail.
 - **Needs more than the app keeps today:** the sales tax reports (tax by agency),
   exceptions to closing date, statement list, terms and payment method lists, and
   purchases by product or service.

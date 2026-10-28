@@ -12,7 +12,8 @@ import type { PnlReport, PnlSection } from './pnlLayout';
 // YYYY-MM-DD, amounts as decimal strings) that the page shows, prints and
 // exports alike.
 
-export type ColumnKind = 'text' | 'date' | 'money' | 'percent';
+/** `number` is a count or quantity: right-aligned like money, shown as it is. */
+export type ColumnKind = 'text' | 'date' | 'money' | 'percent' | 'number';
 export type ReportColumn = { label: string; kind: ColumnKind };
 export type ReportRow =
   | { kind: 'heading'; label: string; depth: number }

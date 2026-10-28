@@ -35,6 +35,10 @@ import {
   RecentTransactionsPage, SalesByCustomerDetailPage, TransactionDetailByAccountPage, TransactionListByCustomerPage, TransactionListByVendorPage,
   TransactionListWithSplitsPage,
 } from '@/pages/reports/LedgerReportPages';
+import {
+  CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InvoiceListReportPage, OpenPurchaseOrderListPage,
+  ProductServiceListPage, VendorContactListPage,
+} from '@/pages/reports/ListReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
 import CustomerDetailPage from '@/pages/customers/CustomerDetailPage';
@@ -223,6 +227,13 @@ export default function App() {
             <Route path="/reports/check-detail" element={<CheckDetailPage />} />
             <Route path="/reports/bill-payment-list" element={<BillPaymentListReportPage />} />
             <Route path="/reports/purchases-by-vendor-detail" element={<PurchasesByVendorDetailPage />} />
+            <Route path="/reports/customer-contact-list" element={<CustomerContactListPage />} />
+            <Route path="/reports/vendor-contact-list" element={<VendorContactListPage />} />
+            <Route path="/reports/product-service-list" element={<ProductServiceListPage />} />
+            <Route path="/reports/estimates-by-customer" element={<EstimatesByCustomerPage />} />
+            <Route path="/reports/open-purchase-orders" element={<OpenPurchaseOrderListPage />} />
+            <Route path="/reports/invoice-list" element={<InvoiceListReportPage />} />
+            <Route path="/reports/collections" element={<CollectionsReportPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />

@@ -51,6 +51,8 @@ const groups: ReportGroup[] = [
       { to: '/reports/open-invoices', name: 'Open Invoices', description: 'Every invoice still carrying a balance, one row each, due soonest first.' },
       { to: '/reports/ar-aging-detail', name: 'A/R Aging Detail', description: 'Open invoices grouped under their aging bucket, one row each.' },
       { to: '/reports/customer-balance-detail', name: 'Customer Balance Detail', description: 'Open invoices grouped under each customer, one row each.' },
+      { to: '/reports/collections', name: 'Collections Report', description: 'Invoices past due, under each customer with their phone number, and how many days late.' },
+      { to: '/reports/invoice-list', name: 'Invoice List', description: 'Every invoice dated in the period, with its status and what is still owed.' },
     ],
   },
   {
@@ -61,6 +63,9 @@ const groups: ReportGroup[] = [
       { to: '/reports/income-by-customer', name: 'Income by Customer Summary', description: 'Each customer\'s income, the costs that name them, and what is left.' },
       { to: '/reports/transaction-list-by-customer', name: 'Transaction List by Customer', description: 'Every transaction in the period under the customer it names.' },
       { to: '/reports/deposit-detail', name: 'Deposit Detail', description: 'What went into each bank account, with where it came from under it.' },
+      { to: '/reports/estimates-by-customer', name: 'Estimates by Customer', description: 'The estimates dated in the period, under each customer, with their status.' },
+      { to: '/reports/customer-contact-list', name: 'Customer Contact List', description: 'Each active customer\'s phone numbers, email, contact name and addresses.' },
+      { to: '/reports/product-service-list', name: 'Product/Service List', description: 'Every active item with its price, cost and quantity on hand.' },
     ],
   },
   {
@@ -81,6 +86,8 @@ const groups: ReportGroup[] = [
       { to: '/reports/purchases-by-vendor-detail', name: 'Purchases by Vendor Detail', description: 'What was bought from each vendor, line by line, less vendor credits.' },
       { to: '/reports/transaction-list-by-vendor', name: 'Transaction List by Vendor', description: 'Every transaction in the period under the vendor it names.' },
       { to: '/reports/check-detail', name: 'Check Detail', description: 'Every check written in the period, with what it paid for under it.' },
+      { to: '/reports/open-purchase-orders', name: 'Open Purchase Order List', description: 'Purchase orders not yet received, closed or voided, under each vendor.' },
+      { to: '/reports/vendor-contact-list', name: 'Vendor Contact List', description: 'Each active vendor\'s phone numbers, email, contact name, address and account number.' },
       { to: '/reports/1099', name: '1099 Transaction Detail Report', description: 'Annual payments to 1099 vendors, grouped by vendor and tax ID.' },
     ],
   },
