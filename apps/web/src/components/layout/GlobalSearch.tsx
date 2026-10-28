@@ -109,6 +109,9 @@ const ALL_PAGES: Page[] = [
   { label: 'Physical Inventory Worksheet', group: 'Reports', to: '/reports/physical-inventory-worksheet' },
   { label: 'Invoices and Received Payments', group: 'Reports', to: '/reports/invoices-and-payments' },
   { label: 'Sales Tax Liability Report', group: 'Reports', to: '/reports/sales-tax-liability' },
+  { label: 'Sales Tax by Agency', group: 'Reports', to: '/reports/sales-tax-by-agency' },
+  { label: 'Sales by Product/Service Summary', group: 'Reports', to: '/reports/sales-by-product' },
+  { label: 'Closing Date Exception Report', group: 'Reports', to: '/reports/closing-date-exceptions' },
   // Inventory
   { label: 'Inventory Overview', group: 'Inventory', to: '/inventory/overview' },
   { label: 'Inventory Items', group: 'Inventory', to: '/inventory/items' },

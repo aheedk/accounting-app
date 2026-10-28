@@ -194,11 +194,34 @@ November 1.
     invoices credited its tax payable account, and the line opens that
     account's ledger. The rate shown is the one in effect at the period end.
     Credit memos carry no tax lines, so they are not in it.
+- **Added 10-28 (Riham), in the same files:**
+  - **Closing Date Exception Report:** from
+    `GET /businesses/:id/reports/closing-date-exceptions`
+    (`services/core/closingDateExceptionService.ts`). Each entry posted into a
+    closed period after it closed, or voided after it closed; both take a firm
+    admin's override. An entry records its own period (`period_id`), so the
+    report takes no dates, as in QuickBooks.
+  - **Sales by Product/Service Summary:** from
+    `GET /businesses/:id/reports/sales-by-product?period_start=&period_end=`
+    (`services/ar/reports/salesByProductService.ts`). The posted invoices' lines
+    dated in the period, under the product or service each was for. A line
+    records its product since migration 0112 (`invoice_lines.inventory_item_id`);
+    older lines and free-text ones fall under "Not Specified". Credit memos
+    carry no items, so they are not in it.
+  - **Sales Tax by Agency:** the Sales Tax Liability figures, grouped under the
+    agency each tax code is owed to (`tax_codes.agency`, migration 0113, set on
+    Settings → Tax Codes), so the two tie out. A code with no agency falls under
+    "Not Specified".
+  - Standard Reports is a grid of sections that fold, with a search box and
+    favourites, kept in the browser for each company.
 
 ## 4. Not built
 
-- **Riham's next:** sales by product or service.
-- **Needs more than the app keeps today:** sales tax by agency, and the Taxable
-  Sales reports (a tax code has no agency, an invoice line no product);
-  exceptions to closing date; statement list; terms and payment method lists;
-  and purchases by product or service.
+- **Can be built now:** the Taxable Sales reports (summary and detail), since
+  an invoice line carries its product as well as its tax code.
+- **Needs more than the app keeps today:** the statement list (a statement is
+  not recorded when it is sent), and purchases by product or service (a bill
+  line has no product).
+- **Decided against (Riham, 10-28):** the terms and payment method lists. Both
+  are fixed lists in the app, not the business's data, so a report would only
+  repeat them.
