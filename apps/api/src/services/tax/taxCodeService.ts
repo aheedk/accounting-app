@@ -10,6 +10,7 @@ export type CreateTaxCodeInput = {
   code: string;
   name: string;
   tax_payable_account_id: string;
+  agency?: string | null;
   initial_rate: { rate: number; effective_from: string; effective_to: string | null };
 };
 
@@ -28,6 +29,7 @@ export async function createTaxCode(trx: Transaction<DB>, ctx: ServiceCtx, input
     business_id: input.business_id,
     code: input.code, name: input.name,
     tax_payable_account_id: input.tax_payable_account_id,
+    agency: input.agency ?? null,
   }).returningAll().executeTakeFirstOrThrow();
 
   await trx.insertInto('tax_rates').values({
@@ -51,6 +53,7 @@ export type UpdateTaxCodeInput = {
     name?: string;
     tax_payable_account_id?: string;
     is_active?: boolean;
+    agency?: string | null;
     /** A rate that takes over from a date. Earlier dates keep the rate they had. */
     new_rate?: { rate: number; effective_from: string };
   };
@@ -66,9 +69,10 @@ export async function updateTaxCode(trx: Transaction<DB>, ctx: ServiceCtx, input
     .where('id', '=', input.tax_code_id).where('business_id', '=', input.business_id).executeTakeFirst();
   if (!before) throw new NotFoundError('tax_code', input.tax_code_id);
 
-  const patch: { name?: string; tax_payable_account_id?: string; is_active?: boolean } = {};
+  const patch: { name?: string; tax_payable_account_id?: string; is_active?: boolean; agency?: string | null } = {};
   if (input.patch.name !== undefined) patch.name = input.patch.name;
   if (input.patch.is_active !== undefined) patch.is_active = input.patch.is_active;
+  if (input.patch.agency !== undefined) patch.agency = input.patch.agency;
   if (input.patch.tax_payable_account_id !== undefined) {
     const acct = await trx.selectFrom('chart_of_accounts').selectAll()
       .where('id', '=', input.patch.tax_payable_account_id).executeTakeFirst();

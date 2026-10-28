@@ -14,7 +14,7 @@ import { useAddAccount } from '@/components/addNew/useAddAccount';
 import { printReport } from '@/lib/reportExport';
 import { todayLocal } from '@/lib/dates';
 
-type TaxCode = { id: string; code: string; name: string; tax_payable_account_id: string; current_rate: string | null; is_active: boolean };
+type TaxCode = { id: string; code: string; name: string; tax_payable_account_id: string; agency: string | null; current_rate: string | null; is_active: boolean };
 
 /** A stored rate (0.0875) as the percent a person reads (8.75). */
 const ratePercent = (rate: string | null) => (rate ? String(parseFloat((parseFloat(rate) * 100).toFixed(4))) : '');
@@ -39,10 +39,10 @@ export default function TaxCodesPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const addAccount = useAddAccount(accounts, account => setAccounts(prev => [...prev, account]));
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ code: '', name: '', tax_payable_account_id: '', rate: '8.75', effective_from: '2026-01-01' });
+  const [form, setForm] = useState({ code: '', name: '', tax_payable_account_id: '', agency: '', rate: '8.75', effective_from: '2026-01-01' });
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState<TaxCode | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', tax_payable_account_id: '', is_active: true, rate: '', effective_from: todayLocal() });
+  const [editForm, setEditForm] = useState({ name: '', tax_payable_account_id: '', agency: '', is_active: true, rate: '', effective_from: todayLocal() });
   const [editErr, setEditErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [excelBusy, setExcelBusy] = useState(false);
@@ -61,9 +61,10 @@ export default function TaxCodesPage() {
     try {
       await api.post(`/businesses/${bizId}/tax-codes`, {
         code: form.code, name: form.name, tax_payable_account_id: form.tax_payable_account_id,
+        agency: form.agency.trim() || null,
         initial_rate: { rate: rateFromPercent(form.rate), effective_from: form.effective_from, effective_to: null },
       });
-      setShow(false); setForm({ code: '', name: '', tax_payable_account_id: '', rate: '8.75', effective_from: '2026-01-01' });
+      setShow(false); setForm({ code: '', name: '', tax_payable_account_id: '', agency: '', rate: '8.75', effective_from: '2026-01-01' });
       await reload();
     } catch (e: unknown) {
       setErr(pickErr(e));
@@ -72,7 +73,7 @@ export default function TaxCodesPage() {
 
   function startEdit(c: TaxCode) {
     setEditing(c);
-    setEditForm({ name: c.name, tax_payable_account_id: c.tax_payable_account_id, is_active: c.is_active, rate: ratePercent(c.current_rate), effective_from: todayLocal() });
+    setEditForm({ name: c.name, tax_payable_account_id: c.tax_payable_account_id, agency: c.agency ?? '', is_active: c.is_active, rate: ratePercent(c.current_rate), effective_from: todayLocal() });
     setEditErr(null);
     setShow(false);
   }
@@ -87,6 +88,7 @@ export default function TaxCodesPage() {
       await api.patch(`/businesses/${bizId}/tax-codes/${editing.id}`, {
         name: editForm.name.trim(),
         tax_payable_account_id: editForm.tax_payable_account_id,
+        agency: editForm.agency.trim() || null,
         is_active: editForm.is_active,
         ...(rateChanged ? { new_rate: { rate: rateFromPercent(editForm.rate), effective_from: editForm.effective_from } } : {}),
       });
@@ -101,8 +103,8 @@ export default function TaxCodesPage() {
 
   if (!bizId) return <div>Pick a business.</div>;
 
-  const dlHeaders = ['Code', 'Name', 'Current Rate', 'Active'];
-  const dlRows = () => items.map(c => [c.code, c.name, c.current_rate ? `${ratePercent(c.current_rate)}%` : '—', c.is_active ? 'Yes' : 'No']);
+  const dlHeaders = ['Code', 'Name', 'Agency', 'Current Rate', 'Active'];
+  const dlRows = () => items.map(c => [c.code, c.name, c.agency ?? '', c.current_rate ? `${ratePercent(c.current_rate)}%` : '—', c.is_active ? 'Yes' : 'No']);
 
   function handleExport() {
     setExcelBusy(true);
@@ -146,6 +148,7 @@ export default function TaxCodesPage() {
               </div>
               <div><Label>Rate (%)</Label><Input type="number" step="0.0001" min="0" max="100" value={form.rate} onChange={e => setForm(f => ({ ...f, rate: e.target.value }))} required /></div>
               <div><Label>Effective from</Label><DateInput value={form.effective_from} onChange={e => setForm(f => ({ ...f, effective_from: e.target.value }))} required /></div>
+              <div><Label>Agency</Label><Input value={form.agency} onChange={e => setForm(f => ({ ...f, agency: e.target.value }))} placeholder="e.g. State Department of Revenue" /></div>
               <Button type="submit">Create</Button>
               {err && <p className="text-sm text-destructive col-span-3">{err}</p>}
             </form>
@@ -166,6 +169,7 @@ export default function TaxCodesPage() {
                 <input type="checkbox" checked={editForm.is_active} onChange={e => setEditForm(f => ({ ...f, is_active: e.target.checked }))} />
                 Active
               </label>
+              <div><Label>Agency</Label><Input value={editForm.agency} onChange={e => setEditForm(f => ({ ...f, agency: e.target.value }))} placeholder="e.g. State Department of Revenue" /></div>
               <div><Label>Rate (%)</Label><Input type="number" step="0.0001" min="0" max="100" value={editForm.rate} onChange={e => setEditForm(f => ({ ...f, rate: e.target.value }))} required /></div>
               <div><Label>New rate applies from</Label><DateInput value={editForm.effective_from} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} required /></div>
               <div className="flex gap-2">
@@ -180,10 +184,11 @@ export default function TaxCodesPage() {
       )}
       <Card><CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40"><tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground"><th className="text-left p-3">Code</th><th className="text-left p-3">Name</th><th className="text-right p-3">Current rate</th><th className="text-left p-3">Status</th><th className="text-right p-3">Action</th></tr></thead>
-          <tbody>{items.length === 0 && (<tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No tax codes yet.</td></tr>)}{items.map(c => (<tr key={c.id} className="border-b last:border-b-0 hover:bg-muted/30">
+          <thead className="border-b bg-muted/40"><tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground"><th className="text-left p-3">Code</th><th className="text-left p-3">Name</th><th className="text-left p-3">Agency</th><th className="text-right p-3">Current rate</th><th className="text-left p-3">Status</th><th className="text-right p-3">Action</th></tr></thead>
+          <tbody>{items.length === 0 && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No tax codes yet.</td></tr>)}{items.map(c => (<tr key={c.id} className="border-b last:border-b-0 hover:bg-muted/30">
             <td className="p-3 font-mono">{c.code}</td>
             <td className="p-3">{c.name}</td>
+            <td className="p-3 text-muted-foreground">{c.agency ?? '—'}</td>
             <td className="p-3 text-right font-mono">{c.current_rate ? `${ratePercent(c.current_rate)}%` : '—'}</td>
             <td className="p-3">{statusBadge(c.is_active)}</td>
             <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-auto p-0 font-normal text-link hover:text-link" onClick={() => startEdit(c)} disabled={!isFirmAdmin} title={isFirmAdmin ? undefined : 'Only a firm admin can change a tax code'}>Edit</Button></td>

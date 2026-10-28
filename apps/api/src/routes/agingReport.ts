@@ -7,6 +7,7 @@ import * as aging from '../services/ar/reports/agingReportService.js';
 import * as apAging from '../services/ap/reports/apAgingReportService.js';
 import { customerStatement } from '../services/ar/reports/customerStatementService.js';
 import { invoicesAndPayments } from '../services/ar/reports/invoicePaymentsService.js';
+import { salesByProduct } from '../services/ar/reports/salesByProductService.js';
 
 const router = Router({ mergeParams: true });
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
@@ -49,6 +50,15 @@ router.get('/businesses/:businessId/reports/invoices-and-payments', async (req, 
     const q = schemas.pnlQuerySchema.parse(req.query);
     const invoices = await invoicesAndPayments(db, { business_id: req.tenancy!.business_id, ...q });
     res.json({ ...q, invoices });
+  } catch (e) { next(e); }
+});
+
+// Sales by Product/Service: income from invoice lines, dated in the period, under the item each was for.
+router.get('/businesses/:businessId/reports/sales-by-product', async (req, res, next) => {
+  try {
+    const q = schemas.pnlQuerySchema.parse(req.query);
+    const rows = await salesByProduct(db, { business_id: req.tenancy!.business_id, ...q });
+    res.json({ ...q, rows });
   } catch (e) { next(e); }
 });
 

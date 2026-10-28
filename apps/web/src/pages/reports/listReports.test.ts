@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   addressText, closingDateExceptionTable, collectionsReportTable, customerContactListTable, estimatesByCustomerTable,
   inventoryValuationDetailTable, inventoryValuationSummaryTable, invoiceListTable, invoicesAndPaymentsTable, openPurchaseOrderDetailTable,
-  openPurchaseOrderListTable, physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
+  openPurchaseOrderListTable, physicalInventoryWorksheetTable, productServiceListTable, salesByProductTable, salesTaxByAgencyTable,
+  salesTaxLiabilityTable, vendorContactListTable,
   type ClosingDateExceptionRow, type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type OpenInvoiceRow,
-  type PurchaseOrderRow, type ValuationItem,
+  type PurchaseOrderRow, type SalesByProductRow, type ValuationItem,
 } from './listReports';
 import type { ReportRow } from './standardReports';
 
@@ -205,8 +206,8 @@ describe('salesTaxLiabilityTable', () => {
     const { rows } = salesTaxLiabilityTable({
       gross_sales: '320.0000', non_taxable_sales: '20.0000',
       codes: [
-        { tax_code_id: 't1', code: 'CA', name: 'California', rate: '0.087500', payable_account_id: 'a1', payable_account_code: '2100', payable_account_name: 'Sales Tax Payable', taxable_amount: '100.0000', tax_amount: '8.7500' },
-        { tax_code_id: 't2', code: 'NV', name: 'Nevada', rate: null, payable_account_id: 'a2', payable_account_code: '2110', payable_account_name: 'NV Tax', taxable_amount: '200.0000', tax_amount: '12.0000' },
+        { tax_code_id: 't1', code: 'CA', name: 'California', agency: 'CA Dept. of Tax and Fee Administration', rate: '0.087500', payable_account_id: 'a1', payable_account_code: '2100', payable_account_name: 'Sales Tax Payable', taxable_amount: '100.0000', tax_amount: '8.7500' },
+        { tax_code_id: 't2', code: 'NV', name: 'Nevada', agency: null, rate: null, payable_account_id: 'a2', payable_account_code: '2110', payable_account_name: 'NV Tax', taxable_amount: '200.0000', tax_amount: '12.0000' },
       ],
     }, { start: '2026-04-01', end: '2026-04-30' });
     expect(cells(rows)).toEqual([
@@ -217,6 +218,40 @@ describe('salesTaxLiabilityTable', () => {
       ['Gross total sales', '', '', '320.0000', ''],
     ]);
     expect(rows[0]).toMatchObject({ to: '/reports/general-ledger?account_id=a1&period_start=2026-04-01&period_end=2026-04-30' });
+  });
+});
+
+describe('salesTaxByAgencyTable', () => {
+  it('groups the codes under the agency each is owed to, with "Not Specified" last', () => {
+    const { rows } = salesTaxByAgencyTable({
+      gross_sales: '320.0000', non_taxable_sales: '20.0000',
+      codes: [
+        { tax_code_id: 't1', code: 'CA', name: 'California', agency: 'CA Dept. of Tax and Fee Administration', rate: '0.087500', payable_account_id: 'a1', payable_account_code: '2100', payable_account_name: 'Sales Tax Payable', taxable_amount: '100.0000', tax_amount: '8.7500' },
+        { tax_code_id: 't2', code: 'CA2', name: 'California District', agency: 'CA Dept. of Tax and Fee Administration', rate: '0.010000', payable_account_id: 'a1', payable_account_code: '2100', payable_account_name: 'Sales Tax Payable', taxable_amount: '100.0000', tax_amount: '1.0000' },
+        { tax_code_id: 't3', code: 'NV', name: 'Nevada', agency: null, rate: null, payable_account_id: 'a2', payable_account_code: '2110', payable_account_name: 'NV Tax', taxable_amount: '200.0000', tax_amount: '12.0000' },
+      ],
+    });
+    expect(cells(rows)).toEqual([
+      ['CA Dept. of Tax and Fee Administration', '200.0000', '9.7500'],
+      ['Not Specified', '200.0000', '12.0000'],
+      ['TOTAL', '400.0000', '21.7500'],
+    ]);
+  });
+});
+
+describe('salesByProductTable', () => {
+  const widget: SalesByProductRow = { item_id: 'i1', sku: 'W-1', name: 'Widget', quantity: '2.0000', amount: '40.0000' };
+  const unspecified: SalesByProductRow = { item_id: null, sku: null, name: 'Not Specified', quantity: '1.0000', amount: '10.0000' };
+
+  it('lists each product with its quantity and amount, linking to the item', () => {
+    const { rows } = salesByProductTable([widget, unspecified]);
+    expect(cells(rows)).toEqual([
+      ['Widget', 'W-1', '2.0000', '40.0000'],
+      ['Not Specified', '', '1.0000', '10.0000'],
+      ['TOTAL', '', '', '50.0000'],
+    ]);
+    expect(rows[0]).toMatchObject({ to: '/inventory/items/i1' });
+    expect(rows[1]).not.toHaveProperty('to');
   });
 });
 

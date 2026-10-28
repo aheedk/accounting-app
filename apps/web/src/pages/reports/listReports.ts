@@ -534,6 +534,8 @@ export type SalesTaxReport = {
     tax_code_id: string;
     code: string;
     name: string;
+    /** The taxing authority this code's collections are owed to — null until set. */
+    agency: string | null;
     /** A fraction: 0.0875. */
     rate: string | null;
     payable_account_id: string;
@@ -613,4 +615,65 @@ export function closingDateExceptionTable(rows: ClosingDateExceptionRow[]): Repo
     cells: [r.entry_date, r.label, r.num ?? '', r.name ?? '', REASON_LABEL[r.reason], r.amount, day(r.when), r.who ?? ''],
   }));
   return { columns, rows: reportRows };
+}
+
+export type SalesByProductRow = {
+  item_id: string | null;
+  sku: string | null;
+  name: string;
+  quantity: string;
+  amount: string;
+};
+
+/**
+ * Sales by Product/Service: income from invoice lines, dated in the period,
+ * under the product/service each was for. A line with none (written before
+ * migration 0112, or left as plain text) falls under "Not Specified", same
+ * as the API already groups it.
+ */
+export function salesByProductTable(rows: SalesByProductRow[]): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Product/Service', kind: 'text' },
+    { label: 'SKU', kind: 'text' },
+    { label: 'Quantity', kind: 'number' },
+    { label: 'Amount', kind: 'money' },
+  ];
+  const reportRows: ReportRow[] = rows.map(r => ({
+    kind: 'line', depth: 0, ...(r.item_id ? { to: `/inventory/items/${r.item_id}` } : {}),
+    cells: [r.name, r.sku ?? '', r.quantity, r.amount],
+  }));
+  reportRows.push(totalRow(columns.length, 'TOTAL', [sum(rows.map(r => r.amount))]));
+  return { columns, rows: reportRows };
+}
+
+const NOT_SPECIFIED_AGENCY = 'Not Specified';
+
+/**
+ * Sales Tax by Agency: the same figures as Sales Tax Liability, grouped under
+ * the taxing authority each code is owed to instead of listed by code — reads
+ * the same report's own data, just grouped differently; no new endpoint.
+ */
+export function salesTaxByAgencyTable(report: SalesTaxReport): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Agency', kind: 'text' },
+    { label: 'Taxable Amount', kind: 'money' },
+    { label: 'Tax Amount', kind: 'money' },
+  ];
+  const width = columns.length;
+  const byAgency = new Map<string, { taxable: string[]; tax: string[] }>();
+  for (const c of report.codes) {
+    const key = c.agency?.trim() || NOT_SPECIFIED_AGENCY;
+    const own = byAgency.get(key) ?? { taxable: [], tax: [] };
+    own.taxable.push(c.taxable_amount);
+    own.tax.push(c.tax_amount);
+    byAgency.set(key, own);
+  }
+  const agencies = [...byAgency.keys()].sort((a, b) =>
+    Number(a === NOT_SPECIFIED_AGENCY) - Number(b === NOT_SPECIFIED_AGENCY) || a.localeCompare(b));
+  const rows: ReportRow[] = agencies.map(agency => {
+    const own = byAgency.get(agency)!;
+    return { kind: 'line', depth: 0, cells: [agency, sum(own.taxable), sum(own.tax)] };
+  });
+  rows.push(totalRow(width, 'TOTAL', [sum(report.codes.map(c => c.taxable_amount)), sum(report.codes.map(c => c.tax_amount))]));
+  return { columns, rows };
 }

@@ -38,7 +38,8 @@ import {
 import {
   ClosingDateExceptionPage, CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InventoryValuationDetailPage,
   InventoryValuationSummaryPage, InvoiceListReportPage, InvoicesAndPaymentsPage, OpenPurchaseOrderDetailPage, OpenPurchaseOrderListPage,
-  PhysicalInventoryWorksheetPage, ProductServiceListPage, SalesTaxLiabilityPage, VendorContactListPage,
+  PhysicalInventoryWorksheetPage, ProductServiceListPage, SalesByProductPage, SalesTaxByAgencyPage, SalesTaxLiabilityPage,
+  VendorContactListPage,
 } from '@/pages/reports/ListReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
@@ -242,6 +243,8 @@ export default function App() {
             <Route path="/reports/invoices-and-payments" element={<InvoicesAndPaymentsPage />} />
             <Route path="/reports/sales-tax-liability" element={<SalesTaxLiabilityPage />} />
             <Route path="/reports/closing-date-exceptions" element={<ClosingDateExceptionPage />} />
+            <Route path="/reports/sales-by-product" element={<SalesByProductPage />} />
+            <Route path="/reports/sales-tax-by-agency" element={<SalesTaxByAgencyPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />

@@ -194,7 +194,7 @@ function InvoiceNewPage() {
     try {
       const filled = lines.filter(l => !isLineEmpty(l));
       if (filled.length === 0) { setErr('Add at least one line.'); setBusy(false); return; }
-      const mapped: { description: string; quantity: string; unit_price: string; revenue_account_id: string; tax_code_id: string | null }[] = [];
+      const mapped: { description: string; quantity: string; unit_price: string; revenue_account_id: string; tax_code_id: string | null; inventory_item_id: string }[] = [];
       for (const l of filled) {
         const item = items.find(it => it.id === l.inventory_item_id);
         if (!item) { setErr('Pick a product/service for every line.'); setBusy(false); return; }
@@ -205,6 +205,7 @@ function InvoiceNewPage() {
           unit_price: parseMoneyInput(l.amount || '0'),
           revenue_account_id: item.income_account_id,
           tax_code_id: taxCodeId,
+          inventory_item_id: item.id,
         });
       }
       const body = {

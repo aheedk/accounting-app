@@ -16,6 +16,8 @@ export type InvoiceLineInput = {
   unit_price: string;
   revenue_account_id: string;
   tax_code_id: string | null;
+  /** The product/service this line was for — null for a free-text line. */
+  inventory_item_id?: string | null;
 };
 
 export type CreateDraftInput = {
@@ -89,6 +91,7 @@ export async function createDraft(trx: Transaction<DB>, ctx: ServiceCtx, input: 
       unit_price: c.line.unit_price,
       revenue_account_id: c.line.revenue_account_id,
       tax_code_id: c.line.tax_code_id,
+      inventory_item_id: c.line.inventory_item_id ?? null,
       line_subtotal: c.subtotal,
       tax_amount: c.taxAmount,
       line_total: c.total,
@@ -307,6 +310,7 @@ export async function addLine(
     invoice_id: input.invoice_id, line_number: next,
     description: input.line.description, quantity: input.line.quantity, unit_price: input.line.unit_price,
     revenue_account_id: input.line.revenue_account_id, tax_code_id: input.line.tax_code_id,
+    inventory_item_id: input.line.inventory_item_id ?? null,
     line_subtotal: c.subtotal, tax_amount: c.taxAmount, line_total: c.total,
   }).execute();
   await recomputeInvoiceTotals(trx, input.invoice_id);

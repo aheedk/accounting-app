@@ -42,6 +42,7 @@ router.post('/businesses/:businessId/tax-codes', requireMinRole('firm_admin'), a
         code: body.code,
         name: body.name,
         tax_payable_account_id: body.tax_payable_account_id,
+        agency: body.agency ?? null,
         initial_rate: {
           rate: body.initial_rate.rate,
           effective_from: body.initial_rate.effective_from,
@@ -60,6 +61,7 @@ router.patch('/businesses/:businessId/tax-codes/:id', requireMinRole('firm_admin
     if (body.name !== undefined) patch.name = body.name;
     if (body.tax_payable_account_id !== undefined) patch.tax_payable_account_id = body.tax_payable_account_id;
     if (body.is_active !== undefined) patch.is_active = body.is_active;
+    if (body.agency !== undefined) patch.agency = body.agency;
     if (body.new_rate !== undefined) patch.new_rate = body.new_rate;
     const updated = await db.transaction().execute(trx =>
       tax.updateTaxCode(trx, ctxFromReq(req), { business_id: req.tenancy!.business_id, tax_code_id: req.params['id']!, patch }),

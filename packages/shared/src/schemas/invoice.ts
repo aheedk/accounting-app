@@ -9,6 +9,8 @@ export const invoiceLineInputSchema = z.object({
   unit_price: money,
   revenue_account_id: z.string().uuid(),
   tax_code_id: z.string().uuid().nullable().optional(),
+  /** The product/service this line was for — null for a free-text line. */
+  inventory_item_id: z.string().uuid().nullable().optional(),
 });
 export type InvoiceLineInput = z.infer<typeof invoiceLineInputSchema>;
 

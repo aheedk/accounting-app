@@ -62,6 +62,7 @@ const groups: ReportGroup[] = [
     heading: 'Sales and customers',
     reports: [
       { to: '/reports/sales-by-customer', name: 'Sales by Customer Summary', description: 'Income from invoices, credit memos and deposits, for each customer.' },
+      { to: '/reports/sales-by-product', name: 'Sales by Product/Service Summary', description: 'Income from invoice lines, for each product or service.' },
       { to: '/reports/sales-by-customer-detail', name: 'Sales by Customer Detail', description: 'The sales behind Sales by Customer Summary, line by line, under each customer.' },
       { to: '/reports/income-by-customer', name: 'Income by Customer Summary', description: 'Each customer\'s income, the costs that name them, and what is left.' },
       { to: '/reports/transaction-list-by-customer', name: 'Transaction List by Customer', description: 'Every transaction in the period under the customer it names.' },
@@ -102,6 +103,7 @@ const groups: ReportGroup[] = [
     heading: 'Sales tax',
     reports: [
       { to: '/reports/sales-tax-liability', name: 'Sales Tax Liability Report', description: 'The tax charged on the period\'s invoices under each tax code, with the sales it was charged on.' },
+      { to: '/reports/sales-tax-by-agency', name: 'Sales Tax by Agency', description: 'The same figures as Sales Tax Liability, grouped under the authority each code is owed to.' },
     ],
   },
 ];

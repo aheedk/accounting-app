@@ -267,6 +267,8 @@ export interface TaxCodesTable {
   name: string;
   tax_payable_account_id: string;
   is_active: Generated<boolean>;
+  /** The taxing authority this code's collections are owed to — null until set. */
+  agency: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
@@ -317,6 +319,9 @@ export interface InvoiceLinesTable {
   line_subtotal: ColumnType<string, string | number, string | number>;
   tax_amount: ColumnType<string, string | number | undefined, string | number>;
   line_total: ColumnType<string, string | number, string | number>;
+  /** The product/service this line was for, when one was picked — null for a
+   * free-text line, or one written before this column existed. */
+  inventory_item_id: string | null;
 }
 
 export interface PaymentsTable {

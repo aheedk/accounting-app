@@ -6,6 +6,8 @@ export const taxCodeCreateSchema = z.object({
   code: z.string().min(1).max(30),
   name: z.string().min(1).max(120),
   tax_payable_account_id: z.string().uuid(),
+  /** The taxing authority this code's collections are owed to. */
+  agency: z.string().max(120).nullable().optional(),
   initial_rate: z.object({
     rate: z.number().min(0).max(1),
     effective_from: dateString,
@@ -26,6 +28,7 @@ export const taxCodeUpdateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   tax_payable_account_id: z.string().uuid().optional(),
   is_active: z.boolean().optional(),
+  agency: z.string().max(120).nullable().optional(),
   new_rate: z.object({ rate: z.number().min(0).max(1), effective_from: dateString }).optional(),
 });
 export type TaxCodeUpdate = z.infer<typeof taxCodeUpdateSchema>;

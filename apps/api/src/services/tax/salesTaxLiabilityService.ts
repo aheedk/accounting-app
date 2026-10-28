@@ -13,6 +13,8 @@ export type SalesTaxCode = {
   tax_code_id: string;
   code: string;
   name: string;
+  /** The taxing authority this code's collections are owed to — null until set. */
+  agency: string | null;
   /** The rate in effect at the end of the period, as a fraction (0.0875); null when none is. */
   rate: string | null;
   payable_account_id: string;
@@ -67,7 +69,7 @@ export async function salesTaxLiability(
   const ids = [...byCode.keys()];
   const codes = await db.selectFrom('tax_codes as tc')
     .innerJoin('chart_of_accounts as a', 'a.id', 'tc.tax_payable_account_id')
-    .select(['tc.id', 'tc.code', 'tc.name', 'tc.tax_payable_account_id', 'a.code as account_code', 'a.name as account_name'])
+    .select(['tc.id', 'tc.code', 'tc.name', 'tc.agency', 'tc.tax_payable_account_id', 'a.code as account_code', 'a.name as account_name'])
     .where('tc.business_id', '=', q.business_id)
     .where('tc.id', 'in', ids)
     .orderBy('tc.code')
@@ -88,6 +90,7 @@ export async function salesTaxLiability(
       tax_code_id: c.id,
       code: c.code,
       name: c.name,
+      agency: c.agency,
       rate: rateOf.get(c.id) ?? null,
       payable_account_id: c.tax_payable_account_id,
       payable_account_code: c.account_code,

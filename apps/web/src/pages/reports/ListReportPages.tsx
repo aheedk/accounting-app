@@ -3,9 +3,10 @@ import { StandardReport, type ReportDates } from './StandardReport';
 import {
   closingDateExceptionTable, collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable,
   inventoryValuationSummaryTable, invoiceListTable, invoicesAndPaymentsTable, isOpenOrder, openPurchaseOrderDetailTable,
-  openPurchaseOrderListTable, physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
+  openPurchaseOrderListTable, physicalInventoryWorksheetTable, productServiceListTable, salesByProductTable, salesTaxByAgencyTable,
+  salesTaxLiabilityTable, vendorContactListTable,
   type ClosingDateExceptionRow, type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type Item, type OpenInvoiceRow,
-  type PurchaseOrderRow, type SalesTaxReport, type ValuationItem,
+  type PurchaseOrderRow, type SalesByProductRow, type SalesTaxReport, type ValuationItem,
 } from './listReports';
 import type { ReportTable } from './standardReports';
 
@@ -93,6 +94,12 @@ const loadInvoicesAndPayments = async (bizId: string, range: ReportDates) =>
 const loadSalesTaxLiability = async (bizId: string, range: ReportDates) =>
   salesTaxLiabilityTable(await api.get<SalesTaxReport>(`/businesses/${bizId}/reports/sales-tax-liability`, periodParams(range)).then(r => r.data), range);
 
+const loadSalesTaxByAgency = async (bizId: string, range: ReportDates) =>
+  salesTaxByAgencyTable(await api.get<SalesTaxReport>(`/businesses/${bizId}/reports/sales-tax-liability`, periodParams(range)).then(r => r.data));
+
+const loadSalesByProduct = async (bizId: string, range: ReportDates) =>
+  salesByProductTable(await api.get<{ rows: SalesByProductRow[] }>(`/businesses/${bizId}/reports/sales-by-product`, periodParams(range)).then(r => r.data.rows));
+
 async function loadCollections(bizId: string, range: ReportDates): Promise<ReportTable> {
   const [open, customers] = await Promise.all([fetchOpenInvoices(bizId, range.end), fetchCustomers(bizId, true)]);
   const phones = new Map<string, string>();
@@ -163,6 +170,14 @@ export function InvoicesAndPaymentsPage() {
 
 export function SalesTaxLiabilityPage() {
   return <StandardReport title="Sales Tax Liability Report" dates="period" fileStem="sales-tax-liability" load={loadSalesTaxLiability} />;
+}
+
+export function SalesTaxByAgencyPage() {
+  return <StandardReport title="Sales Tax by Agency" dates="period" fileStem="sales-tax-by-agency" load={loadSalesTaxByAgency} />;
+}
+
+export function SalesByProductPage() {
+  return <StandardReport title="Sales by Product/Service Summary" dates="period" fileStem="sales-by-product" load={loadSalesByProduct} />;
 }
 
 const loadClosingDateExceptions = async (bizId: string) => closingDateExceptionTable(
