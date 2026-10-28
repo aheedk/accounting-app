@@ -293,10 +293,15 @@ export async function signOutUser(trx: Transaction<DB>, ctx: ServiceCtx, input: 
   return { ended };
 }
 
-/** Turns the second step off for someone who has lost the phone it was on. */
+/**
+ * Turns the second step off for someone who has lost the phone it was on.
+ * Also ends their sessions, like resetUserPassword: the phone being lost is
+ * reason enough to assume whoever has it might also be signed in right now.
+ */
 export async function resetUserTwoStep(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
   const user = await userInFirm(trx, ctx, input.user_id);
   await trx.updateTable('users').set({ totp_secret: null, totp_enabled_at: null, totp_last_step: null }).where('id', '=', user.id).execute();
+  await endSessions(trx, { user_id: user.id });
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_TWO_STEP_RESET, entity_type: 'user', entity_id: user.id, before: null, after: { email: user.email },
   });

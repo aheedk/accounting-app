@@ -143,7 +143,12 @@ describe('accounts and signing in', () => {
     expect((await signIn('pat@x.com', PASSWORD, totpCode(secret, Date.now() + 30_000))).status).toBe(200);
 
     const admin = await signIn('admin@x.com');
+    // Pat is still signed in on this session when the phone is reported lost.
+    const stillSignedIn = await signIn('pat@x.com', PASSWORD, totpCode(secret, Date.now() + 60_000));
     expect((await as(admin).post(`/me/firm/users/${await userId('pat@x.com')}/reset-two-step`)).status).toBe(200);
+    // The reset ends that session too, same as resetting a password does — not just new sign-ins.
+    expect((await as(stillSignedIn).get('/me')).status).toBe(401);
+    expect((await request(app).post('/auth/refresh').set('Cookie', stillSignedIn.cookie)).status).toBe(401);
     expect((await signIn('pat@x.com')).status).toBe(200);
   });
 
