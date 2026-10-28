@@ -1,11 +1,14 @@
 import { Decimal } from 'decimal.js';
+import { generalLedgerDrilldownUrl } from '@/lib/reportDrilldown';
+import { PAYMENT_METHOD_OPTIONS } from '@/lib/paymentMethods';
 import { sum, totalRow, type ReportColumn, type ReportRow, type ReportTable } from './standardReports';
 
 // The standard reports read off the app's lists rather than the ledger (item
-// 18, 10-27): the contact lists, the product list, estimates, open purchase
-// orders, the invoice list and the collections report. Each takes the list as
-// its endpoint returns it. Open balances come from the Open Invoices report, so
-// they tie out to A/R Aging.
+// 18, 10-27): the contact lists, the product list and the inventory worksheet,
+// estimates, open purchase orders, the invoice list, invoices and received
+// payments, the collections report, and sales tax. Each takes the list as its
+// endpoint returns it. Open balances come from the Open Invoices report's own
+// figures, so they tie out to A/R Aging.
 
 /** A date as the API sends it, cut to YYYY-MM-DD. */
 const day = (value: string | null | undefined): string => (value ?? '').slice(0, 10);
@@ -111,7 +114,7 @@ export function productServiceListTable(items: Item[]): ReportTable {
 
 /** Rows under a heading per name, each with its own total, then the grand total. */
 function grouped<T>(
-  list: T[], nameOf: (entry: T) => string, rowOf: (entry: T) => ReportRow, totalsOf: (entries: T[]) => string[], width: number,
+  list: T[], nameOf: (entry: T) => string, rowOf: (entry: T) => ReportRow | ReportRow[], totalsOf: (entries: T[]) => string[], width: number,
 ): ReportRow[] {
   const groups = new Map<string, T[]>();
   for (const entry of list) groups.set(nameOf(entry), [...(groups.get(nameOf(entry)) ?? []), entry]);
@@ -119,7 +122,7 @@ function grouped<T>(
   for (const name of [...groups.keys()].sort((a, b) => a.localeCompare(b))) {
     const own = groups.get(name)!;
     rows.push({ kind: 'heading', label: name, depth: 0 });
-    for (const entry of own) rows.push(rowOf(entry));
+    for (const entry of own) rows.push(...[rowOf(entry)].flat());
     rows.push(totalRow(width, `Total for ${name}`, totalsOf(own)));
   }
   rows.push(totalRow(width, 'TOTAL', totalsOf(list)));
@@ -164,6 +167,9 @@ export function estimatesByCustomerTable(estimates: EstimateRow[], range: { star
   return { columns, rows };
 }
 
+/** A purchase order line, as the purchase order endpoint returns it. */
+export type PurchaseOrderLine = { inventory_item_id: string; description: string | null; quantity: string; unit_cost: string };
+
 /** A purchase order with its lines, as the purchase order endpoint returns it. */
 export type PurchaseOrderRow = {
   id: string;
@@ -173,15 +179,19 @@ export type PurchaseOrderRow = {
   expected_delivery_date: string | null;
   status: string;
   memo: string | null;
-  lines: { quantity: string; unit_cost: string }[];
+  lines: PurchaseOrderLine[];
 };
 
 // Not yet received, closed or voided: a draft, or one sent to the vendor.
 const OPEN_ORDER = new Set(['draft', 'sent']);
 export const isOpenOrder = (order: { status: string }): boolean => OPEN_ORDER.has(order.status);
 
-const orderAmount = (order: PurchaseOrderRow): string =>
-  sum(order.lines.map(line => new Decimal(line.quantity || '0').times(line.unit_cost || '0').toFixed(4)));
+const lineAmount = (line: PurchaseOrderLine): string => new Decimal(line.quantity || '0').times(line.unit_cost || '0').toFixed(4);
+
+const orderAmount = (order: PurchaseOrderRow): string => sum(order.lines.map(lineAmount));
+
+const byOrderDate = (a: PurchaseOrderRow, b: PurchaseOrderRow): number =>
+  day(a.order_date).localeCompare(day(b.order_date)) || a.po_number.localeCompare(b.po_number, undefined, { numeric: true });
 
 /** Open Purchase Order List: the orders not yet received, closed or voided, under each vendor. */
 export function openPurchaseOrderListTable(orders: PurchaseOrderRow[], vendorNames: ReadonlyMap<string, string>): ReportTable {
@@ -193,9 +203,7 @@ export function openPurchaseOrderListTable(orders: PurchaseOrderRow[], vendorNam
     { label: 'Expected Date', kind: 'date' },
     { label: 'Amount', kind: 'money' },
   ];
-  const open = orders
-    .filter(isOpenOrder)
-    .sort((a, b) => day(a.order_date).localeCompare(day(b.order_date)));
+  const open = orders.filter(isOpenOrder).sort(byOrderDate);
   const rows = grouped(
     open,
     order => vendorNames.get(order.vendor_id) ?? 'Unknown vendor',
@@ -206,6 +214,64 @@ export function openPurchaseOrderListTable(orders: PurchaseOrderRow[], vendorNam
     list => [sum(list.map(orderAmount))],
     columns.length,
   );
+  return { columns, rows };
+}
+
+/**
+ * Open Purchase Order Detail: each line of the open orders, under each vendor.
+ * A receipt takes in the whole order, so nothing on an open one has been
+ * received yet; QuickBooks' Received and Backordered columns are left off.
+ */
+export function openPurchaseOrderDetailTable(
+  orders: PurchaseOrderRow[], vendorNames: ReadonlyMap<string, string>, itemNames: ReadonlyMap<string, string>,
+): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Date', kind: 'date' },
+    { label: 'Num', kind: 'text' },
+    { label: 'Product/Service', kind: 'text' },
+    { label: 'Memo/Description', kind: 'text' },
+    { label: 'Qty', kind: 'number' },
+    { label: 'Rate', kind: 'money' },
+    { label: 'Amount', kind: 'money' },
+  ];
+  const lines = orders.filter(isOpenOrder).sort(byOrderDate).flatMap(order => order.lines.map(line => ({ order, line })));
+  const rows = grouped(
+    lines,
+    ({ order }) => vendorNames.get(order.vendor_id) ?? 'Unknown vendor',
+    ({ order, line }): ReportRow => ({
+      kind: 'line', depth: 1, to: `/inventory/purchase-orders/${order.id}`,
+      cells: [
+        day(order.order_date), order.po_number, itemNames.get(line.inventory_item_id) ?? '', line.description ?? '',
+        quantity(line.quantity), line.unit_cost, lineAmount(line),
+      ],
+    }),
+    list => [sum(list.map(({ line }) => lineAmount(line)))],
+    columns.length,
+  );
+  return { columns, rows };
+}
+
+/**
+ * Physical Inventory Worksheet: each active item with the quantity on hand and
+ * on open purchase orders, and a blank column to write the count in.
+ */
+export function physicalInventoryWorksheetTable(items: Item[], orders: PurchaseOrderRow[]): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Product/Service', kind: 'text' },
+    { label: 'SKU', kind: 'text' },
+    { label: 'Description', kind: 'text' },
+    { label: 'Qty On Hand', kind: 'number' },
+    { label: 'Qty On PO', kind: 'number' },
+    { label: 'Physical Count', kind: 'number' },
+  ];
+  const onOrder = new Map<string, Decimal>();
+  for (const line of orders.filter(isOpenOrder).flatMap(order => order.lines)) {
+    onOrder.set(line.inventory_item_id, (onOrder.get(line.inventory_item_id) ?? new Decimal(0)).plus(line.quantity || '0'));
+  }
+  const rows = byName(items).map((item): ReportRow => ({
+    kind: 'line', depth: 0, to: `/inventory/items/${item.id}`,
+    cells: [item.name, item.sku, item.description ?? '', quantity(item.quantity_on_hand), quantity(onOrder.get(item.id) ?? '0'), ''],
+  }));
   return { columns, rows };
 }
 
@@ -261,6 +327,67 @@ export function invoiceListTable(
       };
     });
   rows.push(totalRow(columns.length, 'TOTAL', [sum(amounts), sum(balances)]));
+  return { columns, rows };
+}
+
+/** An invoice with what was applied to it, as the Invoices and Received Payments endpoint returns it. */
+export type InvoicePayments = {
+  id: string;
+  invoice_number: string;
+  customer_id: string;
+  customer_name: string;
+  issue_date: string;
+  due_date: string;
+  total: string;
+  open: string;
+  applications: {
+    id: string;
+    kind: 'payment' | 'credit_memo';
+    source_id: string;
+    date: string;
+    number: string | null;
+    method: string | null;
+    amount: string;
+  }[];
+};
+
+/** "Check", "Wire transfer"; a method the payment form does not offer, such as credit_card, as "Credit card". */
+const methodLabel = (method: string | null): string =>
+  (method === null ? '' : PAYMENT_METHOD_OPTIONS.find(option => option.value === method)?.label ?? capitalized(method.replace(/_/g, ' ')));
+
+/**
+ * Invoices and Received Payments: each invoice dated in the period under its
+ * customer, the payments and credit memos applied to it under it, and what is
+ * still owed. The endpoint counts what the Open Invoices report counts, so the
+ * open balances tie out to it.
+ */
+export function invoicesAndPaymentsTable(invoices: InvoicePayments[]): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Date', kind: 'date' },
+    { label: 'Transaction Type', kind: 'text' },
+    { label: 'Num', kind: 'text' },
+    { label: 'Payment Method', kind: 'text' },
+    { label: 'Amount', kind: 'money' },
+    { label: 'Applied', kind: 'money' },
+    { label: 'Open Balance', kind: 'money' },
+  ];
+  const applied = (invoice: InvoicePayments): string => sum(invoice.applications.map(a => a.amount));
+  const rows = grouped(
+    invoices,
+    invoice => invoice.customer_name,
+    (invoice): ReportRow[] => [
+      {
+        kind: 'line', depth: 1, to: `/invoices/${invoice.id}`,
+        cells: [day(invoice.issue_date), 'Invoice', invoice.invoice_number, '', invoice.total, '', invoice.open],
+      },
+      ...invoice.applications.map((a): ReportRow => ({
+        kind: 'line', depth: 2, to: a.kind === 'payment' ? `/payments/${a.source_id}` : `/credit-memos/${a.source_id}`,
+        cells: [day(a.date), a.kind === 'payment' ? 'Payment' : 'Credit Memo', a.number ?? '', methodLabel(a.method), '', a.amount, ''],
+      })),
+    ],
+    list => [sum(list.map(i => i.total)), sum(list.map(applied)), sum(list.map(i => i.open))],
+    columns.length,
+  );
   return { columns, rows };
 }
 
@@ -396,5 +523,51 @@ export function inventoryValuationDetailTable(items: ValuationItem[]): ReportTab
     ]));
   }
   rows.push(totalRow(width, 'TOTAL', [sum(shown.map(item => item.value))]));
+  return { columns, rows };
+}
+
+/** The Sales Tax Liability endpoint's report. */
+export type SalesTaxReport = {
+  gross_sales: string;
+  non_taxable_sales: string;
+  codes: {
+    tax_code_id: string;
+    code: string;
+    name: string;
+    /** A fraction: 0.0875. */
+    rate: string | null;
+    payable_account_id: string;
+    payable_account_code: string;
+    payable_account_name: string;
+    taxable_amount: string;
+    tax_amount: string;
+  }[];
+};
+
+/**
+ * Sales Tax Liability: the tax charged on the period's invoices under each tax
+ * code, with the sales it was charged on; then the sales with no tax code, and
+ * all sales. A code opens its tax payable account's ledger for the period.
+ */
+export function salesTaxLiabilityTable(report: SalesTaxReport, range: { start: string; end: string }): ReportTable {
+  const columns: ReportColumn[] = [
+    { label: 'Tax Code', kind: 'text' },
+    { label: 'Tax Payable Account', kind: 'text' },
+    { label: 'Rate', kind: 'percent' },
+    { label: 'Taxable Amount', kind: 'money' },
+    { label: 'Tax Amount', kind: 'money' },
+  ];
+  const width = columns.length;
+  const rows = report.codes.map((c): ReportRow => ({
+    kind: 'line', depth: 0,
+    to: generalLedgerDrilldownUrl({ accountId: c.payable_account_id, periodStart: range.start, periodEnd: range.end }),
+    cells: [
+      `${c.code} ${c.name}`, `${c.payable_account_code} ${c.payable_account_name}`,
+      c.rate === null ? '' : `${new Decimal(c.rate).times(100).toString()}%`, c.taxable_amount, c.tax_amount,
+    ],
+  }));
+  rows.push(totalRow(width, 'Total taxable sales', [sum(report.codes.map(c => c.taxable_amount)), sum(report.codes.map(c => c.tax_amount))]));
+  rows.push({ kind: 'line', depth: 0, cells: ['Non-taxable sales', '', '', report.non_taxable_sales, ''] });
+  rows.push(totalRow(width, 'Gross total sales', [report.gross_sales, '']));
   return { columns, rows };
 }

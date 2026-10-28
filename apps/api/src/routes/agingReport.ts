@@ -6,6 +6,7 @@ import { resolveBusiness } from '../middleware/tenancy.js';
 import * as aging from '../services/ar/reports/agingReportService.js';
 import * as apAging from '../services/ap/reports/apAgingReportService.js';
 import { customerStatement } from '../services/ar/reports/customerStatementService.js';
+import { invoicesAndPayments } from '../services/ar/reports/invoicePaymentsService.js';
 
 const router = Router({ mergeParams: true });
 router.use('/businesses/:businessId', requireAuth, resolveBusiness);
@@ -39,6 +40,15 @@ router.get('/businesses/:businessId/reports/unpaid-bills', async (req, res, next
     const q = schemas.agingQuerySchema.parse({ as_of: req.query['as_of'] ?? new Date().toISOString().slice(0, 10) });
     const rows = await apAging.unpaidBills(db, { business_id: req.tenancy!.business_id, as_of: q.as_of });
     res.json({ as_of: q.as_of, rows });
+  } catch (e) { next(e); }
+});
+
+// Invoices and Received Payments: the period's invoices with what was applied to each.
+router.get('/businesses/:businessId/reports/invoices-and-payments', async (req, res, next) => {
+  try {
+    const q = schemas.pnlQuerySchema.parse(req.query);
+    const invoices = await invoicesAndPayments(db, { business_id: req.tenancy!.business_id, ...q });
+    res.json({ ...q, invoices });
   } catch (e) { next(e); }
 });
 

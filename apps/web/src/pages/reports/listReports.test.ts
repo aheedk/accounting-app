@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   addressText, collectionsReportTable, customerContactListTable, estimatesByCustomerTable, inventoryValuationDetailTable,
-  inventoryValuationSummaryTable, invoiceListTable, openPurchaseOrderListTable, productServiceListTable, vendorContactListTable,
-  type Contact, type EstimateRow, type InvoiceRow, type OpenInvoiceRow, type PurchaseOrderRow, type ValuationItem,
+  inventoryValuationSummaryTable, invoiceListTable, invoicesAndPaymentsTable, openPurchaseOrderDetailTable, openPurchaseOrderListTable,
+  physicalInventoryWorksheetTable, productServiceListTable, salesTaxLiabilityTable, vendorContactListTable,
+  type Contact, type EstimateRow, type InvoicePayments, type InvoiceRow, type OpenInvoiceRow, type PurchaseOrderRow, type ValuationItem,
 } from './listReports';
 import type { ReportRow } from './standardReports';
 
@@ -85,17 +86,20 @@ describe('estimatesByCustomerTable', () => {
   });
 });
 
-describe('openPurchaseOrderListTable', () => {
+describe('purchase orders', () => {
   const order = (id: string, vendor: string, status: string, lines: PurchaseOrderRow['lines']): PurchaseOrderRow => ({
     id, po_number: id.toUpperCase(), vendor_id: vendor, order_date: '2026-03-05', expected_delivery_date: null, status, memo: null, lines,
   });
+  const line = (quantity: string, unit_cost: string, inventory_item_id = 'i1', description: string | null = null) =>
+    ({ inventory_item_id, description, quantity, unit_cost });
+  const orders = [
+    order('po1', 'v1', 'sent', [line('3.0000', '2.5000'), line('1.0000', '10.0000', 'i2', 'Rush')]),
+    order('po2', 'v1', 'received', [line('9.0000', '9.0000')]),
+    order('po3', 'gone', 'draft', [line('2.0000', '4.0000')]),
+  ];
 
   it('lists drafts and sent orders under their vendor, priced from their lines', () => {
-    const { rows } = openPurchaseOrderListTable([
-      order('po1', 'v1', 'sent', [{ quantity: '3.0000', unit_cost: '2.5000' }, { quantity: '1.0000', unit_cost: '10.0000' }]),
-      order('po2', 'v1', 'received', [{ quantity: '9.0000', unit_cost: '9.0000' }]),
-      order('po3', 'gone', 'draft', [{ quantity: '2.0000', unit_cost: '4.0000' }]),
-    ], new Map([['v1', 'Staples']]));
+    const { rows } = openPurchaseOrderListTable(orders, new Map([['v1', 'Staples']]));
     expect(cells(rows)).toEqual([
       ['# Staples'],
       ['2026-03-05', 'PO1', 'Sent', '', '', '17.5000'],
@@ -104,6 +108,34 @@ describe('openPurchaseOrderListTable', () => {
       ['2026-03-05', 'PO3', 'Draft', '', '', '8.0000'],
       ['Total for Unknown vendor', '', '', '', '', '8.0000'],
       ['TOTAL', '', '', '', '', '25.5000'],
+    ]);
+  });
+
+  it('gives each line of the open orders, with the item, under its vendor; the totals are the list\'s', () => {
+    const { rows } = openPurchaseOrderDetailTable(orders, new Map([['v1', 'Staples']]), new Map([['i1', 'Paper'], ['i2', 'Toner']]));
+    expect(cells(rows)).toEqual([
+      ['# Staples'],
+      ['2026-03-05', 'PO1', 'Paper', '', '3', '2.5000', '7.5000'],
+      ['2026-03-05', 'PO1', 'Toner', 'Rush', '1', '10.0000', '10.0000'],
+      ['Total for Staples', '', '', '', '', '', '17.5000'],
+      ['# Unknown vendor'],
+      ['2026-03-05', 'PO3', 'Paper', '', '2', '4.0000', '8.0000'],
+      ['Total for Unknown vendor', '', '', '', '', '', '8.0000'],
+      ['TOTAL', '', '', '', '', '', '25.5000'],
+    ]);
+    expect(rows[1]).toMatchObject({ to: '/inventory/purchase-orders/po1' });
+  });
+
+  it('puts what is on open orders beside what is on hand, with a blank column for the count', () => {
+    const { rows } = physicalInventoryWorksheetTable([
+      { id: 'i2', sku: 'T-1', name: 'Toner', description: 'Black', sale_price: null, purchase_cost: null, quantity_on_hand: '4.0000' },
+      { id: 'i1', sku: 'P-1', name: 'Paper', description: null, sale_price: null, purchase_cost: null, quantity_on_hand: '0.0000' },
+      { id: 'i3', sku: 'S-1', name: 'Stapler', description: null, sale_price: null, purchase_cost: null, quantity_on_hand: '2.5000' },
+    ], orders);
+    expect(cells(rows)).toEqual([
+      ['Paper', 'P-1', '', '0', '5', ''],
+      ['Stapler', 'S-1', '', '2.5', '0', ''],
+      ['Toner', 'T-1', 'Black', '4', '1', ''],
     ]);
   });
 });
@@ -130,6 +162,60 @@ describe('invoiceListTable', () => {
       ['', '', '60.0000', '35.0000'],
     ]);
     expect(rows[0]).toMatchObject({ to: '/invoices/i1', cells: ['2026-03-02', '101', 'Acme', '', '2026-04-01', 'Paid', '10.0000', '0.0000'] });
+  });
+});
+
+describe('invoicesAndPaymentsTable', () => {
+  const invoice = (id: string, customer: string, total: string, open: string, applications: InvoicePayments['applications'] = []): InvoicePayments => ({
+    id, invoice_number: id.toUpperCase(), customer_id: customer, customer_name: customer === 'c1' ? 'Acme' : 'Birch',
+    issue_date: '2026-04-01', due_date: '2026-05-01', total, open, applications,
+  });
+
+  it('puts what was applied to each invoice under it, with what is still owed, by customer', () => {
+    const { rows } = invoicesAndPaymentsTable([
+      invoice('a-1', 'c1', '100.0000', '25.0000', [
+        { id: 'pa1', kind: 'payment', source_id: 'p1', date: '2026-04-10', number: '1234', method: 'check', amount: '60.0000' },
+        { id: 'pa2', kind: 'credit_memo', source_id: 'cm1', date: '2026-04-12', number: 'CM-1001', method: null, amount: '15.0000' },
+      ]),
+      invoice('a-2', 'c1', '50.0000', '50.0000'),
+      invoice('b-1', 'c2', '80.0000', '0.0000', [
+        { id: 'pa3', kind: 'payment', source_id: 'p2', date: '2026-04-11', number: null, method: 'credit_card', amount: '80.0000' },
+      ]),
+    ]);
+    expect(cells(rows)).toEqual([
+      ['# Acme'],
+      ['2026-04-01', 'Invoice', 'A-1', '', '100.0000', '', '25.0000'],
+      ['2026-04-10', 'Payment', '1234', 'Check', '', '60.0000', ''],
+      ['2026-04-12', 'Credit Memo', 'CM-1001', '', '', '15.0000', ''],
+      ['2026-04-01', 'Invoice', 'A-2', '', '50.0000', '', '50.0000'],
+      ['Total for Acme', '', '', '', '150.0000', '75.0000', '75.0000'],
+      ['# Birch'],
+      ['2026-04-01', 'Invoice', 'B-1', '', '80.0000', '', '0.0000'],
+      ['2026-04-11', 'Payment', '', 'Credit card', '', '80.0000', ''],
+      ['Total for Birch', '', '', '', '80.0000', '80.0000', '0.0000'],
+      ['TOTAL', '', '', '', '230.0000', '155.0000', '75.0000'],
+    ]);
+    expect(rows.slice(1, 4)).toMatchObject([{ to: '/invoices/a-1' }, { to: '/payments/p1' }, { to: '/credit-memos/cm1' }]);
+  });
+});
+
+describe('salesTaxLiabilityTable', () => {
+  it('gives each code\'s taxable sales and tax, then the sales with no tax and all sales', () => {
+    const { rows } = salesTaxLiabilityTable({
+      gross_sales: '320.0000', non_taxable_sales: '20.0000',
+      codes: [
+        { tax_code_id: 't1', code: 'CA', name: 'California', rate: '0.087500', payable_account_id: 'a1', payable_account_code: '2100', payable_account_name: 'Sales Tax Payable', taxable_amount: '100.0000', tax_amount: '8.7500' },
+        { tax_code_id: 't2', code: 'NV', name: 'Nevada', rate: null, payable_account_id: 'a2', payable_account_code: '2110', payable_account_name: 'NV Tax', taxable_amount: '200.0000', tax_amount: '12.0000' },
+      ],
+    }, { start: '2026-04-01', end: '2026-04-30' });
+    expect(cells(rows)).toEqual([
+      ['CA California', '2100 Sales Tax Payable', '8.75%', '100.0000', '8.7500'],
+      ['NV Nevada', '2110 NV Tax', '', '200.0000', '12.0000'],
+      ['Total taxable sales', '', '', '300.0000', '20.7500'],
+      ['Non-taxable sales', '', '', '20.0000', ''],
+      ['Gross total sales', '', '', '320.0000', ''],
+    ]);
+    expect(rows[0]).toMatchObject({ to: '/reports/general-ledger?account_id=a1&period_start=2026-04-01&period_end=2026-04-30' });
   });
 });
 

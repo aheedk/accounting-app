@@ -53,6 +53,7 @@ const groups: ReportGroup[] = [
       { to: '/reports/customer-balance-detail', name: 'Customer Balance Detail', description: 'Open invoices grouped under each customer, one row each.' },
       { to: '/reports/collections', name: 'Collections Report', description: 'Invoices past due, under each customer with their phone number, and how many days late.' },
       { to: '/reports/invoice-list', name: 'Invoice List', description: 'Every invoice dated in the period, with its status and what is still owed.' },
+      { to: '/reports/invoices-and-payments', name: 'Invoices and Received Payments', description: 'Each invoice dated in the period, with the payments and credits applied to it, and what is still owed.' },
     ],
   },
   {
@@ -68,6 +69,7 @@ const groups: ReportGroup[] = [
       { to: '/reports/product-service-list', name: 'Product/Service List', description: 'Every active item with its price, cost and quantity on hand.' },
       { to: '/reports/inventory-valuation-summary', name: 'Inventory Valuation Summary', description: 'Each item\'s quantity on hand as of a date, what it cost, and the average cost.' },
       { to: '/reports/inventory-valuation-detail', name: 'Inventory Valuation Detail', description: 'Each item\'s stock from the start of the period, through every movement, with the quantity and value running.' },
+      { to: '/reports/physical-inventory-worksheet', name: 'Physical Inventory Worksheet', description: 'Each item with the quantity on hand and on order, and a blank column to count into.' },
     ],
   },
   {
@@ -89,8 +91,15 @@ const groups: ReportGroup[] = [
       { to: '/reports/transaction-list-by-vendor', name: 'Transaction List by Vendor', description: 'Every transaction in the period under the vendor it names.' },
       { to: '/reports/check-detail', name: 'Check Detail', description: 'Every check written in the period, with what it paid for under it.' },
       { to: '/reports/open-purchase-orders', name: 'Open Purchase Order List', description: 'Purchase orders not yet received, closed or voided, under each vendor.' },
+      { to: '/reports/open-purchase-order-detail', name: 'Open Purchase Order Detail', description: 'Each line of the purchase orders not yet received, under each vendor.' },
       { to: '/reports/vendor-contact-list', name: 'Vendor Contact List', description: 'Each active vendor\'s phone numbers, email, contact name, address and account number.' },
       { to: '/reports/1099', name: '1099 Transaction Detail Report', description: 'Annual payments to 1099 vendors, grouped by vendor and tax ID.' },
+    ],
+  },
+  {
+    heading: 'Sales tax',
+    reports: [
+      { to: '/reports/sales-tax-liability', name: 'Sales Tax Liability Report', description: 'The tax charged on the period\'s invoices under each tax code, with the sales it was charged on.' },
     ],
   },
 ];

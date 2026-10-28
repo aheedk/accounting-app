@@ -170,12 +170,33 @@ November 1.
     still holds stock or moved in the period.
   - A page can have no dates at all (a list, as it stands today), and a column
     can be a plain number (a quantity, a count of days).
+- **Added 10-28 (Aheed), in the same files:**
+  - **Open Purchase Order Detail:** each line of the open orders, with its item,
+    under each vendor. A receipt takes in the whole order, so nothing on an open
+    one has been received; QuickBooks' Received and Backordered columns are left
+    off.
+  - **Physical Inventory Worksheet:** each active item with the quantity on hand
+    and on open orders, and a blank column to write the count in.
+  - **Invoices and Received Payments:** from a new read-only endpoint,
+    `GET /businesses/:id/reports/invoices-and-payments?period_start=&period_end=`
+    (`services/ar/reports/invoicePaymentsService.ts`). The posted invoices dated
+    in the period, under each customer, with the payments and credit memos
+    applied to each, whenever they were applied, and what is still owed. It
+    counts what the Open Invoices report counts (posted payments, posted or
+    applied credit memos), so the open balances tie out to it.
+  - **Sales Tax Liability Report:** from a new read-only endpoint,
+    `GET /businesses/:id/reports/sales-tax-liability?period_start=&period_end=`
+    (`services/tax/salesTaxLiabilityService.ts`). For the posted invoices dated in
+    the period, each tax code's taxable sales and tax from the invoice lines,
+    then the sales with no tax code, and all sales. A code's tax is what its
+    invoices credited its tax payable account, and the line opens that
+    account's ledger. The rate shown is the one in effect at the period end.
+    Credit memos carry no tax lines, so they are not in it.
 
 ## 4. Not built
 
 - **Riham's next:** sales by product or service.
-- **Needs a small endpoint:** invoices and received payments, and open purchase
-  order detail.
-- **Needs more than the app keeps today:** the sales tax reports (tax by agency),
-  exceptions to closing date, statement list, terms and payment method lists, and
-  purchases by product or service.
+- **Needs more than the app keeps today:** sales tax by agency, and the Taxable
+  Sales reports (a tax code has no agency, an invoice line no product);
+  exceptions to closing date; statement list; terms and payment method lists;
+  and purchases by product or service.

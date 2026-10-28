@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import * as tax from '../services/tax/taxCodeService.js';
+import { salesTaxLiability } from '../services/tax/salesTaxLiabilityService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router({ mergeParams: true });
@@ -22,6 +23,14 @@ router.use('/businesses/:businessId', requireAuth, resolveBusiness);
 router.get('/businesses/:businessId/tax-codes', async (req, res, next) => {
   try { res.json({ tax_codes: await tax.listTaxCodes(db, req.tenancy!.business_id) }); }
   catch (e) { next(e); }
+});
+
+// Sales Tax Liability: the tax charged on the period's invoices, by tax code.
+router.get('/businesses/:businessId/reports/sales-tax-liability', async (req, res, next) => {
+  try {
+    const q = schemas.pnlQuerySchema.parse(req.query);
+    res.json({ ...q, ...await salesTaxLiability(db, { business_id: req.tenancy!.business_id, ...q }) });
+  } catch (e) { next(e); }
 });
 
 router.post('/businesses/:businessId/tax-codes', requireMinRole('firm_admin'), async (req, res, next) => {

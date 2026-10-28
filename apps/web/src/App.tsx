@@ -37,7 +37,8 @@ import {
 } from '@/pages/reports/LedgerReportPages';
 import {
   CollectionsReportPage, CustomerContactListPage, EstimatesByCustomerPage, InventoryValuationDetailPage, InventoryValuationSummaryPage,
-  InvoiceListReportPage, OpenPurchaseOrderListPage, ProductServiceListPage, VendorContactListPage,
+  InvoiceListReportPage, InvoicesAndPaymentsPage, OpenPurchaseOrderDetailPage, OpenPurchaseOrderListPage, PhysicalInventoryWorksheetPage,
+  ProductServiceListPage, SalesTaxLiabilityPage, VendorContactListPage,
 } from '@/pages/reports/ListReportPages';
 import CustomerListPage from '@/pages/customers/CustomerListPage';
 import CustomerNewPage from '@/pages/customers/CustomerNewPage';
@@ -236,6 +237,10 @@ export default function App() {
             <Route path="/reports/collections" element={<CollectionsReportPage />} />
             <Route path="/reports/inventory-valuation-summary" element={<InventoryValuationSummaryPage />} />
             <Route path="/reports/inventory-valuation-detail" element={<InventoryValuationDetailPage />} />
+            <Route path="/reports/open-purchase-order-detail" element={<OpenPurchaseOrderDetailPage />} />
+            <Route path="/reports/physical-inventory-worksheet" element={<PhysicalInventoryWorksheetPage />} />
+            <Route path="/reports/invoices-and-payments" element={<InvoicesAndPaymentsPage />} />
+            <Route path="/reports/sales-tax-liability" element={<SalesTaxLiabilityPage />} />
             <Route path="/reports/balance-sheet" element={<BalanceSheetPage />} />
             <Route path="/reports/cash-flow" element={<CashFlowPage />} />
             <Route path="/reports/reconciliation" element={<ReconciliationReportsPage />} />
