@@ -37,7 +37,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Build the API image in the registry
-        run: az acr build --registry "${{ vars.AZURE_REGISTRY }}" --image "accounting-api:$SHA" .
+        run: az acr build --registry "${{ vars.AZURE_REGISTRY }}" --image "accounting-api:$SHA" --file deploy/azure/Dockerfile .
       - name: Run it on App Service
         # The container migrates the database, then starts; App Service's health
         # check on /health takes it out of service if it stops answering.

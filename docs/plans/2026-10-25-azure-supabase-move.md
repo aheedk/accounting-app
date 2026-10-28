@@ -21,7 +21,7 @@ below are updated.
 
 | What | Checked |
 |---|---|
-| `Dockerfile`, `.dockerignore`: the API as a container. It runs the migrations, then starts | Built and run against the local database: it migrated, started, and answered `/health` with the security headers |
+| `deploy/azure/Dockerfile` and its `Dockerfile.dockerignore`: the API as a container. It runs the migrations, then starts. Kept out of the repo root: a root Dockerfile makes Railway build with it instead of Nixpacks, and Railway then runs only the first half of the `&&` start command, so no deploy started from 10-26 to 10-28 | Built and run against the local database: it migrated, started, and answered `/health` with the security headers |
 | `lib/forwardedFor.ts`: Azure's front end puts the port on the visitor's address (`203.0.113.7:51234`). The audit log's `inet` column refuses that, so **every audited request, sign-in included, would have failed**, and the sign-in limit would have seen each connection as a new address. The port is now taken off | Unit test. In the container, a failed sign-in sent from `203.0.113.7:51234` was recorded as `203.0.113.7` |
 | `bin/migrate.ts`: on Supabase, the roles its Data API uses (`anon`, `authenticated`) get no access to our tables, and no access to new tables either. It runs on every deploy and does nothing where those roles don't exist | Locally with stand-in roles: they could read `journal_entries` before, nothing after, and not a table created later |
 | `bin/upload-files.ts` (`npm run files:upload -- <folder>`): copies the uploaded files into the bucket, keeping each one's path. It skips files already there | Usage only. Its S3 calls are the ones `lib/fileStorage.ts` makes |

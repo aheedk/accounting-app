@@ -1,7 +1,10 @@
 # The API, as Azure App Service runs it (docs/plans/2026-10-25-azure-supabase-move.md).
 # Built from the repo root, since the API needs the shared package, the
-# migrations and bin/migrate.ts beside it. The web app and the phone app are not
-# in the image.
+# migrations and bin/migrate.ts beside it:
+#   docker build -f deploy/azure/Dockerfile .
+# The web app and the phone app are not in the image. Not at the repo root:
+# there Railway builds with it instead of Nixpacks, and runs only the first half
+# of its `&&` start command, so the API never started (10-28).
 
 FROM node:20-bookworm AS build
 WORKDIR /app

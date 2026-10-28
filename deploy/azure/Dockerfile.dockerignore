@@ -1,3 +1,5 @@
+# For deploy/azure/Dockerfile: BuildKit reads a <Dockerfile>.dockerignore beside
+# it. Not at the repo root, where Railway's build would read it too.
 # What .gitignore leaves out stays out of the image too: the image must build
 # from what is in git, as CI builds it.
 **/node_modules
