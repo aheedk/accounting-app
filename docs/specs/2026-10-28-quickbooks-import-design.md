@@ -1,8 +1,10 @@
 # Moving a client from QuickBooks — Design Spec
 
-**Status:** Proposed 2026-10-28, not decided. Nothing in it is built. Written after
-Riham's question of 10-28 about moving the firm's QuickBooks clients over so
-Faizan's team can start working in the app. What is still to decide is in section 8.
+**Status:** Built 2026-10-29 as Setup → Import from QuickBooks (Aheed). Proposed
+2026-10-28, after Riham's question about moving the firm's QuickBooks clients over
+so Faizan's team can start working in the app. Sections 1–4 are the proposal as
+written; section 5 is what was built, and says where it differs. What is still for
+the firm to decide is in section 7.
 
 Column names and report layouts below are QuickBooks' as we understand them. Check
 them against real exports from one of the firm's clients before building.
@@ -23,7 +25,7 @@ She also asked whether to move a few clients or all of them.
 
 ## 2. What the app has today
 
-Checked against the code on 2026-10-28.
+Checked against the code on 2026-10-28, before the import was built.
 
 | | Today | Where |
 |---|---|---|
@@ -92,105 +94,107 @@ B gets nearly everything C would, from files the firm can already export, withou
 waiting on Intuit. C pays off only for many clients with long histories where the
 original documents matter.
 
-## 5. Proposed design (option B)
+## 5. As built (option B)
 
-An **Import from QuickBooks** page for each company: a checklist of the steps
-below, in order. Each step:
+Setup → **Import from QuickBooks** (`/setup/quickbooks-import`), for an accountant
+and up. A checklist of steps, one card each, then the check and the list of uploads.
 
-- takes QuickBooks' export as it comes out (Excel or CSV, with QuickBooks' header
-  rows, total rows and column names);
-- shows a preview before anything posts: what will be created, rows it can't match
-  (an account, customer or vendor name it doesn't know), and totals that don't
-  agree;
-- posts through the existing services (accounts, customers, vendors,
-  `invoiceService`, `billService`, `ledgerService.postJournalEntry`), so imported
-  records behave like ones entered by hand and are in the audit trail;
-- is kept as one import batch that can be undone as a whole, like a bank upload.
+### How every step works
 
-The cutover date is chosen first. A month end is simplest. The fiscal periods
-covering it must exist, and so must those for any history brought over.
+- The page reads QuickBooks' export as it comes out (Excel or CSV): it finds the
+  heading row under QuickBooks' title rows, follows rows grouped under a customer or
+  vendor line, skips "Total for" rows, and reads amounts like `(1,234.56)` and dates
+  like `10/31/26` (`apps/web/src/lib/qbImport.ts`).
+- The rows go to `POST /businesses/:id/qb-import/<step>`, first with `?dry_run=true`:
+  the upload runs in full and is rolled back, so the preview is exactly what bringing
+  it in would do. Anything wrong (a name it can't find, a date with no open period,
+  an entry that doesn't balance) is listed, and while any is left nothing is brought
+  in (422 without `dry_run`).
+- It posts through the existing services, so imported records behave like ones
+  entered by hand and are in the activity log.
+- Each upload is a batch (`qb_import_batches`, migration 0114) listing everything it
+  made (`qb_import_records`), and can be undone from the page
+  (`POST .../qb-import/batches/:id/undo`). Posted things are voided; accounts,
+  customers, vendors and items are removed while nothing uses them. Undo refuses
+  when something later depends on the upload: a customer with open invoices, an
+  invoice with a payment applied, a bank entry reconciled since.
+- All of a company's uploads are on one cutover date, set before the first.
+- Code: `apps/api/src/services/import/` (`qbLists.ts`, `qbOpenItems.ts`,
+  `qbLedger.ts`, `qbBatches.ts`, and `qbMatch.ts` for finding names).
 
-### Step 1: Lists
+### Finding names
 
-- **Chart of accounts:** take QuickBooks' Account List export as it is. Give a code
-  when QuickBooks has none (the next free one in the type's range). Keep
-  sub-accounts: QuickBooks writes them as `Parent:Child`.
-- **Customers and vendors:** take QuickBooks' column names, the billing address,
-  and terms by name ("Net 30") as well as by days.
-- **Products and services (new):** name, SKU, description, sales price, cost, and
-  income and expense accounts by name. For stock items, the inventory asset
-  account and the quantity on hand.
-- Sales tax codes and their agencies are set up by hand on Settings → Tax Codes
-  (a few for each client).
+QuickBooks writes an account by its full name, a sub-account as `Parent:Child`, and,
+when the company numbers its accounts, each part with its number in front
+("6000 Utilities:6010 Gas"). The name decides; a number only picks between accounts
+that share a name. Customers and vendors are found by name, or by the last part of a
+QuickBooks `Parent:Child` name.
 
-### Step 2: Opening balances
+### The steps, in the order on the page
 
-QuickBooks' Trial Balance as of the cutover date becomes one journal entry dated
-that day. Lines that a later step brings in in detail go to Opening Balance Equity
-instead of their own account, so nothing is counted twice:
-
-- Accounts Receivable and Accounts Payable (step 3);
-- each bank account's uncleared items (step 4), so the bank opens at its cleared
-  balance;
-- Inventory Asset, when stock comes in with the products and is posted as opening
-  stock.
-
-Once the later steps are done, Opening Balance Equity comes back to what QuickBooks
-shows for it.
-
-With a mid-year cutover, the year's income and expenses all sit in this one entry.
-The year's totals are right, but the months before cutover are not. Step 5 fixes
-that.
-
-### Step 3: Open invoices and unpaid bills
-
-- From QuickBooks' Open Invoices report (or A/R Aging Detail) and its Unpaid Bills
-  report.
-- Each open invoice becomes a posted invoice with its QuickBooks number, customer,
-  date, due date and terms. It has one line for the open balance, credited to
-  Opening Balance Equity. Bills are the same the other way round. A bill with no
-  number gets one: QuickBooks doesn't require it, the app does.
-- Negative rows (credit memos, and payments not yet applied) come in as credit
-  memos, vendor credits, or unapplied payments.
-- The open balance includes its sales tax, which is already in Sales Tax Payable
-  from step 2, so the line has no tax code.
-- New invoice numbers carry on from QuickBooks' highest, as long as the company's
-  invoice prefix matches QuickBooks' numbers.
-- A/R and A/P Aging here then match QuickBooks' as of cutover, and Accounts
-  Receivable and Payable match the trial balance.
-
-### Step 4: Uncleared bank items
-
-- From QuickBooks' list of each bank account's transactions not yet cleared at the
-  cutover date.
-- Each becomes its own entry against Opening Balance Equity, with its date, number
-  and payee, so it can be ticked when it clears. With step 2 opening the bank at
-  its cleared balance, the book balance comes out at QuickBooks'.
-
-### Step 5 (optional): History
-
-- From QuickBooks' Journal report for the years wanted: every transaction with its
-  date, type, number, name, memo and lines.
-- Each transaction becomes a journal entry with its date, QuickBooks type, number
-  and name. Past P&Ls, balance sheets, the general ledger and this year's months
-  then work here.
-- It brings the ledger, not the original invoices and bills: an old invoice is a
-  journal entry here.
-- With history in, step 2 is not posted. The trial balance becomes the check
-  instead.
-  - Step 3 still brings the open invoices and bills as documents. One entry at
-    cutover moves the history's Accounts Receivable and Payable balances to Opening
-    Balance Equity, so they aren't counted twice.
-  - Step 4 isn't needed, since each uncleared item is already an entry of its own.
-    Instead the import marks every history entry on a bank account as reconciled,
-    except those QuickBooks shows as uncleared. The first reconciliation here then
-    starts where QuickBooks' last one ended.
+1. **Chart of accounts.** From the Account List.
+   - QuickBooks' Accounts Receivable, Accounts Payable and Retained Earnings are the
+     company's own (the default chart has them): those take QuickBooks' name and
+     number rather than being added twice.
+   - An account already here by full name is left as it is; one here as a different
+     type stops the upload.
+   - Sub-accounts are kept under their parent.
+   - A number already taken, or none at all, gets the next tenth in the type's range
+     (1010, 1020... for assets; cost of goods sold in the 5000s, other expenses from
+     6000), with a note.
+2. **Customers**, 3. **Vendors.** From the contact lists: name, company, email,
+   phone, billing address, terms ("Net 30" read as 30 days), notes; a vendor's
+   account number. A name already here is left as it is.
+4. **Products and services.** Name, SKU, description, price, cost, and the income,
+   expense and inventory asset accounts by name. QuickBooks doesn't need a SKU and the
+   app does, so an item without one uses its name. Bundles and categories are
+   skipped. A stock item's quantity on hand comes in as opening stock on the cutover
+   date, posted to Inventory against Opening Balance Equity.
+5. **Open invoices**, 6. **Unpaid bills.** From the Open Invoices and Unpaid Bills
+   reports. Each open row is a posted invoice or bill with its QuickBooks number,
+   date, due date and terms, and one line for the open balance, against Opening
+   Balance Equity. A negative row (a credit memo, a payment not yet applied, a vendor
+   credit) is a credit memo or vendor credit. Invoice and bill numbers are one to a
+   company here, so a number already used (two vendors' bills can share one in
+   QuickBooks) gets -2, -3; a bill with none gets one.
+7. **Uncleared bank and card items.** One account an upload, chosen on the card, from
+   the uncleared sections of its QuickBooks reconciliation report. Each item is an
+   entry of its own against Opening Balance Equity. "Nothing was uncleared" records an
+   account with none.
+8. **History** (optional). From the Journal report. Each transaction is a journal
+   entry with QuickBooks' date, number and name. QuickBooks' type becomes the app's
+   (journal entries take a fixed list: deposit, check, expense, invoice...) and is
+   kept at the start of the memo. Brought in 500 at a time.
+9. **Opening balances**, last. From the Trial Balance at the cutover date.
+   **Differs from the proposal:** instead of sending chosen lines to Opening Balance
+   Equity, the entry is QuickBooks' figure less what is already here, account by
+   account (`computeTrialBalance`, so income and expense are the year to date). What
+   the steps above brought in is already counted: open invoices on Accounts
+   Receivable, uncleared items on the bank, history on everything. So it is right in
+   any combination of steps, Opening Balance Equity ends where QuickBooks has it, and
+   with full history the entry is empty. The preview shows QuickBooks, here already,
+   and the entry for each account. A note says when Accounts Receivable or Payable
+   doesn't match the open documents brought in.
+   - Then each bank and credit card account is **reconciled to the cutover date**:
+     every entry up to then is ticked except the uncleared items, at the balance that
+     leaves. The first reconciliation here starts where QuickBooks' last one ended,
+     with only the uncleared items to tick. An account with a reconciliation in
+     progress is left alone, with a note.
+   - Nothing that posts can be added while the opening balances are posted: undo
+     them, add the upload, and post them again.
 
 ### The check
 
-At the end, the page puts our trial balance as of the cutover date beside
-QuickBooks', and lists any account that differs. It does the same for the A/R and
-A/P aging totals. A client counts as moved when they match to the cent.
+`GET .../qb-import/check`: once the opening balances are posted, the page puts each
+account's balance at the cutover date beside QuickBooks' trial balance (kept with the
+upload) and lists any that differ.
+
+### Tests
+
+`apps/api/tests/integration/qbImport.test.ts`: a whole move (lists, open items,
+uncleared items, opening entry, the check, the reconciliation, undo), account
+mapping, history, and the HTTP routes (dry run, roles, problems). The readers:
+`apps/web/src/lib/qbImport.test.ts`.
 
 ## 6. Not covered
 
@@ -201,32 +205,11 @@ A/P aging totals. A client counts as moved when they match to the cent.
   users and their access.
 - Past reconciliations. They stay in QuickBooks.
 
-## 7. Size and order
+## 7. To decide
 
-Rough guesses for one developer, tests included:
-
-| Part | Size |
-|---|---|
-| Step 1: lists, and the products upload | 1.5 days |
-| Import batches with undo, and the preview | 1 day |
-| Step 2: trial balance | 1 day |
-| Step 3: open invoices and bills | 2 days |
-| Step 4: uncleared bank items | 1 day |
-| The check | half a day |
-| Step 5: history | 3–4 days |
-
-Steps 1–4 and the check come to about a week, or a bit more. History adds 3–4 days.
-
-For a pilot of two or three clients, build steps 1–3 first (3–4 days). Their
-uncleared bank items, and if need be their open invoices and bills, can be typed in
-by hand while the rest is built. Build history before moving everyone else.
-
-## 8. To decide
-
-- Whether to build this at all, and whether the first week is a pilot of a few
-  clients or everyone.
+- Whether the first week is a pilot of a few clients or everyone. Before the first,
+  try the page on one client's real exports: the column names are QuickBooks' as we
+  understand them.
 - The cutover date: a month end, 2026-10-31 if the pilot starts the week of 11-02.
 - Whether to bring history, and how many years of it.
-- Who builds what. Suggested: Riham takes step 1, since she has already looked into
-  the uploads, and Aheed takes steps 2 and 3.
 - How long to keep QuickBooks for looking things up.

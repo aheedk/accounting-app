@@ -260,6 +260,12 @@ export const AUDIT = {
   // Signing in, second pass (security review 2026-10-21)
   AUTH_REFRESH_REUSE: 'auth.refresh_reuse',
   FIRM_SECURITY_UPDATE: 'firm.security_update',
+
+  // Moving a client from QuickBooks: one upload, and undoing it
+  QB_IMPORT_POST: 'qb_import.post',
+  QB_IMPORT_UNDO: 'qb_import.undo',
+  // An account an import added, taken out again by undoing it while nothing used it.
+  COA_DELETE: 'coa.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

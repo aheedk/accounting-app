@@ -20,6 +20,7 @@ import suspenseRoutes from './routes/suspense.js';
 import trialBalanceRoutes from './routes/trialBalance.js';
 import customerRoutes from './routes/customers.js';
 import taxCodeRoutes from './routes/taxCodes.js';
+import qbImportRoutes from './routes/qbImport.js';
 import invoiceRoutes from './routes/invoices.js';
 import estimateRoutes from './routes/estimates.js';
 import paymentRoutes from './routes/payments.js';
@@ -121,6 +122,8 @@ export function makeApp(): Express {
     credentials: true,
   }));
   app.use(cookieParser());
+  // A QuickBooks history upload is every past transaction at once.
+  app.use('/businesses/:businessId/qb-import', express.json({ limit: '50mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(healthRoutes);
   app.use(cspReportRoutes);
@@ -141,6 +144,7 @@ export function makeApp(): Express {
   app.use(trialBalanceRoutes);
   app.use(customerRoutes);
   app.use(taxCodeRoutes);
+  app.use(qbImportRoutes);
   app.use(invoiceRoutes);
   app.use(estimateRoutes);
   app.use(paymentRoutes);

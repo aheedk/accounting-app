@@ -52,6 +52,8 @@ export async function stopTestDb(): Promise<void> {
 export async function truncateAll(db: Kysely<DB>) {
   await sql`
     TRUNCATE
+      qb_import_records,
+      qb_import_batches,
       chat_messages,
       chat_conversations,
       estimate_lines,

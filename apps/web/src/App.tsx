@@ -108,6 +108,7 @@ import CheckPage from '@/pages/accounting/CheckPage';
 import ExpenseListPage from '@/pages/accounting/ExpenseListPage';
 import EntityPage from '@/pages/setup/EntityPage';
 import CompanySettingsPage from '@/pages/setup/CompanySettingsPage';
+import QuickBooksImportPage from '@/pages/setup/QuickBooksImportPage';
 import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
 import CostCentersPage from '@/pages/setup/CostCentersPage';
@@ -324,6 +325,7 @@ export default function App() {
             <Route path="/clients/new" element={<AddClientPage />} />
             <Route path="/setup/entity" element={<EntityPage />} />
             <Route path="/setup/company-settings" element={<CompanySettingsPage />} />
+            <Route path="/setup/quickbooks-import" element={<QuickBooksImportPage />} />
             <Route path="/setup/coa" element={<CoaListPage />} />
             <Route path="/setup/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/setup/cost-centers" element={<CostCentersPage />} />

@@ -1263,6 +1263,8 @@ export interface DB {
   approval_requests: ApprovalRequestsTable;
   estimates: EstimatesTable;
   estimate_lines: EstimateLinesTable;
+  qb_import_batches: QbImportBatchesTable;
+  qb_import_records: QbImportRecordsTable;
 }
 
 export interface InvoiceImportStagingTable {
@@ -1410,4 +1412,34 @@ export interface ChatMessagesTable {
   action_payload: ColumnType<unknown, unknown, unknown> | null;
   sql_query: string | null;
   created_at: Generated<Timestamp>;
+}
+
+// Moving a client from QuickBooks (migration 0114).
+export type QbImportStep =
+  | 'accounts' | 'customers' | 'vendors' | 'items'
+  | 'open_invoices' | 'open_bills' | 'uncleared' | 'history' | 'trial_balance';
+export type QbImportEntityType =
+  | 'account' | 'account_renamed' | 'customer' | 'vendor' | 'inventory_item' | 'stock_movement'
+  | 'journal_entry' | 'invoice' | 'bill' | 'credit_memo' | 'vendor_credit' | 'reconciliation';
+
+export interface QbImportBatchesTable {
+  id: Generated<string>;
+  business_id: string;
+  step: QbImportStep;
+  cutover_date: ColumnType<string, string, string>;
+  file_name: string | null;
+  summary: ColumnType<unknown, unknown, unknown>;
+  created_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  undone_at: Timestamp | null;
+  undone_by_user_id: string | null;
+}
+
+export interface QbImportRecordsTable {
+  id: Generated<string>;
+  batch_id: string;
+  entity_type: QbImportEntityType;
+  entity_id: string;
+  previous: ColumnType<unknown, unknown, unknown> | null;
+  sort_order: Generated<number>;
 }

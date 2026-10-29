@@ -41,6 +41,7 @@ const FIRM_ADMIN_PAGES = ['/firm', '/setup/users', '/clients/new', '/accounting/
 // staff are not handed a form they cannot save.
 const ACCOUNTANT_PAGES = [
   '/setup/activity',
+  '/setup/quickbooks-import',
   '/journal/new',
   '/accounting/transfers/new',
   '/credit-memos/new',

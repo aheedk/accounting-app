@@ -122,6 +122,7 @@ const ALL_PAGES: Page[] = [
   // Setup
   { label: 'Entity', group: 'Setup', to: '/setup/entity' },
   { label: 'Company Settings', group: 'Setup', to: '/setup/company-settings' },
+  { label: 'Import from QuickBooks', group: 'Setup', to: '/setup/quickbooks-import' },
   { label: 'Chart of Accounts Setup', group: 'Setup', to: '/setup/coa' },
   { label: 'Cost Centers', group: 'Setup', to: '/setup/cost-centers' },
   { label: 'Users', group: 'Setup', to: '/setup/users' },

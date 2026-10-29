@@ -108,6 +108,7 @@ export const PAGE_NAMES: Record<string, string> = {
   '/clients/new': 'Add Client',
   '/setup/entity': 'Entity',
   '/setup/company-settings': 'Company Settings',
+  '/setup/quickbooks-import': 'Import from QuickBooks',
   '/setup/coa': 'Chart of Accounts Setup',
   '/setup/cost-centers': 'Cost Centers',
   '/setup/users': 'Users',

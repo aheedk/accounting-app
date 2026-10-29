@@ -164,6 +164,7 @@ const ALL_GROUPS: NavGroup[] = [
     children: [
       { to: '/setup/entity', label: 'Entity' },
       { to: '/setup/company-settings', label: 'Company Settings' },
+      { to: '/setup/quickbooks-import', label: 'Import from QuickBooks' },
       { to: '/setup/coa', label: 'Chart of Accounts' },
       { to: '/setup/cost-centers', label: 'Cost Centers' },
       { to: '/setup/users', label: 'Users' },
