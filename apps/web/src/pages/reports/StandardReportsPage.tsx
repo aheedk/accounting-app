@@ -118,12 +118,13 @@ function favoritesKey(businessId: string | null): string {
   return `report-favorites-${businessId ?? 'none'}`;
 }
 
-function loadFavorites(businessId: string | null): Set<string> {
+/** In the order favorited, oldest first — not the order reports are listed in. */
+function loadFavorites(businessId: string | null): string[] {
   try {
     const raw = localStorage.getItem(favoritesKey(businessId));
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
-    return new Set();
+    return [];
   }
 }
 
@@ -166,9 +167,9 @@ function ReportRow({ report, favorite, onToggleFavorite }: { report: ReportLink;
 }
 
 function ReportSection({
-  heading, reports, favorites, onToggleFavorite,
+  heading, reports, favoriteSet, onToggleFavorite,
 }: {
-  heading: string; reports: ReportLink[]; favorites: Set<string>; onToggleFavorite: (to: string) => void;
+  heading: string; reports: ReportLink[]; favoriteSet: Set<string>; onToggleFavorite: (to: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [left, right] = twoColumns(reports);
@@ -185,10 +186,10 @@ function ReportSection({
       {open && (
         <div className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-2">
           <div className="divide-y">
-            {left.map(r => <ReportRow key={r.to} report={r} favorite={favorites.has(r.to)} onToggleFavorite={() => onToggleFavorite(r.to)} />)}
+            {left.map(r => <ReportRow key={r.to} report={r} favorite={favoriteSet.has(r.to)} onToggleFavorite={() => onToggleFavorite(r.to)} />)}
           </div>
           <div className="divide-y">
-            {right.map(r => <ReportRow key={r.to} report={r} favorite={favorites.has(r.to)} onToggleFavorite={() => onToggleFavorite(r.to)} />)}
+            {right.map(r => <ReportRow key={r.to} report={r} favorite={favoriteSet.has(r.to)} onToggleFavorite={() => onToggleFavorite(r.to)} />)}
           </div>
         </div>
       )}
@@ -200,7 +201,8 @@ export default function StandardReportsPage() {
   // A report the role cannot open is left off, as in the sidebar and search.
   const canOpen = useCanOpen();
   const [businessId] = useActiveBusinessId();
-  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites(businessId));
+  // Order favorited, oldest first — not the order reports are listed in.
+  const [favoriteOrder, setFavoriteOrder] = useState<string[]>(() => loadFavorites(businessId));
   const [query, setQuery] = useState('');
 
   const visible = useMemo(
@@ -210,7 +212,12 @@ export default function StandardReportsPage() {
     [canOpen],
   );
   const visibleReports = useMemo(() => visible.flatMap(g => g.reports), [visible]);
-  const favoriteReports = useMemo(() => visibleReports.filter(r => favorites.has(r.to)), [visibleReports, favorites]);
+  const favoriteSet = useMemo(() => new Set(favoriteOrder), [favoriteOrder]);
+  const byTo = useMemo(() => new Map(visibleReports.map(r => [r.to, r])), [visibleReports]);
+  const favoriteReports = useMemo(
+    () => favoriteOrder.map(to => byTo.get(to)).filter((r): r is ReportLink => r !== undefined),
+    [favoriteOrder, byTo],
+  );
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -219,10 +226,9 @@ export default function StandardReportsPage() {
   }, [query, canOpen]);
 
   function toggleFavorite(to: string) {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(to)) next.delete(to); else next.add(to);
-      try { localStorage.setItem(favoritesKey(businessId), JSON.stringify([...next])); } catch { /* best effort */ }
+    setFavoriteOrder((prev) => {
+      const next = prev.includes(to) ? prev.filter(t => t !== to) : [...prev, to];
+      try { localStorage.setItem(favoritesKey(businessId), JSON.stringify(next)); } catch { /* best effort */ }
       return next;
     });
   }
@@ -259,18 +265,16 @@ export default function StandardReportsPage() {
         )}
       </div>
 
-      {!query.trim() && (
-        <div className="space-y-4">
-          {favoriteReports.length > 0 && (
-            <ReportSection heading="Favorites" reports={favoriteReports} favorites={favorites} onToggleFavorite={toggleFavorite} />
-          )}
-          {visible.map(group => (
-            <ReportSection
-              key={group.heading} heading={group.heading} reports={group.reports} favorites={favorites} onToggleFavorite={toggleFavorite}
-            />
-          ))}
-        </div>
-      )}
+      <div className="space-y-4">
+        {favoriteReports.length > 0 && (
+          <ReportSection heading="Favorites" reports={favoriteReports} favoriteSet={favoriteSet} onToggleFavorite={toggleFavorite} />
+        )}
+        {visible.map(group => (
+          <ReportSection
+            key={group.heading} heading={group.heading} reports={group.reports} favoriteSet={favoriteSet} onToggleFavorite={toggleFavorite}
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -183,6 +183,35 @@ describe('statement import', () => {
     expect(otherAmount).toEqual([]);
   });
 
+  it('works in the other order too: the card statement reviewed before the bank statement exists', async () => {
+    const data = await setup(t);
+    const cardStagingId = randomUUID();
+
+    // Nothing posted yet: the payment waits.
+    const beforeBank = await findAlreadyRecorded(t.db, data.ctx, {
+      staging_id: cardStagingId, account_id: data.card.id, lines: cardStatement,
+      offsets: [{ index: 2, offset_account_id: null }],
+    });
+    expect(beforeBank).toEqual([]);
+
+    // The bank statement arrives later and is posted.
+    const bankStatement: StatementLine[] = [
+      { date: '03/14/2026', description: 'CHASE CREDIT CRD AUTOPAY', amount: '500.00', type: 'expense' },
+    ];
+    const [fromBank] = await t.db.transaction().execute(trx => postStatementLines(trx, data.ctx, {
+      staging_id: randomUUID(), statement_kind: 'bank', lines: bankStatement,
+      account_id: data.checking.id, items: [{ index: 0, offset_account_id: data.card.id }],
+    }));
+
+    // Reviewing the card statement again now finds it, same as when the bank statement came first.
+    const afterBank = await findAlreadyRecorded(t.db, data.ctx, {
+      staging_id: cardStagingId, account_id: data.card.id, lines: cardStatement,
+      offsets: [{ index: 2, offset_account_id: null }],
+    });
+    expect(afterBank).toHaveLength(1);
+    expect(afterBank[0]).toMatchObject({ index: 2, journal_entry_id: fromBank });
+  });
+
   it('suggests which card a statement is, and which card a bank payment paid', async () => {
     const data = await setup(t);
     const amex = await makeAccount(t.db, data.business.id, { code: '2110', name: 'Amex Business Gold', account_type: 'liability', detail_type: 'Credit Card' });
