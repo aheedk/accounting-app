@@ -92,8 +92,9 @@ of use decides. Supabase's Pro plan backs up daily.
 
 In the meeting, Faizan was to pass the logins to Aheed. Both services can add
 Aheed as a member instead, with a separate sign-in, so the firm's password
-stays with the firm. The plan asks for that on Azure: the Contributor role on
-the resource group.
+stays with the firm. The plan asks for that on Azure: the Owner role on the
+resource group only (10-29: Contributor can't give the web app and GitHub the
+access the setup needs).
 
 Aheed said Supabase could go first and Azure after. The plan moves both on one
 evening, but the database could also move first, with Railway's API pointed at

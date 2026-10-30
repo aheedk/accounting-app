@@ -31,12 +31,28 @@ below are updated.
 ## The firm does (accounts in the firm's name)
 
 1. **Supabase.** Create an organization in the firm's name on the Pro plan,
-   and a project in East US (North Virginia). Keep the database password in
+   and a project in East US (North Virginia) on the Small compute size
+   (point-in-time recovery needs Small or larger). Keep the database password
+   in the firm's password manager. Invite Aheed to the organization as
+   Administrator.
+2. **Azure.** Create a pay-as-you-go subscription in the firm's name, signed in
+   with the firm's Microsoft 365 account so it sits in the firm's directory.
+   - Register the resource providers `Microsoft.Web`,
+     `Microsoft.ContainerRegistry` and `Microsoft.KeyVault` on the
+     subscription. That needs the subscription, so Aheed can't do it from the
+     resource group.
+   - Create a resource group, `accounting-prod`, in East US, and give Aheed the
+     **Owner** role on it, with the recommended condition (no Owner or access
+     administrator roles). Not Contributor: the setup gives the web app access
+     to the registry and GitHub access to deploy, and a Contributor can't give
+     access.
+   - If Aheed is a guest in the firm's directory, give them the Application
+     Developer role in Entra ID, so they can register GitHub's sign-in. A
+     guest can't by default.
+3. **Secrets.** Copy `FIELD_ENCRYPTION_KEY`, `JWT_ACCESS_SECRET`,
+   `JWT_REFRESH_SECRET` and `ANTHROPIC_API_KEY` from Railway's API service into
    the firm's password manager.
-2. **Azure.** Create a subscription in the firm's name, under the firm's
-   Microsoft 365 if it has one. Create a resource group, `accounting-prod`, in
-   East US, and give Aheed the Contributor role on it.
-3. Sign in, and Aheed sets up the rest. Claude can drive the portals once
+4. Sign in, and Aheed sets up the rest. Claude can drive the portals once
    someone is signed in.
 
 ## Setting up
