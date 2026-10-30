@@ -31,10 +31,9 @@ below are updated.
 ## The firm does (accounts in the firm's name)
 
 1. **Supabase.** Create an organization in the firm's name on the Pro plan,
-   and a project in East US (North Virginia) on the Small compute size
-   (point-in-time recovery needs Small or larger). Keep the database password
-   in the firm's password manager. Invite Aheed to the organization as
-   Administrator.
+   and a project in East US (North Virginia) on the Micro compute size the
+   plan includes. Keep the database password in the firm's password manager.
+   Invite Aheed to the organization as Administrator.
 2. **Azure.** Create a pay-as-you-go subscription in the firm's name, signed in
    with the firm's Microsoft 365 account so it sits in the firm's directory.
    - Register the resource providers `Microsoft.Web`,
@@ -76,8 +75,9 @@ below are updated.
    Connection, create an access key. The endpoint is
    `https://<project>.supabase.co/storage/v1/s3`, and the region is the
    project's (`us-east-1`).
-5. **Backups.** The Pro plan takes daily backups. Add point-in-time recovery
-   too: it restores to any minute, and the books are worth it.
+5. **Backups.** The Pro plan takes a backup every day and keeps the last 7.
+   No point-in-time recovery for now (10-29): it restores to any minute, but
+   it is $100 a month on top of the plan's $25. It can be turned on later.
 
 ### Azure
 
