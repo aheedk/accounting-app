@@ -65,9 +65,20 @@ jobs:
           VITE_API_URL: ${{ vars.API_ORIGIN }}
       - name: Azure's config, naming the API in the script policy
         run: sed "s#__API_ORIGIN__#${{ vars.API_ORIGIN }}#g" apps/web/staticwebapp.config.json > apps/web/dist/staticwebapp.config.json
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The deployment token is read at deploy time, so none is stored in GitHub.
+      - name: The Static Web App's deployment token
+        run: |
+          token=$(az staticwebapp secrets list --name "${{ vars.AZURE_STATIC_WEB_APP }}" --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --query properties.apiKey -o tsv)
+          echo "::add-mask::$token"
+          echo "SWA_TOKEN=$token" >> "$GITHUB_ENV"
       - uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ env.SWA_TOKEN }}
           action: upload
           app_location: apps/web/dist
           skip_app_build: true

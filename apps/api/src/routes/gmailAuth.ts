@@ -20,7 +20,8 @@ function getOAuth2Client() {
   const credPath = path.resolve(process.env.GMAIL_CREDENTIALS_PATH ?? 'secrets/gmail-credentials.json');
   if (!fs.existsSync(credPath)) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'Gmail is not set up on this server: its Google credentials file is missing.');
   const { web } = JSON.parse(fs.readFileSync(credPath, 'utf8')) as { web: { client_id: string; client_secret: string; redirect_uris: string[] } };
-  return new google.auth.OAuth2(web.client_id, web.client_secret, web.redirect_uris[0]);
+  // GMAIL_REDIRECT_URI picks this host's callback when the Google client lists more than one (Railway and Azure during the move).
+  return new google.auth.OAuth2(web.client_id, web.client_secret, process.env.GMAIL_REDIRECT_URI ?? web.redirect_uris[0]);
 }
 
 // Connecting the firm's Gmail decides whose mailbox feeds the AI inbox, so only

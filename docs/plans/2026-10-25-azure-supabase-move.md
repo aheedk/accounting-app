@@ -26,7 +26,8 @@ below are updated.
 | `bin/migrate.ts`: on Supabase, the roles its Data API uses (`anon`, `authenticated`) get no access to our tables, and no access to new tables either. It runs on every deploy and does nothing where those roles don't exist | Locally with stand-in roles: they could read `journal_entries` before, nothing after, and not a table created later |
 | `bin/upload-files.ts` (`npm run files:upload -- <folder>`): copies the uploaded files into the bucket, keeping each one's path. It skips files already there | Usage only. Its S3 calls are the ones `lib/fileStorage.ts` makes |
 | `apps/web/staticwebapp.config.json`: the headers from `netlify.toml` and the fallback to `index.html`. The deploy fills in the API's address | Valid JSON. Not served yet |
-| `.github/workflows/deploy-azure.yml`: after CI passes on `main`, builds the image in the registry and points App Service at it, then builds and uploads the web app. Every push deploys both, so nothing is skipped the way Railway's watch paths skipped pushes. **It does nothing until its variables are set** | Parses. Not run: Azure does not exist yet |
+| `.github/workflows/deploy-azure.yml`: after CI passes on `main`, builds the image in the registry and points App Service at it, then builds and uploads the web app. Every push deploys both, so nothing is skipped the way Railway's watch paths skipped pushes. It reads the Static Web App's deployment token at deploy time (10-31), so no token is stored in GitHub. **Each job does nothing until its variables are set** | Parses. Not run: Azure does not exist yet |
+| `GMAIL_REDIRECT_URI` (10-31): which callback the Gmail connection uses, when Google's client lists both Railway's and Azure's | Typechecks |
 
 ## The firm does (accounts in the firm's name)
 
@@ -81,6 +82,19 @@ below are updated.
 
 ### Azure
 
+**Done 10-31:** the registry `khanarndtapps`, the Key Vault `khanarndt-acct-kv`
+(Aheed is Key Vault Secrets Officer), the Static Web App
+`khanarndt-accounting-web` (East US 2, `agreeable-pond-02cc2310f.6.azurestaticapps.net`),
+GitHub's sign-in `github-deploy-accounting-app` with its roles, and every GitHub
+variable except `AZURE_WEBAPP_NAME` and `API_ORIGIN`.
+
+**Waiting on the owner:** a new subscription may run no App Service at all in
+East US (every size's quota is 0 of 0; Central US had 30). Only a subscription
+Contributor or Owner can raise it: Quotas → App Service → East US → **B1 VMs** →
+request 1. The plan `khanarndt-accounting-plan` and the web app
+`khanarndt-accounting-api` follow. Central US would work today, but every query
+would cross to the database in Virginia.
+
 1. **Container registry**, Basic, in `accounting-prod`.
 2. **App Service.** A Linux plan (B1 to start; see "Later"), and a Web App for
    Containers on it.
@@ -100,17 +114,25 @@ below are updated.
    - **`FIELD_ENCRYPTION_KEY` must be the same value as on Railway**, or the
      encrypted SSNs, tax IDs and two-step secrets cannot be read. Keep the JWT
      secrets the same too.
-   - Put the secrets in a Key Vault and reference them from the settings.
-4. **Static Web App** (Standard). Its deployment token goes into GitHub as the
-   secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+   - Put the secrets in a Key Vault and reference them from the settings. In
+     `khanarndt-acct-kv`: `database-url`, `jwt-access-secret`,
+     `jwt-refresh-secret`, `field-encryption-key`, `anthropic-api-key`,
+     `aws-access-key-id`, `aws-secret-access-key`. The web app's identity gets
+     Key Vault Secrets User on the vault.
+   - `GMAIL_REDIRECT_URI=https://<app>.azurewebsites.net/auth/gmail/callback`,
+     and the same address added to the Google client's redirect URIs.
+4. **Static Web App** (Standard). East US 2: Static Web Apps has no East US.
 5. **GitHub's sign-in to Azure.** An app registration with a federated
    credential for this repository's `main` branch, so no password is stored.
-   Give it AcrPush on the registry and Website Contributor on the web app.
+   Give it Contributor on the registry (`az acr build` runs a registry task,
+   which AcrPush can't), Contributor on the Static Web App (the workflow reads
+   its deployment token) and Website Contributor on the web app.
 6. **GitHub variables** (Settings → Secrets and variables → Actions):
    `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
    `AZURE_RESOURCE_GROUP`, `AZURE_REGISTRY` (the name, without `.azurecr.io`),
-   `AZURE_WEBAPP_NAME`, and `API_ORIGIN` (`https://<app>.azurewebsites.net`).
-   Setting them switches the workflow on.
+   `AZURE_STATIC_WEB_APP`, `AZURE_WEBAPP_NAME`, and `API_ORIGIN`
+   (`https://<app>.azurewebsites.net`). `AZURE_WEBAPP_NAME` switches the API's
+   deploy on, and `API_ORIGIN` the web app's.
 
 ## Trial run (Railway stays live)
 
@@ -135,8 +157,10 @@ below are updated.
    Storage variables set. The script is in the deployed code, so nothing
    needs downloading.
 4. **Deploy.** Run the deploy workflow, which migrates and locks down again.
-5. **Gmail.** Put `gmail-credentials.json` into `/home/secrets` (App Service →
-   SSH), then reconnect Gmail as a firm admin.
+5. **Gmail.** Copy `gmail-credentials.json` and `gmail-token.json` from
+   Railway's secrets folder into `/home/secrets` (App Service → SSH). With the
+   token there, Gmail keeps working without reconnecting. If it has to be
+   reconnected, the Azure callback must be in the Google client first.
 6. **Old address.** Change `netlify.toml` to send every page to the new
    address (301), so old bookmarks keep working.
 7. **Phone app.** Riham sets `EXPO_PUBLIC_API_URL` to the new API and ships a
