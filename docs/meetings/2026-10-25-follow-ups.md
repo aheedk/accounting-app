@@ -28,8 +28,8 @@ the reconciliation and the phone app.
 - **Hosting: Supabase and Azure** (item 92). Faizan: money is not a factor.
   What matters is that it is secure, easy to manage and backed up. The database
   goes to Supabase as soon as possible. The API and the web app go to Azure,
-  because the firm works in Office 365. Faizan creates the accounts and Aheed
-  sets them up.
+  because the firm works in Office 365. The firm creates the accounts (Asif
+  did, 10-31) and Aheed sets them up.
 - **For November 1:** hosting, bugs and the financial reports. **All of
   QuickBooks' standard reports** are to be added (item 18).
 - **Reconciliation matching:** Riham read out the rules (item 71), and Faizan
@@ -65,7 +65,7 @@ the reconciliation and the phone app.
 
 | # | What | Owner |
 |---|---|---|
-| 92 | **Hosting.** The database (and uploaded files) to Supabase, as soon as possible; the API and the web app to Azure. Faizan creates both accounts in the firm's name and gives Aheed access. Aheed sets them up and does a trial run while Railway stays live, then switches over one evening. The repo side is ready: [`../plans/2026-10-25-azure-supabase-move.md`](../plans/2026-10-25-azure-supabase-move.md). Covers what is left of 43 | Faizan (accounts), Aheed |
+| 92 | **Hosting.** The database (and uploaded files) to Supabase, as soon as possible; the API and the web app to Azure. Asif creates both accounts in the firm's name and gives Aheed access (done 10-31; Azure's server quota is with Microsoft, ticket 2610310040001721). Aheed sets them up and does a trial run while Railway stays live, then switches over one evening. The repo side is ready: [`../plans/2026-10-25-azure-supabase-move.md`](../plans/2026-10-25-azure-supabase-move.md). Covers what is left of 43 | Asif (accounts), Aheed |
 | 18 | **All of QuickBooks' standard reports**, then a review of them with the firm. Ten were on Reports → Standard Reports; nine more were added 10-26, Account List, Customer/Vendor Balance Summary, Open Invoices, Unpaid Bills, A/R and A/P Aging Detail, Customer/Vendor Balance Detail and twenty-six more from the ledger and the lists on 10-27, four on 10-28, the Closing Date Exception Report on 10-28, and Sales by Product/Service and Sales Tax by Agency on 10-28, once `invoice_lines` and `tax_codes` carried the data they needed (below). Left: a statement list, and the terms/payment method lists — those are hardcoded option lists in the UI, not business data, so a "report" on them would just restate 6–7 static strings; not worth building. See "Reports" below **(10-05)** | Riham |
 | 96 | Go through the second security pass on the live site, as demo steps 1 to 3 have it: a new login choosing its own password, a role taken away, requiring the second step. Aheed: "I didn't fully test this" | Aheed |
 | 95 | Test the reconciliation (the matching, and item 72's statement upload) on a client whose books are complete for the period. Riham's test data has gaps, so its difference cannot reach zero | Faizan |
@@ -181,8 +181,8 @@ permissions instead, so this needs a spec first.
 
 ## Not code
 
-- **Faizan creates the Supabase and Azure accounts** in the firm's name and adds
-  Aheed (92). Aheed starts as soon as they exist.
+- **Asif creates the Supabase and Azure accounts** in the firm's name and adds
+  Aheed (92). Aheed starts as soon as they exist. Done 10-31.
 - **Keep a copy of the secrets outside Railway**, `FIELD_ENCRYPTION_KEY` above
   all, in the firm's password manager. This was in the demo and was not
   reached.

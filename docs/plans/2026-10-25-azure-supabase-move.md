@@ -88,12 +88,15 @@ below are updated.
 GitHub's sign-in `github-deploy-accounting-app` with its roles, and every GitHub
 variable except `AZURE_WEBAPP_NAME` and `API_ORIGIN`.
 
-**Waiting on the owner:** a new subscription may run no App Service at all in
+**Waiting on Microsoft:** a new subscription may run no App Service at all in
 East US (every size's quota is 0 of 0; Central US had 30). Only a subscription
 Contributor or Owner can raise it: Quotas → App Service → East US → **B1 VMs** →
-request 1. The plan `khanarndt-accounting-plan` and the web app
-`khanarndt-accounting-api` follow. Central US would work today, but every query
-would cross to the database in Virginia.
+request 1. Asif, who set up the firm's Azure and Supabase, asked on 10-31; the
+portal couldn't raise it, so it went to Microsoft as support ticket
+2610310040001721 (severity C, a reply by email to Asif in business hours). The
+plan `khanarndt-accounting-plan` and the web app `khanarndt-accounting-api`
+follow. Central US would work today, but every query would cross to the
+database in Virginia.
 
 1. **Container registry**, Basic, in `accounting-prod`.
 2. **App Service.** A Linux plan (B1 to start; see "Later"), and a Web App for
