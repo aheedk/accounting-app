@@ -28,6 +28,7 @@ below are updated.
 | `apps/web/staticwebapp.config.json`: the headers from `netlify.toml` and the fallback to `index.html`. The deploy fills in the API's address | Valid JSON. Not served yet |
 | `.github/workflows/deploy-azure.yml`: after CI passes on `main`, builds the image in the registry and points App Service at it, then builds and uploads the web app. Every push deploys both, so nothing is skipped the way Railway's watch paths skipped pushes. It reads the Static Web App's deployment token at deploy time (10-31), so no token is stored in GitHub. **Each job does nothing until its variables are set** | Parses. Not run: Azure does not exist yet |
 | `GMAIL_REDIRECT_URI` (10-31): which callback the Gmail connection uses, when Google's client lists both Railway's and Azure's | Typechecks |
+| `bin/copy-to-supabase.sh` (11-01): `check`, `copy` (into an empty Supabase) or `replace` (empties it first). Takes a fresh dump of Railway, restores it with Postgres 18's tools in Docker, compares every table's row count. Reads both connection strings from `secrets/migration.env` (git-ignored) and prints neither | The trial copy below |
 
 ## The firm does (accounts in the firm's name)
 
@@ -59,7 +60,7 @@ below are updated.
 
 ### Supabase
 
-1. **Turn the Data API off** (Project Settings → Data API). The lockdown in
+1. **Turn the Data API off** (Project Settings → Data API). Off as of 11-01. The lockdown in
    `bin/migrate.ts` is the second line of defence. Afterwards, the Security
    Advisor should list no table open to `anon`.
 2. **Get the SSL certificate.** Download it from Database Settings → SSL and
@@ -139,8 +140,22 @@ database in Virginia.
 
 ## Trial run (Railway stays live)
 
-1. Dump production (`npm run db:backup` with Railway's connection string) and
-   restore it into Supabase (`docs/guides/backups.md`, "Restoring for real").
+1. **Done 11-01.** Copy production into Supabase: `bin/copy-to-supabase.sh copy`,
+   then the migrations from this machine with the API's certificate check:
+   `DATABASE_URL="<Supabase session pooler string>?sslmode=verify-full&sslrootcert=apps/api/certs/supabase-ca.crt" npm run db:migrate`.
+   - Railway runs **Postgres 18.6** and Supabase **17.11**. Version 17's
+     `pg_dump` refuses an 18 database, so the backup tool now uses 18
+     (`docs/guides/backups.md`); 18's dump restored into 17 without trouble. The
+     app is tested on 16.
+   - All 77 tables matched in row count. The 13 companies, 3 logins and the
+     ledger's debits and credits (47,991,723.28 each) matched, and a fingerprint
+     of every journal line was the same on both.
+   - The migrations added 0114 and 0115 and printed "Supabase roles anon and
+     authenticated: no access to public"; `anon` can read no table. The Data API
+     was already off. The certificate check (`verify-full`) worked.
+   - The pooler only took the password after it was reset and pasted in, not
+     typed: a wrong one gives "password authentication failed for user
+     postgres". The project is on `aws-0-us-east-1`; `aws-1` doesn't know it.
 2. Run the deploy workflow (Actions → Deploy to Azure → Run workflow).
 3. On the Static Web App's address:
    - sign in;
@@ -153,8 +168,10 @@ database in Virginia.
 ## Switch-over (one evening)
 
 1. **Freeze.** Tell the firm nothing is entered for about two hours.
-2. **Database.** Take the final dump from Railway. Empty the trial's data
-   (drop and recreate `public`), then restore the dump into Supabase.
+2. **Database.** `bin/copy-to-supabase.sh replace`: it takes the final dump from
+   Railway, empties the trial's data (drops and recreates `public`), restores
+   the dump into Supabase and compares the row counts. Keep that dump with the
+   Railway service (step 9).
 3. **Files.** `railway ssh` into the API service, then run
    `npm run files:upload -- "$FILE_STORAGE_DIR"` there with the Supabase
    Storage variables set. The script is in the deployed code, so nothing
