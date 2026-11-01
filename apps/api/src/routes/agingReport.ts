@@ -31,7 +31,11 @@ router.get('/businesses/:businessId/reports/ap-aging', async (req, res, next) =>
 router.get('/businesses/:businessId/reports/open-invoices', async (req, res, next) => {
   try {
     const q = schemas.agingQuerySchema.parse({ as_of: req.query['as_of'] ?? new Date().toISOString().slice(0, 10) });
-    const rows = await aging.openInvoices(db, { business_id: req.tenancy!.business_id, as_of: q.as_of });
+    const scope = { business_id: req.tenancy!.business_id, as_of: q.as_of };
+    // ?credits=true adds money on account as negative rows, so the detail reports add up to Accounts Receivable.
+    const rows = req.query['credits'] === 'true'
+      ? [...await aging.openInvoices(db, scope), ...await aging.openCustomerCredits(db, scope)].sort((a, b) => a.due_date.localeCompare(b.due_date))
+      : await aging.openInvoices(db, scope);
     res.json({ as_of: q.as_of, rows });
   } catch (e) { next(e); }
 });
@@ -39,7 +43,11 @@ router.get('/businesses/:businessId/reports/open-invoices', async (req, res, nex
 router.get('/businesses/:businessId/reports/unpaid-bills', async (req, res, next) => {
   try {
     const q = schemas.agingQuerySchema.parse({ as_of: req.query['as_of'] ?? new Date().toISOString().slice(0, 10) });
-    const rows = await apAging.unpaidBills(db, { business_id: req.tenancy!.business_id, as_of: q.as_of });
+    const scope = { business_id: req.tenancy!.business_id, as_of: q.as_of };
+    // ?credits=true adds credit with each vendor as negative rows, so the detail reports add up to Accounts Payable.
+    const rows = req.query['credits'] === 'true'
+      ? [...await apAging.unpaidBills(db, scope), ...await apAging.openVendorCredits(db, scope)].sort((a, b) => a.due_date.localeCompare(b.due_date))
+      : await apAging.unpaidBills(db, scope);
     res.json({ as_of: q.as_of, rows });
   } catch (e) { next(e); }
 });

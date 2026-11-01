@@ -54,7 +54,7 @@ const groups: ReportGroup[] = [
     reports: [
       { to: '/reports/aging', name: 'Accounts Receivable Aging Summary', description: 'Outstanding customer invoices bucketed by days past due, less unapplied payments and credits.' },
       { to: '/reports/customer-balances', name: 'Customer Balance Summary', description: 'Each customer\'s current open balance, with no bucket breakdown.' },
-      { to: '/reports/open-invoices', name: 'Open Invoices', description: 'Every invoice still carrying a balance, one row each, due soonest first.' },
+      { to: '/reports/open-invoices', name: 'Open Invoices', description: 'Every invoice still carrying a balance, and money customers have on account, due soonest first.' },
       { to: '/reports/ar-aging-detail', name: 'A/R Aging Detail', description: 'Open invoices grouped under their aging bucket, one row each.' },
       { to: '/reports/customer-balance-detail', name: 'Customer Balance Detail', description: 'Open invoices grouped under each customer, one row each.' },
       { to: '/reports/collections', name: 'Collections Report', description: 'Invoices past due, under each customer with their phone number, and how many days late.' },
@@ -84,7 +84,7 @@ const groups: ReportGroup[] = [
     reports: [
       { to: '/reports/ap-aging', name: 'Accounts Payable Aging Summary', description: 'Unpaid vendor bills bucketed by days past due, less unused vendor credits.' },
       { to: '/reports/vendor-balances', name: 'Vendor Balance Summary', description: 'Each vendor\'s current open balance, with no bucket breakdown.' },
-      { to: '/reports/unpaid-bills', name: 'Unpaid Bills', description: 'Every bill still carrying a balance, one row each, due soonest first.' },
+      { to: '/reports/unpaid-bills', name: 'Unpaid Bills', description: 'Every bill still carrying a balance, and credit with vendors, due soonest first.' },
       { to: '/reports/ap-aging-detail', name: 'A/P Aging Detail', description: 'Unpaid bills grouped under their aging bucket, one row each.' },
       { to: '/reports/vendor-balance-detail', name: 'Vendor Balance Detail', description: 'Unpaid bills grouped under each vendor, one row each.' },
       { to: '/reports/bill-payment-list', name: 'Bill Payment List', description: 'Every bill payment in the period, under the account it was paid from.' },

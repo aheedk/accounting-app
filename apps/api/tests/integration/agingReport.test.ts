@@ -83,6 +83,12 @@ describe('aging report', () => {
       .where('je.business_id', '=', biz.id).where('je.status', '=', 'posted').where('a.code', '=', '1100')
       .executeTakeFirstOrThrow();
     expect(Number(ar.debit) - Number(ar.credit)).toBe(140);
+
+    // The detail reports list that money on account as a row of its own, so they add up to it too.
+    const credits = await aging.openCustomerCredits(t.db, { business_id: biz.id, as_of: '2026-04-20' });
+    expect(credits).toEqual([expect.objectContaining({ type: 'Payment', invoice_number: 'Payment', open: '-30.0000', due_date: '2026-04-15', bucket: 'days_1_30' })]);
+    const listed = [...await aging.openInvoices(t.db, { business_id: biz.id, as_of: '2026-04-20' }), ...credits];
+    expect(listed.reduce((s, r) => s + Number(r.open), 0)).toBe(140);
   });
 
   it('openInvoices: the per-invoice detail behind the aging buckets, fully paid ones left out', async () => {

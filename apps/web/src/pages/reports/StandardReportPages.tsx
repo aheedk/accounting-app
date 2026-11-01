@@ -55,16 +55,20 @@ const fetchPartyBalances = (bizId: string, endpoint: 'aging' | 'ap-aging', asOf:
 const loadCustomerBalances = async (bizId: string, range: ReportDates) => partyBalanceTable(await fetchPartyBalances(bizId, 'aging', range.end), 'Customer');
 const loadVendorBalances = async (bizId: string, range: ReportDates) => partyBalanceTable(await fetchPartyBalances(bizId, 'ap-aging', range.end), 'Vendor');
 
-type OpenInvoiceRow = { invoice_number: string; customer_name: string; issue_date: string; due_date: string; total: string; open: string; bucket: OpenDocument['bucket'] };
-type UnpaidBillRow = { bill_number: string; vendor_name: string; bill_date: string; due_date: string; total: string; open: string; bucket: OpenDocument['bucket'] };
+type OpenInvoiceRow = { invoice_number: string; customer_name: string; issue_date: string; due_date: string; total: string; open: string; bucket: OpenDocument['bucket']; type: string };
+type UnpaidBillRow = { bill_number: string; vendor_name: string; bill_date: string; due_date: string; total: string; open: string; bucket: OpenDocument['bucket']; type: string };
 
+/** "1047" for an invoice or bill; a credit says what it is: "Credit Memo CM-1003", "Payment". */
+const docNumber = (number: string, type: string) => (type === 'Invoice' || type === 'Bill' || number === type ? number : `${type} ${number}`);
+
+// With the credits on account as negative rows, as QuickBooks lists them, so each report adds up to A/R or A/P.
 const fetchOpenInvoices = (bizId: string, asOf: string): Promise<OpenDocument[]> =>
-  api.get<{ rows: OpenInvoiceRow[] }>(`/businesses/${bizId}/reports/open-invoices`, { params: { as_of: asOf } }).then(r => r.data.rows.map(row => ({
-    number: row.invoice_number, party_name: row.customer_name, issue_date: row.issue_date, due_date: row.due_date, total: row.total, open: row.open, bucket: row.bucket,
+  api.get<{ rows: OpenInvoiceRow[] }>(`/businesses/${bizId}/reports/open-invoices`, { params: { as_of: asOf, credits: 'true' } }).then(r => r.data.rows.map(row => ({
+    number: docNumber(row.invoice_number, row.type), party_name: row.customer_name, issue_date: row.issue_date, due_date: row.due_date, total: row.total, open: row.open, bucket: row.bucket,
   })));
 const fetchUnpaidBills = (bizId: string, asOf: string): Promise<OpenDocument[]> =>
-  api.get<{ rows: UnpaidBillRow[] }>(`/businesses/${bizId}/reports/unpaid-bills`, { params: { as_of: asOf } }).then(r => r.data.rows.map(row => ({
-    number: row.bill_number, party_name: row.vendor_name, issue_date: row.bill_date, due_date: row.due_date, total: row.total, open: row.open, bucket: row.bucket,
+  api.get<{ rows: UnpaidBillRow[] }>(`/businesses/${bizId}/reports/unpaid-bills`, { params: { as_of: asOf, credits: 'true' } }).then(r => r.data.rows.map(row => ({
+    number: docNumber(row.bill_number, row.type), party_name: row.vendor_name, issue_date: row.bill_date, due_date: row.due_date, total: row.total, open: row.open, bucket: row.bucket,
   })));
 
 const loadOpenInvoices = async (bizId: string, range: ReportDates) => openDocumentsTable(await fetchOpenInvoices(bizId, range.end), 'invoice');

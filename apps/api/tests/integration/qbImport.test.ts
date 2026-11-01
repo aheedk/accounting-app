@@ -6,7 +6,7 @@ import { makeApp } from '../../src/app.js';
 import { destroyDbSingleton } from '../../src/db/index.js';
 import type { ServiceCtx } from '../../src/lib/ctx.js';
 import { computeTrialBalance } from '../../src/services/core/ledgerService.js';
-import { importCheck, runQbImport, undoBatch, type QbImportResult } from '../../src/services/import/qbBatches.js';
+import { importCheck, runQbImport, undoAll, undoBatch, type QbImportResult } from '../../src/services/import/qbBatches.js';
 import { importAccounts, importCustomers, importItems, importVendors } from '../../src/services/import/qbLists.js';
 import { importOpenBills, importOpenInvoices } from '../../src/services/import/qbOpenItems.js';
 import { importHistory, importTrialBalance, importUncleared } from '../../src/services/import/qbLedger.js';
@@ -166,7 +166,10 @@ describe('QuickBooks import', () => {
 
     const posted = await s.run(importTrialBalance, trialBalance);
     expect(posted.problems).toEqual([]);
-    expect(posted.notes.some(n => n.includes('Business Checking is reconciled to 2026-10-31 at 10150.0000, with 2 uncleared items left'))).toBe(true);
+    expect(posted.notes.some(n => n.includes('Business Checking is reconciled to 2026-10-31 at 10,150.00, with 2 uncleared items left'))).toBe(true);
+    // The card's opening line is an entry of its own, so the bank's reconciliation doesn't tick it off the card's.
+    const visa = await t.db.selectFrom('reconciliations').selectAll().where('account_id', '=', (await s.account('Visa')).id).executeTakeFirstOrThrow();
+    expect(String(visa.statement_ending_balance)).toBe('400.0000');
 
     const check = await importCheck(t.db, s.biz.id);
     expect(check.differences).toBe(0);
@@ -197,12 +200,16 @@ describe('QuickBooks import', () => {
     // A customer with open invoices here can't be taken out by undoing the customer upload.
     await expect(t.db.transaction().execute(trx => undoBatch(trx, s.ctx, customers.batch_id!))).rejects.toThrow(/has transactions now/);
     await t.db.transaction().execute(trx => undoBatch(trx, s.ctx, invoices.batch_id!));
-    expect((await t.db.selectFrom('invoices').select('status').where('invoice_number', '=', '1047').executeTakeFirstOrThrow()).status).toBe('voided');
+    // Voided, it gives its number back, so bringing the invoices in again keeps 1047.
+    expect((await t.db.selectFrom('invoices').select('status').where('invoice_number', '=', '1047 (undone)').executeTakeFirstOrThrow()).status).toBe('voided');
+    // With only voided invoices left, the customers can go; they keep them, out of every list.
+    await t.db.transaction().execute(trx => undoBatch(trx, s.ctx, customers.batch_id!));
+    expect(await t.db.selectFrom('customers').select('name').where('business_id', '=', s.biz.id).where('deleted_at', 'is', null).execute()).toEqual([]);
   });
 
   it('brings history in as journal entries, and then needs no opening entry', async () => {
     const s = await setup();
-    await s.run(importAccounts, { cutover_date: CUTOVER, rows: [ACCOUNTS[0]!, ACCOUNTS[5]!] });
+    await s.run(importAccounts, { cutover_date: CUTOVER, rows: [ACCOUNTS[0]!, ACCOUNTS[5]!, ACCOUNTS[6]!] });
     const bad = await s.run(importHistory, {
       cutover_date: CUTOVER,
       transactions: [
@@ -222,24 +229,33 @@ describe('QuickBooks import', () => {
       transactions: [
         { date: '2026-01-15', type: 'Deposit', name: 'Acme Corp', lines: [{ account: 'Business Checking', debit: '1000', credit: '0' }, { account: 'Consulting Income', debit: '0', credit: '1000' }] },
         { date: '2026-02-01', type: 'Check', number: '101', name: 'Landlord', lines: [{ account: 'Rent', debit: '400', credit: '0' }, { account: 'Business Checking', debit: '0', credit: '400' }] },
+        { date: '2026-02-10', type: 'Expense', name: 'Landlord', lines: [{ account: 'Rent', debit: '150', credit: '0' }, { account: 'Visa', debit: '0', credit: '150' }] },
+        // Paying the card from the bank: one entry on both accounts.
+        { date: '2026-03-01', type: 'Credit Card Payment', lines: [{ account: 'Visa', debit: '100', credit: '0' }, { account: 'Business Checking', debit: '0', credit: '100' }] },
       ],
     });
     expect(history.problems).toEqual([]);
-    expect(history.counts).toEqual({ transactions: 2 });
+    expect(history.counts).toEqual({ transactions: 4 });
     const check = await t.db.selectFrom('journal_entries').selectAll().where('reference', '=', '101').executeTakeFirstOrThrow();
     expect(check).toMatchObject({ transaction_type: 'check', payee_name: 'Landlord', memo: 'Check', status: 'posted' });
 
     const opening = await s.run(importTrialBalance, {
       cutover_date: CUTOVER,
       lines: [
-        { account: 'Business Checking', debit: '600', credit: '0' },
+        { account: 'Business Checking', debit: '500', credit: '0' },
+        { account: 'Visa', debit: '0', credit: '50' },
         { account: 'Consulting Income', debit: '0', credit: '1000' },
-        { account: 'Rent', debit: '400', credit: '0' },
+        { account: 'Rent', debit: '550', credit: '0' },
       ],
     });
     expect(opening.problems).toEqual([]);
-    expect(opening.counts).toEqual({ entry_lines: 0, reconciled_accounts: 1 });
+    expect(opening.counts).toEqual({ entry_lines: 0, reconciled_accounts: 2 });
     expect(opening.notes).toContain('Every account already matches QuickBooks, so no opening entry was needed');
+    // Whichever is reconciled first ticks the card payment for both; each still ends at its own balance.
+    const ending = async (name: string) => String((await t.db.selectFrom('reconciliations').select('statement_ending_balance')
+      .where('account_id', '=', (await s.account(name)).id).executeTakeFirstOrThrow()).statement_ending_balance);
+    expect(await ending('Business Checking')).toBe('500.0000');
+    expect(await ending('Visa')).toBe('50.0000');
     expect(await t.db.selectFrom('journal_entries').select('reconciliation_status').where('reference', '=', '101').executeTakeFirstOrThrow())
       .toEqual({ reconciliation_status: 'reconciled' });
 
@@ -248,6 +264,63 @@ describe('QuickBooks import', () => {
     await t.db.transaction().execute(trx => undoBatch(trx, s.ctx, history.batch_id!));
     const tb = await computeTrialBalance(t.db, { business_id: s.biz.id, as_of: CUTOVER });
     expect(tb.rows.every(r => r.net === '0.0000')).toBe(true);
+  });
+
+  it('history gives each vendor the expense account it was coded to most, and starting over undoes every upload', async () => {
+    const s = await setup();
+    await s.run(importAccounts, { cutover_date: CUTOVER, rows: [ACCOUNTS[0]!, ACCOUNTS[3]!, ACCOUNTS[4]!, ACCOUNTS[6]!] });
+    await s.run(importVendors, { cutover_date: CUTOVER, rows: [{ name: 'Power Co' }, { name: 'Landlord' }, { name: 'Corner Shop' }, { name: 'Gas Co' }] });
+    const rent = await s.account('Rent');
+    await t.db.updateTable('vendors').set({ default_expense_account_id: rent.id }).where('name', '=', 'Landlord').execute();
+    const stock = await s.run(importItems, {
+      cutover_date: CUTOVER,
+      rows: [{ name: 'Widget', income_account: 'Sales Revenue', expense_account: 'Cost of Goods Sold', inventory_asset_account: 'Inventory', purchase_cost: '5', quantity_on_hand: '10' }],
+    });
+    expect(stock.problems).toEqual([]);
+    const spend = (date: string, name: string, account: string, amount: string, from = 'Business Checking') => ({
+      date, type: 'Check', name, lines: [{ account, debit: amount, credit: '0' }, { account: from, debit: '0', credit: amount }],
+    });
+    const history = await s.run(importHistory, {
+      cutover_date: CUTOVER,
+      transactions: [
+        // Power Co: three to Utilities, one to Gas. Three in four is a habit.
+        spend('2026-01-05', 'Power Co', 'Utilities', '100'), spend('2026-02-05', 'Power Co', 'Utilities', '110'),
+        spend('2026-03-05', 'Power Co', 'Utilities', '120'), spend('2026-04-05', 'Power Co', 'Utilities:Gas', '30', 'Visa'),
+        // Corner Shop: half and half is not. Gas Co: once is not. Landlord already has one.
+        spend('2026-01-09', 'Corner Shop', 'Utilities', '5'), spend('2026-02-09', 'Corner Shop', 'Rent', '5'),
+        spend('2026-01-10', 'Gas Co', 'Utilities:Gas', '40'),
+        spend('2026-01-01', 'Landlord', 'Utilities', '900'), spend('2026-02-01', 'Landlord', 'Utilities', '900'),
+      ],
+    });
+    expect(history.problems).toEqual([]);
+    expect(history.counts).toEqual({ transactions: 9, vendor_defaults: 1 });
+    const defaults = async () => Object.fromEntries((await t.db.selectFrom('vendors as v').leftJoin('chart_of_accounts as a', 'a.id', 'v.default_expense_account_id')
+      .select(['v.name', 'a.name as account']).where('v.business_id', '=', s.biz.id).execute()).map(r => [r.name, r.account]));
+    expect(await defaults()).toEqual({ 'Power Co': 'Utilities', Landlord: 'Rent', 'Corner Shop': null, 'Gas Co': null });
+
+    const uncleared = await s.run(importUncleared, {
+      cutover_date: CUTOVER, account: 'Visa',
+      rows: [{ date: '2026-10-30', name: 'Shop', amount: '-40.00' }, { date: '2026-10-31', name: 'Bank', amount: '100.00' }],
+    }, true);
+    expect(uncleared.notes).toContain('Charges: 1 for 40.00. Payments and credits: 1 for 100.00. These should match the uncleared totals in QuickBooks');
+
+    // Starting over: the history goes, Power Co's default with it, then the opening stock, the vendors and the accounts.
+    const undone = await t.db.transaction().execute(trx => undoAll(trx, s.ctx));
+    expect(undone).toEqual({ undone: 4 });
+    expect(await t.db.selectFrom('inventory_items').select('id').where('business_id', '=', s.biz.id).where('deleted_at', 'is', null).execute()).toEqual([]);
+    expect(await t.db.selectFrom('qb_import_batches').select('id').where('undone_at', 'is', null).execute()).toEqual([]);
+    expect(await t.db.selectFrom('vendors').select('name').where('business_id', '=', s.biz.id).where('deleted_at', 'is', null).execute()).toEqual([]);
+    // Visa has voided lines, so it stays, made inactive.
+    expect(await t.db.selectFrom('chart_of_accounts').select('is_active').where('business_id', '=', s.biz.id).where('name', '=', 'Visa').executeTakeFirst()).toEqual({ is_active: false });
+    const tb = await computeTrialBalance(t.db, { business_id: s.biz.id, as_of: CUTOVER });
+    expect(tb.rows.every(r => r.net === '0.0000')).toBe(true);
+
+    // Bringing the chart in again makes those accounts active again, and undoing that puts them back.
+    const again = await s.run(importAccounts, { cutover_date: CUTOVER, rows: [ACCOUNTS[0]!, ACCOUNTS[3]!, ACCOUNTS[4]!, ACCOUNTS[6]!] });
+    expect(again.notes.some(n => /^\d+ inactive here, made active again$/.test(n))).toBe(true);
+    expect((await s.account('Visa')).is_active).toBe(true);
+    await t.db.transaction().execute(trx => undoBatch(trx, s.ctx, again.batch_id!));
+    expect((await s.account('Visa')).is_active).toBe(false);
   });
 
   it('over HTTP: a dry run saves nothing, staff are refused, and an upload with a problem posts nothing', async () => {
@@ -287,5 +360,9 @@ describe('QuickBooks import', () => {
     const undo = await request(app).post(`${base}/batches/${saved.body.batch_id as string}/undo`).set(accountant).send({});
     expect(undo.status).toBe(200);
     expect(await t.db.selectFrom('customers').select('id').where('deleted_at', 'is', null).executeTakeFirst()).toBeUndefined();
+
+    await request(app).post(`${base}/customers`).set(accountant).send(body);
+    expect((await request(app).post(`${base}/undo-all`).set(await login(staff)).send({})).status).toBe(403);
+    expect((await request(app).post(`${base}/undo-all`).set(accountant).send({})).body).toEqual({ undone: 1 });
   });
 });

@@ -9,7 +9,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import type { ServiceCtx } from '../lib/ctx.js';
-import { importCheck, listBatches, runQbImport, undoBatch, type QbImportResult } from '../services/import/qbBatches.js';
+import { importCheck, listBatches, runQbImport, undoAll, undoBatch, type QbImportResult } from '../services/import/qbBatches.js';
 import { importAccounts, importCustomers, importItems, importVendors } from '../services/import/qbLists.js';
 import { importOpenBills, importOpenInvoices } from '../services/import/qbOpenItems.js';
 import { importHistory, importTrialBalance, importUncleared } from '../services/import/qbLedger.js';
@@ -78,6 +78,11 @@ router.post('/businesses/:businessId/qb-import/batches/:batchId/undo', requireMi
     const undone = await db.transaction().execute(trx => undoBatch(trx, ctxFromReq(req), batchId));
     res.json({ batch: undone });
   } catch (e) { next(e); }
+});
+
+router.post('/businesses/:businessId/qb-import/undo-all', requireMinRole('accountant'), async (req, res, next) => {
+  try { res.json(await db.transaction().execute(trx => undoAll(trx, ctxFromReq(req)))); }
+  catch (e) { next(e); }
 });
 
 export default router;

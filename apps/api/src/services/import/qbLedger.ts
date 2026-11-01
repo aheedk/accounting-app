@@ -3,9 +3,10 @@ import type { schemas } from '@accounting/shared';
 import { addMoney, equalMoney, isZero, subMoney, toMoneyString } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { scopeBusiness, type ServiceCtx } from '../../lib/ctx.js';
+import { updateVendor } from '../ap/vendorService.js';
 import { getOrCreateOpeningBalanceEquity } from '../core/chartOfAccountsService.js';
 import {
-  computeTrialBalance, postJournalEntry, postJournalEntryBatch, type LineInput, type PostJournalEntryInput,
+  computeTrialBalance, postJournalEntryBatch, type LineInput, type PostJournalEntryInput,
 } from '../core/ledgerService.js';
 import {
   finishReconciliation, getWorksheet, reconcilableCategory, saveProgress, startReconciliation,
@@ -14,7 +15,7 @@ import {
   activeBatches, createBatch, dateProblems, emptyResult, guardProblems, type QbImportResult, type QbProblem, type QbRecord,
 } from './qbBatches.js';
 import { loadAccounts } from './qbLists.js';
-import { makeAccountMatcher, norm, type MatchableAccount } from './qbMatch.js';
+import { makeAccountMatcher, makeNameMatcher, norm, type MatchableAccount } from './qbMatch.js';
 
 // QuickBooks' transaction types, as the app's own (journal_entries keeps a
 // fixed list). Anything else is a journal entry, its QuickBooks name kept in the memo.
@@ -89,6 +90,16 @@ export async function importUncleared(trx: Transaction<DB>, ctx: ServiceCtx, inp
   const posted = await postJournalEntryBatch(trx, ctx, entries);
   const records: QbRecord[] = posted.map(p => ({ entity_type: 'journal_entry', entity_id: p.id }));
   const total = toMoneyString(rows.reduce((s, { row }) => addMoney(s, row.amount), addMoney('0', '0')));
+  // Both sides, worded for the account, so a file read the wrong way round shows before it is brought in.
+  const side = (incoming: boolean) => {
+    const list = rows.filter(({ row }) => (Number(row.amount) > 0) === incoming);
+    const sum = list.reduce((s, { row }) => addMoney(s, row.amount.replace('-', '')), addMoney('0', '0'));
+    return `${list.length} for ${Number(sum).toFixed(2)}`;
+  };
+  const card = account.account_type === 'liability';
+  if (rows.length > 0) {
+    result.notes.push(`${card ? 'Charges' : 'Checks and payments'}: ${side(false)}. ${card ? 'Payments and credits' : 'Deposits'}: ${side(true)}. These should match the uncleared totals in QuickBooks`);
+  }
   result.counts = { items: records.length };
   result.preview = { account_id: account.id, account: `${account.code} ${account.name}`, total };
   result.batch_id = await createBatch(trx, ctx, {
@@ -162,16 +173,60 @@ export async function importHistory(trx: Transaction<DB>, ctx: ServiceCtx, input
     records.push(...posted.map(p => ({ entity_type: 'journal_entry' as const, entity_id: p.id })));
   }
   if (empty > 0) result.notes.push(`${empty} had no amounts and were left out`);
+  const learned = await learnVendorDefaults(trx, ctx, business_id, kept.map(k => k.lines));
+  records.push(...learned);
+  if (learned.length > 0) {
+    result.notes.push(`${learned.length} vendor${learned.length === 1 ? '' : 's'} with no default expense account now ${learned.length === 1 ? 'has' : 'have'} the one QuickBooks used most, so ${learned.length === 1 ? 'its' : 'their'} bank lines and bills are coded that way here`);
+  }
   const dates = kept.map(k => k.t.date).sort();
-  result.counts = { transactions: records.length };
+  result.counts = { transactions: records.length - learned.length, ...(learned.length > 0 ? { vendor_defaults: learned.length } : {}) };
   result.preview = { first_date: dates[0] ?? null, last_date: dates.at(-1) ?? null };
   if (records.length > 0) {
     result.batch_id = await createBatch(trx, ctx, {
       step: 'history', cutover_date: input.cutover_date, file_name: input.file_name ?? null,
-      summary: { transactions: records.length, first_date: dates[0], last_date: dates.at(-1) }, records,
+      summary: { ...result.counts, first_date: dates[0], last_date: dates.at(-1) }, records,
     });
   }
   return result;
+}
+
+/**
+ * What the history says about each vendor: the expense account QuickBooks used
+ * for it most becomes its default when it has none, which the auto-coding's
+ * vendor-default layer and the bill form both use. Only a clear habit counts:
+ * two transactions or more, three in four of them to that one account.
+ */
+async function learnVendorDefaults(
+  trx: Transaction<DB>, ctx: ServiceCtx, business_id: string, transactions: LineInput[][],
+): Promise<QbRecord[]> {
+  const vendors = await trx.selectFrom('vendors').select(['id', 'name', 'default_expense_account_id'])
+    .where('business_id', '=', business_id).where('deleted_at', 'is', null).execute();
+  if (vendors.length === 0) return [];
+  const vendorOf = makeNameMatcher(vendors);
+  const accounts = new Map((await loadAccounts(trx, business_id)).map(a => [a.id, a]));
+  const tally = new Map<string, Map<string, number>>();
+  for (const lines of transactions) {
+    const seen = new Set<string>();
+    for (const l of lines) {
+      const account = accounts.get(l.account_id);
+      if (!l.name || account?.account_type !== 'expense' || !account.is_active) continue;
+      const vendor = vendorOf(l.name);
+      if (!vendor || vendor.default_expense_account_id || seen.has(`${vendor.id}|${account.id}`)) continue;
+      seen.add(`${vendor.id}|${account.id}`);
+      const counts = tally.get(vendor.id) ?? new Map<string, number>();
+      counts.set(account.id, (counts.get(account.id) ?? 0) + 1);
+      tally.set(vendor.id, counts);
+    }
+  }
+  const records: QbRecord[] = [];
+  for (const [vendor_id, counts] of tally) {
+    const total = [...counts.values()].reduce((s, n) => s + n, 0);
+    const [account_id, hits] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]!;
+    if (hits < 2 || hits / total < 0.75) continue;
+    await updateVendor(trx, ctx, { vendor_id, patch: { default_expense_account_id: account_id } });
+    records.push({ entity_type: 'vendor_default', entity_id: vendor_id, previous: { set_to: account_id } });
+  }
+  return records;
 }
 
 export type OpeningLine = {
@@ -234,18 +289,16 @@ export async function importTrialBalance(trx: Transaction<DB>, ctx: ServiceCtx, 
 
   result.notes.push(...await subledgerNotes(trx, business_id, accounts, target));
 
+  const banks = await bankAndCardAccounts(trx, business_id, accounts);
   const records: QbRecord[] = [];
   if (lines.length > 0) {
-    const entry = await postJournalEntry(trx, ctx, {
-      business_id, entry_date: cutover, source_type: 'manual', transaction_type: 'journal_entry',
-      reference: 'QB-OPENING', memo: `Opening balances from QuickBooks: its trial balance as of ${cutover}`, lines,
-    });
-    records.push({ entity_type: 'journal_entry', entity_id: entry.id });
+    const posted = await postJournalEntryBatch(trx, ctx, await openingEntries(trx, ctx, business_id, cutover, lines, banks.ids, byId));
+    records.push(...posted.map(p => ({ entity_type: 'journal_entry' as const, entity_id: p.id })));
   } else {
     result.notes.push('Every account already matches QuickBooks, so no opening entry was needed');
   }
 
-  const reconciled = await startingReconciliations(trx, ctx, business_id, cutover, accounts);
+  const reconciled = await startingReconciliations(trx, ctx, cutover, banks);
   records.push(...reconciled.records);
   result.notes.push(...reconciled.notes);
 
@@ -286,16 +339,10 @@ async function subledgerNotes(
   return notes;
 }
 
-/**
- * Each bank and credit card account, reconciled to the cutover date: every
- * entry up to then ticked except the uncleared items brought in, so the first
- * reconciliation here starts where QuickBooks' last one ended.
- */
-async function startingReconciliations(
-  trx: Transaction<DB>, ctx: ServiceCtx, business_id: string, cutover: string, accounts: MatchableAccount[],
-): Promise<{ records: QbRecord[]; notes: string[] }> {
-  const records: QbRecord[] = [];
-  const notes: string[] = [];
+type BankAndCard = { list: MatchableAccount[]; ids: Set<string>; uncleared: Map<string, Set<string>> };
+
+/** The bank and card accounts the opening balances reconcile to the cutover date, and the uncleared items brought in for each. */
+async function bankAndCardAccounts(trx: Transaction<DB>, business_id: string, accounts: MatchableAccount[]): Promise<BankAndCard> {
   const uncleared = new Map<string, Set<string>>();
   for (const b of (await activeBatches(trx, business_id)).filter(x => x.step === 'uncleared')) {
     const account_id = (b.summary as { account_id?: string } | null)?.account_id;
@@ -305,14 +352,81 @@ async function startingReconciliations(
   }
   const bankRows = new Set((await trx.selectFrom('bank_accounts').select('cash_account_id')
     .where('business_id', '=', business_id).where('deleted_at', 'is', null).execute()).map(r => r.cash_account_id));
+  const list = accounts.filter(a => (a.account_type === 'asset' || a.account_type === 'liability')
+    && (uncleared.has(a.id) || ['Bank', 'Credit Card'].includes(reconcilableCategory(a, bankRows.has(a.id)))));
+  return { list, ids: new Set(list.map(a => a.id)), uncleared };
+}
 
-  for (const account of accounts) {
-    if (account.account_type !== 'asset' && account.account_type !== 'liability') continue;
-    const category = reconcilableCategory(account, bankRows.has(account.id));
-    if (!uncleared.has(account.id) && category !== 'Bank' && category !== 'Credit Card') continue;
+/**
+ * The opening entry. A bank or card account's line is an entry of its own
+ * against Opening Balance Equity: whether an entry is reconciled is kept for
+ * the whole entry, so one line shared with another bank's would be ticked off
+ * by that bank's reconciliation. The rest is one entry.
+ */
+async function openingEntries(
+  trx: Transaction<DB>, ctx: ServiceCtx, business_id: string, cutover: string,
+  lines: LineInput[], bankIds: Set<string>, byId: Map<string, MatchableAccount>,
+): Promise<PostJournalEntryInput[]> {
+  const obe = await getOrCreateOpeningBalanceEquity(trx, ctx, business_id);
+  const memo = `Opening balances from QuickBooks: its trial balance as of ${cutover}`;
+  const entry = (entryLines: LineInput[], what: string | null): PostJournalEntryInput => ({
+    business_id, entry_date: cutover, source_type: 'manual', transaction_type: 'journal_entry',
+    reference: 'QB-OPENING', memo: what ? `${memo} (${what})` : memo, lines: entryLines,
+  });
+  const entries: PostJournalEntryInput[] = [];
+  // What Opening Balance Equity takes in the main entry: its own line, plus the other side of each bank's.
+  let obeNet = addMoney('0', '0');
+  const rest: LineInput[] = [];
+  for (const l of lines) {
+    const net = subMoney(l.debit, l.credit);
+    if (bankIds.has(l.account_id)) {
+      entries.push(entry([l, { account_id: obe.id, debit: l.credit, credit: l.debit, memo: null }], byId.get(l.account_id)?.name ?? null));
+      obeNet = obeNet.plus(net);
+    } else if (l.account_id === obe.id) {
+      obeNet = obeNet.plus(net);
+    } else {
+      rest.push(l);
+    }
+  }
+  if (!obeNet.isZero()) {
+    const amount = toMoneyString(obeNet);
+    rest.push({ account_id: obe.id, debit: debitOf(amount), credit: creditOf(amount), memo: null });
+  }
+  if (rest.length > 0) entries.unshift(entry(rest, null));
+  return entries;
+}
+
+/** An account's balance up to a date, positive the way the account normally runs (a bank's debit, a card's credit). */
+async function balanceTo(trx: Transaction<DB>, account: MatchableAccount, date: string, onlyEntries?: string[]): Promise<string> {
+  let q = trx.selectFrom('journal_entry_lines as l').innerJoin('journal_entries as j', 'j.id', 'l.journal_entry_id')
+    .select([sql<string>`coalesce(sum(l.debit), 0)`.as('debit'), sql<string>`coalesce(sum(l.credit), 0)`.as('credit')])
+    // A voided entry counts with its posted reversal, as on the trial balance, so the two cancel.
+    .where('l.account_id', '=', account.id).where('j.status', 'in', ['posted', 'voided']).where('j.entry_date', '<=', date);
+  if (onlyEntries) q = q.where('j.id', 'in', onlyEntries);
+  const r = await q.executeTakeFirstOrThrow();
+  return toMoneyString(account.account_type === 'asset' ? subMoney(r.debit, r.credit) : subMoney(r.credit, r.debit));
+}
+
+const shown = (amount: string) => Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Each bank and credit card account, reconciled to the cutover date: every
+ * entry up to then ticked except the uncleared items brought in, so the first
+ * reconciliation here starts where QuickBooks' last one ended. Where that ends
+ * is worked out from the ledger: the account's balance less its uncleared
+ * items. An entry shared with another bank (a transfer, a card payment in the
+ * history) is ticked by whichever is reconciled first, so the worksheet alone
+ * would leave it out of the other; the starting balance makes up for it.
+ */
+async function startingReconciliations(
+  trx: Transaction<DB>, ctx: ServiceCtx, cutover: string, banks: BankAndCard,
+): Promise<{ records: QbRecord[]; notes: string[] }> {
+  const records: QbRecord[] = [];
+  const notes: string[] = [];
+  for (const account of banks.list) {
     const anyEntry = await trx.selectFrom('journal_entry_lines as l').innerJoin('journal_entries as j', 'j.id', 'l.journal_entry_id')
       .select('j.id').where('l.account_id', '=', account.id).where('j.status', '=', 'posted')
-      .where('j.entry_date', '<=', cutover).where('j.reconciliation_status', '!=', 'reconciled').executeTakeFirst();
+      .where('j.entry_date', '<=', cutover).executeTakeFirst();
     if (!anyEntry) continue;
     const open = await trx.selectFrom('reconciliations').select(['status', 'statement_ending_date'])
       .where('account_id', '=', account.id).where('status', 'in', ['in_progress', 'completed']).execute();
@@ -322,21 +436,28 @@ async function startingReconciliations(
     }
     if (open.some(r => String(r.statement_ending_date).slice(0, 10) >= cutover)) continue;
 
-    const leaveOpen = uncleared.get(account.id) ?? new Set<string>();
-    const recon = await startReconciliation(trx, ctx, { account_id: account.id, statement_ending_balance: '0', statement_ending_date: cutover });
+    const leaveOpen = banks.uncleared.get(account.id) ?? new Set<string>();
+    const outstanding = leaveOpen.size > 0 ? await balanceTo(trx, account, cutover, [...leaveOpen]) : '0';
+    const cleared = toMoneyString(subMoney(await balanceTo(trx, account, cutover), outstanding));
+
+    const recon = await startReconciliation(trx, ctx, { account_id: account.id, statement_ending_balance: cleared, statement_ending_date: cutover });
     const { items } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, recon.id);
     await saveProgress(trx, ctx, recon.id, items.map(it => ({
       transaction_type: it.transaction_type, transaction_id: it.transaction_id,
       is_cleared: !(it.transaction_type === 'journal_entry' && leaveOpen.has(it.transaction_id)),
     })));
     const { summary } = await getWorksheet(trx as unknown as Kysely<DB>, ctx, recon.id);
-    await trx.updateTable('reconciliations').set({ statement_ending_balance: summary.cleared_balance, updated_at: sql`now()` })
-      .where('id', '=', recon.id).execute();
+    if (!isZero(summary.difference)) {
+      const beginning = toMoneyString(addMoney(summary.statement_beginning_balance, summary.difference));
+      await trx.updateTable('reconciliations')
+        .set({ beginning_balance: beginning, statement_beginning_balance: beginning, updated_at: sql`now()` })
+        .where('id', '=', recon.id).execute();
+    }
     await finishReconciliation(trx, ctx, recon.id);
     records.push({ entity_type: 'reconciliation', entity_id: recon.id });
-    notes.push(uncleared.has(account.id)
-      ? `${account.name} is reconciled to ${cutover} at ${summary.cleared_balance}, with ${leaveOpen.size} uncleared item${leaveOpen.size === 1 ? '' : 's'} left to tick`
-      : `${account.name} is reconciled to ${cutover} at ${summary.cleared_balance}. No uncleared items were brought in for it, so all of it was taken as cleared`);
+    notes.push(banks.uncleared.has(account.id)
+      ? `${account.name} is reconciled to ${cutover} at ${shown(cleared)}, with ${leaveOpen.size} uncleared item${leaveOpen.size === 1 ? '' : 's'} left to tick`
+      : `${account.name} is reconciled to ${cutover} at ${shown(cleared)}. No uncleared items were brought in for it, so all of it was taken as cleared`);
   }
   return { records, notes };
 }

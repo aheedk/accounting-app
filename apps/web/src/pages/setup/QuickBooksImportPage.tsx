@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { CheckCircle2, Upload } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
@@ -7,7 +6,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { fmtDateTime, fmtLongDate, todayLocal } from '@/lib/dates';
 import { fmtMoney } from '@/lib/money';
 import {
-  parseAccounts, parseContacts, parseItems, parseJournal, parseOpenItems, parseTrialBalance, parseUncleared,
+  parseAccounts, parseContacts, parseItems, parseJournal, parseOpenItems, parseTrialBalance, parseUncleared, readGrid,
   type Grid, type OpenItemRow, type Parsed,
 } from '@/lib/qbImport';
 import { Button } from '@/components/ui/button';
@@ -41,7 +40,7 @@ type StepDef = {
   title: string;
   /** Where in QuickBooks the file comes from. */
   source: string;
-  read: (grid: Grid) => Parsed<unknown>;
+  read: (grid: Grid, opts: { cutover: string; liability: boolean }) => Parsed<unknown>;
   /** The request body, from the rows read. */
   body: (rows: unknown[]) => Record<string, unknown>;
   optional?: boolean;
@@ -84,8 +83,8 @@ const STEPS: StepDef[] = [
   },
   {
     key: 'uncleared', path: 'uncleared', title: 'Uncleared bank and card items',
-    source: 'For each bank and credit card account: the reconciliation report for the last statement before the cutover date (its uncleared sections), exported to Excel. One account an upload.',
-    read: parseUncleared, body: rows => ({ rows }),
+    source: 'Reconcile each bank and credit card account in QuickBooks up to the cutover date first. Then, one account an upload: its reconciliation report exported to Excel (only the uncleared items are read), or Reports → Transaction Detail by Account for that account up to the cutover date, with the Clr column or filtered to uncleared.',
+    read: (grid, opts) => parseUncleared(grid, opts), body: rows => ({ rows }),
   },
   {
     key: 'history', path: 'history', title: 'History', optional: true,
@@ -101,14 +100,6 @@ const STEPS: StepDef[] = [
 
 const STEP_TITLE = Object.fromEntries(STEPS.map(s => [s.key, s.title])) as Record<StepKey, string>;
 
-async function readGrid(file: File): Promise<Grid> {
-  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0] ?? ''];
-  if (!ws) return [];
-  return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '', blankrows: false })
-    .map(row => row.map(c => (c === null || c === undefined ? '' : String(c))));
-}
-
 /** The last day of last month: where a move usually starts. */
 function lastMonthEnd(): string {
   const [y, m] = todayLocal().split('-').map(Number) as [number, number];
@@ -117,7 +108,16 @@ function lastMonthEnd(): string {
 }
 
 const countLabel = (counts: Record<string, number>) =>
-  Object.entries(counts).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`).join(', ');
+  Object.entries(counts).map(([k, v]) => {
+    const label = k.replace(/_/g, ' ');
+    return `${v} ${v === 1 && label.endsWith('s') ? label.slice(0, -1) : label}`;
+  }).join(', ');
+
+/** What an upload brought in, from its summary's counts. */
+const batchLabel = (b: Batch) => {
+  const counts = Object.fromEntries(Object.entries(b.summary ?? {}).filter((e): e is [string, number] => typeof e[1] === 'number'));
+  return Object.keys(counts).length > 0 ? countLabel(counts) : `${b.record_count}`;
+};
 
 function ResultView({ result }: { result: Result }) {
   const lines = (result.preview as { lines?: OpeningLine[] } | undefined)?.lines;
@@ -174,13 +174,20 @@ function StepCard({
   def: StepDef; index: number; bizId: string; cutover: string; done: Batch[]; accounts: AccountLike[]; onDone: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [parsed, setParsed] = useState<Parsed<unknown> | null>(null);
+  const [grid, setGrid] = useState<Grid | null>(null);
+  const [nothing, setNothing] = useState(false);
   const [accountId, setAccountId] = useState('');
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const needsAccount = def.key === 'uncleared';
   const account = accounts.find(a => a.id === accountId);
+  const liability = account?.account_type === 'liability';
+  // Read again when the account or the cutover changes: they decide the signs and which rows count.
+  const parsed = useMemo<Parsed<unknown> | null>(() => {
+    if (nothing) return { rows: [], problems: [] };
+    return grid ? def.read(grid, { cutover, liability }) : null;
+  }, [grid, nothing, def, cutover, liability]);
 
   const send = useCallback(async (rows: unknown[], dryRun: boolean) => {
     setBusy(true); setErr(null);
@@ -191,7 +198,7 @@ function StepCard({
       };
       const r = await api.post<Result>(`/businesses/${bizId}/qb-import/${def.path}${dryRun ? '?dry_run=true' : ''}`, body);
       setResult(r.data);
-      if (!dryRun) { setFile(null); setParsed(null); onDone(); }
+      if (!dryRun) { setFile(null); setGrid(null); setNothing(false); setAccountId(''); onDone(); }
     } catch (e: unknown) {
       const data = (e as { response?: { data?: Result } }).response?.data;
       if (data && Array.isArray(data.problems)) setResult(data);
@@ -200,11 +207,10 @@ function StepCard({
   }, [account, bizId, cutover, def, file, needsAccount, onDone]);
 
   async function choose(f: File | null) {
-    setFile(f); setResult(null); setErr(null); setParsed(null);
+    setFile(f); setResult(null); setErr(null); setGrid(null); setNothing(false);
     if (!f) return;
     try {
-      const p = def.read(await readGrid(f));
-      setParsed(p);
+      setGrid(readGrid(await f.arrayBuffer()));
     } catch {
       setErr('That file could not be read. Export it from QuickBooks as Excel (.xlsx) or CSV.');
     }
@@ -233,7 +239,7 @@ function StepCard({
         <p className="text-sm text-muted-foreground">{def.source}</p>
         {active.length > 0 && (
           <p className="text-sm">
-            Brought in: {active.map(b => `${b.record_count} from ${b.file_name ?? 'an upload'}${typeof b.summary?.['account'] === 'string' ? ` (${b.summary['account'] as string})` : ''}`).join('; ')}
+            Brought in: {active.map(b => `${batchLabel(b)} from ${b.file_name ?? 'an upload'}${typeof b.summary?.['account'] === 'string' ? ` (${b.summary['account'] as string})` : ''}`).join('; ')}
           </p>
         )}
         {needsAccount && (
@@ -256,12 +262,14 @@ function StepCard({
           </label>
           {needsAccount && account && !file && (
             <Button type="button" variant="outline" size="sm" disabled={busy}
-              onClick={() => { setParsed({ rows: [], problems: [] }); }}>
+              onClick={() => { setNothing(true); }}>
               Nothing was uncleared
             </Button>
           )}
           {parsed && parsed.problems.length === 0 && (
-            <span className="text-sm text-muted-foreground">{parsed.rows.length} row{parsed.rows.length === 1 ? '' : 's'} read</span>
+            <span className="text-sm text-muted-foreground">
+              {parsed.rows.length} row{parsed.rows.length === 1 ? '' : 's'} read{parsed.notes && parsed.notes.length > 0 ? `; ${parsed.notes.join('; ')}` : ''}
+            </span>
           )}
           {busy && <LoadingIndicator />}
         </div>
@@ -332,6 +340,11 @@ export default function QuickBooksImportPage() {
   const [err, setErr] = useState<string | null>(null);
   const [undoing, setUndoing] = useState<string | null>(null);
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  // Starting over clears every step's file and result along with the uploads.
+  const [round, setRound] = useState(0);
+  // An undo's error belongs by the Uploads list, where the button was pressed.
+  const [undoErr, setUndoErr] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!bizId) return;
@@ -359,15 +372,27 @@ export default function QuickBooksImportPage() {
 
   async function undo(id: string) {
     if (!bizId) return;
-    setUndoing(id); setErr(null);
+    setUndoing(id); setUndoErr(null);
     try {
       await api.post(`/businesses/${bizId}/qb-import/batches/${id}/undo`, {});
       setConfirmUndo(null);
       await reload();
-    } catch (e: unknown) { setErr(pickErr(e)); } finally { setUndoing(null); }
+    } catch (e: unknown) { setUndoErr(pickErr(e)); } finally { setUndoing(null); }
+  }
+
+  async function undoEverything() {
+    if (!bizId) return;
+    setUndoing('all'); setUndoErr(null);
+    try {
+      await api.post(`/businesses/${bizId}/qb-import/undo-all`, {});
+      setConfirmAll(false);
+      setRound(r => r + 1);
+      await reload();
+    } catch (e: unknown) { setUndoErr(pickErr(e)); } finally { setUndoing(null); }
   }
 
   if (!bizId) return <p className="text-sm text-muted-foreground">Choose a company first.</p>;
+  const anyActive = (batches ?? []).some(b => !b.undone_at);
 
   return (
     <div className="space-y-6">
@@ -399,7 +424,7 @@ export default function QuickBooksImportPage() {
           <div className="space-y-4">
             {STEPS.map((def, i) => (
               <StepCard
-                key={def.key} def={def} index={i} bizId={bizId} cutover={cutover}
+                key={`${def.key}-${round}`} def={def} index={i} bizId={bizId} cutover={cutover}
                 done={byStep.get(def.key) ?? []} accounts={accounts} onDone={() => { void reload(); }}
               />
             ))}
@@ -409,8 +434,20 @@ export default function QuickBooksImportPage() {
 
           {batches.length > 0 && (
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">Uploads</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-2">
+                <CardTitle className="text-base">Uploads</CardTitle>
+                {anyActive && (confirmAll
+                  ? (
+                    <span className="inline-flex items-center gap-2 text-sm">
+                      Undo every upload and start over?
+                      <Button type="button" size="sm" variant="destructive" disabled={undoing === 'all'} onClick={() => void undoEverything()}>Undo everything</Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>Keep</Button>
+                    </span>
+                  )
+                  : <Button type="button" size="sm" variant="outline" onClick={() => setConfirmAll(true)}>Start over</Button>)}
+              </CardHeader>
               <CardContent>
+                {undoErr && <p className="mb-2 text-sm text-destructive">{undoErr}</p>}
                 <table className="w-full text-sm">
                   <thead className="text-left text-muted-foreground">
                     <tr><th className="py-1.5">Step</th><th>File</th><th className="text-right">Records</th><th>When</th><th>By</th><th /></tr>

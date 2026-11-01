@@ -59,6 +59,8 @@ export async function importAccounts(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   const existing = await loadAccounts(trx, business_id);
   const paths = accountPaths(existing);
   const pathToAccount = new Map(existing.map(a => [norm(paths.get(a.id)!), { id: a.id, account_type: a.account_type }]));
+  const byId = new Map(existing.map(a => [a.id, a]));
+  let reactivated = 0;
   const taken = new Set(existing.map(a => a.code));
   const systemUsed = new Set<string>();
   const records: QbRecord[] = [];
@@ -79,7 +81,16 @@ export async function importAccounts(trx: Transaction<DB>, ctx: ServiceCtx, inpu
     if (same) {
       if (same.account_type !== row.account_type) {
         result.problems.push({ row: i, message: `"${row.name}" is already here as ${TYPE_LABEL[same.account_type]} account; QuickBooks has it as ${TYPE_LABEL[row.account_type]} account` });
-      } else matched++;
+        continue;
+      }
+      matched++;
+      // Inactive, as undoing an earlier upload leaves an account that had entries: QuickBooks still uses it.
+      const was = byId.get(same.id);
+      if (was && !was.is_active) {
+        await updateAccount(trx, ctx, { account_id: was.id, patch: { is_active: true } });
+        records.push({ entity_type: 'account_renamed', entity_id: was.id, previous: { name: was.name, code: was.code, is_active: false } });
+        reactivated++;
+      }
       continue;
     }
 
@@ -133,6 +144,7 @@ export async function importAccounts(trx: Transaction<DB>, ctx: ServiceCtx, inpu
     created++;
   }
 
+  if (reactivated > 0) result.notes.push(`${reactivated} inactive here, made active again`);
   result.counts = { created, already_here: matched };
   if (result.problems.length === 0 && records.length > 0) {
     result.batch_id = await createBatch(trx, ctx, {

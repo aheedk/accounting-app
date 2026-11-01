@@ -17,6 +17,8 @@ export type UnpaidBill = {
   total: string;
   open: string;
   bucket: Bucket;
+  /** 'Bill', or credit with the vendor: 'Bill Payment' (not yet applied) or 'Vendor Credit' (not yet used). */
+  type: 'Bill' | 'Bill Payment' | 'Vendor Credit';
 };
 
 /** Every posted bill with a balance still owed, as of a date — kept separate
@@ -46,7 +48,38 @@ export async function unpaidBills(db: Kysely<DB>, q: { business_id: string; as_o
   return bills
     .map(bill => ({ ...bill, open: toMoneyString(subMoney(bill.total, applied.get(bill.id) ?? '0')) }))
     .filter(bill => parseFloat(bill.open) > 0)
-    .map(bill => ({ ...bill, bucket: bucketFor(daysBetween(q.as_of, bill.due_date)) }))
+    .map(bill => ({ ...bill, bucket: bucketFor(daysBetween(q.as_of, bill.due_date)), type: 'Bill' as const }))
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+}
+
+/**
+ * Credit with a vendor: bill payments not yet applied and vendor credits not
+ * yet used, each as a negative row dated (and aged) from its own date. The
+ * Aging summary takes them off each vendor's total; the Unpaid Bills and
+ * detail reports list them, as QuickBooks does, so they too add up to
+ * Accounts Payable.
+ */
+export async function openVendorCredits(db: Kysely<DB>, q: { business_id: string; as_of: string }): Promise<UnpaidBill[]> {
+  const payments = await db.selectFrom('bill_payments as bp')
+    .innerJoin('vendors as v', 'v.id', 'bp.vendor_id')
+    .select(['bp.id', 'bp.reference as number', 'bp.vendor_id', 'v.name as vendor_name', 'bp.payment_date as date', 'bp.amount as total', 'bp.unapplied_amount as open'])
+    .where('bp.business_id', '=', q.business_id)
+    .where('bp.status', '=', 'posted')
+    .where('bp.unapplied_amount', '>', '0')
+    .execute();
+  const credits = await db.selectFrom('vendor_credits as vc')
+    .innerJoin('vendors as v', 'v.id', 'vc.vendor_id')
+    .select(['vc.id', 'vc.vendor_credit_number as number', 'vc.vendor_id', 'v.name as vendor_name', 'vc.credit_date as date', 'vc.amount as total', 'vc.remaining_amount as open'])
+    .where('vc.business_id', '=', q.business_id)
+    .where('vc.status', 'in', ['posted', 'applied'])
+    .where('vc.remaining_amount', '>', '0')
+    .execute();
+  const row = (r: (typeof payments)[number], type: 'Bill Payment' | 'Vendor Credit'): UnpaidBill => ({
+    id: r.id, bill_number: r.number ?? type, vendor_id: r.vendor_id, vendor_name: r.vendor_name,
+    bill_date: r.date, due_date: r.date, total: toMoneyString(subMoney('0', r.total)), open: toMoneyString(subMoney('0', r.open)),
+    bucket: bucketFor(daysBetween(q.as_of, r.date)), type,
+  });
+  return [...payments.map(p => row(p, 'Bill Payment')), ...credits.map(c => row(c, 'Vendor Credit'))]
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 }
 
@@ -63,26 +96,8 @@ export async function vendorAging(db: Kysely<DB>, q: { business_id: string; as_o
   }
 
   // Credit with the vendor: aged from its own date, shown as a negative.
-  const unappliedPayments = await db.selectFrom('bill_payments as bp')
-    .innerJoin('vendors as v', 'v.id', 'bp.vendor_id')
-    .select(['bp.vendor_id', 'v.name as vendor_name', 'bp.payment_date as date', 'bp.unapplied_amount as amount'])
-    .where('bp.business_id', '=', q.business_id)
-    .where('bp.status', '=', 'posted')
-    .where('bp.unapplied_amount', '>', '0')
-    .execute();
-  const openCredits = await db.selectFrom('vendor_credits as vc')
-    .innerJoin('vendors as v', 'v.id', 'vc.vendor_id')
-    .select(['vc.vendor_id', 'v.name as vendor_name', 'vc.credit_date as date', 'vc.remaining_amount as amount'])
-    .where('vc.business_id', '=', q.business_id)
-    .where('vc.status', 'in', ['posted', 'applied'])
-    .where('vc.remaining_amount', '>', '0')
-    .execute();
-  for (const credit of [...unappliedPayments, ...openCredits]) {
-    table.add(
-      { id: credit.vendor_id, name: credit.vendor_name },
-      toMoneyString(subMoney('0', credit.amount)),
-      daysBetween(q.as_of, credit.date),
-    );
+  for (const credit of await openVendorCredits(db, q)) {
+    table.add({ id: credit.vendor_id, name: credit.vendor_name }, credit.open, daysBetween(q.as_of, credit.due_date));
   }
 
   return table.result();

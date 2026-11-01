@@ -102,9 +102,15 @@ and up. A checklist of steps, one card each, then the check and the list of uplo
 ### How every step works
 
 - The page reads QuickBooks' export as it comes out (Excel or CSV): it finds the
-  heading row under QuickBooks' title rows, follows rows grouped under a customer or
-  vendor line, skips "Total for" rows, and reads amounts like `(1,234.56)` and dates
-  like `10/31/26` (`apps/web/src/lib/qbImport.ts`).
+  heading row under QuickBooks' title rows (a heading may carry the currency, as in
+  "AMOUNT (USD)"), follows rows grouped under a customer or vendor line (a
+  sub-customer's heading inside its parent's, read as `Parent:Child`, until its
+  "Total for" row closes it), skips "Total for" rows and the line under each report
+  saying when it was run ("Accrual Basis Friday, October 31, 2026 09:41 AM
+  GMT-04:00"), and reads amounts like `(1,234.56)` and dates like `10/31/26`,
+  `Oct 31, 2026`, `31-Oct-26` or Excel's day number (`apps/web/src/lib/qbImport.ts`).
+  A date column holding something else is listed as a problem rather than the row
+  dropped quietly.
 - The rows go to `POST /businesses/:id/qb-import/<step>`, first with `?dry_run=true`:
   the upload runs in full and is rolled back, so the preview is exactly what bringing
   it in would do. Anything wrong (a name it can't find, a date with no open period,
@@ -118,6 +124,16 @@ and up. A checklist of steps, one card each, then the check and the list of uplo
   customers, vendors and items are removed while nothing uses them. Undo refuses
   when something later depends on the upload: a customer with open invoices, an
   invoice with a payment applied, a bank entry reconciled since.
+  - **Start over** (`POST .../qb-import/undo-all`, added 10-31) undoes every upload
+    still in place, newest first, in one transaction; one that can't be undone stops
+    all of it.
+  - What undoing leaves behind, so the same files can be brought in again: a voided
+    invoice or bill gives its number back ("1047" becomes "1047 (undone)"); a
+    customer or vendor whose only documents are voided is deleted (soft, keeping
+    those documents); an account whose only entries are voided ones and their
+    reversals is made inactive, and the chart of accounts step makes it active again
+    (and inactive again if that upload is undone). Opening stock is voided as the
+    stock movement's own entry.
 - All of a company's uploads are on one cutover date, set before the first.
 - Code: `apps/api/src/services/import/` (`qbLists.ts`, `qbOpenItems.ts`,
   `qbLedger.ts`, `qbBatches.ts`, and `qbMatch.ts` for finding names).
@@ -132,7 +148,8 @@ QuickBooks `Parent:Child` name.
 
 ### The steps, in the order on the page
 
-1. **Chart of accounts.** From the Account List.
+1. **Chart of accounts.** From the Account List (a list grouped under account-type
+   headings is read too).
    - QuickBooks' Accounts Receivable, Accounts Payable and Retained Earnings are the
      company's own (the default chart has them): those take QuickBooks' name and
      number rather than being added twice.
@@ -144,7 +161,11 @@ QuickBooks `Parent:Child` name.
      6000), with a note.
 2. **Customers**, 3. **Vendors.** From the contact lists: name, company, email,
    phone, billing address, terms ("Net 30" read as 30 days), notes; a vendor's
-   account number. A name already here is left as it is.
+   account number. A name already here is left as it is. The contact lists give
+   the address in one cell ("88 Market Ave, Suite 4, Austin, TX 78704, US") and
+   the phones in one ("Phone: (512) 555-0102 Mobile: ..."): the address is taken
+   apart into street, city, state, ZIP and country when it reads that way (else all
+   of it is the street), and the first number is the phone.
 4. **Products and services.** Name, SKU, description, price, cost, and the income,
    expense and inventory asset accounts by name. QuickBooks doesn't need a SKU and the
    app does, so an item without one uses its name. Bundles and categories are
@@ -158,13 +179,31 @@ QuickBooks `Parent:Child` name.
    company here, so a number already used (two vendors' bills can share one in
    QuickBooks) gets -2, -3; a bill with none gets one.
 7. **Uncleared bank and card items.** One account an upload, chosen on the card, from
-   the uncleared sections of its QuickBooks reconciliation report. Each item is an
-   entry of its own against Opening Balance Equity. "Nothing was uncleared" records an
-   account with none.
+   the uncleared sections of its QuickBooks reconciliation report, or from
+   Transaction Detail by Account for that account (rows with C or R in its Clr
+   column are left out). The page asks for each account to be reconciled in
+   QuickBooks up to the cutover date first. Each item is an entry of its own against
+   Opening Balance Equity. "Nothing was uncleared" records an account with none.
+   - Rows dated after the cutover date are left out with a note (the reconciliation
+     report lists "after" items too): the team enters those here.
+   - Money into the account is positive. A reconciliation report says which way
+     each section goes. A report of a card account shows what is owed going up as
+     positive, so for a credit card account its amounts are turned round; a card
+     register's Charge and Payment columns are read the card's way.
+   - The preview gives each side, worded for the account ("Checks and payments: 2
+     for 586.40. Deposits: 1 for 735.00"), to compare with QuickBooks' uncleared
+     totals before anything is brought in.
 8. **History** (optional). From the Journal report. Each transaction is a journal
    entry with QuickBooks' date, number and name. QuickBooks' type becomes the app's
    (journal entries take a fixed list: deposit, check, expense, invoice...) and is
-   kept at the start of the memo. Brought in 500 at a time.
+   kept at the start of the memo. Brought in 500 at a time; 3,000 transactions take
+   about two seconds each way (the check, then bringing them in).
+   - **Added 10-31:** a vendor with no default expense account gets the one
+     QuickBooks used for it most, when the habit is clear (two transactions or more,
+     three in four to that account). The auto-coding's vendor-default layer and the
+     bill form use it, so the vendor's bank lines and bills are coded that way from
+     the first day. Undo takes it off while it is still the one set (record type
+     `vendor_default`, migration 0115).
 9. **Opening balances**, last. From the Trial Balance at the cutover date.
    **Differs from the proposal:** instead of sending chosen lines to Opening Balance
    Equity, the entry is QuickBooks' figure less what is already here, account by
@@ -175,11 +214,19 @@ QuickBooks `Parent:Child` name.
    with full history the entry is empty. The preview shows QuickBooks, here already,
    and the entry for each account. A note says when Accounts Receivable or Payable
    doesn't match the open documents brought in.
+   - A bank or credit card account's line is an entry of its own against Opening
+     Balance Equity (the rest is one entry). Whether an entry is reconciled is kept
+     for the whole entry, so a line shared with another bank's would be ticked off by
+     that bank's reconciliation (found 10-31 with the made-up client below: the card
+     was reconciled at 0.00).
    - Then each bank and credit card account is **reconciled to the cutover date**:
-     every entry up to then is ticked except the uncleared items, at the balance that
-     leaves. The first reconciliation here starts where QuickBooks' last one ended,
-     with only the uncleared items to tick. An account with a reconciliation in
-     progress is left alone, with a note.
+     every entry up to then is ticked except the uncleared items. Where it ends is
+     worked out from the ledger, the account's balance less its uncleared items, not
+     from the ticks: an entry shared with another bank (a transfer, a card payment in
+     the history) is ticked by whichever is reconciled first, and the starting
+     balance makes up for it. The first reconciliation here starts where QuickBooks'
+     last one ended, with only the uncleared items to tick. An account with a
+     reconciliation in progress is left alone, with a note.
    - Nothing that posts can be added while the opening balances are posted: undo
      them, add the upload, and post them again.
 
@@ -193,8 +240,27 @@ upload) and lists any that differ.
 
 `apps/api/tests/integration/qbImport.test.ts`: a whole move (lists, open items,
 uncleared items, opening entry, the check, the reconciliation, undo), account
-mapping, history, and the HTTP routes (dry run, roles, problems). The readers:
-`apps/web/src/lib/qbImport.test.ts`.
+mapping, history (a card payment shared by the bank and the card), vendor defaults,
+Start over and bringing the chart in again, and the HTTP routes (dry run, roles,
+problems). The readers: `apps/web/src/lib/qbImport.test.ts`, and
+`qbImport.files.test.ts`, which writes a made-up client's exports
+(`qbImport.fixtures.ts`: Maple Street Bakery, laid out as QuickBooks exports them,
+its figures agreeing with one another) as real Excel and CSV files and reads them
+back as the page does.
+
+**Tried by hand 10-31** on the local app with the same files: every step, the check
+(all 21 accounts matching), the balance sheet and aging against the made-up
+QuickBooks figures, Start over, and the whole move again with history. It found the
+card reconciled at 0.00, Start over refused by opening stock, and the detail reports
+below.
+
+**Reports found while testing:** Open Invoices, A/R Aging Detail and Customer
+Balance Detail (and Unpaid Bills, A/P Aging Detail, Vendor Balance Detail) listed
+only invoices or bills, so they came to more than Accounts Receivable or Payable
+whenever money was on account; the aging summaries already took it off. They now ask
+for `?credits=true` and list each open credit memo, unapplied payment and vendor
+credit as a negative row, as QuickBooks does. Collections and the Invoice List read
+the same endpoint without it and are unchanged.
 
 ## 6. Not covered
 

@@ -19,6 +19,8 @@ export type OpenInvoice = {
   total: string;
   open: string;
   bucket: Bucket;
+  /** 'Invoice', or money the customer has on account: 'Payment' (not yet applied) or 'Credit Memo' (not yet used). */
+  type: 'Invoice' | 'Payment' | 'Credit Memo';
 };
 
 /** Every posted invoice with a balance still owed, as of a date — no business
@@ -49,7 +51,38 @@ export async function openInvoices(db: Kysely<DB>, q: { business_id: string; as_
   return invoices
     .map(inv => ({ ...inv, open: toMoneyString(subMoney(inv.total, applied.get(inv.id) ?? '0')) }))
     .filter(inv => parseFloat(inv.open) > 0)
-    .map(inv => ({ ...inv, bucket: bucketFor(daysBetween(q.as_of, inv.due_date)) }))
+    .map(inv => ({ ...inv, bucket: bucketFor(daysBetween(q.as_of, inv.due_date)), type: 'Invoice' as const }))
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+}
+
+/**
+ * Money a customer has on account: payments not yet applied and credit memos
+ * not yet used, each as a negative row dated (and aged) from its own date. The
+ * Aging summary takes them off each customer's total; the Open Invoices and
+ * detail reports list them, as QuickBooks does, so they too add up to Accounts
+ * Receivable.
+ */
+export async function openCustomerCredits(db: Kysely<DB>, q: { business_id: string; as_of: string }): Promise<OpenInvoice[]> {
+  const payments = await db.selectFrom('payments as p')
+    .innerJoin('customers as c', 'c.id', 'p.customer_id')
+    .select(['p.id', 'p.reference as number', 'p.customer_id', 'c.name as customer_name', 'p.payment_date as date', 'p.amount as total', 'p.unapplied_amount as open'])
+    .where('p.business_id', '=', q.business_id)
+    .where('p.status', '=', 'posted')
+    .where('p.unapplied_amount', '>', '0')
+    .execute();
+  const credits = await db.selectFrom('credit_memos as cm')
+    .innerJoin('customers as c', 'c.id', 'cm.customer_id')
+    .select(['cm.id', 'cm.credit_memo_number as number', 'cm.customer_id', 'c.name as customer_name', 'cm.memo_date as date', 'cm.amount as total', 'cm.remaining_amount as open'])
+    .where('cm.business_id', '=', q.business_id)
+    .where('cm.status', 'in', ['posted', 'applied'])
+    .where('cm.remaining_amount', '>', '0')
+    .execute();
+  const row = (r: (typeof payments)[number], type: 'Payment' | 'Credit Memo'): OpenInvoice => ({
+    id: r.id, invoice_number: r.number ?? type, customer_id: r.customer_id, customer_name: r.customer_name,
+    issue_date: r.date, due_date: r.date, total: toMoneyString(subMoney('0', r.total)), open: toMoneyString(subMoney('0', r.open)),
+    bucket: bucketFor(daysBetween(q.as_of, r.date)), type,
+  });
+  return [...payments.map(p => row(p, 'Payment')), ...credits.map(c => row(c, 'Credit Memo'))]
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 }
 
@@ -66,26 +99,8 @@ export async function customerAging(db: Kysely<DB>, q: { business_id: string; as
   }
 
   // Money on account: aged from its own date, shown as a negative.
-  const unappliedPayments = await db.selectFrom('payments as p')
-    .innerJoin('customers as c', 'c.id', 'p.customer_id')
-    .select(['p.customer_id', 'c.name as customer_name', 'p.payment_date as date', 'p.unapplied_amount as amount'])
-    .where('p.business_id', '=', q.business_id)
-    .where('p.status', '=', 'posted')
-    .where('p.unapplied_amount', '>', '0')
-    .execute();
-  const openCredits = await db.selectFrom('credit_memos as cm')
-    .innerJoin('customers as c', 'c.id', 'cm.customer_id')
-    .select(['cm.customer_id', 'c.name as customer_name', 'cm.memo_date as date', 'cm.remaining_amount as amount'])
-    .where('cm.business_id', '=', q.business_id)
-    .where('cm.status', 'in', ['posted', 'applied'])
-    .where('cm.remaining_amount', '>', '0')
-    .execute();
-  for (const credit of [...unappliedPayments, ...openCredits]) {
-    table.add(
-      { id: credit.customer_id, name: credit.customer_name },
-      toMoneyString(subMoney('0', credit.amount)),
-      daysBetween(q.as_of, credit.date),
-    );
+  for (const credit of await openCustomerCredits(db, q)) {
+    table.add({ id: credit.customer_id, name: credit.customer_name }, credit.open, daysBetween(q.as_of, credit.due_date));
   }
 
   return table.result();

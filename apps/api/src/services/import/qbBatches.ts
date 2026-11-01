@@ -8,7 +8,7 @@ import { PreconditionError } from '../../lib/ledgerErrors.js';
 import { computeTrialBalance, voidJournalEntry } from '../core/ledgerService.js';
 import { updateAccount } from '../core/chartOfAccountsService.js';
 import { customerHasAnyTransaction, deleteCustomer } from '../ar/customerService.js';
-import { deleteVendor, vendorHasAnyTransaction } from '../ap/vendorService.js';
+import { deleteVendor, updateVendor, vendorHasAnyTransaction } from '../ap/vendorService.js';
 import { deleteItem } from '../inventory/inventoryItemService.js';
 import { voidInvoice } from '../ar/invoiceService.js';
 import { voidBill } from '../ap/billService.js';
@@ -194,12 +194,14 @@ export async function undoBatch(trx: Transaction<DB>, ctx: ServiceCtx, batch_id:
         await refuseIfApplied(trx, 'invoice', r.entity_id);
         const inv = await trx.selectFrom('invoices').select('status').where('id', '=', r.entity_id).executeTakeFirst();
         if (inv && (inv.status === 'posted' || inv.status === 'paid')) await voidInvoice(trx, ctx, { invoice_id: r.entity_id, void_reason: UNDO_REASON });
+        await giveNumberBack(trx, 'invoice', r.entity_id);
         break;
       }
       case 'bill': {
         await refuseIfApplied(trx, 'bill', r.entity_id);
         const bill = await trx.selectFrom('bills').select('status').where('id', '=', r.entity_id).executeTakeFirst();
         if (bill && (bill.status === 'posted' || bill.status === 'paid')) await voidBill(trx, ctx, { bill_id: r.entity_id, void_reason: UNDO_REASON });
+        await giveNumberBack(trx, 'bill', r.entity_id);
         break;
       }
       case 'credit_memo': {
@@ -221,7 +223,13 @@ export async function undoBatch(trx: Transaction<DB>, ctx: ServiceCtx, batch_id:
         if (!sm) break;
         if (sm.journal_entry_id) {
           const je = await trx.selectFrom('journal_entries').select('status').where('id', '=', sm.journal_entry_id).executeTakeFirst();
-          if (je?.status === 'posted') await voidJournalEntry(trx, ctx, { journal_entry_id: sm.journal_entry_id, void_reason: UNDO_REASON });
+          // The movement's own entry, so it is voided as the movement's.
+          if (je?.status === 'posted') {
+            await voidJournalEntry(trx, ctx, {
+              journal_entry_id: sm.journal_entry_id, void_reason: UNDO_REASON,
+              source_guard: { source_type: 'adjustment', source_id: sm.id },
+            });
+          }
         }
         await trx.deleteFrom('stock_movements').where('id', '=', sm.id).execute();
         break;
@@ -235,29 +243,54 @@ export async function undoBatch(trx: Transaction<DB>, ctx: ServiceCtx, batch_id:
         break;
       }
       case 'customer': {
-        const c = await trx.selectFrom('customers').select(['name', 'deleted_at']).where('id', '=', r.entity_id).executeTakeFirst();
+        const c = await trx.selectFrom('customers').selectAll().where('id', '=', r.entity_id).executeTakeFirst();
         if (!c || c.deleted_at) break;
-        if (await customerHasAnyTransaction(trx, r.entity_id)) {
+        if (!(await customerHasAnyTransaction(trx, r.entity_id))) {
+          await deleteCustomer(trx, ctx, { customer_id: r.entity_id });
+          break;
+        }
+        if (await customerHasLiveTransaction(trx, r.entity_id)) {
           throw new PreconditionError(`${c.name} has transactions now. Undo the open invoices first, or make the customer inactive`);
         }
-        await deleteCustomer(trx, ctx, { customer_id: r.entity_id });
+        // Only voided invoices and credits are left (from undoing the open invoices): they keep the customer, out of every list.
+        await trx.updateTable('customers').set({ deleted_at: sql`now()` }).where('id', '=', c.id).execute();
+        await auditRecord(trx, ctx, { action: AUDIT.CUSTOMER_DELETE, entity_type: 'customer', entity_id: c.id, before: c, after: null });
         break;
       }
       case 'vendor': {
-        const v = await trx.selectFrom('vendors').select(['name', 'deleted_at']).where('id', '=', r.entity_id).executeTakeFirst();
+        const v = await trx.selectFrom('vendors').selectAll().where('id', '=', r.entity_id).executeTakeFirst();
         if (!v || v.deleted_at) break;
-        if (await vendorHasAnyTransaction(trx, r.entity_id)) {
+        if (!(await vendorHasAnyTransaction(trx, r.entity_id))) {
+          await deleteVendor(trx, ctx, { vendor_id: r.entity_id });
+          break;
+        }
+        if (await vendorHasLiveTransaction(trx, r.entity_id)) {
           throw new PreconditionError(`${v.name} has transactions now. Undo the unpaid bills first, or make the vendor inactive`);
         }
-        await deleteVendor(trx, ctx, { vendor_id: r.entity_id });
+        await trx.updateTable('vendors').set({ deleted_at: sql`now()` }).where('id', '=', v.id).execute();
+        await auditRecord(trx, ctx, { action: AUDIT.VENDOR_DELETE, entity_type: 'vendor', entity_id: v.id, before: v, after: null });
         break;
       }
       case 'account':
         await deleteImportedAccount(trx, ctx, r.entity_id);
         break;
+      case 'vendor_default': {
+        // Taken off only while it is still the one the history set.
+        const prev = (typeof r.previous === 'string' ? JSON.parse(r.previous) : r.previous) as { set_to: string } | null;
+        const v = await trx.selectFrom('vendors').select(['default_expense_account_id', 'deleted_at']).where('id', '=', r.entity_id).executeTakeFirst();
+        if (prev && v && !v.deleted_at && v.default_expense_account_id === prev.set_to) {
+          await updateVendor(trx, ctx, { vendor_id: r.entity_id, patch: { default_expense_account_id: null } });
+        }
+        break;
+      }
       case 'account_renamed': {
-        const prev = (typeof r.previous === 'string' ? JSON.parse(r.previous) : r.previous) as { name: string; code: string } | null;
-        if (prev) await updateAccount(trx, ctx, { account_id: r.entity_id, patch: { name: prev.name, code: prev.code } });
+        // An account the upload renamed, renumbered or made active again: what it was before.
+        const prev = (typeof r.previous === 'string' ? JSON.parse(r.previous) : r.previous) as { name: string; code: string; is_active?: boolean } | null;
+        if (prev) {
+          await updateAccount(trx, ctx, {
+            account_id: r.entity_id, patch: { name: prev.name, code: prev.code, ...(prev.is_active === false ? { is_active: false } : {}) },
+          });
+        }
         break;
       }
     }
@@ -271,6 +304,55 @@ export async function undoBatch(trx: Transaction<DB>, ctx: ServiceCtx, batch_id:
     before: { step: batch.step, records: records.length }, after: { undone_at: undone.undone_at },
   });
   return undone;
+}
+
+/** Starting over: every upload still in place, undone newest first. Any one that can't be stops all of it. */
+export async function undoAll(trx: Transaction<DB>, ctx: ServiceCtx) {
+  const active = await activeBatches(trx, scopeBusiness(ctx));
+  for (const batch of [...active].reverse()) await undoBatch(trx, ctx, batch.id);
+  return { undone: active.length };
+}
+
+/** Anything recorded for a customer that isn't voided. */
+async function customerHasLiveTransaction(trx: Transaction<DB>, customer_id: string): Promise<boolean> {
+  const found = await Promise.all([
+    trx.selectFrom('invoices').select('id').where('customer_id', '=', customer_id).where('deleted_at', 'is', null).where('status', '!=', 'voided').executeTakeFirst(),
+    trx.selectFrom('credit_memos').select('id').where('customer_id', '=', customer_id).where('status', '!=', 'voided').executeTakeFirst(),
+    trx.selectFrom('payments').select('id').where('customer_id', '=', customer_id).executeTakeFirst(),
+    trx.selectFrom('sales_orders').select('id').where('customer_id', '=', customer_id).executeTakeFirst(),
+  ]);
+  return found.some(row => row !== undefined);
+}
+
+/** Anything recorded for a vendor that isn't voided. */
+async function vendorHasLiveTransaction(trx: Transaction<DB>, vendor_id: string): Promise<boolean> {
+  const found = await Promise.all([
+    trx.selectFrom('bills').select('id').where('vendor_id', '=', vendor_id).where('status', '!=', 'voided').executeTakeFirst(),
+    trx.selectFrom('vendor_credits').select('id').where('vendor_id', '=', vendor_id).where('status', '!=', 'voided').executeTakeFirst(),
+    trx.selectFrom('bill_payments').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+    trx.selectFrom('expense_transactions').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+    trx.selectFrom('purchase_orders').select('id').where('vendor_id', '=', vendor_id).executeTakeFirst(),
+  ]);
+  return found.some(row => row !== undefined);
+}
+
+/**
+ * A voided invoice or bill from an undone upload gives its number back ("1047"
+ * becomes "1047 (undone)"), so bringing the upload in again keeps QuickBooks'
+ * numbers instead of "1047-2". Numbers are one to a company, voided or not.
+ */
+async function giveNumberBack(trx: Transaction<DB>, kind: 'invoice' | 'bill', id: string) {
+  const doc = kind === 'invoice'
+    ? await trx.selectFrom('invoices').select(['business_id', 'status', 'invoice_number as number']).where('id', '=', id).executeTakeFirst()
+    : await trx.selectFrom('bills').select(['business_id', 'status', 'bill_number as number']).where('id', '=', id).executeTakeFirst();
+  if (!doc || doc.status !== 'voided' || / \(undone( \d+)?\)$/.test(doc.number)) return;
+  const taken = async (n: string) => (kind === 'invoice'
+    ? await trx.selectFrom('invoices').select('id').where('business_id', '=', doc.business_id).where('invoice_number', '=', n).executeTakeFirst()
+    : await trx.selectFrom('bills').select('id').where('business_id', '=', doc.business_id).where('bill_number', '=', n).executeTakeFirst()) !== undefined;
+  let number = `${doc.number} (undone)`;
+  for (let k = 2; await taken(number); k++) number = `${doc.number} (undone ${k})`;
+  if (kind === 'invoice') await trx.updateTable('invoices').set({ invoice_number: number }).where('id', '=', id).execute();
+  else await trx.updateTable('bills').set({ bill_number: number }).where('id', '=', id).execute();
 }
 
 async function refuseIfApplied(trx: Transaction<DB>, kind: 'invoice' | 'bill', id: string) {
@@ -289,7 +371,11 @@ async function deleteImportedAccount(trx: Transaction<DB>, ctx: ServiceCtx, acco
   const account = await trx.selectFrom('chart_of_accounts').selectAll().where('id', '=', account_id).executeTakeFirst();
   if (!account) return;
   const line = await trx.selectFrom('journal_entry_lines as l').innerJoin('journal_entries as j', 'j.id', 'l.journal_entry_id')
-    .select('l.id').where('l.account_id', '=', account_id).where('j.status', '=', 'posted').executeTakeFirst();
+    .leftJoin('journal_entries as o', 'o.id', 'j.reversed_entry_id')
+    .select('l.id').where('l.account_id', '=', account_id).where('j.status', '=', 'posted')
+    // A void's reversal only nets out an entry that is gone; it isn't use.
+    .where(eb => eb.or([eb('j.reversed_entry_id', 'is', null), eb('o.status', '!=', 'voided')]))
+    .executeTakeFirst();
   const child = await trx.selectFrom('chart_of_accounts').select('id').where('parent_id', '=', account_id).executeTakeFirst();
   const item = await trx.selectFrom('inventory_items').select('id').where('deleted_at', 'is', null)
     .where(eb => eb.or([

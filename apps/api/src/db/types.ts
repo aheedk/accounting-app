@@ -1414,13 +1414,14 @@ export interface ChatMessagesTable {
   created_at: Generated<Timestamp>;
 }
 
-// Moving a client from QuickBooks (migration 0114).
+// Moving a client from QuickBooks (migrations 0114, 0115).
 export type QbImportStep =
   | 'accounts' | 'customers' | 'vendors' | 'items'
   | 'open_invoices' | 'open_bills' | 'uncleared' | 'history' | 'trial_balance';
 export type QbImportEntityType =
   | 'account' | 'account_renamed' | 'customer' | 'vendor' | 'inventory_item' | 'stock_movement'
-  | 'journal_entry' | 'invoice' | 'bill' | 'credit_memo' | 'vendor_credit' | 'reconciliation';
+  | 'journal_entry' | 'invoice' | 'bill' | 'credit_memo' | 'vendor_credit' | 'reconciliation'
+  | 'vendor_default';
 
 export interface QbImportBatchesTable {
   id: Generated<string>;
