@@ -6,7 +6,9 @@ This guide covers the copy we take ourselves. It does not replace the host's
 own backups; see "Still to do" at the end.
 
 Docker has to be running. Nothing else needs installing: `pg_dump` and
-`pg_restore` come from the Postgres image.
+`pg_restore` come from the Postgres image (`postgres:18-alpine`). The tools must
+be at least as new as the database: Railway runs Postgres 18, and version 17's
+`pg_dump` refuses it (found 11-01, when the tool still used 17).
 
 ## Take a backup
 
@@ -53,7 +55,7 @@ To check an older dump, give its path: `npm run db:backup:verify -- backups/<fil
 Only if production is lost. Into a **new, empty** database:
 
 ```
-docker run --rm -v "$PWD/backups:/b" postgres:17-alpine \
+docker run --rm -v "$PWD/backups:/b" postgres:18-alpine \
   pg_restore --no-owner --no-acl -d "<the new database's connection string>" /b/<file>.dump
 ```
 
@@ -64,12 +66,14 @@ not in the database; they are on the Railway volume and need their own copy.
 ## What was tested
 
 On 10-13, against a throwaway database with every migration applied: dump,
-restore, and the row-count comparison all passed. **It has not been run against
-production yet.**
+restore, and the row-count comparison all passed.
+
+**Run against production on 11-01:** the dump was 262 MB, the restore check
+found 77 tables and 35,313 rows, and every table matched the live database.
 
 ## Still to do
 
-1. Run both commands against production once and note the date here.
+1. ~~Run both commands against production once.~~ Done 11-01, above.
 2. **Checked 10-14: Railway keeps no regular backups.** The Postgres service's
    Backups tab holds one backup Railway took before a security patch, and no
    schedule is set. To turn one on: Postgres service → Backups → set a

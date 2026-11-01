@@ -21,8 +21,9 @@ import { Pool } from 'pg';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKUP_DIR = path.resolve(__dirname, '../backups');
-// The tools must be at least as new as the server they read from.
-const IMAGE = process.env.BACKUP_PG_IMAGE ?? 'postgres:17-alpine';
+// The tools must be at least as new as the server they read from: Railway runs
+// Postgres 18 (found 11-01; pg_dump 17 refuses it). 18 also reads older servers.
+const IMAGE = process.env.BACKUP_PG_IMAGE ?? 'postgres:18-alpine';
 
 const COUNT_ROWS = `
   SELECT table_name,
