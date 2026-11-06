@@ -89,7 +89,28 @@ below are updated.
 GitHub's sign-in `github-deploy-accounting-app` with its roles, and every GitHub
 variable except `AZURE_WEBAPP_NAME` and `API_ORIGIN`.
 
-**Waiting on Microsoft:** a new subscription may run no App Service at all in
+**Done 11-05:** the quota was raised. Created the plan `khanarndt-accounting-plan`
+(Linux, B1, East US, one instance) and the web app `khanarndt-accounting-api` on
+it, at **`https://khanarndt-accounting-api-g2fjghhefjdrgcfm.eastus-01.azurewebsites.net`**:
+Azure now gives a new app a unique default hostname, not `<app>.azurewebsites.net`,
+so that is the address wherever this plan says `<app>.azurewebsites.net`.
+- Sidecar support is **off**: the deploy uses `az webapp config container set`,
+  the single-container command. It runs Azure's sample page until the first deploy.
+- System-assigned identity on; it pulls from the registry with it
+  (`acrUseManagedIdentityCreds`). Always On, health check `/health`, HTTPS only,
+  TLS 1.2, FTP and basic authentication off. No Application Insights.
+- Every app setting in step 3 is set, the seven secrets as Key Vault references
+  (`@Microsoft.KeyVault(VaultName=khanarndt-acct-kv;SecretName=…)`).
+  `ANTHROPIC_WORKSPACE_ID` is optional: copy it too if Railway has it.
+- GitHub variables `AZURE_WEBAPP_NAME` and `API_ORIGIN` are set, so the deploy
+  is switched on.
+- **Left, needing someone who can give roles** (Aheed, as Owner of the
+  resource group): AcrPull on the registry and Key Vault Secrets User on the vault
+  for the web app's identity, and Website Contributor on the web app for GitHub's
+  sign-in. Then the seven secrets in the vault, Supabase Storage's bucket and key,
+  and the Azure callback in Google's client.
+
+**Was waiting on Microsoft (resolved by 11-05):** a new subscription may run no App Service at all in
 East US (every size's quota is 0 of 0; Central US had 30). Only a subscription
 Contributor or Owner can raise it: Quotas → App Service → East US → **B1 VMs** →
 request 1. Asif, who set up the firm's Azure and Supabase, asked on 10-31; the
