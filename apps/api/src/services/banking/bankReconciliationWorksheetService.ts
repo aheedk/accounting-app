@@ -84,6 +84,16 @@ export function reconcilableCategory(
   return 'Other Current Liability';
 }
 
+/**
+ * A system account that is never reconciled: a control account (A/R, A/P,
+ * sales tax payable) or retained earnings / suspense, none of which get a
+ * bank or credit card statement. `cash_on_hand` and `operating_bank` are real
+ * bank accounts and belong in the picker like any other (item 100, 11-05) —
+ * excluding every system-keyed account shut every company out of
+ * reconciling its own main bank account.
+ */
+const NON_RECONCILABLE_SYSTEM_KEYS = ['accounts_receivable', 'accounts_payable', 'sales_tax_payable', 'retained_earnings', 'suspense'];
+
 /** Every account the Reconcile picker offers: active asset/liability/equity
  * accounts, not just ones registered as a bank account. */
 export async function listReconcilableAccounts(db: Kysely<DB>, ctx: ServiceCtx) {
@@ -93,7 +103,7 @@ export async function listReconcilableAccounts(db: Kysely<DB>, ctx: ServiceCtx) 
     .where('business_id', '=', bizId)
     .where('is_active', '=', true)
     .where('account_type', 'in', ['asset', 'liability', 'equity'])
-    .where('system_key', 'is', null)
+    .where(eb => eb.or([eb('system_key', 'is', null), eb('system_key', 'not in', NON_RECONCILABLE_SYSTEM_KEYS)]))
     .orderBy('code')
     .execute();
   const bankRows = await db.selectFrom('bank_accounts').select('cash_account_id')

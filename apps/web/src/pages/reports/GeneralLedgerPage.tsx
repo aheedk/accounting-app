@@ -32,6 +32,7 @@ import {
   nextColumnSort,
   saveGeneralLedgerPreferences,
   sortLedgerLines,
+  toggleGeneralLedgerColumn,
   type GeneralLedgerColumnKey,
   type GeneralLedgerColumnSort,
   type GeneralLedgerPreferences,
@@ -580,16 +581,7 @@ export default function GeneralLedgerPage() {
   }
 
   function toggleColumn(column: GeneralLedgerColumnKey): void {
-    setPreferences(current => {
-      const isVisible = current.visibleColumns.includes(column);
-      if (isVisible && current.visibleColumns.length === 1) return current;
-      return {
-        ...current,
-        visibleColumns: isVisible
-          ? current.visibleColumns.filter(key => key !== column)
-          : [...current.visibleColumns, column],
-      };
-    });
+    setPreferences(current => toggleGeneralLedgerColumn(current, column));
   }
 
   function resetCustomization(): void {
@@ -731,6 +723,12 @@ export default function GeneralLedgerPage() {
             ))}
           </AppSelect>
         </div>
+        <Input
+          value={searchText}
+          onChange={event => setSearchText(event.target.value)}
+          placeholder="Find a transaction, amount or name…"
+          className="w-64"
+        />
         <Button
           variant={customizationOpen ? 'secondary' : 'outline'}
           onClick={() => setCustomizationOpen(current => !current)}
@@ -841,7 +839,7 @@ export default function GeneralLedgerPage() {
                 className="w-full text-xs"
                 style={{ minWidth: `${Math.max(520, visibleColumns.length * 135)}px` }}
               >
-                <thead className="border-b">
+                <thead className="sticky top-0 z-10 border-b bg-card">
                   <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {visibleColumns.map(column => {
                       const definition = columnDefinition(column);
@@ -885,7 +883,10 @@ export default function GeneralLedgerPage() {
                       account={account}
                       columns={visibleColumns}
                       preferences={preferences}
-                      collapsed={collapsedAccounts.has(account.account_id)}
+                      // A search match stays visible even in a collapsed account
+                      // (111, 11-05): otherwise Ctrl+F can't find text that was
+                      // never rendered, and neither can a glance down the page.
+                      collapsed={collapsedAccounts.has(account.account_id) && !(searchText.trim() && account.lines.length > 0)}
                       onToggle={() => toggleAccount(account.account_id)}
                     />
                   ))}

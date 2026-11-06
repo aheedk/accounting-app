@@ -189,6 +189,20 @@ describe('bank reconciliation worksheet', () => {
     expect(byId.has(d.supplies.id)).toBe(false);
   });
 
+  it('includes the main bank account (item 100, 11-05) but not a control account, even though both are system accounts', async () => {
+    const d = await setup(t);
+    // As seeded for a new business: is_system + the right code assigns the system_key (migration 0083).
+    const operatingBank = await makeAccount(t.db, d.business.id, { code: '1020', name: '1020 Operating Bank', account_type: 'asset', detail_type: 'Checking', is_system: true });
+    const ar = await makeAccount(t.db, d.business.id, { code: '1100', name: 'Accounts Receivable', account_type: 'asset', detail_type: 'Accounts receivable (A/R)', is_system: true });
+    const ap = await makeAccount(t.db, d.business.id, { code: '2010', name: 'Accounts Payable', account_type: 'liability', detail_type: 'AP', is_system: true });
+
+    const accounts = await recon.listReconcilableAccounts(t.db, d.ctx);
+    const byId = new Map(accounts.map(a => [a.id, a]));
+    expect(byId.get(operatingBank.id)).toMatchObject({ category: 'Bank' });
+    expect(byId.has(ar.id)).toBe(false);
+    expect(byId.has(ap.id)).toBe(false);
+  });
+
   it('reconciles a credit card directly: a charge increases its balance (the opposite sign from a bank payment), and a bank-paid payment to the card clears it', async () => {
     const d = await setup(t);
     const card = await makeAccount(t.db, d.business.id, { code: '2100', name: 'Visa Business Card', account_type: 'liability', detail_type: 'Credit Card' });

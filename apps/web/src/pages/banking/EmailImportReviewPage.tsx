@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { hideUnless, useCan } from '@/lib/roleAccess';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, CheckCircle, XCircle, FileText, CreditCard, Landmark, RefreshCw, History, ExternalLink, Sparkles, Info, Receipt, Mail } from 'lucide-react';
+import { ChevronLeft, ChevronUp, ChevronDown, CheckCircle, XCircle, FileText, CreditCard, Landmark, RefreshCw, History, ExternalLink, Sparkles, Info, Receipt, Mail } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { fmtMoney } from '@/lib/money';
@@ -20,6 +20,7 @@ import { StatementSummaryFields } from './StatementSummaryFields';
 import { NO_SUMMARY, summaryFormOf, type SummaryForm } from '@/lib/statementSummary';
 import { todayLocal } from '@/lib/dates';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { sortLedgerLines } from '@/lib/generalLedgerCustomization';
 
 // ── Bank statement types ──────────────────────────────────────────────────────
 type ExtractedTx = {
@@ -36,6 +37,8 @@ type ExtractedTx = {
   suggested_account_id?: string;
   suggestion?: SuggestionMeta | null;
   auto_posted?: boolean;
+  /** Posted on an earlier, partial Approve (107): as done as auto_posted, but never "Auto-posted" — a person did it. */
+  posted?: boolean;
   /** An uploaded check stub that describes this check. */
   check_stub?: {
     id: string; check_number: string | null; payee_name: string | null; memo: string | null;
@@ -174,6 +177,44 @@ function fmtStatementDate(iso: string): string {
   return y && m && d ? `${Number(m)}/${Number(d)}/${y.slice(2)}` : iso;
 }
 
+/** "03/14/2026" to "2026-03-14" — so date sorts chronologically, not as text. */
+export function sortableStatementDate(mmddyyyy: string): string {
+  const [m, d, y] = mmddyyyy.split('/');
+  return m && d && y ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : mmddyyyy;
+}
+
+export type BankSortColumn = 'date' | 'description' | 'name' | 'memo' | 'amount' | 'type';
+
+/** Click once for ascending, again for descending, a third time back to the order it came in — as in the General Ledger. */
+export function nextBankSort(
+  current: { column: BankSortColumn; direction: 'asc' | 'desc' } | null, column: BankSortColumn,
+): { column: BankSortColumn; direction: 'asc' | 'desc' } | null {
+  if (!current || current.column !== column) return { column, direction: 'asc' };
+  return current.direction === 'asc' ? { column, direction: 'desc' } : null;
+}
+
+function BankSortHeader({
+  label, column, sort, onClick, align = 'left', className = '',
+}: {
+  label: string; column: BankSortColumn; sort: { column: BankSortColumn; direction: 'asc' | 'desc' } | null;
+  onClick: () => void; align?: 'left' | 'right'; className?: string;
+}) {
+  const active = sort?.column === column;
+  return (
+    <th className={`px-3 py-2 text-xs font-semibold text-muted-foreground uppercase ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-sort={active ? (sort!.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+        className={`inline-flex items-center gap-0.5 hover:text-foreground ${align === 'right' ? 'flex-row-reverse' : ''}`}
+      >
+        {label}
+        {active && (sort!.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
+}
+
 function isCard(imp: StagedImport): boolean {
   return imp.statement_kind === 'credit_card';
 }
@@ -251,6 +292,10 @@ export default function EmailImportReviewPage() {
   const [offsets, setOffsets] = useState<Record<number, string>>({});
   const [included, setIncluded] = useState<Record<number, boolean>>({});
   const [payees, setPayees] = useState<Record<number, string>>({});
+  // A note typed in at review time, between Name and Amount (item 106, 11-05).
+  const [memos, setMemos] = useState<Record<number, string>>({});
+  // Sort by any column heading, as in the General Ledger (item 105, 11-05).
+  const [bankSort, setBankSort] = useState<{ column: BankSortColumn; direction: 'asc' | 'desc' } | null>(null);
   // Rows where the accountant ticked "use this account next time".
   const [remember, setRemember] = useState<Record<number, boolean>>({});
   // Check stub accepted per line (cleared when the reviewer says "don't use").
@@ -335,6 +380,8 @@ export default function EmailImportReviewPage() {
     setOffsets({});
     setIncluded({});
     setPayees({});
+    setMemos({});
+    setBankSort(null);
     setRemember({});
     setSummary(NO_SUMMARY);
     setAutoPostNote(null);
@@ -444,6 +491,8 @@ export default function EmailImportReviewPage() {
     setOffsets(initOffsets);
     setPayees(initPayees);
     setStubIds(initStubs);
+    setMemos({});
+    setBankSort(null);
     setRemember({});
   }
 
@@ -518,7 +567,7 @@ export default function EmailImportReviewPage() {
     if (!bizId || !selectedBank) return;
     if (bankPostingRef.current) return;
     if (!bankAccountId) { setBankError(isCard(selectedBank) ? 'Select the credit card account first.' : 'Select a bank account first.'); return; }
-    const missing = selectedBank.extracted_transactions.findIndex((_, i) => included[i] && !offsets[i]);
+    const missing = selectedBank.extracted_transactions.findIndex((tx, i) => included[i] && !offsets[i] && !tx.auto_posted && !tx.posted);
     if (missing !== -1) { setBankError(`Select an offset account for row ${missing + 1}.`); return; }
     if (summary.period_start && summary.period_end && summary.period_start > summary.period_end) {
       setBankError('The statement period ends before it starts.');
@@ -528,7 +577,7 @@ export default function EmailImportReviewPage() {
     setBankPosting(true);
     setBankError(null);
     try {
-      await api.post(`/businesses/${bizId}/email-imports/${selectedBank.id}/approve`, {
+      const res = await api.post(`/businesses/${bizId}/email-imports/${selectedBank.id}/approve`, {
         bank_account_id: bankAccountId,
         transactions: selectedBank.extracted_transactions.map((_, i) => ({
           index: i,
@@ -537,6 +586,7 @@ export default function EmailImportReviewPage() {
           remember: remember[i] === true,
           payee_name: payees[i] ?? '',
           check_stub_id: stubIds[i] ?? null,
+          memo: memos[i] ?? '',
         })),
         summary: {
           period_start: summary.period_start || null,
@@ -545,8 +595,19 @@ export default function EmailImportReviewPage() {
           ending_balance: summary.ending_balance || null,
         },
       });
-      setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
-      setSelectedBank(null);
+      if (res.data.done) {
+        setBankImports(prev => prev.filter(im => im.id !== selectedBank.id));
+        setSelectedBank(null);
+      } else {
+        // Rows left unticked (he doesn't know yet what they are) stay on the
+        // statement for later, instead of disappearing with the rest (107).
+        setAutoPostNote(`Posted ${res.data.posted as number}. ${res.data.remaining as number} left to review.`);
+        const fresh = await api.get(`/businesses/${bizId}/email-imports`);
+        const imports = (fresh.data.imports as StagedImport[]) ?? [];
+        setBankImports(imports);
+        const reopened = imports.find(im => im.id === selectedBank.id);
+        if (reopened) openBank(reopened); else setSelectedBank(null);
+      }
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       if (status === 404) {
@@ -679,6 +740,26 @@ export default function EmailImportReviewPage() {
       : selectedInvoice.line_items.reduce((s, li) => s + parseFloat(li.amount ?? '0'), 0))
     : 0;
   const hasTaxCol = invTotalTax > 0;
+
+  // The rows in the order asked for (105); unsorted, the order they came in.
+  const bankDisplayOrder = useMemo(() => {
+    const bankTransactions = selectedBank?.extracted_transactions ?? [];
+    const indices = bankTransactions.map((_, i) => i);
+    if (!bankSort) return indices;
+    const { column, direction } = bankSort;
+    const valueOf = (i: number): string | number => {
+      const tx = bankTransactions[i]!;
+      switch (column) {
+        case 'date': return sortableStatementDate(tx.date);
+        case 'description': return tx.description;
+        case 'name': return payees[i] ?? tx.payee_name ?? '';
+        case 'memo': return memos[i] ?? '';
+        case 'amount': return Number(tx.amount);
+        case 'type': return tx.card_type ?? tx.type;
+      }
+    };
+    return sortLedgerLines(indices, direction, valueOf);
+  }, [selectedBank, bankSort, payees, memos]);
 
   if (!bizId) return <div className="p-6">Select a business first.</div>;
 
@@ -899,20 +980,23 @@ export default function EmailImportReviewPage() {
                             setIncluded(Object.fromEntries(selectedBank.extracted_transactions.map((tx, i) => [i, v && !isCardPayment(selectedBank, tx)])));
                           }} />
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Date</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Description</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[140px]">Name</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase">Amount</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Type</th>
+                      <BankSortHeader label="Date" column="date" sort={bankSort} onClick={() => setBankSort(s => nextBankSort(s, 'date'))} />
+                      <BankSortHeader label="Description" column="description" sort={bankSort} onClick={() => setBankSort(s => nextBankSort(s, 'description'))} />
+                      <BankSortHeader label="Name" column="name" sort={bankSort} onClick={() => setBankSort(s => nextBankSort(s, 'name'))} className="min-w-[140px]" />
+                      <BankSortHeader label="Memo" column="memo" sort={bankSort} onClick={() => setBankSort(s => nextBankSort(s, 'memo'))} className="min-w-[140px]" />
+                      <BankSortHeader label="Amount" column="amount" sort={bankSort} onClick={() => setBankSort(s => nextBankSort(s, 'amount'))} align="right" />
+                      <BankSortHeader label="Type" column="type" sort={bankSort} onClick={() => setBankSort(s => nextBankSort(s, 'type'))} />
                       <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase min-w-[200px]">{isCard(selectedBank) ? 'Category / account' : 'Offset account'}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedBank.extracted_transactions.map((tx, i) => (
+                    {bankDisplayOrder.map(i => {
+                      const tx = selectedBank.extracted_transactions[i]!;
+                      return (
                       <tr key={i} className={`border-b ${!included[i] && !isCardPayment(selectedBank, tx) ? 'opacity-40' : ''}`}>
                         <td className="px-3 py-2">
                           <input type="checkbox" checked={included[i] ?? true}
-                            disabled={tx.auto_posted || isCardPayment(selectedBank, tx)}
+                            disabled={tx.auto_posted || tx.posted || isCardPayment(selectedBank, tx)}
                             onChange={e => setIncluded(prev => ({ ...prev, [i]: e.target.checked }))} />
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{tx.date}</td>
@@ -930,7 +1014,7 @@ export default function EmailImportReviewPage() {
                                 onBlur={() => setTimeout(
                                   () => setPayeeDropdownRow(current => (current === i ? null : current)), 150,
                                 )}
-                                disabled={!included[i] || tx.auto_posted}
+                                disabled={!included[i] || tx.auto_posted || tx.posted}
                                 placeholder="Payee…"
                                 className="w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-primary"
                               />
@@ -976,6 +1060,16 @@ export default function EmailImportReviewPage() {
                             </div>
                           ) : null}
                         </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={memos[i] ?? ''}
+                            onChange={e => setMemos(prev => ({ ...prev, [i]: e.target.value }))}
+                            disabled={tx.auto_posted || tx.posted}
+                            placeholder="Memo…"
+                            className="w-full rounded border bg-background px-2 py-1 text-xs disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
                         <td className={`px-3 py-2 text-right font-mono font-medium ${(tx.type === 'credit' || tx.type === 'deposit') ? 'text-emerald-600' : 'text-destructive'}`}>
                           {isCard(selectedBank) ? '' : (tx.type === 'credit' || tx.type === 'deposit') ? '+' : '-'}{fmtMoney(tx.amount)}
                         </td>
@@ -1020,7 +1114,7 @@ export default function EmailImportReviewPage() {
                               )}
                             </div>
                           ) : (<>
-                          <AppSelect disabled={!included[i] || tx.auto_posted} value={offsets[i] ?? ''}
+                          <AppSelect disabled={!included[i] || tx.auto_posted || tx.posted} value={offsets[i] ?? ''}
                             onChange={e => setOffsets(prev => ({ ...prev, [i]: e.target.value }))}
                             onAddNew={() => addAccount.open({ onPick: id => setOffsets(prev => ({ ...prev, [i]: id })) })} addNewLabel="Add new account"
                             title={tx.suggested_offset ? `AI suggested: ${tx.suggested_offset}` : undefined}
@@ -1032,6 +1126,10 @@ export default function EmailImportReviewPage() {
                             {tx.auto_posted
                               ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
                                   <CheckCircle className="h-3 w-3" />Auto-posted
+                                </span>
+                              : tx.posted
+                              ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+                                  <CheckCircle className="h-3 w-3" />Posted
                                 </span>
                               : <ConfidenceBadge suggestion={tx.suggestion} />}
                             {recorded[i] && (
@@ -1057,7 +1155,7 @@ export default function EmailImportReviewPage() {
                             {/* Only offer to learn when the accountant overrode
                                 the engine -- accepting a suggestion is not a
                                 signal worth turning into a rule. */}
-                            {!tx.auto_posted && included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
+                            {!tx.auto_posted && !tx.posted && included[i] && offsets[i] && offsets[i] !== tx.suggested_account_id && (
                               <label className="flex items-start gap-1.5 text-[10px] leading-tight text-muted-foreground">
                                 <input
                                   type="checkbox"
@@ -1078,7 +1176,8 @@ export default function EmailImportReviewPage() {
                           </>)}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

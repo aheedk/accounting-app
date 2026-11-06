@@ -229,6 +229,20 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
     setForm(current => ({ ...current, lines: pickJournalLineAccount(current.lines, index, accountId) }));
   }
 
+  // Up and down move to the row above or below in the same column, as in
+  // QuickBooks (item 103, 11-05) — left and right already do, being a normal
+  // text cursor move, so only Up/Down need handling here.
+  function handleAmountArrowKey(event: React.KeyboardEvent<HTMLInputElement>, column: 'debit' | 'credit', index: number) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    const target = event.key === 'ArrowUp' ? index - 1 : index + 1;
+    const el = document.getElementById(`journal-${column}-${target}`);
+    if (el instanceof HTMLInputElement) {
+      event.preventDefault();
+      el.focus();
+      el.select();
+    }
+  }
+
   function handleAccountCreated(account: JournalAccount) {
     setAccounts(current => [...current.filter(item => item.id !== account.id), account]);
     if (newAccountLineIndex !== null) {
@@ -593,8 +607,10 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
                       <div className="w-full px-3 py-2 text-right font-mono">{line.debit ? fmtMoney(line.debit) : ''}</div>
                     ) : (
                       <MoneyInput
+                        id={`journal-debit-${index}`}
                         value={line.debit}
                         onChange={event => updateLine(index, { debit: event.target.value, credit: '' })}
+                        onKeyDown={event => handleAmountArrowKey(event, 'debit', index)}
                         placeholder="0.00"
                         className="w-full text-right font-mono"
                       />
@@ -605,8 +621,10 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
                       <div className="w-full px-3 py-2 text-right font-mono">{line.credit ? fmtMoney(line.credit) : ''}</div>
                     ) : (
                       <MoneyInput
+                        id={`journal-credit-${index}`}
                         value={line.credit}
                         onChange={event => updateLine(index, { credit: event.target.value, debit: '' })}
+                        onKeyDown={event => handleAmountArrowKey(event, 'credit', index)}
                         placeholder="0.00"
                         className="w-full text-right font-mono"
                       />

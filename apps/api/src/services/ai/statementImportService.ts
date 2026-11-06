@@ -33,7 +33,18 @@ export type StatementLine = {
   suggested_offset?: string;
   suggested_account_id?: string;
   auto_posted?: boolean;
+  /**
+   * Posted on an earlier, partial Approve (item 107, 11-05) -- as done as
+   * `auto_posted` for every purpose below, but never shown as "Auto-posted":
+   * a person ticked and posted it themselves.
+   */
+  posted?: boolean;
 };
+
+/** Done with this line already, one way or another; never post or re-code it again. */
+export function isLinePosted(line: Pick<StatementLine, 'auto_posted' | 'posted'>): boolean {
+  return line.auto_posted === true || line.posted === true;
+}
 
 export type RawCardLine = {
   date?: string;
@@ -110,6 +121,8 @@ export type PostStatementItem = {
   payee_name?: string | null;
   /** A check stub this line was matched to; marked used once the line posts. */
   check_stub_id?: string | null;
+  /** A note added at review time (item 106, 11-05); appended to the posted entry's own memo. */
+  memo?: string | null;
 };
 
 /**
@@ -166,7 +179,7 @@ export async function postStatementLines(
 
   const postable = input.items.flatMap(item => {
     const line = input.lines[item.index];
-    return line && !line.auto_posted && !isCardStatementPayment(input.statement_kind, line) ? [{ item, line }] : [];
+    return line && !isLinePosted(line) && !isCardStatementPayment(input.statement_kind, line) ? [{ item, line }] : [];
   });
   if (postable.some(({ item }) => item.offset_account_id === input.account_id)) {
     throw new BusinessRuleError(
@@ -179,13 +192,14 @@ export async function postStatementLines(
     const amount = Number(line.amount).toFixed(2);
     const inflow = isInflow(line);
     const payee = item.payee_name?.trim() || line.payee_name || null;
+    const note = item.memo?.trim();
     return {
       business_id: businessId,
       entry_date: statementDateToIso(line.date),
       source_type: 'bank_import',
       transaction_type: entryTransactionType(input.statement_kind, line),
       source_id: input.staging_id,
-      memo: line.description,
+      memo: note ? `${line.description} — ${note}` : line.description,
       // A bank deposit has no payee column; everything else carries one.
       payee_name: input.statement_kind === 'bank' && inflow ? null : payee,
       reference: input.statement_kind === 'bank' && line.type === 'check' ? checkNumberOf(line) : null,
@@ -285,7 +299,7 @@ export async function findAlreadyRecorded(
   const found: Array<Omit<AlreadyRecorded, 'label' | 'path'>> = [];
   for (const { index, offset_account_id } of input.offsets) {
     const line = input.lines[index];
-    if (!line || line.auto_posted || (offset_account_id !== null && !balanceSheet.has(offset_account_id))) continue;
+    if (!line || isLinePosted(line) || (offset_account_id !== null && !balanceSheet.has(offset_account_id))) continue;
     const amount = Number(line.amount).toFixed(4);
     const inflow = isInflow(line);
     const date = statementDateToIso(line.date);

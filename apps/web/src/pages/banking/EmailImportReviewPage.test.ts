@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestVendorMatch, statementBankAccounts } from './EmailImportReviewPage';
+import { bestVendorMatch, nextBankSort, sortableStatementDate, statementBankAccounts } from './EmailImportReviewPage';
 
 // 2026-10-05 meeting follow-up: the bank account picker on a statement listed
 // most of the chart; it should list bank accounts only.
@@ -68,5 +68,31 @@ describe('bestVendorMatch', () => {
   it('returns null for blank input or an empty vendor list', () => {
     expect(bestVendorMatch('', vendors)).toBeNull();
     expect(bestVendorMatch('Duke Power', [])).toBeNull();
+  });
+});
+
+// Item 105, 11-05: sort by any column heading, as in the General Ledger.
+describe('sortableStatementDate', () => {
+  it('turns a statement date into one that sorts chronologically, not as text', () => {
+    expect(sortableStatementDate('03/14/2026')).toBe('2026-03-14');
+    expect(sortableStatementDate('1/5/2026')).toBe('2026-01-05');
+    // Text order would put December before January across a year boundary; this must not.
+    expect([sortableStatementDate('12/20/2025'), sortableStatementDate('01/05/2026')].sort())
+      .toEqual(['2025-12-20', '2026-01-05']);
+  });
+});
+
+describe('nextBankSort', () => {
+  it('cycles ascending, then descending, then back to the order it came in', () => {
+    const asc = nextBankSort(null, 'date');
+    expect(asc).toEqual({ column: 'date', direction: 'asc' });
+    const desc = nextBankSort(asc, 'date');
+    expect(desc).toEqual({ column: 'date', direction: 'desc' });
+    expect(nextBankSort(desc, 'date')).toBeNull();
+  });
+
+  it('starts a different column over at ascending', () => {
+    const dateDesc = nextBankSort({ column: 'date', direction: 'desc' }, 'amount');
+    expect(dateDesc).toEqual({ column: 'amount', direction: 'asc' });
   });
 });

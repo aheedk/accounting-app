@@ -5,6 +5,8 @@ import {
   nextColumnSort,
   normalizeGeneralLedgerPreferences,
   sortLedgerLines,
+  toggleGeneralLedgerColumn,
+  type GeneralLedgerPreferences,
 } from './generalLedgerCustomization';
 
 describe('General Ledger customization preferences', () => {
@@ -81,5 +83,42 @@ describe('General Ledger column sorting', () => {
     expect(sortLedgerLines(lines, 'desc', l => l.v).map(l => l.id)).toEqual([1, 4, 3, 2]);
     // The list handed in is left as it was.
     expect(lines.map(l => l.id)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+// Item 110, 11-05: ticking Debit, then Credit, then Balance gave Balance,
+// Debit, Credit -- the fixed default order, not the order they were ticked in.
+describe('toggleGeneralLedgerColumn', () => {
+  it('shows newly-ticked columns in the order they were ticked, not the default order', () => {
+    let prefs: GeneralLedgerPreferences = { ...defaultGeneralLedgerPreferences(), visibleColumns: ['date'] };
+    prefs = toggleGeneralLedgerColumn(prefs, 'debit');
+    prefs = toggleGeneralLedgerColumn(prefs, 'credit');
+    prefs = toggleGeneralLedgerColumn(prefs, 'balance');
+    const order = prefs.columnOrder.filter(c => prefs.visibleColumns.includes(c));
+    expect(order).toEqual(['date', 'debit', 'credit', 'balance']);
+  });
+
+  it('hiding a column leaves the order of what remains visible alone', () => {
+    let prefs: GeneralLedgerPreferences = { ...defaultGeneralLedgerPreferences(), visibleColumns: ['date', 'memo', 'amount'] };
+    prefs = toggleGeneralLedgerColumn(prefs, 'memo');
+    expect(prefs.visibleColumns).toEqual(['date', 'amount']);
+    const order = prefs.columnOrder.filter(c => prefs.visibleColumns.includes(c));
+    expect(order).toEqual(['date', 'amount']);
+  });
+
+  it('will not hide the last visible column', () => {
+    let prefs: GeneralLedgerPreferences = { ...defaultGeneralLedgerPreferences(), visibleColumns: ['amount'] };
+    prefs = toggleGeneralLedgerColumn(prefs, 'amount');
+    expect(prefs.visibleColumns).toEqual(['amount']);
+  });
+
+  it('re-ticking a column moves it to the end again, after whatever was ticked since', () => {
+    let prefs: GeneralLedgerPreferences = { ...defaultGeneralLedgerPreferences(), visibleColumns: ['date'] };
+    prefs = toggleGeneralLedgerColumn(prefs, 'debit'); // date, debit
+    prefs = toggleGeneralLedgerColumn(prefs, 'debit'); // off: date
+    prefs = toggleGeneralLedgerColumn(prefs, 'credit'); // date, credit
+    prefs = toggleGeneralLedgerColumn(prefs, 'debit'); // date, credit, debit
+    const order = prefs.columnOrder.filter(c => prefs.visibleColumns.includes(c));
+    expect(order).toEqual(['date', 'credit', 'debit']);
   });
 });

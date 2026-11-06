@@ -20,7 +20,7 @@ import { useCloseForm } from '@/lib/useCloseForm';
 import { PartySelect, type Party } from '@/components/ui/PartySelect';
 import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
-import { todayLocal } from '@/lib/dates';
+import { fmtLongDate, todayLocal } from '@/lib/dates';
 import { previewCheck, type CheckLayout } from '@/lib/download';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
 
@@ -531,6 +531,28 @@ export default function CheckPage() {
   const canVoid = role !== undefined && hasMinRole(role, 'accountant');
   const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
 
+  // A number typed that another check on this account already has: allowed
+  // (item 104, 11-05, same as item 88 for journal numbers), but said so
+  // before saving, so whoever enters it just knows rather than nobody being told.
+  const typedCheckNumber = checkNumber.trim();
+  const [checkNumberUsedOn, setCheckNumberUsedOn] = useState<string | null>(null);
+  useEffect(() => {
+    if (!bizId || !bankAccountId || !typedCheckNumber || !canEdit) { setCheckNumberUsedOn(null); return; }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      api.get<{ checks: Array<{ id: string; check_number: string | null; bank_account_id: string | null; payment_date: string; status: string }> }>(
+        `/businesses/${bizId}/checks`,
+      ).then(response => {
+        if (cancelled) return;
+        const other = response.data.checks.find(c => (
+          c.check_number === typedCheckNumber && c.bank_account_id === bankAccountId && c.id !== id && c.status !== 'voided'
+        ));
+        setCheckNumberUsedOn(other ? String(other.payment_date).slice(0, 10) : null);
+      }).catch(() => { if (!cancelled) setCheckNumberUsedOn(null); });
+    }, 400);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [bizId, bankAccountId, typedCheckNumber, id, canEdit]);
+
   async function handleSave(after?: 'close' | 'new') {
     setErr(null);
     if (!bankAccountId) { setErr('Please select a bank account.'); return; }
@@ -811,6 +833,11 @@ export default function CheckPage() {
                   disabled={!canEdit}
                   className="w-32"
                 />
+                {checkNumberUsedOn && (
+                  <p className="mt-1 w-48 text-xs text-amber-700" role="status">
+                    No. {typedCheckNumber} is already used, on {fmtLongDate(checkNumberUsedOn)}. It can be used again.
+                  </p>
+                )}
               </div>
             </div>
             <label className="flex items-center gap-2 text-sm text-muted-foreground">

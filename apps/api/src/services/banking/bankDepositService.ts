@@ -408,7 +408,14 @@ export async function getDeposit(db: Kysely<DB>, ctx: ServiceCtx, id: string) {
     .orderBy('l.sort_order', 'asc')
     .execute();
 
-  return { ...deposit, editable, imported, is_reconciled, lines };
+  // A line wrapped from an imported journal entry (wrapImportedDepositJournalEntry)
+  // never had these typed in, so they are null in the database; the web page's
+  // own line editor treats them as always-a-string and crashes on null (item 101, 11-05).
+  const normalizedLines = lines.map(l => ({
+    ...l, received_from: l.received_from ?? '', payment_method: l.payment_method ?? '', ref_no: l.ref_no ?? '',
+  }));
+
+  return { ...deposit, editable, imported, is_reconciled, lines: normalizedLines };
 }
 
 export async function listDeposits(db: Kysely<DB>, ctx: ServiceCtx) {

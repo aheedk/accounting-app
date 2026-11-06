@@ -123,6 +123,28 @@ export function saveGeneralLedgerPreferences(preferences: GeneralLedgerPreferenc
   }
 }
 
+/**
+ * Shows or hides a column. Showing one moves it to the end of the display
+ * order too, not just onto the visible list, so columns show in the order
+ * they were ticked -- as in QuickBooks (item 110, 11-05). The last visible
+ * column cannot be hidden: a report with no columns makes no sense.
+ */
+export function toggleGeneralLedgerColumn(
+  preferences: GeneralLedgerPreferences, column: GeneralLedgerColumnKey,
+): GeneralLedgerPreferences {
+  const isVisible = preferences.visibleColumns.includes(column);
+  if (isVisible && preferences.visibleColumns.length === 1) return preferences;
+  return {
+    ...preferences,
+    visibleColumns: isVisible
+      ? preferences.visibleColumns.filter(key => key !== column)
+      : [...preferences.visibleColumns, column],
+    columnOrder: isVisible
+      ? preferences.columnOrder
+      : [...preferences.columnOrder.filter(key => key !== column), column],
+  };
+}
+
 export function moveGeneralLedgerColumn(
   order: GeneralLedgerColumnKey[],
   key: GeneralLedgerColumnKey,

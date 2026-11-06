@@ -101,10 +101,12 @@ describe('statement balances', () => {
       period_start: '2026-03-01', period_end: '2026-03-31', beginning_balance: '5000.0000', ending_balance: '5590.0100', account_id: null,
     });
 
+    // Both lines ticked: this test is about the period/balances carrying over
+    // for Reconcile, not about a row left for later (107) -- that has its own test.
     const approved = await post(`/email-imports/${importId}/approve`, {
       bank_account_id: checkingId,
       transactions: [
-        { index: 0, offset_account_id: suppliesId, include: false },
+        { index: 0, offset_account_id: suppliesId },
         { index: 1, offset_account_id: suppliesId },
       ],
       summary: { period_start: '2026-03-01', period_end: '2026-03-31', beginning_balance: '5000.00', ending_balance: '5950.01' },
@@ -124,6 +126,46 @@ describe('statement balances', () => {
     });
     // Another account has no statements.
     expect((await get(`/email-imports/statement-balances?account_id=${suppliesId}`)).body.statements).toEqual([]);
+  });
+
+  it('item 107 (11-05): a row left unticked keeps the statement open for later, instead of finishing and losing it', async () => {
+    const importId = await stageMarchStatement();
+
+    const firstPass = await post(`/email-imports/${importId}/approve`, {
+      bank_account_id: checkingId,
+      transactions: [
+        { index: 0, offset_account_id: suppliesId },
+        { index: 1, offset_account_id: '', include: false }, // he doesn't know yet what this one is
+      ],
+    });
+    expect(firstPass.status).toBe(200);
+    expect(firstPass.body).toMatchObject({ posted: 1, remaining: 1, done: false });
+
+    // Still pending, and still findable, not lost -- today's bug.
+    const stillPending = await t.db.selectFrom('email_import_staging').select('status').where('id', '=', importId).executeTakeFirstOrThrow();
+    expect(stillPending.status).toBe('pending');
+    const reopened = await get(`/email-imports/${importId}`);
+    expect(reopened.status).toBe(200);
+    const [posted, left] = reopened.body.import.extracted_transactions;
+    expect(posted).toMatchObject({ posted: true });
+    expect(left.posted).toBeFalsy();
+
+    // Re-approving the row posted the first time must not post it again.
+    const secondPass = await post(`/email-imports/${importId}/approve`, {
+      bank_account_id: checkingId,
+      transactions: [
+        { index: 0, offset_account_id: suppliesId }, // already posted; carried along by the client as before
+        { index: 1, offset_account_id: suppliesId }, // now he knows
+      ],
+    });
+    expect(secondPass.status).toBe(200);
+    expect(secondPass.body).toMatchObject({ posted: 1, remaining: 0, done: true });
+
+    const finished = await t.db.selectFrom('email_import_staging').select('status').where('id', '=', importId).executeTakeFirstOrThrow();
+    expect(finished.status).toBe('approved');
+
+    const entries = await t.db.selectFrom('journal_entries').select('id').where('business_id', '=', bizId).where('source_id', '=', importId).execute();
+    expect(entries).toHaveLength(2); // once each, not twice for the first row
   });
 
   it('GET /email-imports/:importId returns one staged statement in full, without shadowing the literal routes beside it', async () => {

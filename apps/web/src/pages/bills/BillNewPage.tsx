@@ -3,6 +3,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
+import { pickErr } from '@/lib/apiErrors';
 import { useActiveBusinessId } from '@/lib/business';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,6 +118,8 @@ function BillNewPage() {
     e.preventDefault(); setErr(null); setBusy(true);
     try {
       const used = lines.filter(l => l.description.trim() !== '' || l.expense_account_id !== '');
+      const missingAccount = used.find(l => l.expense_account_id === '');
+      if (missingAccount) { setErr('Pick an account for every line.'); setBusy(false); return; }
       const body = {
         vendor_id: hdr.vendor_id, bill_number: hdr.bill_number,
         bill_date: hdr.bill_date, due_date: hdr.due_date, memo: hdr.memo || null,
@@ -134,8 +137,7 @@ function BillNewPage() {
         label: 'Bill',
       });
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: { message?: string } } } } | undefined)?.response?.data?.error?.message;
-      setErr(msg ?? 'Failed');
+      setErr(pickErr(e));
     }
     finally { setBusy(false); }
   }

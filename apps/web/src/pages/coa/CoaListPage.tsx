@@ -531,7 +531,12 @@ export default function CoaListPage() {
   }
 
   function downloadSampleTemplate() {
-    downloadAsExcel(['Name', 'Code', 'Account Type'], [['Cash', '1000', 'asset'], ['Revenue', '4000', 'revenue'], ['Accounts Payable', '2000', 'liability']], 'coa-template', { bare: true });
+    // Number, name, account type, detail type -- what the Chart of Accounts itself has (item 102, 11-05).
+    downloadAsExcel(['Name', 'Code', 'Account Type', 'Detail Type'], [
+      ['Cash', '1000', 'asset', 'Cash on hand'],
+      ['Revenue', '4000', 'revenue', 'Sales of Product Income'],
+      ['Accounts Payable', '2000', 'liability', 'AP'],
+    ], 'coa-template', { bare: true });
   }
 
   const validImportCount = importRows.filter(r => !r.error).length;

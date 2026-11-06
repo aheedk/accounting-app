@@ -14,6 +14,7 @@ import {
   guessCardAccount,
   isCardStatementPayment,
   isInflow,
+  isLinePosted,
   listStatementBalances,
   postStatementLines,
   statementDateToIso,
@@ -278,7 +279,10 @@ const approveSchema = z.object({
   bank_account_id: z.string().uuid(),
   transactions: z.array(z.object({
     index: z.number().int().min(0),
-    offset_account_id: z.string().uuid(),
+    // Empty for a row left unticked, already auto-posted, or a card
+    // statement's payment (never offered an account to pick) — none of
+    // those are posted, so none of them need one (item 99, 11-05).
+    offset_account_id: z.union([z.string().uuid(), z.literal('')]).nullable().optional(),
     include: z.boolean().default(true),
     /** "Use this account for future <vendor> transactions" was ticked. */
     remember: z.boolean().optional(),
@@ -286,6 +290,8 @@ const approveSchema = z.object({
     payee_name: z.string().optional(),
     /** A check stub the reviewer accepted for this check. */
     check_stub_id: z.string().uuid().nullable().optional(),
+    /** A note typed in at review time (item 106, 11-05). */
+    memo: z.string().max(500).optional(),
   })),
   /** The statement's period and balances as the reviewer left them (item 72). */
   summary: z.object({
@@ -310,7 +316,7 @@ function parseLines(raw: unknown): StatementLine[] {
 async function attachSuspense(serviceCtx: ServiceCtx, businessId: string, imports: StagedImportRow[]): Promise<void> {
   // A card statement's payment is not coded here at all, so it is not "unknown".
   const uncoded = imports.flatMap(row => row.extracted_transactions
-    .filter(tx => !tx.auto_posted && !tx.suggested_account_id && !isCardStatementPayment(row.statement_kind, tx)));
+    .filter(tx => !isLinePosted(tx) && !tx.suggested_account_id && !isCardStatementPayment(row.statement_kind, tx)));
   if (uncoded.length === 0) return;
   const suspense = await db.transaction().execute(trx => getOrCreateSuspenseAccount(trx, serviceCtx, businessId));
   for (const tx of uncoded) {
@@ -340,11 +346,19 @@ router.post(
       if (!staged) { res.status(404).json({ error: 'Import not found or already processed' }); return; }
 
       const transactions = parseLines(staged.extracted_transactions);
-      // A card statement's payment is recorded by the bank statement, never from here.
+      // A card statement's payment is recorded by the bank statement, never from here;
+      // one already posted (by the engine, or an earlier partial Approve, 107) needs no account either.
       const included = body.transactions.filter(t => {
         const line = transactions[t.index];
-        return t.include && !(line && isCardStatementPayment(staged.statement_kind, line));
+        return t.include && line && !isLinePosted(line) && !isCardStatementPayment(staged.statement_kind, line);
       });
+      const missingAccount = included.find(t => !t.offset_account_id);
+      if (missingAccount) {
+        res.status(400).json({ error: { code: 'VALIDATION_FAILED', message: `Row ${missingAccount.index + 1} is ticked to post but has no account selected.` } });
+        return;
+      }
+      // Checked above: every row here has one.
+      const postable = included.map(item => ({ ...item, offset_account_id: item.offset_account_id! }));
 
       // Recompute the suggestions server-side rather than trusting what the
       // client says was suggested -- this decides what gets learned.
@@ -363,16 +377,17 @@ router.post(
           statement_kind: staged.statement_kind,
           lines: transactions,
           account_id: body.bank_account_id,
-          items: included.map(item => ({
+          items: postable.map(item => ({
             index: item.index,
             offset_account_id: item.offset_account_id,
             payee_name: item.payee_name ?? null,
             check_stub_id: item.check_stub_id ?? null,
+            memo: item.memo ?? null,
           })),
         });
 
-        for (let i = 0; i < included.length; i += 1) {
-          const item = included[i]!;
+        for (let i = 0; i < postable.length; i += 1) {
+          const item = postable[i]!;
           const tx = transactions[item.index];
           // Only lines this approval actually posted teach the engine; card
           // payments say nothing about a vendor.
@@ -405,23 +420,35 @@ router.post(
           learned += 1;
         }
 
+        // Only the rows ticked this time: one left unticked (he doesn't know
+        // yet what it is) stays in the statement for a later Approve, instead
+        // of posting the whole thing and losing it (item 107, 11-05).
+        for (let i = 0; i < postable.length; i += 1) {
+          if (entryIds[i]) transactions[postable[i]!.index]!.posted = true;
+        }
+        const remainingNow = transactions.filter(t => !isLinePosted(t) && !isCardStatementPayment(staged.statement_kind, t)).length;
+
         await trx
           .updateTable('email_import_staging')
           .set({
-            status: 'approved',
             business_id: bizId,
-            approved_by_user_id: serviceCtx.user_id,
-            approved_at: new Date().toISOString(),
+            extracted_transactions: JSON.stringify(transactions),
             // Which account this statement is, for Reconcile (item 72).
             account_id: body.bank_account_id,
             ...(body.summary ?? {}),
+            // Nothing left to review means the document is done.
+            ...(remainingNow === 0 ? {
+              status: 'approved',
+              approved_by_user_id: serviceCtx.user_id,
+              approved_at: new Date().toISOString(),
+            } : {}),
           })
           .where('id', '=', staged.id)
           .execute();
-        return entryIds;
+        return { entryIds, remainingNow };
       });
 
-      res.json({ ok: true, posted: created.filter(Boolean).length, learned });
+      res.json({ ok: true, posted: created.entryIds.filter(Boolean).length, learned, remaining: created.remainingNow, done: created.remainingNow === 0 });
     } catch (e) { next(e); }
   },
 );

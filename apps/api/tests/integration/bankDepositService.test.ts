@@ -306,6 +306,10 @@ describe('bankDepositService', () => {
     const full = await depositSvc.getDeposit(t.db, ctx, wrapped!.id);
     expect(full.imported).toBe(true);
     expect(full.editable).toBe(true);
+    // This line never had received_from, payment_method or ref_no set, so they
+    // are null in the database; the web page's line editor treats every line as
+    // typed-in and crashes on null (item 101, 11-05) — getDeposit must not hand it one.
+    expect(full.lines[0]).toMatchObject({ received_from: '', payment_method: '', ref_no: '' });
 
     const updated = await t.db.transaction().execute(trx => depositSvc.updateDeposit(trx, ctx, wrapped!.id, {
       bank_account_id: bankAccount.id,
