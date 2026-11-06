@@ -104,10 +104,10 @@ so that is the address wherever this plan says `<app>.azurewebsites.net`.
   `ANTHROPIC_WORKSPACE_ID` is optional: copy it too if Railway has it.
 - GitHub variables `AZURE_WEBAPP_NAME` and `API_ORIGIN` are set, so the deploy
   is switched on.
-- **Left, needing someone who can give roles** (Aheed, as Owner of the
-  resource group): AcrPull on the registry and Key Vault Secrets User on the vault
-  for the web app's identity, and Website Contributor on the web app for GitHub's
-  sign-in. Then the seven secrets in the vault, Supabase Storage's bucket and key,
+- **Roles given 11-06** (Aheed, in Cloud Shell): AcrPull on the registry and Key
+  Vault Secrets User on the vault for the web app's identity, and Website
+  Contributor on the web app for GitHub's sign-in.
+- **Left:** the seven secrets in the vault, Supabase Storage's bucket and key,
   and the Azure callback in Google's client.
 
 **Was waiting on Microsoft (resolved by 11-05):** a new subscription may run no App Service at all in
