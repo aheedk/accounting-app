@@ -79,9 +79,9 @@ export default function PeriodsPage() {
   const dlHeaders = ['Start', 'End', 'Status', 'Closed At'];
   const dlRows = () => periods.map(p => [p.starts_on, p.ends_on, p.status, p.closed_at ?? '—']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'fiscal-periods', { title: 'Fiscal Periods' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'fiscal-periods', { title: 'Fiscal Periods' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

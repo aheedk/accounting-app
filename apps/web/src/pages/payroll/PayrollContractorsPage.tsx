@@ -74,9 +74,9 @@ export default function PayrollContractorsPage() {
   const dlHeaders = ['Name', 'Email', 'Tax ID Type', 'Tax ID (last 4)', '1099 Status'];
   const dlRows = () => items.map(c => [c.name, c.email ?? '', c.tax_id_type ?? '—', c.tax_id_last_four ?? '—', c.is_1099 ? 'Active 1099' : 'Inactive']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'payroll-contractors', { title: 'Payroll Contractors' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'payroll-contractors', { title: 'Payroll Contractors' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

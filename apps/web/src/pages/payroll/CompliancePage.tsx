@@ -217,9 +217,9 @@ export default function CompliancePage() {
   const dlHeaders = ['Item', 'Status', 'Due Date', 'Notes'];
   const dlRows = () => items.map(i => [ITEM_LABELS[i.item_key], STATUS_LABELS[i.status], i.due_date ?? '—', i.notes ?? '']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'payroll-compliance', { title: 'Compliance' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'payroll-compliance', { title: 'Compliance' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

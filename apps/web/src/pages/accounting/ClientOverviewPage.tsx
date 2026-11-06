@@ -112,9 +112,9 @@ export default function ClientOverviewPage() {
     r.last_reconciliation_date ?? '—',
   ]);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'client-overview', { title: 'Client Overview' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'client-overview', { title: 'Client Overview' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

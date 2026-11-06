@@ -24,9 +24,9 @@ export default function TenNinetyNineReportPage() {
   const total = rows.reduce((acc, r) => acc + parseFloat(r.total_paid), 0);
   const dlHeaders = ['Vendor', 'Tax ID', 'Total Paid'];
   const dlRows = () => rows.map(r => [r.vendor_name, r.tax_id ?? '—', r.total_paid]);
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), `1099-${year}`, { title: '1099 Report', subtitle: `Tax year ${year}` }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), `1099-${year}`, { title: '1099 Report', subtitle: `Tax year ${year}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

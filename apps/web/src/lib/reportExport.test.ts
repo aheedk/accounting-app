@@ -1,16 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as XLSX from 'xlsx';
-import { buildPdf, downloadAsExcel } from './download';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { buildExcelWorkbook, buildPdf } from './download';
 import { amountColumns, buildPrintHtml, parseAmount, rowKind, setExportCompany } from './reportExport';
-
-// SheetJS 0.20's module namespace exports `writeFile` as non-configurable,
-// so `vi.spyOn(XLSX, 'writeFile')` fails ("Cannot redefine property").
-// `vi.mock` replaces the module at resolution time instead, before that
-// descriptor exists, so `writeFile` is a plain, reconfigurable vi.fn() here.
-vi.mock('xlsx', async importOriginal => {
-  const actual = await importOriginal<typeof import('xlsx')>();
-  return { ...actual, writeFile: vi.fn() };
-});
 
 const headers = ['Code', 'Account', 'Invoice No.', 'Amount'];
 const rows = [
@@ -23,7 +13,7 @@ const rows = [
 
 describe('report export layout', () => {
   beforeEach(() => { setExportCompany('Blue Widget Co.'); });
-  afterEach(() => { vi.restoreAllMocks(); setExportCompany(''); });
+  afterEach(() => { setExportCompany(''); });
 
   it('reads amounts, including negatives in parentheses, and leaves other text alone', () => {
     expect(parseAmount('1,234.50')).toBe(1234.5);
@@ -101,36 +91,35 @@ describe('report export layout', () => {
   });
 
   it('writes Excel with a title block, numeric amounts and a generated line', () => {
-    let sheet: XLSX.WorkSheet | undefined;
-    let file = '';
-    vi.mocked(XLSX.writeFile).mockImplementation((workbook, name) => {
-      sheet = workbook.Sheets[workbook.SheetNames[0]!];
-      file = String(name);
-    });
+    const sheet = buildExcelWorkbook(headers, rows, { title: 'Profit & Loss', subtitle: 'Q1 2026' }).worksheets[0]!;
 
-    downloadAsExcel(headers, rows, 'pnl', { title: 'Profit & Loss', subtitle: 'Q1 2026' });
-
-    expect(file).toBe('pnl.xlsx');
-    const grid = XLSX.utils.sheet_to_json<(string | number)[]>(sheet!, { header: 1, blankrows: true });
-    expect(grid[0]).toEqual(['Blue Widget Co.']);
-    expect(grid[1]).toEqual(['Profit & Loss']);
-    expect(grid[2]).toEqual(['Q1 2026']);
-    expect(grid[4]).toEqual(headers);
-    expect(grid[6]).toEqual(['4010', 'Sales <Retail>', '1001', 6843]);
-    expect(grid[7]).toEqual(['4020', 'Service', '1002', -250.5]);
-    expect(String(grid.at(-1)![0])).toMatch(/^Generated /);
+    const grid = (n: number) => sheet.getRow(n).values as unknown[];
+    // Merged across the table's width, so exceljs echoes the one value onto every column.
+    expect(sheet.getRow(1).getCell(1).value).toBe('Blue Widget Co.');
+    expect(sheet.getRow(2).getCell(1).value).toBe('Profit & Loss');
+    expect(sheet.getRow(3).getCell(1).value).toBe('Q1 2026');
+    expect(grid(5)).toEqual([undefined, ...headers]);
+    // The section row ("Revenue", nothing else) and every total row are bold,
+    // same as the page and the PDF (item 109, 11-05); an ordinary row is not.
+    expect(sheet.getRow(6).font).toMatchObject({ bold: true });
+    expect(grid(7)).toEqual([undefined, '4010', 'Sales <Retail>', '1001', 6843]);
+    expect(sheet.getRow(7).font?.bold).not.toBe(true);
+    expect(grid(8)).toEqual([undefined, '4020', 'Service', '1002', -250.5]);
+    expect(sheet.getRow(9).font).toMatchObject({ bold: true }); // "Total Revenue"
+    expect(String((sheet.getRow(11).values as unknown[])[1])).toMatch(/^Generated /);
     // Amounts are numbers with a money format; the invoice number stays text.
-    expect(sheet!['D7']).toMatchObject({ t: 'n', v: 6843, z: '#,##0.00' });
-    expect(sheet!['C7']).toMatchObject({ t: 's', v: '1001' });
+    expect(sheet.getRow(7).getCell(4)).toMatchObject({ value: 6843, numFmt: '#,##0.00' });
+    expect(sheet.getRow(7).getCell(3).value).toBe('1001');
+    // The column headings are bold too.
+    expect(sheet.getRow(5).font).toMatchObject({ bold: true });
   });
 
   it('writes an import template with nothing but headings and rows', () => {
-    let sheet: XLSX.WorkSheet | undefined;
-    vi.mocked(XLSX.writeFile).mockImplementation(workbook => { sheet = workbook.Sheets[workbook.SheetNames[0]!]; });
+    const sheet = buildExcelWorkbook(['Name', 'Code'], [['Cash', '1000']], { bare: true }).worksheets[0]!;
 
-    downloadAsExcel(['Name', 'Code'], [['Cash', '1000']], 'coa-template', { bare: true });
-
-    expect(XLSX.utils.sheet_to_json(sheet!, { header: 1 })).toEqual([['Name', 'Code'], ['Cash', '1000']]);
+    expect(sheet.rowCount).toBe(2);
+    expect(sheet.getRow(1).values).toEqual([undefined, 'Name', 'Code']);
+    expect(sheet.getRow(2).values).toEqual([undefined, 'Cash', '1000']);
   });
 
   it('builds a PDF with the header on the page and a page-number footer', () => {

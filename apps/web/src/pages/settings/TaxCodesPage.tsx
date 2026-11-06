@@ -106,9 +106,9 @@ export default function TaxCodesPage() {
   const dlHeaders = ['Code', 'Name', 'Agency', 'Current Rate', 'Active'];
   const dlRows = () => items.map(c => [c.code, c.name, c.agency ?? '', c.current_rate ? `${ratePercent(c.current_rate)}%` : '—', c.is_active ? 'Yes' : 'No']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'tax-codes', { title: 'Tax Codes' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'tax-codes', { title: 'Tax Codes' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

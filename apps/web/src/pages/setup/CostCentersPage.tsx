@@ -139,9 +139,9 @@ export default function CostCentersPage() {
   const dlHeaders = ['Name', 'Code', 'Active'];
   const dlRows = () => items.map(c => [c.name, c.code ?? '', c.is_active ? 'Yes' : 'No']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'cost-centers', { title: 'Cost Centers' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'cost-centers', { title: 'Cost Centers' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

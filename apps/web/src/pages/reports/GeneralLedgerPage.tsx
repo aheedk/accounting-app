@@ -633,11 +633,11 @@ export default function GeneralLedgerPage() {
     });
   }
 
-  function handleExport(): void {
+  async function handleExport(): Promise<void> {
     if (!report) return;
     setExporting(true);
     try {
-      downloadAsExcel(exportHeaders, rowsForExport, `general-ledger-${report.period_start}-to-${report.period_end}`, {
+      await downloadAsExcel(exportHeaders, rowsForExport, `general-ledger-${report.period_start}-to-${report.period_end}`, {
         title: 'General Ledger',
         subtitle: `${fmtLongDate(report.period_start)} – ${fmtLongDate(report.period_end)}`,
       });

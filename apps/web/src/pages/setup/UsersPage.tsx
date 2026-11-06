@@ -204,9 +204,9 @@ export default function UsersPage() {
   const dlHeaders = ['Email', 'Name', 'Firm Role', 'Business Access'];
   const dlRows = () => users.map(u => [u.email, u.full_name, u.role, u.business_access?.map((b: BusinessAccess) => b.business_name).join(', ') ?? '']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'users', { title: 'Users' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'users', { title: 'Users' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

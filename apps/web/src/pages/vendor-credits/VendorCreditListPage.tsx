@@ -108,9 +108,9 @@ export default function VendorCreditListPage() {
   const dlHeaders = columns.map(c => c.header);
   const dlRows = () => allRows.map(row => columns.map(col => col.sortValue ? String(col.sortValue(row)) : ''));
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'vendor-credits', { title: 'Vendor Credits' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'vendor-credits', { title: 'Vendor Credits' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

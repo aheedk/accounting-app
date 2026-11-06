@@ -221,7 +221,7 @@ export function DataTable<T>({
     return typeof rendered === 'string' || typeof rendered === 'number' ? String(rendered) : '';
   }
 
-  function handleDownload(format: 'excel' | 'pdf') {
+  async function handleDownload(format: 'excel' | 'pdf') {
     if (!downloadable) return;
     const headers = columns.map(c => c.header);
     const exportRows = sortedRows.map(row =>
@@ -229,7 +229,7 @@ export function DataTable<T>({
     );
     if (format === 'excel') {
       setExcelBusy(true);
-      try { downloadAsExcel(headers, exportRows, downloadable.filename, { title: downloadable.title }); } finally { setExcelBusy(false); }
+      try { await downloadAsExcel(headers, exportRows, downloadable.filename, { title: downloadable.title }); } finally { setExcelBusy(false); }
     } else {
       setPdfBusy(true);
       try { downloadAsPdf(headers, exportRows, downloadable.title, downloadable.filename); } finally { setPdfBusy(false); }

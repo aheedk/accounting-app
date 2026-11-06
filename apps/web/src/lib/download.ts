@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -41,45 +41,80 @@ export function downloadAsCsv(headers: string[], rows: string[][], filename: str
 }
 
 /**
- * Excel export. The sheet opens with the company, report name and period,
- * then the table, then a "Generated ..." line. Amount columns are written as
- * real numbers (so they can be summed) with a #,##0.00 format; everything else
- * stays text, so codes and document numbers keep their leading zeros.
+ * The workbook itself, with no browser side effect -- split out from
+ * downloadAsExcel so the sheet's content can be checked directly (jsdom's
+ * Blob cannot carry real binary content, so a test has nothing to read a
+ * saved file back from).
+ *
+ * The sheet opens with the company, report name and period, then the table,
+ * then a "Generated ..." line. Amount columns are written as real numbers (so
+ * they can be summed) with a #,##0.00 format; everything else stays text, so
+ * codes and document numbers keep their leading zeros. The column headings
+ * and every total or section row are bold, as the page and the PDF already
+ * are (item 109, 11-05) -- the free edition of the `xlsx` library this used
+ * before cannot write styled cells at all, so the sheet is now built with
+ * `exceljs` instead.
  */
-export function downloadAsExcel(headers: string[], rows: string[][], filename: string, meta: ExportMeta = {}): void {
+export function buildExcelWorkbook(headers: string[], rows: string[][], meta: ExportMeta = {}): Workbook {
   const body = filledRows(rows);
   const amounts = amountColumns(headers, body);
   const company = getExportCompany();
-  const titleRows = meta.bare
-    ? []
-    : [company, meta.title ?? '', meta.subtitle ?? ''].filter(line => line !== '').map(line => [line]);
-  const lead: string[][] = titleRows.length > 0 ? [...titleRows, []] : [];
-
-  const table: (string | number)[][] = body.map(row => headers.map((_, index) => {
-    const raw = row[index] ?? '';
-    const amount = amounts[index] ? parseAmount(raw) : null;
-    return amount !== null ? amount : raw;
-  }));
-  const ws = XLSX.utils.aoa_to_sheet([...lead, headers, ...table, ...(meta.bare ? [] : [[], [generatedLine()]])]);
-
+  const titleLines = meta.bare ? [] : [company, meta.title ?? '', meta.subtitle ?? ''].filter(line => line !== '');
   const width = Math.max(headers.length, 1);
-  // Title lines span the table so long names are not cut off by a narrow first column.
-  ws['!merges'] = titleRows.map((_, r) => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
-  const firstTableRow = lead.length + 1;
-  for (let r = 0; r < table.length; r += 1) {
-    for (let c = 0; c < headers.length; c += 1) {
-      const cell = ws[XLSX.utils.encode_cell({ r: firstTableRow + r, c })] as XLSX.CellObject | undefined;
-      if (cell && cell.t === 'n') cell.z = '#,##0.00';
-    }
+
+  const wb = new Workbook();
+  const ws = wb.addWorksheet((meta.title ?? 'Report').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Report');
+
+  for (const line of titleLines) {
+    const row = ws.addRow([line]);
+    ws.mergeCells(row.number, 1, row.number, width);
+    row.font = { bold: true };
   }
-  ws['!cols'] = headers.map((header, index) => {
+  if (titleLines.length > 0) ws.addRow([]);
+
+  const headerRow = ws.addRow(headers);
+  headerRow.font = { bold: true };
+
+  for (const row of body) {
+    const kind = rowKind(row);
+    const values = headers.map((_, index) => {
+      const raw = row[index] ?? '';
+      const amount = amounts[index] ? parseAmount(raw) : null;
+      return amount !== null ? amount : raw;
+    });
+    const sheetRow = ws.addRow(values);
+    if (kind !== 'normal') sheetRow.font = { bold: true };
+    values.forEach((value, index) => {
+      if (typeof value === 'number') sheetRow.getCell(index + 1).numFmt = '#,##0.00';
+    });
+  }
+
+  if (!meta.bare) {
+    ws.addRow([]);
+    ws.addRow([generatedLine()]);
+  }
+
+  ws.columns = headers.map((header, index) => {
     const longest = body.reduce((max, row) => Math.max(max, (row[index] ?? '').length), header.length);
-    return { wch: Math.min(Math.max(longest + 2, 10), 60) };
+    return { width: Math.min(Math.max(longest + 2, 10), 60) };
   });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, (meta.title ?? 'Report').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Report');
-  XLSX.writeFile(wb, `${filename}.xlsx`);
+  return wb;
+}
+
+/** Excel export: builds the workbook, then hands the browser a file to save. */
+export async function downloadAsExcel(headers: string[], rows: string[][], filename: string, meta: ExportMeta = {}): Promise<void> {
+  const wb = buildExcelWorkbook(headers, rows, meta);
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /**

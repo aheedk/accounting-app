@@ -351,11 +351,11 @@ export default function BankTransactionsInboxPage() {
     return { headers, rows };
   }
 
-  function handleExcel() {
+  async function handleExcel() {
     setExcelBusy(true);
     try {
       const { headers, rows } = exportTable();
-      downloadAsExcel(headers, rows, 'bank-transactions', { title: 'Bank Transactions' });
+      await downloadAsExcel(headers, rows, 'bank-transactions', { title: 'Bank Transactions' });
     } finally { setExcelBusy(false); }
   }
 

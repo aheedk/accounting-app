@@ -115,9 +115,9 @@ export default function CustomerListPage() {
   const dlHeaders = columns.map(c => c.header);
   const dlRows = () => items.map(row => columns.map(col => col.sortValue ? String(col.sortValue(row)) : ''));
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'customers', { title: 'Customers' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'customers', { title: 'Customers' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

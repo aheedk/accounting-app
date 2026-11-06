@@ -44,9 +44,9 @@ export default function AgingReportPage({ kind = 'ar' }: { kind?: keyof typeof K
   const grandTotal = rows.reduce((sum, r) => sum + parseFloat(r.total), 0);
   const dlHeaders = [report.party, ...BUCKET_LABELS.map(label => label.replace(/ - /, '-')), 'Total'];
   const dlRows = () => rows.map(r => [r.name, ...BUCKETS.map(bucket => r[bucket]), r.total]);
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), report.file, { title: report.title, subtitle: `As of ${fmtLongDate(asOf)}` }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), report.file, { title: report.title, subtitle: `As of ${fmtLongDate(asOf)}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

@@ -446,11 +446,11 @@ export default function CoaListPage() {
     return { headers, rows };
   }
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
     try {
       const { headers, rows } = exportTable();
-      downloadAsExcel(headers, rows, 'chart-of-accounts', { title: 'Chart of Accounts' });
+      await downloadAsExcel(headers, rows, 'chart-of-accounts', { title: 'Chart of Accounts' });
     } finally { setExcelBusy(false); }
   }
 

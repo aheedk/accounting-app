@@ -240,11 +240,11 @@ export default function RecurringTransactionsPage() {
     return { headers, rows };
   }
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
     try {
       const { headers, rows } = exportTable();
-      downloadAsExcel(headers, rows, 'recurring-transactions', { title: 'Recurring Transactions' });
+      await downloadAsExcel(headers, rows, 'recurring-transactions', { title: 'Recurring Transactions' });
     } finally {
       setExcelBusy(false);
     }

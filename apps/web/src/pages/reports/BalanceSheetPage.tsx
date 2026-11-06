@@ -168,9 +168,9 @@ export default function BalanceSheetPage() {
     ['', 'Total Equity + Net Income', equityPlusNi],
     ['', 'Total Liabilities + Equity', report.liabilities_equity_total],
   ];
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), `balance-sheet-${asOf}`, { title: 'Balance Sheet', subtitle: `As of ${fmtLongDate(asOf)}` }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), `balance-sheet-${asOf}`, { title: 'Balance Sheet', subtitle: `As of ${fmtLongDate(asOf)}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

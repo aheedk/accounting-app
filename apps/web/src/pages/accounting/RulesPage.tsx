@@ -388,11 +388,11 @@ export default function RulesPage() {
     return { headers, rows };
   }
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
     try {
       const { headers, rows } = exportTable();
-      downloadAsExcel(headers, rows, 'bank-rules', { title: 'Bank Rules' });
+      await downloadAsExcel(headers, rows, 'bank-rules', { title: 'Bank Rules' });
     } finally {
       setExcelBusy(false);
     }

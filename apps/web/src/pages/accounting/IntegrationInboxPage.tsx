@@ -376,7 +376,7 @@ export default function IntegrationInboxPage() {
         <h1 className="text-2xl font-semibold">Integration Transactions</h1>
         <div className="flex items-center gap-2">
           <div className="relative group">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={() => { setExcelBusy(true); try { downloadAsExcel(['Date', 'Description', 'Amount', 'Source', 'Status'], rows.map(r => [r.occurred_at, r.description, r.amount, r.source, r.status]), 'integration-inbox', { title: 'Integration Transactions' }); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50" onClick={async () => { setExcelBusy(true); try { await downloadAsExcel(['Date', 'Description', 'Amount', 'Source', 'Status'], rows.map(r => [r.occurred_at, r.description, r.amount, r.source, r.status]), 'integration-inbox', { title: 'Integration Transactions' }); } finally { setExcelBusy(false); } }} disabled={excelBusy} aria-label="Export to Excel">
               <FileDown className="h-4 w-4" />
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Export to Excel</div>

@@ -96,9 +96,9 @@ export default function FixedAssetListPage() {
   const dlHeaders = columns.map(c => c.header);
   const dlRows = () => items.map(row => columns.map(col => col.sortValue ? String(col.sortValue(row)) : ''));
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'fixed-assets', { title: 'Fixed Assets' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'fixed-assets', { title: 'Fixed Assets' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

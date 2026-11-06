@@ -137,9 +137,9 @@ export default function ShippingLabelListPage() {
   const dlHeaders = columns.map(c => c.header);
   const dlRows = () => labels.map(row => columns.map(col => col.sortValue ? String(col.sortValue(row)) : ''));
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'shipping-labels', { title: 'Shipping Labels' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'shipping-labels', { title: 'Shipping Labels' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

@@ -80,9 +80,9 @@ export default function ProfitLossPage() {
   }) : [];
 
   const netIncomeNum = report ? parseFloat(report.net_income) : 0;
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), `pnl-${periodStart}-${periodEnd}`, { title: 'Profit & Loss', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}` }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), `pnl-${periodStart}-${periodEnd}`, { title: 'Profit & Loss', subtitle: `${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}` }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {

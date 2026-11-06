@@ -3,14 +3,16 @@
 What Faizan asked for on 11-05, from the transcript of his screen recording,
 with a first look at the code for each bug. Item numbers carry on from
 [`2026-10-25-follow-ups.md`](./2026-10-25-follow-ups.md) (which ended at 97).
-**Built and verified 11-06: everything below except 109, which needs a
-library decision first — see its own row.** Full typecheck, lint, and the
-backend and web test suites all pass. One real regression turned up along the
-way and was fixed: 107's new partial-posting rule broke an older test
-(`statementBalances.test.ts`) that had incidentally left a row unticked while
-testing something unrelated (the period/balances carrying over for Reconcile);
-that test now ticks both rows as it meant to, and a new test covers 107's own
-behavior directly.
+**Built and verified 11-06: everything below, including 109.** Full
+typecheck, lint, and the backend and web test suites all pass. Two real
+regressions turned up along the way and were fixed: 107's new partial-posting
+rule broke an older test (`statementBalances.test.ts`) that had incidentally
+left a row unticked while testing something unrelated (the period/balances
+carrying over for Reconcile); that test now ticks both rows as it meant to,
+and a new test covers 107's own behavior directly. Building 109 (below)
+turned `downloadAsExcel` into an async function, which would have cleared
+every page's "exporting…" spinner before the file actually finished —
+updated all ~40 call sites to `await` it.
 
 **Four bugs stop work, so they come first (98 to 101).** He couldn't save a
 bill, post a credit card statement, reconcile the main bank account, or open a
@@ -37,7 +39,7 @@ the code, below.
 | 106 | AI review (bank and card statements) | A **Memo** column between Name and Amount, to add a note to any transaction | **11-06.** Appended to the posted entry's own memo when the line is posted; not saved anywhere for a row left for later, same as every other typed edit on this screen today |
 | 107 | AI review (bank and card statements) | **Post only the transactions ticked**, and leave the rest on the review page for later, when he doesn't know yet what some of them are. Today posting finishes the whole statement, and the rows not posted disappear. He has asked for this before | **11-06.** The statement now only moves to Approved once every row is posted or a card payment; a partial post reopens the same statement with the ticked rows marked Posted and the rest still waiting |
 | 108 | General Ledger | **Freeze the column headings** at the top of the page while scrolling down | **11-06** |
-| 109 | General Ledger → Excel | The page and the PDF look good; the Excel file doesn't. **Bold the headings and subtotals.** Note: the free edition of the Excel library we use (SheetJS) can't write bold, so the file needs writing another way. Decide when building | **Not built.** The free SheetJS really can't write styled cells; the fix is a new dependency (`exceljs` is the standard alternative — MIT-licensed, writes bold/styled cells, actively maintained). Adding a library is the one kind of change worth a nod before doing it, so this is left for Riham to say go-ahead on |
+| 109 | General Ledger → Excel | The page and the PDF look good; the Excel file doesn't. **Bold the headings and subtotals.** Note: the free edition of the Excel library we use (SheetJS) can't write bold, so the file needs writing another way. Decide when building | **11-06, built with `exceljs`** (go-ahead given) — the `xlsx` package stays for reading an uploaded import file, which it still does fine; only *writing* a download moved. Every Excel export in the app gets bold headings and bold total/section rows this way, not just the General Ledger's, since they all go through the one `downloadAsExcel` |
 | 110 | General Ledger → Customize | Columns show **in the order they are ticked**: Debit, Credit, Balance gives those three in that order, as in QuickBooks. He ticked Debit, Credit, Balance and got Balance, Debit, Credit | **11-06.** Ticking a column on only ever added it to the visible list, never moved it in the display order, which stayed fixed at whatever it started as. Ticking one now moves it to the end of the display order too |
 | 111 | General Ledger and the other reports | **A search box** that finds any transaction, amount or name in the report. The browser's Ctrl+F didn't find a transaction he looked for ("SPI logo", as transcribed) | **11-06, General Ledger only** (the "every report" and Ctrl+F questions below are still open). The search itself already existed and already matched name/amount/memo — it was buried inside Customize, and a match inside a collapsed account was never rendered at all, so Ctrl+F had nothing to find. Now there's a visible search box in the toolbar, and a match auto-expands its account |
 

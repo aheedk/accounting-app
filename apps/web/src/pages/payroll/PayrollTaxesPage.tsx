@@ -199,9 +199,9 @@ export default function PayrollTaxesPage() {
   const dlHeaders = ['Period', 'Start', 'End', 'Amount', 'Status', 'Notes'];
   const dlRows = () => liabilities.map(l => [l.period, l.period_start, l.period_end, l.amount, l.status, l.notes ?? '']);
 
-  function handleExport() {
+  async function handleExport() {
     setExcelBusy(true);
-    try { downloadAsExcel(dlHeaders, dlRows(), 'payroll-taxes', { title: 'Payroll Tax Liabilities' }); } finally { setExcelBusy(false); }
+    try { await downloadAsExcel(dlHeaders, dlRows(), 'payroll-taxes', { title: 'Payroll Tax Liabilities' }); } finally { setExcelBusy(false); }
   }
 
   function handlePrint() {
