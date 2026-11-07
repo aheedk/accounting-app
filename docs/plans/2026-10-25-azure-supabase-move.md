@@ -74,9 +74,11 @@ below are updated.
    - Add `?sslmode=verify-full&sslrootcert=apps/api/certs/supabase-ca.crt`, so
      the API checks it is really talking to Supabase.
 4. **Storage.** Create a private bucket, `uploads`. Under Storage → S3
-   Connection, create an access key. The endpoint is
-   `https://<project>.supabase.co/storage/v1/s3`, and the region is the
-   project's (`us-east-1`).
+   Connection, create an access key. The endpoint is the one Storage → S3
+   shows, `https://<project>.storage.supabase.co/storage/v1/s3` (Azure's
+   `S3_ENDPOINT` changed to it 11-06), and the region is the project's
+   (`us-east-1`). **11-06:** the bucket and an `azure-api` key were already
+   there (made 10-30). A key's secret shows only once, when it is made.
 5. **Backups.** The Pro plan takes a backup every day and keeps the last 7.
    No point-in-time recovery for now (10-29): it restores to any minute, but
    it is $100 a month on top of the plan's $25. It can be turned on later.
