@@ -107,8 +107,9 @@ so that is the address wherever this plan says `<app>.azurewebsites.net`.
 - **Roles given 11-06** (Aheed, in Cloud Shell): AcrPull on the registry and Key
   Vault Secrets User on the vault for the web app's identity, and Website
   Contributor on the web app for GitHub's sign-in.
-- **Left:** the seven secrets in the vault, Supabase Storage's bucket and key,
-  and the Azure callback in Google's client.
+- **Left:** the seven secrets in the vault (`field-encryption-key` is a new
+  key, see step 3 below), Supabase Storage's bucket and key, and the Azure
+  callback in Google's client.
 
 **Was waiting on Microsoft (resolved by 11-05):** a new subscription may run no App Service at all in
 East US (every size's quota is 0 of 0; Central US had 30). Only a subscription
@@ -138,7 +139,11 @@ database in Virginia.
      `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true`, `WEBSITES_PORT=8080`.
    - **`FIELD_ENCRYPTION_KEY` must be the same value as on Railway**, or the
      encrypted SSNs, tax IDs and two-step secrets cannot be read. Keep the JWT
-     secrets the same too.
+     secrets the same too. **Found 11-06: Railway has no `FIELD_ENCRYPTION_KEY`**,
+     and its database holds no encrypted value (0 vendor tax IDs, 0 SSNs, 0
+     two-step secrets), so saving any of them there fails. A new key is made
+     in the vault, and the same value goes onto Railway, so nothing saved
+     before the switch-over is encrypted with a different key.
    - Put the secrets in a Key Vault and reference them from the settings. In
      `khanarndt-acct-kv`: `database-url`, `jwt-access-secret`,
      `jwt-refresh-secret`, `field-encryption-key`, `anthropic-api-key`,
