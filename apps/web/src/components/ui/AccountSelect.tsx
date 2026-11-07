@@ -41,6 +41,8 @@ export interface AccountSelectProps {
   ariaLabel?: string;
   emptyText?: string;
   onCreate?: () => void;
+  /** A red border, for a line a reviewer tried to save with content but no account chosen. */
+  invalid?: boolean;
 }
 
 export function AccountSelect({
@@ -55,6 +57,7 @@ export function AccountSelect({
   ariaLabel,
   emptyText = 'No matching accounts',
   onCreate,
+  invalid,
 }: AccountSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -263,7 +266,8 @@ export function AccountSelect({
           onKeyDown={onKey}
           placeholder={placeholder}
           className={cn(
-            'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+            'flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm',
+            invalid ? 'border-destructive' : 'border-input',
             'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           )}
           autoComplete="off"
@@ -278,7 +282,8 @@ export function AccountSelect({
           onClick={openMenu}
           {...(selected ? { title: `${selected.code} ${selected.name}` } : {})}
           className={cn(
-            'flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-left ring-offset-background',
+            'flex min-h-10 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-left ring-offset-background',
+            invalid ? 'border-destructive' : 'border-input',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
           )}

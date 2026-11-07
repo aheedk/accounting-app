@@ -125,6 +125,11 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
   const supportsManualActions = journalSupportsManualActions(existing);
   const totals = journalEntryTotals(form.lines);
   const filledLineCount = form.lines.filter(line => line.account_id).length;
+  // A line with a debit or credit typed in but no account chosen, highlighted
+  // red on the field itself (QBO parity) rather than just leaving Save disabled.
+  const invalidLineIndexes = new Set(form.lines.flatMap((line, i) => (
+    (line.debit || line.credit) && !line.account_id ? [i] : []
+  )));
   const selectedPeriod = periods.find(period => (
     period.starts_on <= form.date && period.ends_on >= form.date
   ));
@@ -599,8 +604,10 @@ export default function JournalEntryEditor({ existing, copySource, reverseSource
                       placeholder=""
                       disabled={readOnly}
                       className="w-full"
+                      invalid={invalidLineIndexes.has(index)}
                       {...(!readOnly ? { onCreate: () => setNewAccountLineIndex(index) } : {})}
                     />
+                    {invalidLineIndexes.has(index) && <p className="mt-1 text-xs text-destructive">Please select an account</p>}
                   </td>
                   <td className="px-2 py-1.5">
                     {readOnly ? (

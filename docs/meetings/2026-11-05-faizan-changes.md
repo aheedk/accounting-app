@@ -14,6 +14,30 @@ turned `downloadAsExcel` into an async function, which would have cleared
 every page's "exporting…" spinner before the file actually finished —
 updated all ~40 call sites to `await` it.
 
+**QBO-parity follow-up (11-07)**, checking three of the above against how
+QuickBooks Online itself actually behaves, then matching it:
+- **111 (search):** QBO has no "find in report" feature on an individual
+  report — Ctrl+F is just the browser's own, unintercepted, over a plain HTML
+  table (which ours already was). The visible search box added for 111 was
+  more than QBO has; removed it from the toolbar. The pre-existing Customize
+  search field stays (not something 111 added), and the collapsed-account fix
+  (a match now expands its account rather than staying hidden) stays too —
+  that's correct regardless of where the search field lives.
+- **98 (bill validation) — extended to Bills, Expenses and Journal Entries:**
+  QBO highlights the specific account field on the specific line red, inline,
+  rather than a generic banner. `AccountSelect` gained an `invalid` prop (red
+  border); all three line-item forms now flag a line with content but no
+  account directly on that line's field, with "Please select an account"
+  underneath, and scroll to the first one on Bills/Expenses (Journal Entry
+  shows it live, since Save there was already silently disabled rather than
+  erroring). Expense had its own version of 99/107's bug: a line with an
+  amount but no category was silently dropped from the save instead of
+  erroring — fixed the same way.
+- **101 (bank feed deposits):** already fully correct — `received_from`,
+  `payment_method` and `ref_no` are nullable in the schema, nothing requires
+  them, and the deposit list already showed a dash for a missing one. No
+  further change needed.
+
 **Four bugs stop work, so they come first (98 to 101).** He couldn't save a
 bill, post a credit card statement, reconcile the main bank account, or open a
 deposit from the General Ledger. The causes of 99 and 100 are already found in

@@ -355,6 +355,8 @@ export default function ExpensePage() {
   const [reference, setReference] = useState('');
   const [memo, setMemo] = useState('');
   const [lines, setLines] = useState<ExpenseLine[]>([emptyLine(0), emptyLine(1)]);
+  // Lines with an amount but no category chosen, highlighted red on the field itself (QBO parity).
+  const [invalidLines, setInvalidLines] = useState<Set<number>>(new Set());
 
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -482,6 +484,9 @@ export default function ExpensePage() {
 
   function updateLine(idx: number, field: keyof ExpenseLine, value: string) {
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+    if (field === 'category_account_id' && value) {
+      setInvalidLines(prev => { if (!prev.has(idx)) return prev; const next = new Set(prev); next.delete(idx); return next; });
+    }
   }
   function removeLine(idx: number) {
     setLines(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx));
@@ -502,6 +507,17 @@ export default function ExpensePage() {
     setErr(null);
     if (!paymentAccountId) { setErr('Please select a payment account.'); return; }
     if (!payeeId && !payeeText.trim()) { setErr('Please enter a payee.'); return; }
+    // A line with an amount but no category chosen: named on the field itself
+    // (QBO parity), not silently dropped from the save.
+    const missingIndexes = lines.flatMap((l, i) => (
+      !l.category_account_id && parseFloat(l.amount || '0') !== 0 ? [i] : []
+    ));
+    if (missingIndexes.length > 0) {
+      setInvalidLines(new Set(missingIndexes));
+      document.getElementById(`line-${missingIndexes[0]}-category`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setInvalidLines(new Set());
     if (validLines.length === 0) { setErr('Add at least one line.'); return; }
 
     setBusy(true);
@@ -790,14 +806,17 @@ export default function ExpensePage() {
                     <td className="px-2 py-1.5 text-xs text-muted-foreground">{idx + 1}</td>
                     <td className="px-2 py-1.5">
                       <AccountSelect
+                        id={`line-${idx}-category`}
                         accounts={categoryAccounts}
                         value={line.category_account_id}
                         onChange={v => updateLine(idx, 'category_account_id', v)}
                         disabled={!canEdit}
                         className="w-full"
                         placeholder="Choose a category"
+                        invalid={invalidLines.has(idx)}
                         {...(canEdit ? { onCreate: () => addAccount.open({ accountType: 'expense', onPick: id => updateLine(idx, 'category_account_id', id) }) } : {})}
                       />
+                      {invalidLines.has(idx) && <p className="mt-1 text-xs text-destructive">Please select an account</p>}
                     </td>
                     <td className="px-2 py-1.5">
                       <Input value={line.description} onChange={e => updateLine(idx, 'description', e.target.value)} disabled={!canEdit} className="w-full" />

@@ -63,6 +63,8 @@ function BillNewPage() {
   const [lines, setLines] = useState<Line[]>([blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Lines with content but no account chosen, highlighted red on the field itself (QBO parity).
+  const [invalidLines, setInvalidLines] = useState<Set<number>>(new Set());
 
   // The company's default terms (Setup -> Company Settings), until a vendor with its own is picked.
   useEffect(() => {
@@ -110,7 +112,12 @@ function BillNewPage() {
     setHdr(h => ({ ...h, bill_date, due_date: addDays(bill_date, h.terms_days) }));
   }
 
-  function update(i: number, patch: Partial<Line>) { setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l)); }
+  function update(i: number, patch: Partial<Line>) {
+    setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
+    if ('expense_account_id' in patch && patch.expense_account_id) {
+      setInvalidLines(prev => { if (!prev.has(i)) return prev; const next = new Set(prev); next.delete(i); return next; });
+    }
+  }
   const lineAmount = (l: Line) => (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
   const total = lines.reduce((s, l) => s + lineAmount(l), 0);
 
@@ -118,8 +125,16 @@ function BillNewPage() {
     e.preventDefault(); setErr(null); setBusy(true);
     try {
       const used = lines.filter(l => l.description.trim() !== '' || l.expense_account_id !== '');
-      const missingAccount = used.find(l => l.expense_account_id === '');
-      if (missingAccount) { setErr('Pick an account for every line.'); setBusy(false); return; }
+      const missingIndexes = lines.flatMap((l, i) => (
+        (l.description.trim() !== '' || l.expense_account_id !== '') && l.expense_account_id === '' ? [i] : []
+      ));
+      if (missingIndexes.length > 0) {
+        setInvalidLines(new Set(missingIndexes));
+        setBusy(false);
+        document.getElementById(`line-${missingIndexes[0]}-expense`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      setInvalidLines(new Set());
       const body = {
         vendor_id: hdr.vendor_id, bill_number: hdr.bill_number,
         bill_date: hdr.bill_date, due_date: hdr.due_date, memo: hdr.memo || null,
@@ -212,7 +227,9 @@ function BillNewPage() {
                     onChange={(id) => update(i, { expense_account_id: id })}
                     placeholder="Choose category…"
                     onCreate={() => addAccount.open({ onPick: id => update(i, { expense_account_id: id }) })}
+                    invalid={invalidLines.has(i)}
                   />
+                  {invalidLines.has(i) && <p className="mt-1 text-xs text-destructive">Please select an account</p>}
                 </td>
                 <td className="p-3">
                   <Input value={l.description} onChange={e => update(i, { description: e.target.value })} placeholder="What was billed" />

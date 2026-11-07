@@ -723,12 +723,6 @@ export default function GeneralLedgerPage() {
             ))}
           </AppSelect>
         </div>
-        <Input
-          value={searchText}
-          onChange={event => setSearchText(event.target.value)}
-          placeholder="Find a transaction, amount or name…"
-          className="w-64"
-        />
         <Button
           variant={customizationOpen ? 'secondary' : 'outline'}
           onClick={() => setCustomizationOpen(current => !current)}
