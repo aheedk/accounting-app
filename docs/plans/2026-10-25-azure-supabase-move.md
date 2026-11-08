@@ -228,33 +228,37 @@ database in Virginia.
 
 ## Switch-over (one evening)
 
-1. **Freeze.** Tell the firm nothing is entered for about two hours.
-2. **Database.** `bin/copy-to-supabase.sh replace`: it takes the final dump from
-   Railway, empties the trial's data (drops and recreates `public`), restores
-   the dump into Supabase and compares the row counts. Keep that dump with the
-   Railway service (step 9).
-3. **Files.** `railway ssh` into the API service, then run
-   `npm run files:upload -- "$FILE_STORAGE_DIR"` there with the Supabase
-   Storage variables set. The script is in the deployed code, so nothing
-   needs downloading. **Found 11-08:** Railway's API has no volume and no
-   `FILE_STORAGE_DIR`, so files go to `./.local-data/files` inside the
-   container, which each deploy replaces. Of the 14 `files` rows (06-25 to
-   10-21), any uploaded before the last deploy are already gone; copy what is
-   left from `./.local-data/files`. Supabase Storage ends this.
-4. **Deploy.** Run the deploy workflow, which migrates and locks down again.
+**Done 11-08, the afternoon the trial passed.** Aheed said the data on Railway
+was not important, so there was no freeze and no file copy; the database was
+still copied, so nothing entered since 11-01 was lost.
+
+1. ~~**Freeze.**~~ Skipped (above).
+2. **Database. Done 11-08.** `bin/copy-to-supabase.sh replace` took a final
+   dump of Railway (283 MB, `backups/accounting-20261108-183257.dump`, kept on
+   this machine with the Railway service as the way back), emptied the trial's
+   data (dropped and recreated `public`), restored the dump into Supabase, and
+   all 79 tables matched Railway's row counts.
+3. ~~**Files.**~~ Skipped (above). Railway's API has no volume and no
+   `FILE_STORAGE_DIR`: files went to `./.local-data/files` inside the
+   container, which each deploy replaces. The 14 `files` rows (06-25 to
+   10-21) all predate Railway's redeploys of 11-06 to 11-08, so their files
+   were already gone; on Azure those 14 rows point at nothing. Supabase
+   Storage ends this.
+4. **Deploy. Done 11-08** by pushing the redirect below: CI, then the Azure
+   deploy, which migrates and locks down again.
 5. ~~**Gmail.**~~ Nothing to copy: Gmail was never connected on Railway (found
    11-08, see Azure above). When the firm wants emailed documents, make a
    Google client with the Azure callback, put its file at
    `/home/secrets/gmail-credentials.json` (App Service → SSH), and a firm
    admin clicks Connect Gmail.
-6. **Old address.** Change `netlify.toml` to send every page to the new
-   address (301), so old bookmarks keep working.
+6. **Old address. Done 11-08.** `apps/web/netlify.toml` sends every page to
+   the same path on the new address (301), so old bookmarks keep working.
 7. **Phone app.** Riham sets `EXPO_PUBLIC_API_URL` to the new API and ships a
-   build.
+   build. Until then the phone app still calls Railway.
 8. **Everyone signs in again.** The API's address changed, so the sign-in
    cookie is new.
-9. **Railway.** Stop the API service, but don't delete it. Keep it two weeks
-   as the way back, with the final dump.
+9. **Railway.** Aheed stops the API service, but doesn't delete it. Keep it
+   two weeks as the way back, with the final dump.
 
 **Going back:** if the new setup fails before anyone has entered anything
 there, start Railway's service again and undo the Netlify redirect. If work

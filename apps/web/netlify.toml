@@ -3,10 +3,14 @@
   command = "npm --prefix=../.. ci && npm --prefix=../.. -w @accounting/shared run build && npm --prefix=../.. -w @accounting/web run build"
   publish = "dist"
 
+# Moved to Azure on 11-08 (docs/plans/2026-10-25-azure-supabase-move.md): every
+# page goes to the same path on the new address, so old bookmarks keep working.
+# Delete this file once the redirect has had a few weeks.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "https://agreeable-pond-02cc2310f.6.azurestaticapps.net/:splat"
+  status = 301
+  force = true
 
 # Security headers (security review 2026-10-20, docs/qa/2026-10-20-security-review.md).
 # The Content-Security-Policy is report-only for now: it blocks nothing, and the
