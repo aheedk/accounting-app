@@ -109,9 +109,14 @@ so that is the address wherever this plan says `<app>.azurewebsites.net`.
 - **Roles given 11-06** (Aheed, in Cloud Shell): AcrPull on the registry and Key
   Vault Secrets User on the vault for the web app's identity, and Website
   Contributor on the web app for GitHub's sign-in.
-- **Left:** the seven secrets in the vault (`field-encryption-key` is a new
-  key, see step 3 below), Supabase Storage's bucket and key, and the Azure
-  callback in Google's client.
+- **Secrets, 11-08:** four of the seven are in the vault (`database-url`, the two
+  JWT secrets, `anthropic-api-key`). **Left:** `field-encryption-key` (a new
+  key, see step 3 below) and the two Supabase Storage keys.
+- **Gmail was never connected on Railway** (checked 11-08): 0 `gmail.connect`
+  in its audit log; the 9 emailed imports are all from 09-11, the other 109
+  were uploaded. Aheed's Google account has no client for the app either. So
+  there is no Google client to add the Azure callback to, and nothing to copy
+  at the switch-over: setting Gmail up is new work, done on Azure afterwards.
 
 **Was waiting on Microsoft (resolved by 11-05):** a new subscription may run no App Service at all in
 East US (every size's quota is 0 of 0; Central US had 30). Only a subscription
@@ -205,10 +210,11 @@ database in Virginia.
    Storage variables set. The script is in the deployed code, so nothing
    needs downloading.
 4. **Deploy.** Run the deploy workflow, which migrates and locks down again.
-5. **Gmail.** Copy `gmail-credentials.json` and `gmail-token.json` from
-   Railway's secrets folder into `/home/secrets` (App Service → SSH). With the
-   token there, Gmail keeps working without reconnecting. If it has to be
-   reconnected, the Azure callback must be in the Google client first.
+5. ~~**Gmail.**~~ Nothing to copy: Gmail was never connected on Railway (found
+   11-08, see Azure above). When the firm wants emailed documents, make a
+   Google client with the Azure callback, put its file at
+   `/home/secrets/gmail-credentials.json` (App Service → SSH), and a firm
+   admin clicks Connect Gmail.
 6. **Old address.** Change `netlify.toml` to send every page to the new
    address (301), so old bookmarks keep working.
 7. **Phone app.** Riham sets `EXPO_PUBLIC_API_URL` to the new API and ships a
