@@ -203,13 +203,28 @@ database in Virginia.
    `/health`; it starts only after its migrations reach Supabase, so the
    database and the certificate check work. Supabase: last migration 0115,
    and `anon`/`authenticated` hold no grants on `public`.
-3. On the Static Web App's address:
-   - sign in;
-   - open two clients;
-   - compare a Balance Sheet with Railway's;
-   - upload an attachment and open it again.
-4. Check that the Activity Log shows your own address, and that the deploy log
-   says "Supabase roles anon and authenticated: no access to public."
+3. ~~On the Static Web App's address: sign in; open two clients; compare a
+   Balance Sheet with Railway's; upload an attachment and open it again.~~
+   **Done 11-08**, all passed:
+   - Signed in; the session renews, so the cross-site sign-in cookie works.
+   - 94 pages opened in turn (every sidebar area and 36 reports): 197 API calls,
+     all 200, none slow (median 176 ms, slowest 1.7 s, the General Ledger), no
+     error on any page.
+   - Alexander Pharmacy (checked by Aheed) and Donovan's Auto: the Balance
+     Sheet as of 10-31 is the same to the cent on both.
+   - A receipt PDF uploaded to Supabase Storage and came back byte for byte
+     (the `azure-api-2` keys work). A test PDF in the AI inbox was read and
+     classed in 3.4 s (the Anthropic key works). Both are trial rows, which
+     `replace` wipes; the receipt's object stays in the bucket, 398 bytes.
+4. ~~Check that the Activity Log shows your own address~~ **Done 11-08.** The
+   session shows this machine's public address, with no port. The lockdown
+   was checked directly instead of in the deploy log: `anon`/`authenticated`
+   hold no grants. **Found 11-08:** Railway records the wrong address. The same
+   browser, a minute apart, was recorded on Railway as an address that is not
+   this machine's, on the same network as its sessions since 10-08. Most
+   likely the last X-Forwarded-For hop there is Railway's own proxy, so the
+   sign-in limit by address and the Activity Log see the proxy. Azure is
+   right, so nothing to fix; the move ends it.
 
 ## Switch-over (one evening)
 
