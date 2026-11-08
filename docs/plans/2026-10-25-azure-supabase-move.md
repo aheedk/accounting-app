@@ -103,7 +103,11 @@ so that is the address wherever this plan says `<app>.azurewebsites.net`.
   TLS 1.2, FTP and basic authentication off. No Application Insights.
 - Every app setting in step 3 is set, the seven secrets as Key Vault references
   (`@Microsoft.KeyVault(VaultName=khanarndt-acct-kv;SecretName=…)`).
-  `ANTHROPIC_WORKSPACE_ID` is optional: copy it too if Railway has it.
+  `ANTHROPIC_WORKSPACE_ID` is optional: copy it too if Railway has it (11-08:
+  it doesn't; Railway's API has 11 variables, and `ADMIN_EMAIL`,
+  `ADMIN_PASSWORD`, `NIXPACKS_NO_CACHE` and `JWT_REFRESH_TTL_DAYS` aren't
+  needed on Azure). Railway sets `JWT_ACCESS_TTL_MINUTES`, which Azure doesn't
+  (the default is 15): copy it if Railway's isn't 15.
 - GitHub variables `AZURE_WEBAPP_NAME` and `API_ORIGIN` are set, so the deploy
   is switched on.
 - **Roles given 11-06** (Aheed, in Cloud Shell): AcrPull on the registry and Key
@@ -208,7 +212,11 @@ database in Virginia.
 3. **Files.** `railway ssh` into the API service, then run
    `npm run files:upload -- "$FILE_STORAGE_DIR"` there with the Supabase
    Storage variables set. The script is in the deployed code, so nothing
-   needs downloading.
+   needs downloading. **Found 11-08:** Railway's API has no volume and no
+   `FILE_STORAGE_DIR`, so files go to `./.local-data/files` inside the
+   container, which each deploy replaces. Of the 14 `files` rows (06-25 to
+   10-21), any uploaded before the last deploy are already gone; copy what is
+   left from `./.local-data/files`. Supabase Storage ends this.
 4. **Deploy.** Run the deploy workflow, which migrates and locks down again.
 5. ~~**Gmail.**~~ Nothing to copy: Gmail was never connected on Railway (found
    11-08, see Azure above). When the firm wants emailed documents, make a
