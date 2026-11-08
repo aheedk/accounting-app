@@ -113,9 +113,13 @@ so that is the address wherever this plan says `<app>.azurewebsites.net`.
 - **Roles given 11-06** (Aheed, in Cloud Shell): AcrPull on the registry and Key
   Vault Secrets User on the vault for the web app's identity, and Website
   Contributor on the web app for GitHub's sign-in.
-- **Secrets, 11-08:** four of the seven are in the vault (`database-url`, the two
-  JWT secrets, `anthropic-api-key`). **Left:** `field-encryption-key` (a new
-  key, see step 3 below) and the two Supabase Storage keys.
+- **Secrets, 11-08:** all seven are in the vault, and every reference on the web
+  app resolves (green) after "Pull reference values". Checked by shape only:
+  `database-url` is the session pooler with the certificate check on the end,
+  `field-encryption-key` is 64 characters, the Anthropic key starts `sk-ant-`,
+  none has a space. `field-encryption-key` is new (made in Cloud Shell with
+  `openssl rand -hex 32`, see step 3 below) and is on Railway too, as
+  `FIELD_ENCRYPTION_KEY`. The Supabase key is `azure-api-2`.
 - **Gmail was never connected on Railway** (checked 11-08): 0 `gmail.connect`
   in its audit log; the 9 emailed imports are all from 09-11, the other 109
   were uploaded. Aheed's Google account has no client for the app either. So
@@ -193,7 +197,12 @@ database in Virginia.
    - The pooler only took the password after it was reset and pasted in, not
      typed: a wrong one gives "password authentication failed for user
      postgres". The project is on `aws-0-us-east-1`; `aws-1` doesn't know it.
-2. Run the deploy workflow (Actions → Deploy to Azure → Run workflow).
+2. ~~Run the deploy workflow.~~ It ran by itself: the switch-on (11-05) means
+   every push to `main` that passes CI deploys to Azure too, so Riham's pushes
+   of 11-06 and 11-07 did it (all three runs passed). On 11-08 the API answers
+   `/health`; it starts only after its migrations reach Supabase, so the
+   database and the certificate check work. Supabase: last migration 0115,
+   and `anon`/`authenticated` hold no grants on `public`.
 3. On the Static Web App's address:
    - sign in;
    - open two clients;
