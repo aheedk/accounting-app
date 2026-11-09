@@ -57,6 +57,7 @@ router.post('/me/firm/users', async (req, res, next) => {
         email: body.email,
         full_name: body.full_name,
         role: body.role,
+        custom_role_id: body.custom_role_id ?? null,
       }),
     );
     res.status(201).json(result);
@@ -71,7 +72,9 @@ router.patch('/me/firm/users/:id', async (req, res, next) => {
       throw new AuthError(ERR.FORBIDDEN, 'Cannot change your own role');
     }
     const updated = await db.transaction().execute(trx =>
-      userSvc.updateUserRole(trx, ctxFromReq(req), { user_id, role: body.role }),
+      userSvc.updateUserRole(trx, ctxFromReq(req), 'role' in body
+        ? { user_id, role: body.role }
+        : { user_id, role: 'staff', custom_role_id: body.custom_role_id }),
     );
     res.json(updated);
   } catch (e) { next(e); }
@@ -85,6 +88,7 @@ router.post('/me/firm/users/:id/business-access', async (req, res, next) => {
         user_id: req.params['id']!,
         business_id: body.business_id,
         role_override: body.role_override ?? null,
+        custom_role_id: body.custom_role_id ?? null,
       }),
     );
     res.status(201).json(grant);

@@ -266,6 +266,11 @@ export const AUDIT = {
   QB_IMPORT_UNDO: 'qb_import.undo',
   // An account an import added, taken out again by undoing it while nothing used it.
   COA_DELETE: 'coa.delete',
+
+  // The firm's own roles (docs/specs/2026-11-09-custom-roles-design.md)
+  ROLE_CREATE: 'role.create',
+  ROLE_UPDATE: 'role.update',
+  ROLE_DELETE: 'role.delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request } from 'express';
-import { hasMinRole, schemas } from '@accounting/shared';
+import { AREA_INFO, ERR, apiPlaceOf, hasMinRole, roleForRequest, schemas } from '@accounting/shared';
+import { AuthError } from '../lib/errors.js';
 import { db } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { resolveBusiness } from '../middleware/tenancy.js';
@@ -55,6 +56,18 @@ router.post('/businesses/:businessId/approvals/:approvalId/approve', requireMinR
   try {
     const request = await approvals.claimForApproval(db, { id: req.params['approvalId']!, business_id });
     claimedId = request.id;
+    // A custom role approves only what it could have recorded itself: Post in
+    // the entry's own area (docs/specs/2026-11-09-custom-roles-design.md).
+    // Otherwise the entry sent again would only be held again.
+    const permissions = req.tenancy!.permissions;
+    if (permissions) {
+      const decided = roleForRequest(permissions, request.method, request.path);
+      if (!('role' in decided) || !hasMinRole(decided.role, 'accountant')) {
+        const place = apiPlaceOf(request.method, request.path);
+        const area = place?.kind === 'area' ? AREA_INFO[place.area].label : 'this kind of entry';
+        throw new AuthError(ERR.FORBIDDEN, `Approving this needs Post in ${area}, which your role does not have.`);
+      }
+    }
     const payload = typeof request.payload === 'string' ? request.payload : JSON.stringify(request.payload);
     const response = await fetch(`http://localhost:${req.socket.localPort}/businesses/${business_id}${request.path}`, {
       method: request.method,

@@ -8,28 +8,48 @@ import { endSessions, reissueAccessTokens } from '../auth/accountService.js';
 import { firmSignInSettings } from '../auth/authService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
+import { roleInFirm } from './roleService.js';
 
 export type UserBusinessAccess = {
   business_id: string;
   business_name: string;
   role_override: UserRole | null;
+  /** One of the firm's own roles for this company (docs/specs/2026-11-09-custom-roles-design.md). */
+  custom_role: { id: string; name: string } | null;
 };
 
-export async function listUsers(db: Kysely<DB>, firm_id: string) {
+export type ListedUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  custom_role: { id: string; name: string } | null;
+  last_login_at: unknown;
+  created_at: unknown;
+  deactivated_at: unknown;
+  locked: boolean;
+  two_step_enabled: boolean;
+  payroll_access: boolean;
+  business_access: UserBusinessAccess[];
+};
+
+export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<ListedUser[]> {
   const users = await db.selectFrom('users')
-    .select(['id', 'email', 'full_name', 'role', 'last_login_at', 'created_at', 'deactivated_at', 'locked_until', 'totp_enabled_at', 'payroll_access'])
-    .where('firm_id', '=', firm_id)
+    .leftJoin('firm_roles as fr', 'fr.id', 'users.custom_role_id')
+    .select(['users.id', 'email', 'full_name', 'role', 'last_login_at', 'users.created_at', 'deactivated_at', 'locked_until', 'totp_enabled_at', 'payroll_access', 'fr.id as custom_role_id', 'fr.name as custom_role_name'])
+    .where('users.firm_id', '=', firm_id)
     .where('deleted_at', 'is', null)
-    .orderBy('created_at', 'asc')
+    .orderBy('users.created_at', 'asc')
     .execute();
   if (users.length === 0) return [];
 
   const userIds = users.map(u => u.id);
   const accessRows = await db.selectFrom('user_business_access as uba')
     .innerJoin('businesses as b', 'b.id', 'uba.business_id')
+    .leftJoin('firm_roles as fr', 'fr.id', 'uba.custom_role_id')
     .select([
       'uba.user_id', 'uba.business_id', 'uba.role_override',
-      'b.name as business_name',
+      'b.name as business_name', 'fr.id as custom_role_id', 'fr.name as custom_role_name',
     ])
     .where('uba.user_id', 'in', userIds)
     .where('b.deleted_at', 'is', null)
@@ -42,6 +62,7 @@ export async function listUsers(db: Kysely<DB>, firm_id: string) {
       business_id: r.business_id,
       business_name: r.business_name,
       role_override: r.role_override,
+      custom_role: r.custom_role_id && r.custom_role_name ? { id: r.custom_role_id, name: r.custom_role_name } : null,
     });
     byUser.set(r.user_id, list);
   }
@@ -51,6 +72,8 @@ export async function listUsers(db: Kysely<DB>, firm_id: string) {
     email: u.email,
     full_name: u.full_name,
     role: u.role,
+    // One of the firm's own roles, when the login has one (it is then stored as staff).
+    custom_role: u.custom_role_id && u.custom_role_name ? { id: u.custom_role_id, name: u.custom_role_name } : null,
     last_login_at: u.last_login_at,
     created_at: u.created_at,
     // A login that is switched off stays in the list, so it can be switched back on.
@@ -71,8 +94,11 @@ function generateTempPassword(): string {
 export async function createUser(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
-  input: { firm_id: string; email: string; full_name: string; role: UserRole },
+  input: { firm_id: string; email: string; full_name: string; role: UserRole; custom_role_id?: string | null | undefined },
 ) {
+  // A login with one of the firm's own roles is stored as staff (migration 0116).
+  if (input.custom_role_id) await roleInFirm(trx, ctx.firm_id, input.custom_role_id);
+  const role: UserRole = input.custom_role_id ? 'staff' : input.role;
   const dup = await trx.selectFrom('users')
     .select('id')
     .where('firm_id', '=', input.firm_id)
@@ -92,9 +118,10 @@ export async function createUser(
     email: input.email,
     password_hash,
     full_name: input.full_name,
-    role: input.role,
+    role,
+    custom_role_id: input.custom_role_id ?? null,
     must_change_password: true,
-  }).returning(['id', 'email', 'full_name', 'role', 'firm_id', 'created_at'])
+  }).returning(['id', 'email', 'full_name', 'role', 'custom_role_id', 'firm_id', 'created_at'])
     .executeTakeFirstOrThrow();
 
   await auditRecord(trx, ctx, {
@@ -102,7 +129,7 @@ export async function createUser(
     entity_type: 'user',
     entity_id: row.id,
     before: null,
-    after: { id: row.id, email: row.email, full_name: row.full_name, role: row.role, firm_id: row.firm_id },
+    after: { id: row.id, email: row.email, full_name: row.full_name, role: row.role, custom_role_id: row.custom_role_id, firm_id: row.firm_id },
   });
 
   return { user: row, plaintext_password: plaintext };
@@ -111,24 +138,30 @@ export async function createUser(
 export async function updateUserRole(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
-  input: { user_id: string; role: UserRole },
+  input: { user_id: string; role: UserRole; custom_role_id?: string | null | undefined },
 ) {
+  if (input.custom_role_id) await roleInFirm(trx, ctx.firm_id, input.custom_role_id);
   const before = await trx.selectFrom('users')
-    .select(['id', 'email', 'full_name', 'role', 'firm_id'])
+    .select(['id', 'email', 'full_name', 'role', 'custom_role_id', 'firm_id'])
     .where('id', '=', input.user_id)
     .where('firm_id', '=', ctx.firm_id)
     .where('deleted_at', 'is', null)
     .executeTakeFirst();
   if (!before) throw new NotFoundError('user', input.user_id);
 
+  // A custom role is stored with the role staff (migration 0116).
+  const role: UserRole = input.custom_role_id ? 'staff' : input.role;
   const updated = await trx.updateTable('users')
-    .set({ role: input.role })
+    .set({ role, custom_role_id: input.custom_role_id ?? null })
     .where('id', '=', input.user_id)
-    .returning(['id', 'email', 'full_name', 'role', 'firm_id'])
+    .returning(['id', 'email', 'full_name', 'role', 'custom_role_id', 'firm_id'])
     .executeTakeFirstOrThrow();
   // The role travels in the access token: without this, a firm admin made staff
-  // kept firm-admin powers (and every client of the firm) until it expired.
-  if (before.role !== updated.role) await reissueAccessTokens(trx, input.user_id);
+  // kept firm-admin powers (and every client of the firm) until it expired. A new
+  // custom role does not change the token, but renewing redraws the person's menu.
+  if (before.role !== updated.role || before.custom_role_id !== updated.custom_role_id) {
+    await reissueAccessTokens(trx, input.user_id);
+  }
 
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_UPDATE,
@@ -143,8 +176,12 @@ export async function updateUserRole(
 export async function grantBusinessAccess(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
-  input: { user_id: string; business_id: string; role_override: UserRole | null },
+  input: { user_id: string; business_id: string; role_override: UserRole | null; custom_role_id?: string | null | undefined },
 ) {
+  if (input.role_override && input.custom_role_id) {
+    throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'Give either a built-in role or a custom role, not both.');
+  }
+  if (input.custom_role_id) await roleInFirm(trx, ctx.firm_id, input.custom_role_id);
   const user = await trx.selectFrom('users')
     .select(['id', 'firm_id'])
     .where('id', '=', input.user_id)
@@ -172,7 +209,10 @@ export async function grantBusinessAccess(
     user_id: input.user_id,
     business_id: input.business_id,
     role_override: input.role_override,
+    custom_role_id: input.custom_role_id ?? null,
   }).returningAll().executeTakeFirstOrThrow();
+  // The person's list of companies, and the role in each, comes with the session.
+  await reissueAccessTokens(trx, input.user_id);
 
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_BUSINESS_ACCESS_GRANT,

@@ -4,6 +4,7 @@ export * from './autoCoding.js';
 export * from './auditActions.js';
 export * from './errorCodes.js';
 export * from './roles.js';
+export * from './permissions.js';
 export * from './accountGroups.js';
 export * from './statementBalance.js';
 export * from './passwords.js';
