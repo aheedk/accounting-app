@@ -5,12 +5,14 @@ import { useAuth } from '@/auth/useAuth';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { SidebarToggle } from '@/components/layout/SidebarToggle';
-import { roleLabel, useEffectiveRole } from '@/lib/roleAccess';
+import { useEffectiveRole, useRoleName } from '@/lib/roleAccess';
 
 export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   // The role on the company that is open; a role given for one company differs from the firm-wide one.
   const role = useEffectiveRole();
+  // A custom role shows its own name (docs/specs/2026-11-09-custom-roles-design.md).
+  const roleName = useRoleName();
   return (
     // relative z-30: backdrop-blur creates a stacking context at z-auto, which
     // let positioned page content (toolbars, inputs) paint OVER the header's
@@ -40,7 +42,7 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           <Link to="/account" title="My account" className="font-medium text-foreground hover:underline">{user?.full_name ?? ''}</Link>
           {role && (
             <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-              {roleLabel(role)}
+              {roleName}
             </span>
           )}
         </div>

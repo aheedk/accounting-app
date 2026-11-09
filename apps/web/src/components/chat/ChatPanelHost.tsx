@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
-import { useEffectiveRole } from '@/lib/roleAccess';
+import { useCanChat } from '@/lib/roleAccess';
 import { ChatPanel } from './ChatPanel';
 
 /**
@@ -24,7 +24,8 @@ import { ChatPanel } from './ChatPanel';
 export function ChatPanelHost() {
   const { user } = useAuth();
   const [bizId] = useActiveBusinessId();
-  const role = useEffectiveRole();
+  // Not for a client or view-only login; a custom role needs to enter in every area the chat reads.
+  const canChat = useCanChat();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   // One pulse to draw the eye on first load — this component mounts once
@@ -32,7 +33,7 @@ export function ChatPanelHost() {
   // local state is enough; no need to persist it anywhere.
   const [showPulse, setShowPulse] = useState(true);
 
-  if (!user || !bizId || role === 'client' || role === 'viewer') return null;
+  if (!user || !bizId || !canChat) return null;
 
   function toggle() {
     setMounted(true);

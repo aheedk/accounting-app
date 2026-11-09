@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
 import type { Role } from '@accounting/shared';
-import { roleAtLeast, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
+import { roleAtLeast, useCanOpen, useRoleFor } from '@/lib/roleAccess';
 
 // minRole: the lowest role the API lets create this, where it is above staff.
 // Kept in step with tests/integration/roleMatrix.test.ts in the API.
@@ -87,11 +87,12 @@ export function CreateMenu() {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Only what this role can actually create.
-  const role = useEffectiveRole();
+  // Only what this role can actually create. Each form is asked about with the
+  // role the login has on it: for a custom role, its level in that form's area.
+  const roleFor = useRoleFor();
   const canOpen = useCanOpen();
   const categories = CATEGORIES
-    .map(cat => ({ ...cat, items: cat.items.filter(item => canOpen(item.to) && (!item.minRole || roleAtLeast(role, item.minRole))) }))
+    .map(cat => ({ ...cat, items: cat.items.filter(item => canOpen(item.to) && (!item.minRole || roleAtLeast(roleFor(item.to), item.minRole))) }))
     .filter(cat => cat.items.length > 0);
 
   const popup = open
@@ -131,8 +132,9 @@ export function CreateMenu() {
       )
     : null;
 
-  // A client or view-only login creates nothing, so it has no + New.
-  if (!roleAtLeast(role, 'staff')) return null;
+  // A client or view-only login creates nothing, so it has no + New; nor does a
+  // custom role with nothing it can enter.
+  if (!categories.some(cat => cat.items.some(item => roleAtLeast(roleFor(item.to), 'staff')))) return null;
 
   return (
     <div className="px-3 py-2">

@@ -126,6 +126,7 @@ const ALL_PAGES: Page[] = [
   { label: 'Chart of Accounts Setup', group: 'Setup', to: '/setup/coa' },
   { label: 'Cost Centers', group: 'Setup', to: '/setup/cost-centers' },
   { label: 'Users', group: 'Setup', to: '/setup/users' },
+  { label: 'Roles', group: 'Setup', to: '/setup/roles' },
   { label: 'Tax Codes', group: 'Setup', to: '/settings/tax-codes' },
   { label: 'Activity Log', group: 'Setup', to: '/setup/activity' },
   { label: 'Approvals', group: 'Accounting', to: '/accounting/approvals' },

@@ -73,7 +73,7 @@ export default function AccountPage() {
       <div>
         <h1 className="text-2xl font-semibold">My account</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {user?.full_name} · {user?.email}{user?.role ? ` · ${roleLabel(user.role)}` : ''}
+          {user?.full_name} · {user?.email}{user?.custom_role ? ` · ${user.custom_role.name}` : user?.role ? ` · ${roleLabel(user.role)}` : ''}
         </p>
       </div>
       {err && <p className="text-sm text-destructive">{err}</p>}

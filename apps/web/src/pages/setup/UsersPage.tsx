@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,17 +16,46 @@ import { FirmSignInSettings } from '@/components/account/FirmSignInSettings';
 type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
 const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'viewer', 'client'];
 
+/** One of the firm's own roles (Setup → Roles, docs/specs/2026-11-09-custom-roles-design.md). */
+type CustomRoleRef = { id: string; name: string };
+
 type BusinessAccess = {
   business_id: string;
   business_name: string;
   role_override: Role | null;
+  custom_role: CustomRoleRef | null;
 };
+
+// A role menu's value: `builtin:staff`, or `custom:<role id>`.
+const builtin = (role: Role) => `builtin:${role}`;
+const custom = (id: string) => `custom:${id}`;
+function roleChoice(value: string): { role: Role } | { custom_role_id: string } {
+  return value.startsWith('custom:') ? { custom_role_id: value.slice('custom:'.length) } : { role: value.slice('builtin:'.length) as Role };
+}
+
+/** The built-in roles, then the firm's own. */
+function RoleOptions({ roles }: { roles: CustomRoleRef[] }) {
+  return (
+    <>
+      <optgroup label="Built-in roles">
+        {ROLES.map(r => <option key={r} value={builtin(r)}>{ROLE_LABELS[r]}</option>)}
+      </optgroup>
+      {roles.length > 0 && (
+        <optgroup label="Your roles">
+          {roles.map(r => <option key={r.id} value={custom(r.id)}>{r.name}</option>)}
+        </optgroup>
+      )}
+    </>
+  );
+}
 
 type UserRow = {
   id: string;
   email: string;
   full_name: string;
   role: Role;
+  /** One of the firm's own roles; `role` is then staff. */
+  custom_role: CustomRoleRef | null;
   last_login_at: string | null;
   created_at: string;
   // A login that is switched off stays listed, so it can be switched back on.
@@ -55,12 +85,13 @@ export default function UsersPage() {
   const canManage = user?.role === 'firm_admin';
 
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRoleRef[]>([]);
   const [businesses, setBusinesses] = useState<BusinessOption[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   const [showInvite, setShowInvite] = useState(false);
-  const [invite, setInvite] = useState<{ email: string; full_name: string; role: Role }>(
-    { email: '', full_name: '', role: 'staff' },
+  const [invite, setInvite] = useState<{ email: string; full_name: string; access: string }>(
+    { email: '', full_name: '', access: builtin('staff') },
   );
   const [inviteErr, setInviteErr] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -69,8 +100,9 @@ export default function UsersPage() {
   const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
 
   const [grantFor, setGrantFor] = useState<string | null>(null);
-  const [grantForm, setGrantForm] = useState<{ business_id: string; role_override: '' | Role }>({
-    business_id: '', role_override: '',
+  // `access` is '' (the login's own role applies there) or a role menu value.
+  const [grantForm, setGrantForm] = useState<{ business_id: string; access: string }>({
+    business_id: '', access: '',
   });
   const [grantBusy, setGrantBusy] = useState(false);
   const [grantErr, setGrantErr] = useState<string | null>(null);
@@ -79,11 +111,13 @@ export default function UsersPage() {
   const reload = useCallback(async () => {
     setErr(null);
     try {
-      const [u, b] = await Promise.all([
+      const [u, b, r] = await Promise.all([
         api.get<{ users: UserRow[] }>('/me/firm/users'),
         api.get<{ businesses?: BusinessOption[] }>('/me'),
+        api.get<{ roles: CustomRoleRef[] }>('/me/firm/roles'),
       ]);
       setUsers(u.data.users);
+      setCustomRoles(r.data.roles.map(role => ({ id: role.id, name: role.name })));
       const bizList = Array.isArray(b.data.businesses)
         ? b.data.businesses.map(x => ({ id: x.id, name: x.name }))
         : [];
@@ -103,10 +137,14 @@ export default function UsersPage() {
     setInviteErr(null);
     setInviteBusy(true);
     try {
-      const r = await api.post<CreatedUser>('/me/firm/users', invite);
+      const choice = roleChoice(invite.access);
+      const r = await api.post<CreatedUser>('/me/firm/users', {
+        email: invite.email, full_name: invite.full_name,
+        ...('role' in choice ? { role: choice.role } : { role: 'staff', custom_role_id: choice.custom_role_id }),
+      });
       setCreatedUser(r.data);
       setShowInvite(false);
-      setInvite({ email: '', full_name: '', role: 'staff' });
+      setInvite({ email: '', full_name: '', access: builtin('staff') });
       await reload();
     } catch (e) {
       setInviteErr(errorMessage(e));
@@ -140,9 +178,9 @@ export default function UsersPage() {
     }
   }
 
-  async function changeRole(user_id: string, role: Role) {
+  async function changeRole(user_id: string, value: string) {
     try {
-      await api.patch(`/me/firm/users/${user_id}`, { role });
+      await api.patch(`/me/firm/users/${user_id}`, roleChoice(value));
       await reload();
     } catch (e) {
       setErr(errorMessage(e));
@@ -152,7 +190,7 @@ export default function UsersPage() {
   function openGrant(user_id: string) {
     setGrantErr(null);
     setGrantFor(user_id);
-    setGrantForm({ business_id: '', role_override: '' });
+    setGrantForm({ business_id: '', access: '' });
   }
 
   async function submitGrant(e: React.FormEvent) {
@@ -161,9 +199,11 @@ export default function UsersPage() {
     setGrantErr(null);
     setGrantBusy(true);
     try {
+      const choice = grantForm.access === '' ? null : roleChoice(grantForm.access);
       await api.post(`/me/firm/users/${grantFor}/business-access`, {
         business_id: grantForm.business_id,
-        role_override: grantForm.role_override === '' ? null : grantForm.role_override,
+        role_override: choice && 'role' in choice ? choice.role : null,
+        custom_role_id: choice && 'custom_role_id' in choice ? choice.custom_role_id : null,
       });
       setGrantFor(null);
       await reload();
@@ -202,7 +242,7 @@ export default function UsersPage() {
   };
 
   const dlHeaders = ['Email', 'Name', 'Firm Role', 'Business Access'];
-  const dlRows = () => users.map(u => [u.email, u.full_name, u.role, u.business_access?.map((b: BusinessAccess) => b.business_name).join(', ') ?? '']);
+  const dlRows = () => users.map(u => [u.email, u.full_name, u.custom_role?.name ?? ROLE_LABELS[u.role], u.business_access?.map((b: BusinessAccess) => b.business_name).join(', ') ?? '']);
 
   async function handleExport() {
     setExcelBusy(true);
@@ -219,7 +259,7 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-semibold">Users</h1>
           <p className="text-sm text-muted-foreground">
-            Invite team members, assign firm-level roles, and grant access to specific businesses.
+            Add logins, give each a role (built-in, or one of <Link to="/setup/roles" className="text-link hover:underline">your own</Link>), and grant access to specific businesses.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -235,8 +275,11 @@ export default function UsersPage() {
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">Print</div>
           </div>
+          <Link to="/setup/roles" className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent">
+            Roles
+          </Link>
           <Button onClick={() => setShowInvite(s => !s)}>
-            {showInvite ? 'Cancel' : 'Invite user'}
+            {showInvite ? 'Cancel' : 'Add user'}
           </Button>
         </div>
       </div>
@@ -284,7 +327,7 @@ export default function UsersPage() {
 
       {showInvite && (
         <Card>
-          <CardHeader><CardTitle>Invite user</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Add user</CardTitle></CardHeader>
           <CardContent>
             <form className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end" onSubmit={submitInvite}>
               <div>
@@ -298,13 +341,13 @@ export default function UsersPage() {
                   onChange={e => setInvite(i => ({ ...i, full_name: e.target.value }))} />
               </div>
               <div>
-                <Label>Firm-level role</Label>
+                <Label>Role</Label>
                 <AppSelect
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  value={invite.role}
-                  onChange={e => setInvite(i => ({ ...i, role: e.target.value as Role }))}
+                  value={invite.access}
+                  onChange={e => setInvite(i => ({ ...i, access: e.target.value }))}
                 >
-                  {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  <RoleOptions roles={customRoles} />
                 </AppSelect>
               </div>
               {inviteErr && <p className="text-sm text-destructive md:col-span-3">{inviteErr}</p>}
@@ -347,13 +390,19 @@ export default function UsersPage() {
                     <td className="p-3">
                       <AppSelect
                         className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
-                        value={u.role}
+                        value={u.custom_role ? custom(u.custom_role.id) : builtin(u.role)}
                         disabled={isSelf}
-                        onChange={e => changeRole(u.id, e.target.value as Role)}
+                        onChange={e => changeRole(u.id, e.target.value)}
                       >
-                        {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                        <RoleOptions roles={customRoles} />
                       </AppSelect>
                       {isSelf && <p className="text-xs text-muted-foreground mt-1">(you)</p>}
+                      {/* What the role allows, area by area, is changed on Setup → Roles. */}
+                      {u.custom_role && (
+                        <Link to={`/setup/roles?edit=${u.custom_role.id}`} className="mt-1 block text-xs text-link hover:underline">
+                          Change what {u.custom_role.name} allows
+                        </Link>
+                      )}
                       {/* Payroll has pay rates and social security numbers; it can be closed to a login. */}
                       <label className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" title={u.role === 'firm_admin' ? 'A firm admin always has payroll' : undefined}>
                         <input type="checkbox" checked={u.payroll_access} disabled={u.role === 'firm_admin' || u.role === 'client'} onChange={e => void setPayroll(u, e.target.checked)} />
@@ -370,9 +419,9 @@ export default function UsersPage() {
                         {u.business_access.map(a => (
                           <li key={a.business_id} className="flex items-center gap-2">
                             <span>{a.business_name}</span>
-                            {a.role_override && (
+                            {(a.custom_role || a.role_override) && (
                               <span className="text-xs rounded-full border px-2 py-0.5">
-                                as {ROLE_LABELS[a.role_override]}
+                                as {a.custom_role ? a.custom_role.name : a.role_override ? ROLE_LABELS[a.role_override] : ''}
                               </span>
                             )}
                             <button
@@ -402,14 +451,14 @@ export default function UsersPage() {
                             </AppSelect>
                           </div>
                           <div>
-                            <Label className="text-xs">Role override (optional)</Label>
+                            <Label className="text-xs">Role in this company (optional)</Label>
                             <AppSelect
                               className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                              value={grantForm.role_override}
-                              onChange={e => setGrantForm(g => ({ ...g, role_override: e.target.value as '' | Role }))}
+                              value={grantForm.access}
+                              onChange={e => setGrantForm(g => ({ ...g, access: e.target.value }))}
                             >
-                              <option value="">(no override)</option>
-                              {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                              <option value="">Their own role</option>
+                              <RoleOptions roles={customRoles} />
                             </AppSelect>
                           </div>
                           <div className="flex gap-2">

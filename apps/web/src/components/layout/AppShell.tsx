@@ -9,7 +9,7 @@ import { useActiveBusinessId, useCompanySwitchedElsewhere } from '@/lib/business
 import { setExportCompany } from '@/lib/reportExport';
 import { documentTitle } from '@/lib/pageTitle';
 import { useAuth } from '@/auth/useAuth';
-import { useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
+import { customRoleRefusal, useAccess, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -36,6 +36,7 @@ export function AppShell() {
   // A page the role cannot use is not opened, however it was reached (a typed
   // address, a bookmark, an old link). The API refuses the data either way.
   const role = useEffectiveRole();
+  const access = useAccess();
   const { pathname } = useLocation();
   const canOpen = useCanOpen();
   const allowed = canOpen(pathname);
@@ -63,13 +64,13 @@ export function AppShell() {
             <div className="mx-auto mt-16 max-w-md rounded-lg border bg-card p-8 text-center">
               <h1 className="text-lg font-semibold">This page is not part of your access</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                {role === 'client'
+                {customRoleRefusal(access, pathname) ?? (role === 'client'
                   ? 'Your login shows your invoices and financial reports. Ask your accountant if you need something else.'
                   : role === 'viewer'
                     ? 'A view-only login can look at the books and change nothing.'
                     : pathname.startsWith('/payroll')
                       ? 'Payroll is not open to your login. A firm admin can turn it on.'
-                      : 'It needs a login with more access than yours.'}
+                      : 'It needs a login with more access than yours.')}
               </p>
               <Link className="mt-4 inline-block text-sm font-medium text-link hover:underline" to="/">Back to the dashboard</Link>
             </div>

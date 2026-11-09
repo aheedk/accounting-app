@@ -4,9 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { hasMinRole } from '@accounting/shared';
 import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
-import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 /** Where to go once the document is saved. */
 type SaveDestination = 'detail' | 'new' | 'close';
@@ -51,9 +50,8 @@ export function useSaveAndPost() {
   const intent = useRef<SaveIntent>({ post: true, then: 'detail' });
   const nav = useNavigate();
   const restart = useContext(RestartContext);
-  const { user, businesses } = useAuth();
-  const [businessId] = useActiveBusinessId();
-  const role = businesses.find(b => b.id === businessId)?.role_override ?? user?.role;
+  // On the page that is open: for one of the firm's own roles, its level in this page's area.
+  const role = useEffectiveRole() ?? undefined;
   const canPost = role !== undefined && hasMinRole(role, 'accountant');
 
   /**

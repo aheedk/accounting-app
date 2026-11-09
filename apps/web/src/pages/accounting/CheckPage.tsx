@@ -23,6 +23,7 @@ import { fmtMoney } from '@/lib/money';
 import { fmtLongDate, todayLocal } from '@/lib/dates';
 import { previewCheck, type CheckLayout } from '@/lib/download';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -326,8 +327,9 @@ export default function CheckPage() {
   const [searchParams] = useSearchParams();
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const { user, businesses } = useAuth();
-  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  const { businesses } = useAuth();
+  // On the page that is open: for one of the firm's own roles, its level in this page's area.
+  const role = useEffectiveRole() ?? undefined;
 
   const [accounts, setAccounts] = useState<AccountLike[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

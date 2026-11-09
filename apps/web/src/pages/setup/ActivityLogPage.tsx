@@ -11,6 +11,7 @@ import { fmtDateTime } from '@/lib/dates';
 import { activityRecordName, activityVerb } from '@/lib/activityLabels';
 import { humanizeCode } from '@/lib/labels';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { useAuth } from '@/auth/useAuth';
 
 type Row = {
   id: string;
@@ -32,7 +33,10 @@ const PAGE_SIZE = 50;
 // firm admin can also see what belongs to no company: sign-ins and the users.
 export default function ActivityLogPage() {
   const [bizId] = useActiveBusinessId();
-  const isFirmAdmin = useEffectiveRole() === 'firm_admin';
+  // The firm's own log is a firm admin's; Full in Company & activity (a custom role) does not open it.
+  const pageRole = useEffectiveRole();
+  const { user } = useAuth();
+  const isFirmAdmin = pageRole === 'firm_admin' && user?.role === 'firm_admin';
   const [scope, setScope] = useState<'company' | 'firm'>('company');
   const [rows, setRows] = useState<Row[]>([]);
   const [hasMore, setHasMore] = useState(false);

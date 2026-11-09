@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
-import { useEffectiveRole } from '@/lib/roleAccess';
+import { useRoleFor } from '@/lib/roleAccess';
 
 const POLL_MS = 60_000; // refresh every minute
 
 export function usePendingImportCount(): number {
   const [bizId] = useActiveBusinessId();
-  // A client login has no AI inbox, so there is nothing to count or to ask for.
-  const role = useEffectiveRole();
+  // A client login has no AI inbox, and a custom role may have no AI & documents:
+  // then there is nothing to count or to ask for.
+  const role = useRoleFor()('/accounting/email-imports');
   const [count, setCount] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval>>();
 

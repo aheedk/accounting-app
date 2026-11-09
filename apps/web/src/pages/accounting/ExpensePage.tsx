@@ -8,7 +8,6 @@ import { api } from '@/lib/apiClient';
 import { pickErr } from '@/lib/apiErrors';
 import { cachedGet, invalidateReferenceCache } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
@@ -26,6 +25,7 @@ import { useAttachments, AttachmentsPanel } from '@/components/Attachments';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -322,8 +322,8 @@ export default function ExpensePage() {
   const chatDraftExpense: schemas.ExpenseAction | undefined = chatDraft?.type === 'expense' ? chatDraft : undefined;
   const [bizId] = useActiveBusinessId();
   const nav = useNavigate();
-  const { user, businesses } = useAuth();
-  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  // On the page that is open: for one of the firm's own roles, its level in this page's area.
+  const role = useEffectiveRole() ?? undefined;
 
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
   // The chart accounts set up under Banking; they count as banks whatever their detail type.

@@ -111,6 +111,7 @@ import CompanySettingsPage from '@/pages/setup/CompanySettingsPage';
 import QuickBooksImportPage from '@/pages/setup/QuickBooksImportPage';
 import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
+import RolesPage from '@/pages/setup/RolesPage';
 import CostCentersPage from '@/pages/setup/CostCentersPage';
 import InventoryListPage from '@/pages/inventory/InventoryListPage';
 import InventoryNewPage from '@/pages/inventory/InventoryNewPage';
@@ -330,6 +331,7 @@ export default function App() {
             <Route path="/setup/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/setup/cost-centers" element={<CostCentersPage />} />
             <Route path="/setup/users" element={<UsersPage />} />
+            <Route path="/setup/roles" element={<RolesPage />} />
 
             {/* Payroll (placeholders) */}
             <Route path="/payroll/overview" element={<PayrollOverviewPage />} />
