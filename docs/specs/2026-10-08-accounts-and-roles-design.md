@@ -81,7 +81,8 @@ within fifteen minutes.
 
 ## Roles
 
-There are five roles now, in this order:
+There are five roles now, in this order. A firm can add its own beside them, set
+area by area: see `2026-11-09-custom-roles-design.md`.
 
 | Role | Reads | Changes |
 |---|---|---|

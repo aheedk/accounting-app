@@ -1,6 +1,6 @@
 # Custom roles — Design Spec
 
-**Status:** Designed 2026-11-09. Asked for by Aheed: "make a proper one that you can
+**Status:** Implemented 2026-11-09 (migration `0116`). Asked for by Aheed: "make a proper one that you can
 also edit and add roles and change the users permissions through there, make it super
 customizable". Builds on `2026-10-08-accounts-and-roles-design.md`, which this does not
 change for anyone who keeps a built-in role.
@@ -58,9 +58,16 @@ to any login with access to the company. Attachments (`/files`, `/receipts`) go 
 the role's highest level anywhere, so whoever can enter a bill can attach its PDF.
 
 **Reading across areas.** The AI chat reads sales, purchases, banking and the ledger,
-so it needs at least View in each of those besides AI & documents. Search leaves out
-what the role cannot see (invoices and estimates without Sales; bills, checks and
-expenses without Expenses & bills; customers and vendors are lookups).
+so it acts at the lowest level the role has in those and AI & documents, and is
+refused when any of them is No access. Sending it a message is a change, so the chat
+button shows only when that lowest level is Enter or more. Search leaves out what the
+role cannot see (invoices and estimates without Sales; bills, checks and expenses
+without Expenses & bills; customers and vendors are lookups).
+
+**Approving from the AI inbox** records what the inbox coded (a bill, an expense, a
+deposit) through the inbox's own routes, so it is Post in AI & documents that decides,
+not the area of what is recorded. A firm that wants a reviewer who cannot touch bills
+keeps AI & documents at View for them.
 
 ## What stays firm admin only
 
@@ -99,9 +106,15 @@ firm-level guard, the access token and the list of companies work unchanged.
   firm's own, each with its level per area. New role, Edit, Duplicate, Delete. The
   editor is a grid: one row per area, the five levels across, a line under each area
   saying what it covers, and a count of the logins and company grants that use it.
-- **Setup → Users**: the role menus (the login's role, the role in Add user, the role
-  in Grant access) list the built-in roles, then the firm's own. Each user's row links
+- **Setup → Users**: "Add user" makes the login there and then, with a one-time
+  password shown once (it was "Invite user"; there is no mail service to invite by).
+  The role menus (the login's role, the role in Add user, the role in Grant access)
+  list the built-in roles, then the firm's own. Each user's row links
   to the role it has, to change what it allows.
+- **The dashboard** shows a figure only when the role can open where it leads (no cash
+  in the bank without Banking). A closed page names the area the role lacks.
+- **A renewed session** brings the login and its companies with it, so a role a firm
+  admin changes redraws an open browser's menu without a reload.
 - **What a login sees follows its level on the page it is on.** `useEffectiveRole()`
   gives, for a custom role, the built-in role of the level for the area of the page
   that is open, so `useCan()`, `hideUnless()` and every page that hides a button keep
