@@ -110,7 +110,9 @@ firm-level guard, the access token and the list of companies work unchanged.
   password shown once (it was "Invite user"; there is no mail service to invite by).
   The role menus (the login's role, the role in Add user, the role in Grant access)
   list the built-in roles, then the firm's own. Each user's row links
-  to the role it has, to change what it allows.
+  to the role it has, to change what it allows. Your own row shows your role in words
+  ("You. Another firm admin can change your role."), not a locked menu: the API refuses
+  changing your own role, and a greyed-out "Firm admin" read as broken.
 - **The dashboard** shows a figure only when the role can open where it leads (no cash
   in the bank without Banking). A closed page names the area the role lacks.
 - **A renewed session** brings the login and its companies with it, so a role a firm

@@ -388,15 +388,22 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="p-3">
-                      <AppSelect
-                        className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
-                        value={u.custom_role ? custom(u.custom_role.id) : builtin(u.role)}
-                        disabled={isSelf}
-                        onChange={e => changeRole(u.id, e.target.value)}
-                      >
-                        <RoleOptions roles={customRoles} />
-                      </AppSelect>
-                      {isSelf && <p className="text-xs text-muted-foreground mt-1">(you)</p>}
+                      {/* The API refuses changing your own role, so a firm can't be left without an
+                          admin. Words, not a locked menu: a greyed "Firm admin" read as broken. */}
+                      {isSelf ? (
+                        <>
+                          <p className="text-sm font-medium">{u.custom_role?.name ?? ROLE_LABELS[u.role]}</p>
+                          <p className="text-xs text-muted-foreground mt-1">You. Another firm admin can change your role.</p>
+                        </>
+                      ) : (
+                        <AppSelect
+                          className="h-9 rounded-md border bg-background px-2 text-sm"
+                          value={u.custom_role ? custom(u.custom_role.id) : builtin(u.role)}
+                          onChange={e => changeRole(u.id, e.target.value)}
+                        >
+                          <RoleOptions roles={customRoles} />
+                        </AppSelect>
+                      )}
                       {/* What the role allows, area by area, is changed on Setup → Roles. */}
                       {u.custom_role && (
                         <Link to={`/setup/roles?edit=${u.custom_role.id}`} className="mt-1 block text-xs text-link hover:underline">
