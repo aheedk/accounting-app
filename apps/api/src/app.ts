@@ -40,6 +40,7 @@ import bankRuleRoutes from './routes/bankRules.js';
 import fixedAssetRoutes from './routes/fixedAssets.js';
 import businessesRoutes from './routes/businesses.js';
 import usersRoutes from './routes/users.js';
+import rolesRoutes from './routes/roles.js';
 import costCentersRoutes from './routes/costCenters.js';
 import inventoryItemsRoutes from './routes/inventoryItems.js';
 import purchaseOrdersRoutes from './routes/purchaseOrders.js';
@@ -164,6 +165,7 @@ export function makeApp(): Express {
   app.use(fixedAssetRoutes);
   app.use(businessesRoutes);
   app.use(usersRoutes);
+  app.use(rolesRoutes);
   app.use(costCentersRoutes);
   app.use(inventoryItemsRoutes);
   app.use(purchaseOrdersRoutes);

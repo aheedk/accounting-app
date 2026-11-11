@@ -44,6 +44,9 @@ export function renewSession(opts: { keepTokenOnFailure?: boolean } = {}): Promi
       try {
         const r = await axios.post<SessionPayload>(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
         setAccessToken(r.data.access_token);
+        // The login and its companies as they are now: a role a firm admin just
+        // changed redraws the menu without a reload (AuthContext listens).
+        window.dispatchEvent(new CustomEvent<SessionPayload>(SESSION_RENEWED_EVENT, { detail: r.data }));
         return r.data;
       } catch {
         if (!opts.keepTokenOnFailure) {
@@ -61,6 +64,8 @@ export function renewSession(opts: { keepTokenOnFailure?: boolean } = {}): Promi
 export const SETUP_REQUIRED_EVENT = 'acct:setup-required';
 /** Fired when the session could not be renewed: it ended (12 hours, signed out elsewhere, a new password). */
 export const SESSION_ENDED_EVENT = 'acct:session-ended';
+/** Fired when the session was renewed, with what renewing returned (the login and its companies). */
+export const SESSION_RENEWED_EVENT = 'acct:session-renewed';
 
 export function makeClient(): AxiosInstance {
   const client = axios.create({ baseURL: API_URL, withCredentials: true });

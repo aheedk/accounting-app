@@ -7,7 +7,6 @@ import { api } from '@/lib/apiClient';
 import { Badge } from '@/components/ui/badge';
 import { cachedGet, invalidateReferenceCache } from '@/lib/referenceDataCache';
 import { useActiveBusinessId } from '@/lib/business';
-import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
@@ -26,6 +25,7 @@ import { todayLocal } from '@/lib/dates';
 import { previewDepositSummary, previewDepositSlipAndSummary, previewDepositAlignmentTest, type DepositDocInput } from '@/lib/download';
 import { humanizeCode } from '@/lib/labels';
 import { LoadingIndicator } from '@/components/ui/LoadingIndicator';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -333,8 +333,8 @@ export default function BankDepositPage() {
   const chatDraft = (location.state as ChatDraftState | null)?.chatDraft;
   const chatDraftDeposit = chatDraft?.type === 'deposit' ? chatDraft : undefined;
   const close = useCloseForm('/accounting/bank-deposits');
-  const { user, businesses } = useAuth();
-  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  // On the page that is open: for one of the firm's own roles, its level in this page's area.
+  const role = useEffectiveRole() ?? undefined;
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [accounts, setAccounts] = useState<AccountLike[]>([]);

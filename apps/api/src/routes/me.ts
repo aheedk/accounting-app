@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { sql } from 'kysely';
 import { requireAuth } from '../middleware/auth.js';
 import { db } from '../db/index.js';
-import { businessesForUser, firmSignInSettings, mayOpenPayroll, setupSteps } from '../services/auth/authService.js';
+import { businessesForUser, customRoleOf, firmSignInSettings, mayOpenPayroll, setupSteps } from '../services/auth/authService.js';
 
 const router = Router();
 
@@ -11,7 +11,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const { user_id } = req.auth!;
     const user = await db.selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'firm_id', 'payroll_access', 'must_change_password', 'totp_enabled_at'])
+      .select(['id', 'email', 'full_name', 'role', 'firm_id', 'payroll_access', 'must_change_password', 'totp_enabled_at', 'custom_role_id'])
       .where('id', '=', user_id)
       .where('deleted_at', 'is', null)
       .executeTakeFirst();
@@ -21,12 +21,13 @@ router.get('/me', requireAuth, async (req, res, next) => {
     const businesses = await businessesForUser(db, user);
     // What signing in says too: steps left before the app opens, and the idle sign-out.
     const firm = await firmSignInSettings(db, user.firm_id);
-    const { must_change_password: _m, totp_enabled_at: _t, ...shown } = user;
-    void _m; void _t;
+    const { must_change_password: _m, totp_enabled_at: _t, custom_role_id: _c, ...shown } = user;
+    void _m; void _t; void _c;
     res.json({
       user: {
         ...shown, payroll_access: mayOpenPayroll(user),
         setup_required: setupSteps(user, firm), idle_sign_out_minutes: firm.idle_sign_out_minutes,
+        custom_role: await customRoleOf(db, user),
       },
       businesses,
     });

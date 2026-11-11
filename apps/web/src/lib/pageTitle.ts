@@ -112,6 +112,7 @@ export const PAGE_NAMES: Record<string, string> = {
   '/setup/coa': 'Chart of Accounts Setup',
   '/setup/cost-centers': 'Cost Centers',
   '/setup/users': 'Users',
+  '/setup/roles': 'Roles',
   '/setup/activity': 'Activity Log',
   '/settings/tax-codes': 'Tax Codes',
   '/settings/periods': 'Fiscal Periods',

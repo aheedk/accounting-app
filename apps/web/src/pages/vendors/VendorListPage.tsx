@@ -20,6 +20,7 @@ import { pickErr } from '@/lib/apiErrors';
 import { flashMessage } from '@/lib/flash';
 import { mailtoLink, vendorInfoRequest } from '@/lib/mailto';
 import { formatPhone } from '@/lib/phone';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 const IMPORT_COLS = [
   { key: 'name', header: 'Name', required: true },
@@ -40,8 +41,9 @@ type Bill = { id: string; vendor_id: string; bill_date: string; due_date: string
 
 export default function VendorListPage() {
   const [bizId] = useActiveBusinessId();
-  const { user, businesses } = useAuth();
-  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  const { businesses } = useAuth();
+  // On the page that is open: for one of the firm's own roles, its level in this page's area.
+  const role = useEffectiveRole() ?? undefined;
   const canMakeInactive = role !== undefined && hasMinRole(role, 'accountant');
 
   const [items, setItems] = useState<Vendor[]>([]);

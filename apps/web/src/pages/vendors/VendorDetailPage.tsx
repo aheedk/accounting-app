@@ -23,6 +23,7 @@ import { formatPhone } from '@/lib/phone';
 import { printReport } from '@/lib/reportExport';
 import { humanizeCode } from '@/lib/labels';
 import { loadTableSettings, saveTableSettings } from '@/lib/tableSettings';
+import { useEffectiveRole } from '@/lib/roleAccess';
 
 // open_balance is what is owed, less unused credits and payments (vendorService.listVendors).
 type VendorListItem = { id: string; name: string; is_active: boolean; open_balance?: string };
@@ -196,8 +197,9 @@ export default function VendorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
   const [bizId] = useActiveBusinessId();
-  const { user, businesses } = useAuth();
-  const role = businesses.find(b => b.id === bizId)?.role_override ?? user?.role;
+  const { user } = useAuth();
+  // On the page that is open: for one of the firm's own roles, its level in this page's area.
+  const role = useEffectiveRole() ?? undefined;
   const canDelete = role !== undefined && hasMinRole(role, 'firm_admin');
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [vendorErr, setVendorErr] = useState<string | null>(null);

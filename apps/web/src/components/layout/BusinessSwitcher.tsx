@@ -5,6 +5,7 @@ import { useAuth } from '@/auth/useAuth';
 import { useActiveBusinessId } from '@/lib/business';
 import { cn } from '@/lib/utils';
 import { useArrowKeyMenu } from '@/lib/useArrowKeyMenu';
+import { ROLE_LABELS } from '@accounting/shared';
 
 // QBO-style company switcher: shows the current company and lets you jump to
 // another company, add a client, or return to the firm practice view.
@@ -138,9 +139,9 @@ export function BusinessSwitcher() {
                       <Building2 className="h-4 w-4" />
                     </div>
                     <span className="truncate">{b.name}</span>
-                    {b.role_override && (
+                    {(b.custom_role || b.role_override) && (
                       <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
-                        {b.role_override}
+                        {b.custom_role ? b.custom_role.name : b.role_override ? ROLE_LABELS[b.role_override] : ''}
                       </span>
                     )}
                   </button>

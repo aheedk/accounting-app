@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
-import { AUDIT, ERR } from '@accounting/shared';
+import { AUDIT, ERR, normalizePermissions, type Permissions } from '@accounting/shared';
 import type { DB, UserRole } from '../../db/types.js';
 import { AuthError } from '../../lib/errors.js';
 import { hashPassword, verifyPassword } from './passwordHasher.js';
@@ -66,6 +66,9 @@ export function setupSteps(
   return steps;
 }
 
+/** One of the firm's own roles, as the web app needs it to draw the menu (docs/specs/2026-11-09-custom-roles-design.md). */
+export type SessionCustomRole = { id: string; name: string; permissions: Permissions };
+
 export type LoginResult = {
   access_token: string;
   refresh_token: string; // raw; API caller is responsible for cookie-setting
@@ -77,10 +80,43 @@ export type LoginResult = {
     setup_required: SetupStep[];
     /** The browser signs out after this long with nothing done. */
     idle_sign_out_minutes: number;
+    /** The login's own role when it is one of the firm's (`role` is then staff). */
+    custom_role: SessionCustomRole | null;
   };
-  /** `fiscal_year_start_month` (1 to 12) is what "This year" means for that company. */
-  businesses: Array<{ id: string; name: string; role_override: UserRole | null; fiscal_year_start_month: number }>;
+  /**
+   * `fiscal_year_start_month` (1 to 12) is what "This year" means for that company.
+   * `custom_role` is one of the firm's roles given for that company, in place of `role_override`.
+   */
+  businesses: Array<{
+    id: string; name: string; role_override: UserRole | null; fiscal_year_start_month: number;
+    custom_role: SessionCustomRole | null;
+  }>;
 };
+
+/** The login's own custom role, if it has one. */
+export async function customRoleOf(
+  trx: Kysely<DB>,
+  user: { firm_id: string; custom_role_id: string | null },
+): Promise<SessionCustomRole | null> {
+  if (!user.custom_role_id) return null;
+  const row = await trx.selectFrom('firm_roles').select(['id', 'name', 'permissions'])
+    .where('id', '=', user.custom_role_id).where('firm_id', '=', user.firm_id).executeTakeFirst();
+  return row ? { id: row.id, name: row.name, permissions: normalizePermissions(row.permissions) } : null;
+}
+
+type BusinessRow = {
+  id: string; name: string; role_override: UserRole | null; fiscal_year_start_month: number;
+  custom_role_id: string | null; custom_role_name: string | null; custom_role_permissions: unknown;
+};
+
+function withCustomRole(rows: BusinessRow[]): LoginResult['businesses'] {
+  return rows.map(({ custom_role_id, custom_role_name, custom_role_permissions, ...business }) => ({
+    ...business,
+    custom_role: custom_role_id && custom_role_name
+      ? { id: custom_role_id, name: custom_role_name, permissions: normalizePermissions(custom_role_permissions) }
+      : null,
+  }));
+}
 
 /** Whether this login may open payroll: a firm admin always, anyone else unless it was switched off. */
 export function mayOpenPayroll(user: { role: UserRole; payroll_access: boolean }): boolean {
@@ -94,25 +130,29 @@ export async function businessesForUser(
   user: { id: string; firm_id: string; role: UserRole },
 ): Promise<LoginResult['businesses']> {
   if (user.role === 'firm_admin') {
-    return trx
+    return withCustomRole(await trx
       .selectFrom('businesses as b')
       .leftJoin('user_business_access as uba', (join) =>
         join.onRef('uba.business_id', '=', 'b.id').on('uba.user_id', '=', user.id),
       )
-      .select(['b.id', 'b.name', 'uba.role_override', 'b.fiscal_year_start_month'])
+      .leftJoin('firm_roles as fr', 'fr.id', 'uba.custom_role_id')
+      .select(['b.id', 'b.name', 'uba.role_override', 'b.fiscal_year_start_month',
+        'fr.id as custom_role_id', 'fr.name as custom_role_name', 'fr.permissions as custom_role_permissions'])
       .where('b.firm_id', '=', user.firm_id)
       .where('b.deleted_at', 'is', null)
       .orderBy('b.name')
-      .execute();
+      .execute());
   }
-  return trx
+  return withCustomRole(await trx
     .selectFrom('user_business_access as uba')
     .innerJoin('businesses as b', 'b.id', 'uba.business_id')
-    .select(['b.id', 'b.name', 'uba.role_override', 'b.fiscal_year_start_month'])
+    .leftJoin('firm_roles as fr', 'fr.id', 'uba.custom_role_id')
+    .select(['b.id', 'b.name', 'uba.role_override', 'b.fiscal_year_start_month',
+      'fr.id as custom_role_id', 'fr.name as custom_role_name', 'fr.permissions as custom_role_permissions'])
     .where('uba.user_id', '=', user.id)
     .where('b.deleted_at', 'is', null)
     .orderBy('b.name')
-    .execute();
+    .execute());
 }
 
 function ctxFromLogin(user: { id: string; firm_id: string; role: UserRole }, meta: ReqMeta): ServiceCtx {
@@ -234,6 +274,7 @@ export async function login(
       user: {
         id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id,
         payroll_access: mayOpenPayroll(user), setup_required: setup, idle_sign_out_minutes: firm.idle_sign_out_minutes,
+        custom_role: await customRoleOf(trx, user),
       },
       businesses,
     };
@@ -339,6 +380,7 @@ export async function refresh(
       user: {
         id: user.id, email: user.email, full_name: user.full_name, role: user.role, firm_id: user.firm_id,
         payroll_access: mayOpenPayroll(user), setup_required: setup, idle_sign_out_minutes: firm.idle_sign_out_minutes,
+        custom_role: await customRoleOf(trx, user),
       },
       businesses,
     };

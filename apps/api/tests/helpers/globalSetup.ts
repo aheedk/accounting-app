@@ -27,6 +27,10 @@ export async function setup() {
     .withDatabase('accounting')
     .withUsername('accounting')
     .withPassword('accounting')
+    // A throwaway database: nothing in it needs to survive a crash, and without
+    // these every truncate between tests waits on the disk (25-50 s each under
+    // Docker Desktop on Windows, found 2026-11-09, which timed out the hooks).
+    .withCommand(['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'full_page_writes=off'])
     .start();
 
   const url = container.getConnectionUri();

@@ -6,7 +6,7 @@ import { useActiveBusinessId } from '@/lib/business';
 import { api } from '@/lib/apiClient';
 import { fmtMoney } from '@/lib/money';
 import { todayLocal } from '@/lib/dates';
-import { roleAtLeast, roleLabel, useCanOpen, useEffectiveRole } from '@/lib/roleAccess';
+import { roleAtLeast, useCanOpen, useEffectiveRole, useRoleFor, useRoleName } from '@/lib/roleAccess';
 import { ArrowRight, FileBarChart, FilePlus2, Receipt, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -98,6 +98,7 @@ export default function DashboardPage() {
   const { user, businesses } = useAuth();
   const [activeId] = useActiveBusinessId();
   const role = useEffectiveRole();
+  const roleName = useRoleName();
   const summary = useSummary(activeId ?? null, role !== null && role !== 'client');
   const summaryCards = [
     ...(summary?.cash ? [{ label: 'Cash in the bank', value: summary.cash.total, hint: `${summary.cash.accounts} bank account${summary.cash.accounts === 1 ? '' : 's'}, book balance`, to: '/accounting/bank-accounts' }] : []),
@@ -107,7 +108,10 @@ export default function DashboardPage() {
   ];
   // Quick actions create things, so a role sees only the ones it can use.
   const canOpen = useCanOpen();
-  const actions = quickActions.filter(action => canOpen(action.to) && (!action.minRole || roleAtLeast(role, action.minRole)));
+  const roleFor = useRoleFor();
+  const actions = quickActions.filter(action => canOpen(action.to) && (!action.minRole || roleAtLeast(roleFor(action.to), action.minRole)));
+  // A figure is shown only to a role that can open where it leads (a custom role without Banking sees no cash).
+  const shownCards = summaryCards.filter(card => canOpen(card.to));
   const activeBusiness = businesses.find(b => b.id === activeId) ?? null;
   const firmPrefix = user?.full_name ? user.full_name.split(' ')[0] : null;
 
@@ -127,11 +131,11 @@ export default function DashboardPage() {
       </section>
 
       {/* Where the client stands today */}
-      {summaryCards.length > 0 && (
+      {shownCards.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Today</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {summaryCards.map(card => (
+            {shownCards.map(card => (
               <Link key={card.label} to={card.to} className="rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <Card className="h-full transition-colors hover:border-primary/40 hover:bg-secondary/40">
                   <CardContent className="p-5">
@@ -189,7 +193,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p><span className="text-muted-foreground">Signed in as</span> <span className="font-medium">{user?.email}</span></p>
-            <p><span className="text-muted-foreground">Role</span> <span className="font-medium">{roleLabel(role)}</span></p>
+            <p><span className="text-muted-foreground">Role</span> <span className="font-medium">{roleName}</span></p>
             <p><span className="text-muted-foreground">Businesses</span> <span className="font-medium">{businesses.length}</span></p>
           </CardContent>
         </Card>

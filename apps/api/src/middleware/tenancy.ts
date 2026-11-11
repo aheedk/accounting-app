@@ -1,14 +1,20 @@
 import type { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.js';
 import { AuthError, NotFoundError } from '../lib/errors.js';
-import { ERR, type Role } from '@accounting/shared';
+import { ERR, normalizePermissions, refusalMessage, roleForRequest, type Permissions, type Role } from '@accounting/shared';
 import { clientMayRequest } from '../lib/clientAccess.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      tenancy?: { business_id: string; effective_role: Role };
+      tenancy?: {
+        business_id: string;
+        /** For a custom role, the built-in role of its level in this request's area. */
+        effective_role: Role;
+        /** Set when the login acts here under one of the firm's own roles. */
+        permissions?: Permissions;
+      };
     }
   }
 }
@@ -34,20 +40,43 @@ export async function resolveBusiness(req: Request, _res: Response, next: NextFu
       .executeTakeFirst();
     if (!business || business.firm_id !== req.auth.firm_id) throw new NotFoundError('business', business_id);
 
-    const uba = await db.selectFrom('user_business_access')
-      .select(['role_override'])
-      .where('user_id', '=', req.auth.user_id)
-      .where('business_id', '=', business_id)
+    // The grant for this company and both kinds of role: one for this company
+    // (built-in or the firm's own), else the login's own (the firm's own, or the
+    // built-in one the access token carries).
+    const access = await db.selectFrom('users as u')
+      .leftJoin('user_business_access as uba', join => join
+        .onRef('uba.user_id', '=', 'u.id').on('uba.business_id', '=', business_id))
+      .leftJoin('firm_roles as company_role', join => join
+        .onRef('company_role.id', '=', 'uba.custom_role_id').on('company_role.firm_id', '=', req.auth!.firm_id))
+      .leftJoin('firm_roles as own_role', join => join
+        .onRef('own_role.id', '=', 'u.custom_role_id').on('own_role.firm_id', '=', req.auth!.firm_id))
+      .select([
+        'uba.id as grant_id', 'uba.role_override',
+        'company_role.permissions as company_permissions', 'company_role.id as company_role_id',
+        'own_role.permissions as own_permissions', 'own_role.id as own_role_id',
+      ])
+      .where('u.id', '=', req.auth.user_id)
       .executeTakeFirst();
-    if (!uba && req.auth.role !== 'firm_admin') throw new AuthError(ERR.FORBIDDEN, 'No access to this business');
+    if (!access?.grant_id && req.auth.role !== 'firm_admin') throw new AuthError(ERR.FORBIDDEN, 'No access to this business');
 
-    const effective_role = (uba?.role_override ?? req.auth.role) as Role;
+    let effective_role = (access?.role_override ?? req.auth.role) as Role;
+    let permissions: Permissions | undefined;
+    if (access?.company_role_id) permissions = normalizePermissions(access.company_permissions);
+    else if (!access?.role_override && access?.own_role_id) permissions = normalizePermissions(access.own_permissions);
+    if (permissions) {
+      // Docs: docs/specs/2026-11-09-custom-roles-design.md. The route's own guard
+      // then checks the built-in role of the level in this request's area.
+      const decided = roleForRequest(permissions, req.method, req.path);
+      if ('unmapped' in decided) throw new AuthError(ERR.FORBIDDEN, 'Your role has no access to this.');
+      if ('refused' in decided) throw new AuthError(ERR.FORBIDDEN, refusalMessage(decided.refused));
+      effective_role = decided.role;
+    }
     // Checked here, once, because every business route passes through this
     // middleware before its own handler. `req.path` is what follows the business id.
     if (effective_role === 'client' && !clientMayRequest(req.method, req.path)) {
       throw new AuthError(ERR.FORBIDDEN, 'A client login can view reports and invoices only.');
     }
-    req.tenancy = { business_id, effective_role };
+    req.tenancy = { business_id, effective_role, ...(permissions ? { permissions } : {}) };
     next();
   } catch (err) { next(err); }
 }

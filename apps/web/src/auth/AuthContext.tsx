@@ -1,8 +1,12 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, renewSession, setAccessToken, SESSION_ENDED_EVENT, SETUP_REQUIRED_EVENT } from '@/lib/apiClient';
+import type { Permissions } from '@accounting/shared';
+import { api, renewSession, setAccessToken, SESSION_ENDED_EVENT, SESSION_RENEWED_EVENT, SETUP_REQUIRED_EVENT, type SessionPayload } from '@/lib/apiClient';
 import { markSignedOut } from '@/lib/idleSession';
 
 export type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
+
+/** One of the firm's own roles (docs/specs/2026-11-09-custom-roles-design.md). */
+export type CustomRole = { id: string; name: string; permissions: Permissions };
 
 export type AuthUser = {
   id: string;
@@ -19,9 +23,13 @@ export type AuthUser = {
   setup_required?: Array<'password' | 'two_step'>;
   /** The browser signs out after this many minutes with nothing done (the firm's setting). */
   idle_sign_out_minutes?: number;
+  /** The login's own role when it is one of the firm's; `role` is then staff. */
+  custom_role?: CustomRole | null;
 };
 export type AuthBusiness = {
   id: string; name: string; role_override: Role | null;
+  /** One of the firm's own roles for this company, in place of `role_override`. */
+  custom_role?: CustomRole | null;
   /** First month of the company's fiscal year, 1 to 12. See lib/fiscalYear.ts. */
   fiscal_year_start_month?: number;
 };
@@ -90,6 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(out.user as AuthUser);
     setBusinesses((out.businesses as AuthBusiness[] | undefined) ?? []);
+  }, []);
+
+  // Renewed in the background (a firm admin changed this login's role, say):
+  // the menu follows what the session now says.
+  useEffect(() => {
+    const onRenewed = (event: Event) => {
+      const detail = (event as CustomEvent<SessionPayload>).detail;
+      if (!detail?.user) return;
+      setUser(detail.user as AuthUser);
+      setBusinesses((detail.businesses as AuthBusiness[] | undefined) ?? []);
+    };
+    window.addEventListener(SESSION_RENEWED_EVENT, onRenewed);
+    return () => window.removeEventListener(SESSION_RENEWED_EVENT, onRenewed);
   }, []);
 
   // The API refused a call because the login has steps left: show them.

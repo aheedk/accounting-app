@@ -74,9 +74,11 @@ below are updated.
    - Add `?sslmode=verify-full&sslrootcert=apps/api/certs/supabase-ca.crt`, so
      the API checks it is really talking to Supabase.
 4. **Storage.** Create a private bucket, `uploads`. Under Storage → S3
-   Connection, create an access key. The endpoint is
-   `https://<project>.supabase.co/storage/v1/s3`, and the region is the
-   project's (`us-east-1`).
+   Connection, create an access key. The endpoint is the one Storage → S3
+   shows, `https://<project>.storage.supabase.co/storage/v1/s3` (Azure's
+   `S3_ENDPOINT` changed to it 11-06), and the region is the project's
+   (`us-east-1`). **11-06:** the bucket and an `azure-api` key were already
+   there (made 10-30). A key's secret shows only once, when it is made.
 5. **Backups.** The Pro plan takes a backup every day and keeps the last 7.
    No point-in-time recovery for now (10-29): it restores to any minute, but
    it is $100 a month on top of the plan's $25. It can be turned on later.
@@ -89,7 +91,42 @@ below are updated.
 GitHub's sign-in `github-deploy-accounting-app` with its roles, and every GitHub
 variable except `AZURE_WEBAPP_NAME` and `API_ORIGIN`.
 
-**Waiting on Microsoft:** a new subscription may run no App Service at all in
+**Done 11-05:** the quota was raised. Created the plan `khanarndt-accounting-plan`
+(Linux, B1, East US, one instance) and the web app `khanarndt-accounting-api` on
+it, at **`https://khanarndt-accounting-api-g2fjghhefjdrgcfm.eastus-01.azurewebsites.net`**:
+Azure now gives a new app a unique default hostname, not `<app>.azurewebsites.net`,
+so that is the address wherever this plan says `<app>.azurewebsites.net`.
+- Sidecar support is **off**: the deploy uses `az webapp config container set`,
+  the single-container command. It runs Azure's sample page until the first deploy.
+- System-assigned identity on; it pulls from the registry with it
+  (`acrUseManagedIdentityCreds`). Always On, health check `/health`, HTTPS only,
+  TLS 1.2, FTP and basic authentication off. No Application Insights.
+- Every app setting in step 3 is set, the seven secrets as Key Vault references
+  (`@Microsoft.KeyVault(VaultName=khanarndt-acct-kv;SecretName=…)`).
+  `ANTHROPIC_WORKSPACE_ID` is optional: copy it too if Railway has it (11-08:
+  it doesn't; Railway's API has 11 variables, and `ADMIN_EMAIL`,
+  `ADMIN_PASSWORD`, `NIXPACKS_NO_CACHE` and `JWT_REFRESH_TTL_DAYS` aren't
+  needed on Azure). Railway sets `JWT_ACCESS_TTL_MINUTES`, which Azure doesn't
+  (the default is 15): copy it if Railway's isn't 15.
+- GitHub variables `AZURE_WEBAPP_NAME` and `API_ORIGIN` are set, so the deploy
+  is switched on.
+- **Roles given 11-06** (Aheed, in Cloud Shell): AcrPull on the registry and Key
+  Vault Secrets User on the vault for the web app's identity, and Website
+  Contributor on the web app for GitHub's sign-in.
+- **Secrets, 11-08:** all seven are in the vault, and every reference on the web
+  app resolves (green) after "Pull reference values". Checked by shape only:
+  `database-url` is the session pooler with the certificate check on the end,
+  `field-encryption-key` is 64 characters, the Anthropic key starts `sk-ant-`,
+  none has a space. `field-encryption-key` is new (made in Cloud Shell with
+  `openssl rand -hex 32`, see step 3 below) and is on Railway too, as
+  `FIELD_ENCRYPTION_KEY`. The Supabase key is `azure-api-2`.
+- **Gmail was never connected on Railway** (checked 11-08): 0 `gmail.connect`
+  in its audit log; the 9 emailed imports are all from 09-11, the other 109
+  were uploaded. Aheed's Google account has no client for the app either. So
+  there is no Google client to add the Azure callback to, and nothing to copy
+  at the switch-over: setting Gmail up is new work, done on Azure afterwards.
+
+**Was waiting on Microsoft (resolved by 11-05):** a new subscription may run no App Service at all in
 East US (every size's quota is 0 of 0; Central US had 30). Only a subscription
 Contributor or Owner can raise it: Quotas → App Service → East US → **B1 VMs** →
 request 1. Asif, who set up the firm's Azure and Supabase, asked on 10-31; the
@@ -117,7 +154,11 @@ database in Virginia.
      `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true`, `WEBSITES_PORT=8080`.
    - **`FIELD_ENCRYPTION_KEY` must be the same value as on Railway**, or the
      encrypted SSNs, tax IDs and two-step secrets cannot be read. Keep the JWT
-     secrets the same too.
+     secrets the same too. **Found 11-06: Railway has no `FIELD_ENCRYPTION_KEY`**,
+     and its database holds no encrypted value (0 vendor tax IDs, 0 SSNs, 0
+     two-step secrets), so saving any of them there fails. A new key is made
+     in the vault, and the same value goes onto Railway, so nothing saved
+     before the switch-over is encrypted with a different key.
    - Put the secrets in a Key Vault and reference them from the settings. In
      `khanarndt-acct-kv`: `database-url`, `jwt-access-secret`,
      `jwt-refresh-secret`, `field-encryption-key`, `anthropic-api-key`,
@@ -156,39 +197,68 @@ database in Virginia.
    - The pooler only took the password after it was reset and pasted in, not
      typed: a wrong one gives "password authentication failed for user
      postgres". The project is on `aws-0-us-east-1`; `aws-1` doesn't know it.
-2. Run the deploy workflow (Actions → Deploy to Azure → Run workflow).
-3. On the Static Web App's address:
-   - sign in;
-   - open two clients;
-   - compare a Balance Sheet with Railway's;
-   - upload an attachment and open it again.
-4. Check that the Activity Log shows your own address, and that the deploy log
-   says "Supabase roles anon and authenticated: no access to public."
+2. ~~Run the deploy workflow.~~ It ran by itself: the switch-on (11-05) means
+   every push to `main` that passes CI deploys to Azure too, so Riham's pushes
+   of 11-06 and 11-07 did it (all three runs passed). On 11-08 the API answers
+   `/health`; it starts only after its migrations reach Supabase, so the
+   database and the certificate check work. Supabase: last migration 0115,
+   and `anon`/`authenticated` hold no grants on `public`.
+3. ~~On the Static Web App's address: sign in; open two clients; compare a
+   Balance Sheet with Railway's; upload an attachment and open it again.~~
+   **Done 11-08**, all passed:
+   - Signed in; the session renews, so the cross-site sign-in cookie works.
+   - 94 pages opened in turn (every sidebar area and 36 reports): 197 API calls,
+     all 200, none slow (median 176 ms, slowest 1.7 s, the General Ledger), no
+     error on any page.
+   - Alexander Pharmacy (checked by Aheed) and Donovan's Auto: the Balance
+     Sheet as of 10-31 is the same to the cent on both.
+   - A receipt PDF uploaded to Supabase Storage and came back byte for byte
+     (the `azure-api-2` keys work). A test PDF in the AI inbox was read and
+     classed in 3.4 s (the Anthropic key works). Both are trial rows, which
+     `replace` wipes; the receipt's object stays in the bucket, 398 bytes.
+4. ~~Check that the Activity Log shows your own address~~ **Done 11-08.** The
+   session shows this machine's public address, with no port. The lockdown
+   was checked directly instead of in the deploy log: `anon`/`authenticated`
+   hold no grants. **Found 11-08:** Railway records the wrong address. The same
+   browser, a minute apart, was recorded on Railway as an address that is not
+   this machine's, on the same network as its sessions since 10-08. Most
+   likely the last X-Forwarded-For hop there is Railway's own proxy, so the
+   sign-in limit by address and the Activity Log see the proxy. Azure is
+   right, so nothing to fix; the move ends it.
 
 ## Switch-over (one evening)
 
-1. **Freeze.** Tell the firm nothing is entered for about two hours.
-2. **Database.** `bin/copy-to-supabase.sh replace`: it takes the final dump from
-   Railway, empties the trial's data (drops and recreates `public`), restores
-   the dump into Supabase and compares the row counts. Keep that dump with the
-   Railway service (step 9).
-3. **Files.** `railway ssh` into the API service, then run
-   `npm run files:upload -- "$FILE_STORAGE_DIR"` there with the Supabase
-   Storage variables set. The script is in the deployed code, so nothing
-   needs downloading.
-4. **Deploy.** Run the deploy workflow, which migrates and locks down again.
-5. **Gmail.** Copy `gmail-credentials.json` and `gmail-token.json` from
-   Railway's secrets folder into `/home/secrets` (App Service → SSH). With the
-   token there, Gmail keeps working without reconnecting. If it has to be
-   reconnected, the Azure callback must be in the Google client first.
-6. **Old address.** Change `netlify.toml` to send every page to the new
-   address (301), so old bookmarks keep working.
+**Done 11-08, the afternoon the trial passed.** Aheed said the data on Railway
+was not important, so there was no freeze and no file copy; the database was
+still copied, so nothing entered since 11-01 was lost.
+
+1. ~~**Freeze.**~~ Skipped (above).
+2. **Database. Done 11-08.** `bin/copy-to-supabase.sh replace` took a final
+   dump of Railway (283 MB, `backups/accounting-20261108-183257.dump`, kept on
+   this machine with the Railway service as the way back), emptied the trial's
+   data (dropped and recreated `public`), restored the dump into Supabase, and
+   all 79 tables matched Railway's row counts.
+3. ~~**Files.**~~ Skipped (above). Railway's API has no volume and no
+   `FILE_STORAGE_DIR`: files went to `./.local-data/files` inside the
+   container, which each deploy replaces. The 14 `files` rows (06-25 to
+   10-21) all predate Railway's redeploys of 11-06 to 11-08, so their files
+   were already gone; on Azure those 14 rows point at nothing. Supabase
+   Storage ends this.
+4. **Deploy. Done 11-08** by pushing the redirect below: CI, then the Azure
+   deploy, which migrates and locks down again.
+5. ~~**Gmail.**~~ Nothing to copy: Gmail was never connected on Railway (found
+   11-08, see Azure above). When the firm wants emailed documents, make a
+   Google client with the Azure callback, put its file at
+   `/home/secrets/gmail-credentials.json` (App Service → SSH), and a firm
+   admin clicks Connect Gmail.
+6. **Old address. Done 11-08.** `apps/web/netlify.toml` sends every page to
+   the same path on the new address (301), so old bookmarks keep working.
 7. **Phone app.** Riham sets `EXPO_PUBLIC_API_URL` to the new API and ships a
-   build.
+   build. Until then the phone app still calls Railway.
 8. **Everyone signs in again.** The API's address changed, so the sign-in
    cookie is new.
-9. **Railway.** Stop the API service, but don't delete it. Keep it two weeks
-   as the way back, with the final dump.
+9. **Railway.** Aheed stops the API service, but doesn't delete it. Keep it
+   two weeks as the way back, with the final dump.
 
 **Going back:** if the new setup fails before anyone has entered anything
 there, start Railway's service again and undo the Netlify redirect. If work

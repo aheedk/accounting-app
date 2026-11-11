@@ -133,6 +133,11 @@ const FIRM_ADMIN_ONLY = [
   'DELETE ~/vendors/:id',
   'GET /firm-overview',
   'GET /me/firm/activity-log',
+  // The firm's own roles (docs/specs/2026-11-09-custom-roles-design.md).
+  'GET /me/firm/roles',
+  'POST /me/firm/roles',
+  'PATCH /me/firm/roles/:id',
+  'DELETE /me/firm/roles/:id',
   'GET /me/firm/security',
   'GET /me/firm/users',
   'GET ~/employees/:id/ssn-reveal',

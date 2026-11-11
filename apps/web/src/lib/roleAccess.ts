@@ -1,18 +1,76 @@
-import { hasMinRole, ROLE_LABELS, type Role } from '@accounting/shared';
+import { hasMinRole, pagePlaceOf, roleForPage, roleForRequest, ROLE_LABELS, AREA_INFO, type Role } from '@accounting/shared';
 import { useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
+import type { CustomRole } from '@/auth/AuthContext';
 import { useActiveBusinessId } from '@/lib/business';
 
 /**
- * The signed-in user's role on the company that is open. A role given for one
- * company (Setup → Users) wins over the user's role in the firm, the same rule
+ * What the signed-in login has on the company that is open: a built-in role, or
+ * one of the firm's own (docs/specs/2026-11-09-custom-roles-design.md). A role
+ * given for one company (Setup → Users) wins over the login's own, the same rule
  * the API applies.
  */
-export function useEffectiveRole(): Role | null {
+export type Access =
+  | { kind: 'builtin'; role: Role }
+  | { kind: 'custom'; role: CustomRole };
+
+export function useAccess(): Access | null {
   const { user, businesses } = useAuth();
   const [activeId] = useActiveBusinessId();
   if (!user) return null;
-  return businesses.find(b => b.id === activeId)?.role_override ?? user.role;
+  const business = businesses.find(b => b.id === activeId);
+  if (business?.custom_role) return { kind: 'custom', role: business.custom_role };
+  if (business?.role_override) return { kind: 'builtin', role: business.role_override };
+  if (user.custom_role) return { kind: 'custom', role: user.custom_role };
+  return { kind: 'builtin', role: user.role };
+}
+
+/**
+ * The built-in role the login acts as on the page at `pathname`. For a custom
+ * role that is the role of its level in the page's area, so every page that
+ * asks `useCan()` or `roleAtLeast()` keeps working; null where it has no access.
+ */
+export function roleOnPage(access: Access | null, pathname: string): Role | null {
+  if (!access) return null;
+  return access.kind === 'builtin' ? access.role : roleForPage(access.role.permissions, pathname);
+}
+
+/** The signed-in login's role on the company that is open, on the page that is open. */
+export function useEffectiveRole(): Role | null {
+  const access = useAccess();
+  const { pathname } = useLocation();
+  return roleOnPage(access, pathname);
+}
+
+/** `roleOnPage` for any page, for a menu or a link that leads elsewhere. */
+export function useRoleFor(): (pathname: string) => Role | null {
+  const access = useAccess();
+  return useCallback((pathname: string) => roleOnPage(access, pathname), [access]);
+}
+
+/** The name of the login's role on the open company: "Accountant", or a custom role's own name. */
+export function useRoleName(): string {
+  const access = useAccess();
+  if (!access) return '';
+  return access.kind === 'custom' ? access.role.name : ROLE_LABELS[access.role];
+}
+
+/** Why a page is closed to a custom role, naming the area it lacks; null when it is not a custom role's area. */
+export function customRoleRefusal(access: Access | null, pathname: string): string | null {
+  if (access?.kind !== 'custom') return null;
+  const place = pagePlaceOf(pathname);
+  if (place.kind !== 'area') return 'This page is for a firm admin.';
+  return `Your role, ${access.role.name}, has no access to ${AREA_INFO[place.area].label}. A firm admin can change it on Setup → Roles.`;
+}
+
+/** Whether the AI chat is open to this login: it writes, and reads sales, purchases, banking and the ledger. */
+export function useCanChat(): boolean {
+  const access = useAccess();
+  if (!access) return false;
+  if (access.kind === 'builtin') return access.role !== 'client' && access.role !== 'viewer';
+  const decided = roleForRequest(access.role.permissions, 'POST', '/chat');
+  return 'role' in decided && decided.role !== 'viewer';
 }
 
 // A client login sees its own invoices and the financial reports, and nothing
@@ -34,7 +92,7 @@ const CLIENT_ONLY_PAGES = ['/documents/send'];
 
 // Pages where everything on them is for a firm admin. Hidden from the others
 // rather than opened and left to fail.
-const FIRM_ADMIN_PAGES = ['/firm', '/setup/users', '/clients/new', '/accounting/client-overview', '/payroll/employees/new'];
+const FIRM_ADMIN_PAGES = ['/firm', '/setup/users', '/setup/roles', '/clients/new', '/accounting/client-overview', '/payroll/employees/new'];
 
 // Pages for an accountant and up. The activity log shows every record before and
 // after each change; the rest are forms the API takes only from an accountant, so
@@ -80,7 +138,7 @@ export function roleAtLeast(role: Role | null, min: Role): boolean {
   return role !== null && hasMinRole(role, min);
 }
 
-/** The role as a person reads it: "View only", not "viewer". */
+/** The role as a person reads it: "View only", not "viewer". For a custom role, `useRoleName()`. */
 export function roleLabel(role: Role | null | undefined): string {
   return role ? ROLE_LABELS[role] : '';
 }
@@ -90,11 +148,13 @@ export function roleLabel(role: Role | null | undefined): string {
  * switch. What the sidebar, + New, search and the page shell all ask.
  */
 export function useCanOpen(): (pathname: string) => boolean {
-  const role = useEffectiveRole();
+  const access = useAccess();
   const { user } = useAuth();
   // Absent on a session from before the switch existed: that login keeps payroll until it next signs in.
   const payroll = user?.payroll_access !== false;
-  return useCallback((pathname: string) => canOpenPage(role, pathname, { payroll }), [role, payroll]);
+  // Each page is asked about with the role the login has on that page: for a
+  // custom role, the level of the page's own area (null: none, or a firm page).
+  return useCallback((pathname: string) => canOpenPage(roleOnPage(access, pathname), pathname, { payroll }), [access, payroll]);
 }
 
 /** What the signed-in login may do on the open company, for showing or hiding a button. */

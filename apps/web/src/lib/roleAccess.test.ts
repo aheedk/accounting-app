@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canOpenPage, roleAtLeast } from './roleAccess';
+import { AREAS, type Level, type Permissions } from '@accounting/shared';
+import { canOpenPage, customRoleRefusal, roleAtLeast, roleOnPage, type Access } from './roleAccess';
 
 describe('canOpenPage', () => {
   it('gives a client the dashboard, its invoices and the financial reports', () => {
@@ -79,5 +80,41 @@ describe('roleAtLeast', () => {
     expect(roleAtLeast('viewer', 'staff')).toBe(false);
     expect(roleAtLeast('viewer', 'client')).toBe(true);
     expect(roleAtLeast(null, 'client')).toBe(false);
+  });
+});
+
+describe('a custom role on a page (docs/specs/2026-11-09-custom-roles-design.md)', () => {
+  const all = (level: Level) => Object.fromEntries(AREAS.map(area => [area, level])) as Permissions;
+  const access = (permissions: Permissions): Access => ({ kind: 'custom', role: { id: 'r1', name: 'Bookkeeper', permissions } });
+  const open = (a: Access, page: string) => canOpenPage(roleOnPage(a, page), page);
+
+  it('opens a page at the level of its area, and none where the area is closed', () => {
+    const bookkeeper = access({ ...all('enter'), payroll: 'none', accounting: 'post' });
+    expect(open(bookkeeper, '/ap/bills/new')).toBe(true);
+    expect(open(bookkeeper, '/payroll/employees')).toBe(false);
+    // Journal entries are an accountant's form: Post in Accounting opens it.
+    expect(open(bookkeeper, '/journal/new')).toBe(true);
+    // Pay Bills is an accountant's form in Expenses & bills, where this role only enters.
+    expect(open(bookkeeper, '/ap/pay-bills')).toBe(false);
+    expect(roleOnPage(bookkeeper, '/invoices')).toBe('staff');
+  });
+
+  it('never opens the firm\'s own pages, even at Full everywhere', () => {
+    for (const page of ['/setup/users', '/setup/roles', '/firm', '/clients/new']) expect(open(access(all('full')), page), page).toBe(false);
+    // Full in an area is a firm admin there: adding an employee.
+    expect(open(access(all('full')), '/payroll/employees/new')).toBe(true);
+  });
+
+  it('a view level opens lists but not the forms that add', () => {
+    const viewer = access({ ...all('none'), sales: 'view' });
+    expect(open(viewer, '/invoices')).toBe(true);
+    expect(open(viewer, '/invoices/new')).toBe(false);
+    expect(open(viewer, '/')).toBe(true);
+    expect(open(access(all('none')), '/')).toBe(false);
+  });
+
+  it('says which area a closed page needs', () => {
+    expect(customRoleRefusal(access(all('none')), '/payroll/pay-runs')).toMatch(/Bookkeeper, has no access to Payroll/);
+    expect(customRoleRefusal({ kind: 'builtin', role: 'staff' }, '/payroll')).toBeNull();
   });
 });
