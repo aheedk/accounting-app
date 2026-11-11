@@ -22,7 +22,7 @@ export function FirmShell() {
 
   // Nothing printed or exported from here is headed with a client's name.
   useEffect(() => { setExportCompany(''); }, []);
-  useEffect(() => { document.title = 'All clients - Accounting App'; }, []);
+  useEffect(() => { document.title = 'All clients - Accmatica'; }, []);
 
   if (user && user.role !== 'firm_admin') return <Navigate to="/" replace />;
 

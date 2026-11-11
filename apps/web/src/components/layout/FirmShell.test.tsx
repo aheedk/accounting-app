@@ -58,7 +58,7 @@ describe('FirmShell', () => {
     expect(container.textContent).toContain('usual sidebar');
     expect(container.textContent).not.toContain('Blue Widget Co.');
     expect(getExportCompany()).toBe('');
-    expect(document.title).toBe('All clients - Accounting App');
+    expect(document.title).toBe('All clients - Accmatica');
   });
 
   it('sends anyone but a firm admin to the dashboard of the company that is open', async () => {

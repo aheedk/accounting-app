@@ -168,5 +168,5 @@ export function pageName(pathname: string): string | null {
 
 /** What the browser tab says: the page first, so it survives a narrow tab. */
 export function documentTitle(pathname: string, company: string): string {
-  return [pageName(pathname), company || 'Accounting App'].filter(Boolean).join(' - ');
+  return [pageName(pathname), company || 'Accmatica'].filter(Boolean).join(' - ');
 }

@@ -31,7 +31,7 @@ describe('documentTitle', () => {
   });
 
   it('falls back to the app name', () => {
-    expect(documentTitle('/reports/balance-sheet', '')).toBe('Balance Sheet - Accounting App');
+    expect(documentTitle('/reports/balance-sheet', '')).toBe('Balance Sheet - Accmatica');
     expect(documentTitle('/x/123', 'Green Gadgets')).toBe('Green Gadgets');
   });
 });
