@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
+import accmaticaLogo from '@/assets/accmatica-logo.png';
 import {
   BookOpen,
   Sparkles,
@@ -13,7 +14,6 @@ import {
   Upload,
   Package,
   Settings,
-  Sigma,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -206,9 +206,7 @@ export function SidebarBrand() {
       title={home === '/' ? 'Dashboard' : 'All clients'}
       className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4 transition-colors hover:bg-sidebar-hover/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
     >
-      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gold/90 text-sidebar">
-        <Sigma className="h-[18px] w-[18px]" strokeWidth={2.5} />
-      </div>
+      <img src={accmaticaLogo} alt="Accmatica" className="h-8 w-8 object-contain" />
       <span className="font-display text-lg tracking-tight text-gold">Accmatica</span>
     </Link>
   );
