@@ -32,6 +32,15 @@ function parseOptions(children: React.ReactNode): OptionData[] {
     } else if (child.type === 'optgroup') {
       const gp = child.props as { children?: React.ReactNode };
       opts.push(...parseOptions(gp.children));
+    } else if (child.type === React.Fragment) {
+      const fp = child.props as { children?: React.ReactNode };
+      opts.push(...parseOptions(fp.children));
+    } else if (typeof child.type === 'function') {
+      // AppSelect never renders `children` through React — it only walks the element
+      // tree — so a reusable component that injects <option>/<optgroup> elements (e.g.
+      // a shared role-option list) has to be resolved by calling it ourselves, or its
+      // options silently vanish (gave an empty, unsearchable list on Setup → Users).
+      opts.push(...parseOptions((child.type as (props: unknown) => React.ReactNode)(child.props)));
     }
   });
   return opts;

@@ -38,6 +38,39 @@ describe('AppSelect', () => {
     expect((onChange.mock.calls[0]![0] as { target: { value: string } }).target.value).toBe('check');
   });
 
+  it('resolves options injected by a wrapping component, like Setup → Users\' RoleOptions', () => {
+    // AppSelect walks raw <option>/<optgroup> elements rather than rendering
+    // `children` through React, so a reusable component that injects them (as
+    // Setup → Users' role dropdowns do) has to be called, not just inspected.
+    function InjectedOptions() {
+      return (
+        <>
+          <optgroup label="Built-in roles">
+            <option value="builtin:firm_admin">Firm admin</option>
+            <option value="builtin:staff">Staff</option>
+          </optgroup>
+        </>
+      );
+    }
+    const onChange = vi.fn();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(
+      <AppSelect value="builtin:staff" onChange={onChange}>
+        <InjectedOptions />
+      </AppSelect>,
+    ));
+
+    expect(host.querySelector('button[aria-haspopup="listbox"]')?.textContent).toBe('Staff');
+    act(() => (host!.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement).click());
+    const admin = [...document.querySelectorAll('[role="option"]')].find(o => o.textContent?.includes('Firm admin')) as HTMLElement;
+    expect(admin).toBeDefined();
+    act(() => admin.click());
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect((onChange.mock.calls[0]![0] as { target: { value: string } }).target.value).toBe('builtin:firm_admin');
+  });
+
   it('shows the whole name on hover when it is cut off', () => {
     const long = '1010 — Operating Bank Account at First National Bank';
     host = document.createElement('div');
