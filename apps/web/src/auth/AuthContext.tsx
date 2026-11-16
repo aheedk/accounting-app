@@ -40,6 +40,8 @@ type AuthState = {
   businesses: AuthBusiness[];
   /** `code` is the 6-digit second step, for a login that has it on. */
   login: (email: string, password: string, code?: string) => Promise<void>;
+  /** Sets the password on an invited login and signs it straight in. */
+  acceptInvitation: (token: string, password: string, fullName?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   /** Renews the session, so a step just done (a new password, the second step) takes effect. */
@@ -66,6 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string, code?: string) => {
     const r = await api.post('/auth/login', { email, password, ...(code ? { code } : {}) });
+    setAccessToken(r.data.access_token);
+    setUser(r.data.user);
+    setBusinesses(r.data.businesses ?? []);
+    setStatus('authenticated');
+  }, []);
+
+  const acceptInvitation = useCallback(async (token: string, password: string, fullName?: string) => {
+    const r = await api.post('/auth/accept-invitation', { token, password, ...(fullName ? { full_name: fullName } : {}) });
     setAccessToken(r.data.access_token);
     setUser(r.data.user);
     setBusinesses(r.data.businesses ?? []);
@@ -137,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
   }, []);
 
-  const value = useMemo<AuthState>(() => ({ status, user, businesses, login, logout, refresh, renew }), [status, user, businesses, login, logout, refresh, renew]);
+  const value = useMemo<AuthState>(() => ({ status, user, businesses, login, acceptInvitation, logout, refresh, renew }),
+    [status, user, businesses, login, acceptInvitation, logout, refresh, renew]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

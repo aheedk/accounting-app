@@ -46,6 +46,19 @@ export async function hashRefreshToken(raw: string): Promise<string> {
   return crypto.createHmac('sha256', config.JWT_REFRESH_SECRET).update(raw).digest('hex');
 }
 
+/**
+ * A one-time link token: an invitation, or a "forgot password" reset. Same
+ * shape as a refresh token (32 random bytes), hashed with a different secret
+ * (JWT_ACCESS_SECRET) so the two purposes don't share a keyspace.
+ */
+export function generateSetupToken(): string {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+export async function hashSetupToken(raw: string): Promise<string> {
+  return crypto.createHmac('sha256', config.JWT_ACCESS_SECRET).update(raw).digest('hex');
+}
+
 // Connecting the firm's Gmail goes through Google and back, so the callback
 // cannot see who started it. The start hands Google this short-lived token as
 // `state`; the callback takes only a reply carrying one, made for this purpose

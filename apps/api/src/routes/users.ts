@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireMinRole } from '../middleware/rbac.js';
 import { AuthError } from '../lib/errors.js';
 import * as userSvc from '../services/admin/userManagementService.js';
+import { resendInvitation } from '../services/auth/invitationService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router();
@@ -77,6 +78,29 @@ router.patch('/me/firm/users/:id', async (req, res, next) => {
         : { user_id, role: 'staff', custom_role_id: body.custom_role_id }),
     );
     res.json(updated);
+  } catch (e) { next(e); }
+});
+
+router.patch('/me/firm/users/:id/profile', async (req, res, next) => {
+  try {
+    const body = schemas.userProfileUpdateSchema.parse(req.body);
+    const updated = await db.transaction().execute(trx =>
+      userSvc.updateUserProfile(trx, ctxFromReq(req), { user_id: req.params['id']!, full_name: body.full_name }));
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
+router.delete('/me/firm/users/:id', async (req, res, next) => {
+  try {
+    await db.transaction().execute(trx => userSvc.deleteUser(trx, ctxFromReq(req), { user_id: req.params['id']! }));
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+router.post('/me/firm/users/:id/resend-invitation', async (req, res, next) => {
+  try {
+    const result = await db.transaction().execute(trx => resendInvitation(trx, ctxFromReq(req), { user_id: req.params['id']! }));
+    res.json(result);
   } catch (e) { next(e); }
 });
 

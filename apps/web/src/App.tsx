@@ -5,6 +5,9 @@ import { AppShell } from '@/components/layout/AppShell';
 import { ChatPanelHost } from '@/components/chat/ChatPanelHost';
 import { FirmShell } from '@/components/layout/FirmShell';
 import LoginPage from '@/pages/LoginPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import AcceptInvitationPage from '@/pages/AcceptInvitationPage';
 import DashboardPage from '@/pages/DashboardPage';
 import AccountPage from '@/pages/AccountPage';
 import ActivityLogPage from '@/pages/setup/ActivityLogPage';
@@ -151,6 +154,9 @@ export default function App() {
       <ChatPanelHost />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route element={<ProtectedRoute />}>
           {/* The firm's view with no client selected: its own top bar, outside AppShell. */}
           <Route path="/firm" element={<FirmShell />}>

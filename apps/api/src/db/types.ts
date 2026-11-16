@@ -79,6 +79,15 @@ export interface UsersTable {
   totp_last_step: ColumnType<string | null, string | number | null | undefined, string | number | null>;
   // Migration 0116: one of the firm's own roles. Set only on a login stored as staff.
   custom_role_id: string | null;
+  // Migration 0117: an emailed invitation link, in place of an admin-typed
+  // password. See docs/specs/2026-11-15-user-invitations-and-signin-design.md.
+  invitation_status: Generated<'pending' | 'sent' | 'accepted'>;
+  invitation_token_hash: string | null;
+  invitation_expires_at: Timestamp | null;
+  email_verified: Generated<boolean>;
+  // A separate, shorter-lived "forgot password" link.
+  password_reset_token_hash: string | null;
+  password_reset_expires_at: Timestamp | null;
 }
 
 export interface UserBusinessAccessTable {

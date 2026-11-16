@@ -83,11 +83,11 @@ until someone turns it on.
 | What | Now |
 |---|---|
 | Remove or switch off a user | **Built.** Setup → Users → Switch off. It ends the person's sessions at once and can be switched back on. `e4be47a`, `497fe6d` |
-| Change your own password; reset a forgotten one | **Built.** My account → Password. A firm admin can give a login a new one-time password. An emailed reset link is not built (no mail service) |
+| Change your own password; reset a forgotten one | **Built.** My account → Password. A firm admin can give a login a new one-time password. **Also built 2026-11-15:** an emailed "Forgot password?" link from the sign-in page (`2026-11-15-user-invitations-and-signin-design.md`) |
 | A limit on wrong passwords | **Built.** Five in a row hold a login for fifteen minutes |
 | Two-step sign-in | **Built.** Each person turns it on under My account, with any authenticator app. Requiring it for a role is not built |
 | Sign out everywhere; where a user is signed in | **Built.** My account → Where you are signed in. Signing out also stops a session at once |
-| Invite by email | **Not built.** Needs a mail service |
+| Invite by email | **Built 2026-11-15.** Add user emails an invitation link instead of the admin typing a password; see `2026-11-15-user-invitations-and-signin-design.md`. |
 
 **Roles and permissions**
 

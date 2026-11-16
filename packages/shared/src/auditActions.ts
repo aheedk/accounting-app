@@ -271,6 +271,14 @@ export const AUDIT = {
   ROLE_CREATE: 'role.create',
   ROLE_UPDATE: 'role.update',
   ROLE_DELETE: 'role.delete',
+
+  // Invitation links in place of an admin-typed password, and self-service
+  // forgot-password (docs/specs/2026-11-15-user-invitations-and-signin-design.md)
+  USER_INVITE_SEND: 'user.invite_send',
+  USER_INVITE_RESEND: 'user.invite_resend',
+  USER_INVITE_ACCEPT: 'user.invite_accept',
+  AUTH_PASSWORD_RESET_REQUEST: 'auth.password_reset_request',
+  AUTH_PASSWORD_RESET_COMPLETE: 'auth.password_reset_complete',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

@@ -16,6 +16,16 @@ const schema = z.object({
   JWT_MOBILE_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Invitation and password-reset links point here (.../accept-invitation,
+  // .../reset-password). The web app's own origin, not the API's.
+  APP_PUBLIC_URL: z.string().url().default('http://localhost:5173'),
+  // Without this, invitation/reset emails are logged instead of sent — see
+  // services/notifications/emailService.ts. Get a key at resend.com/api-keys
+  // (free: 100/day). EMAIL_FROM must be on a domain verified there, EXCEPT
+  // onboarding@resend.dev, which every account may send from with no
+  // verification — the default, so sending works the moment a key is added.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Accmatica <onboarding@resend.dev>'),
 });
 
 export const config = schema.parse(process.env);

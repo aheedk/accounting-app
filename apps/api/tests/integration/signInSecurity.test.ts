@@ -65,35 +65,20 @@ describe('signing in, second pass', () => {
   const userId = async (email: string) =>
     (await t.db.selectFrom('users').select('id').where('email', '=', email).executeTakeFirstOrThrow()).id;
 
-  it('makes a login with a password from a firm admin choose its own before anything else opens', async () => {
+  // A firm-admin-typed temporary password (requiring a "choose your own before
+  // anything opens" step) is now only how an EXISTING, locked-out login is
+  // recovered (the next test). A new login is invited by email instead
+  // (tests/integration/invitations.test.ts) and sets its own password up
+  // front, so it never carries a setup_required step at all.
+  it('a login made by invitation never carries the old "replace this password" step', async () => {
     const admin = await signIn('admin@x.com');
     const made = await as(admin).post('/me/firm/users', { email: 'sam@x.com', full_name: 'Sam Ortiz', role: 'firm_admin' });
     expect(made.status).toBe(201);
-    const temp = made.body.plaintext_password as string;
+    expect(made.body.plaintext_password).toBeUndefined();
 
-    const sam = await signIn('sam@x.com', temp);
-    expect(sam.status).toBe(200);
-    expect(sam.body.user?.setup_required).toEqual(['password']);
-    // Only the person's own account opens.
-    const refused = await as(sam).get('/me/firm/users');
-    expect(refused.status).toBe(403);
-    expect(refused.body.error.code).toBe('ACCOUNT_SETUP_REQUIRED');
-    expect((await as(sam).get(`/businesses/${businessId}/customers`)).status).toBe(403);
-    expect((await as(sam).get('/me')).body.user.setup_required).toEqual(['password']);
-    expect((await as(sam).get('/auth/account')).status).toBe(200);
-
-    // Easily guessed passwords, and the person's own name, are refused.
-    expect((await as(sam).post('/auth/password', { current_password: temp, new_password: 'Password2026!' })).status).toBe(400);
-    expect((await as(sam).post('/auth/password', { current_password: temp, new_password: '1234567890' })).status).toBe(400);
-    const named = await as(sam).post('/auth/password', { current_password: temp, new_password: 'ortiz-likes-ledgers' });
-    expect(named.status).toBe(409);
-    expect(named.body.error.message).toMatch(/email or name/);
-
-    expect((await as(sam).post('/auth/password', { current_password: temp, new_password: 'brass-lantern-river-9' })).status).toBe(200);
-    const renewed = await renew(sam.cookie);
-    expect(renewed.status).toBe(200);
-    expect(renewed.body.user?.setup_required).toEqual([]);
-    expect((await as(renewed).get('/me/firm/users')).status).toBe(200);
+    // Nobody — not even the admin who created the login — knows a password
+    // for it yet, so it cannot sign in before accepting its invitation.
+    expect((await signIn('sam@x.com', 'whatever-password-1')).status).toBe(401);
   });
 
   it('a reset password is also replaced at the next sign-in', async () => {

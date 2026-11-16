@@ -41,6 +41,24 @@ export const firmSecuritySchema = z.object({
 });
 export type FirmSecurity = z.infer<typeof firmSecuritySchema>;
 
+// Invitation links in place of an admin-typed password, and self-service
+// forgot-password. docs/specs/2026-11-15-user-invitations-and-signin-design.md
+export const acceptInvitationSchema = z.object({
+  token: z.string().min(1),
+  password: newPassword,
+  full_name: z.string().trim().min(1).max(200).optional(),
+});
+export type AcceptInvitation = z.infer<typeof acceptInvitationSchema>;
+
+export const tokenLookupSchema = z.object({ token: z.string().min(1) });
+export type TokenLookup = z.infer<typeof tokenLookupSchema>;
+
+export const forgotPasswordSchema = z.object({ email: z.string().email().max(254) });
+export type ForgotPassword = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({ token: z.string().min(1), password: newPassword });
+export type ResetPassword = z.infer<typeof resetPasswordSchema>;
+
 export const loginResponseSchema = z.object({
   access_token: z.string(),
   user: z.object({

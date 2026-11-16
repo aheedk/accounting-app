@@ -6,6 +6,7 @@ import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { hashPassword } from '../auth/passwordHasher.js';
 import { endSessions, reissueAccessTokens } from '../auth/accountService.js';
 import { firmSignInSettings } from '../auth/authService.js';
+import { issueInvitation } from '../auth/invitationService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { roleInFirm } from './roleService.js';
@@ -31,12 +32,19 @@ export type ListedUser = {
   two_step_enabled: boolean;
   payroll_access: boolean;
   business_access: UserBusinessAccess[];
+  /** An invitation link in place of an admin-typed password (migration 0117). */
+  invitation_status: 'pending' | 'sent' | 'accepted';
+  invitation_expires_at: unknown;
 };
 
 export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<ListedUser[]> {
   const users = await db.selectFrom('users')
     .leftJoin('firm_roles as fr', 'fr.id', 'users.custom_role_id')
-    .select(['users.id', 'email', 'full_name', 'role', 'last_login_at', 'users.created_at', 'deactivated_at', 'locked_until', 'totp_enabled_at', 'payroll_access', 'fr.id as custom_role_id', 'fr.name as custom_role_name'])
+    .select([
+      'users.id', 'email', 'full_name', 'role', 'last_login_at', 'users.created_at', 'deactivated_at', 'locked_until',
+      'totp_enabled_at', 'payroll_access', 'fr.id as custom_role_id', 'fr.name as custom_role_name',
+      'invitation_status', 'invitation_expires_at',
+    ])
     .where('users.firm_id', '=', firm_id)
     .where('deleted_at', 'is', null)
     .orderBy('users.created_at', 'asc')
@@ -83,6 +91,8 @@ export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<Listed
     // A firm admin always has payroll, whatever the switch says.
     payroll_access: u.role === 'firm_admin' || u.payroll_access,
     business_access: byUser.get(u.id) ?? [],
+    invitation_status: u.invitation_status,
+    invitation_expires_at: u.invitation_expires_at,
   }));
 }
 
@@ -109,10 +119,9 @@ export async function createUser(
     throw new BusinessRuleError(ERR.DUPLICATE_RESOURCE, `User with email ${input.email} already exists`);
   }
 
-  const plaintext = generateTempPassword();
-  const password_hash = await hashPassword(plaintext);
-
-  // The firm admin sees this password, so the person replaces it before the app opens.
+  // Nobody is ever told this value: it only holds the column until the person
+  // accepts their invitation (below) and sets a real one (invitationService).
+  const password_hash = await hashPassword(generateTempPassword());
   const row = await trx.insertInto('users').values({
     firm_id: input.firm_id,
     email: input.email,
@@ -121,6 +130,8 @@ export async function createUser(
     role,
     custom_role_id: input.custom_role_id ?? null,
     must_change_password: true,
+    invitation_status: 'pending',
+    email_verified: false,
   }).returning(['id', 'email', 'full_name', 'role', 'custom_role_id', 'firm_id', 'created_at'])
     .executeTakeFirstOrThrow();
 
@@ -132,7 +143,15 @@ export async function createUser(
     after: { id: row.id, email: row.email, full_name: row.full_name, role: row.role, custom_role_id: row.custom_role_id, firm_id: row.firm_id },
   });
 
-  return { user: row, plaintext_password: plaintext };
+  // Sequential, not Promise.all: both queries share this transaction's one
+  // connection, and running them concurrently on it serializes with heavy
+  // contention instead of actually running in parallel (one request measured
+  // at 50+ seconds instead of the usual ~150ms).
+  const firm = await trx.selectFrom('firms').select('name').where('id', '=', ctx.firm_id).executeTakeFirstOrThrow();
+  const admin = await trx.selectFrom('users').select('full_name').where('id', '=', ctx.user_id).executeTakeFirst();
+  const email_sent = await issueInvitation(trx, ctx, row, firm.name, admin?.full_name ?? 'Your firm admin');
+
+  return { user: row, email_sent };
 }
 
 export async function updateUserRole(
@@ -169,6 +188,25 @@ export async function updateUserRole(
     entity_id: input.user_id,
     before,
     after: updated,
+  });
+  return updated;
+}
+
+/** Fixing a typo in a login's own name. The email is not editable here — it is the login's identity, so changing it is a bigger decision than this form makes. */
+export async function updateUserProfile(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string; full_name: string }) {
+  const before = await trx.selectFrom('users')
+    .select(['id', 'email', 'full_name', 'firm_id'])
+    .where('id', '=', input.user_id).where('firm_id', '=', ctx.firm_id).where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  if (!before) throw new NotFoundError('user', input.user_id);
+
+  const updated = await trx.updateTable('users').set({ full_name: input.full_name })
+    .where('id', '=', input.user_id)
+    .returning(['id', 'email', 'full_name'])
+    .executeTakeFirstOrThrow();
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_UPDATE, entity_type: 'user', entity_id: input.user_id, before, after: updated,
   });
   return updated;
 }
@@ -293,6 +331,56 @@ export async function deactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   return { ...user, deactivated_at: new Date() };
 }
 
+/**
+ * Whether a login has ever done anything worth keeping a record of: signed
+ * in, been given access to a company, or acted (as the one named in
+ * `audit_logs.user_id`) on anything. The same question `vendorService.deleteVendor`
+ * asks of a vendor's transactions before allowing a real delete.
+ *
+ * Deliberately NOT checked: `audit_logs.entity_id = user_id` — that matches
+ * the USER_CREATE row written the moment this login was made (and
+ * USER_INVITE_SEND/RESEND, USER_DEACTIVATE…), all with the *admin* as the
+ * actor. Counting those would make every login ever created permanently
+ * undeletable, which defeats the one thing Delete is for: undoing a fresh,
+ * still-untouched "Add user".
+ */
+async function userHasAnyFootprint(trx: Transaction<DB>, user_id: string): Promise<boolean> {
+  const [access, sessions, devices, actedInAudit] = [
+    await trx.selectFrom('user_business_access').select('id').where('user_id', '=', user_id).executeTakeFirst(),
+    await trx.selectFrom('refresh_tokens').select('id').where('user_id', '=', user_id).executeTakeFirst(),
+    await trx.selectFrom('push_tokens').select('id').where('user_id', '=', user_id).executeTakeFirst(),
+    await trx.selectFrom('audit_logs').select('id').where('user_id', '=', user_id).executeTakeFirst(),
+  ];
+  return [access, sessions, devices, actedInAudit].some(row => row !== undefined);
+}
+
+/**
+ * Permanently removes a login that was made by mistake and never used —
+ * refused the moment it has any footprint at all (see userHasAnyFootprint),
+ * the same way deleteVendor refuses once a vendor has transactions. Switch
+ * off is the answer for anything that has actually been used; this is only
+ * for undoing a fresh "Add user".
+ */
+export async function deleteUser(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
+  const user = await userInFirm(trx, ctx, input.user_id);
+  if (user.id === ctx.user_id) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'You cannot delete your own login.');
+  if (user.role === 'firm_admin') {
+    const others = await trx.selectFrom('users').select('id')
+      .where('firm_id', '=', ctx.firm_id).where('role', '=', 'firm_admin')
+      .where('deleted_at', 'is', null).where('deactivated_at', 'is', null).where('id', '<>', user.id)
+      .execute();
+    if (others.length === 0) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'This is the only firm admin. Make someone else a firm admin first.');
+  }
+  if (await userHasAnyFootprint(trx, user.id)) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED,
+      `Cannot delete — ${user.full_name} has activity on record. Use "Switch off" instead.`);
+  }
+  await trx.updateTable('users').set({ deleted_at: sql`now()` }).where('id', '=', user.id).execute();
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_DELETE, entity_type: 'user', entity_id: user.id, before: { email: user.email }, after: null,
+  });
+}
+
 export async function reactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
   const user = await userInFirm(trx, ctx, input.user_id);
   if (!user.deactivated_at) return user;
@@ -307,14 +395,21 @@ export async function reactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, inpu
 /**
  * Gives a login a new one-time password, shown once to the firm admin to pass
  * on; the person must choose their own at their next sign-in, before the app
- * opens. Lifts a hold from wrong tries and ends the person's sessions. There is
- * no emailed reset link because the app has no mail service.
+ * opens. Lifts a hold from wrong tries and ends the person's sessions.
+ *
+ * Handing this to the person is a complete substitute for them accepting an
+ * emailed invitation themselves, so it also clears a still-open invitation —
+ * otherwise the login stays stuck showing "Invitation sent" after the admin
+ * has already let them in another way.
  */
 export async function resetUserPassword(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
   const user = await userInFirm(trx, ctx, input.user_id);
   const plaintext = generateTempPassword();
   await trx.updateTable('users')
-    .set({ password_hash: await hashPassword(plaintext), failed_login_count: 0, locked_until: null, must_change_password: true })
+    .set({
+      password_hash: await hashPassword(plaintext), failed_login_count: 0, locked_until: null, must_change_password: true,
+      invitation_status: 'accepted', invitation_token_hash: null, invitation_expires_at: null,
+    })
     .where('id', '=', user.id).execute();
   await endSessions(trx, { user_id: user.id });
   await auditRecord(trx, ctx, {

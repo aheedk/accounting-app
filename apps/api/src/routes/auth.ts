@@ -4,6 +4,8 @@ import { db } from '../db/index.js';
 import { login, refresh, logout } from '../services/auth/authService.js';
 import * as account from '../services/auth/accountService.js';
 import { hashRefreshToken } from '../services/auth/tokenService.js';
+import * as invitation from '../services/auth/invitationService.js';
+import * as passwordReset from '../services/auth/passwordResetService.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import { config } from '../config.js';
@@ -62,6 +64,55 @@ router.post('/auth/login', async (req, res, next) => {
       void _rt;
       res.json(publicOut);
     }
+  } catch (e) { next(e); }
+});
+
+// ── Invitation links, in place of an admin-typed password, and self-service
+// password reset. Both are public: the person isn't signed in yet. Spec:
+// docs/specs/2026-11-15-user-invitations-and-signin-design.md
+
+router.get('/auth/validate-invitation', async (req, res, next) => {
+  try {
+    const { token } = schemas.tokenLookupSchema.parse(req.query);
+    const lookup = await invitation.validateInvitationToken(db, token);
+    res.json({ email: lookup.email, full_name: lookup.full_name, firm_name: lookup.firm_name });
+  } catch (e) { next(e); }
+});
+
+router.post('/auth/accept-invitation', async (req, res, next) => {
+  try {
+    const body = schemas.acceptInvitationSchema.parse(req.body);
+    const out = await invitation.acceptInvitation(db, body, reqMeta(req));
+    const { refresh_expires_at: expiresAt, ...withToken } = out;
+    setRefreshCookie(res, out.refresh_token, expiresAt);
+    const { refresh_token: _rt, ...publicOut } = withToken;
+    void _rt;
+    res.json(publicOut);
+  } catch (e) { next(e); }
+});
+
+router.post('/auth/forgot-password', async (req, res, next) => {
+  try {
+    const body = schemas.forgotPasswordSchema.parse(req.body);
+    await passwordReset.requestPasswordReset(db, body, reqMeta(req));
+    // Always the same response, whether or not the address has a login — see
+    // requestPasswordReset's own note on not revealing which emails exist.
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.get('/auth/validate-password-reset', async (req, res, next) => {
+  try {
+    const { token } = schemas.tokenLookupSchema.parse(req.query);
+    res.json(await passwordReset.validatePasswordResetToken(db, token));
+  } catch (e) { next(e); }
+});
+
+router.post('/auth/reset-password', async (req, res, next) => {
+  try {
+    const body = schemas.resetPasswordSchema.parse(req.body);
+    await passwordReset.completePasswordReset(db, body, reqMeta(req));
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

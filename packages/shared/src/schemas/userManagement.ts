@@ -21,6 +21,10 @@ export const userRoleUpdateSchema = z.union([
 ]);
 export type UserRoleUpdate = z.infer<typeof userRoleUpdateSchema>;
 
+// A login's own name. The email is not editable here — see updateUserProfile.
+export const userProfileUpdateSchema = z.object({ full_name: z.string().trim().min(1).max(200) });
+export type UserProfileUpdate = z.infer<typeof userProfileUpdateSchema>;
+
 // For one company: a built-in role, one of the firm's own, or neither (the login's own role applies).
 export const businessAccessGrantSchema = z.object({
   business_id: z.string().uuid(),
