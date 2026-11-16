@@ -13,6 +13,12 @@ export interface FirmsTable {
   // step; a browser left alone this many minutes is signed out.
   require_two_step: Generated<boolean>;
   idle_sign_out_minutes: Generated<number>;
+  // The firm's single top-level owner, and a pending transfer of that
+  // designation (migration 0118). See docs/specs/2026-11-15-user-invitations-and-signin-design.md.
+  primary_admin_user_id: string | null;
+  transfer_target_user_id: string | null;
+  transfer_token_hash: string | null;
+  transfer_expires_at: Timestamp | null;
 }
 
 export interface BusinessAddress {

@@ -1,6 +1,11 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
+
+// The listbox's rough height budget (search header + up to ~6 rows), used to
+// decide whether it opens above or below the trigger.
+const POPOVER_HEIGHT_BUDGET = 300;
 
 type OptionData = { value: string; label: string; disabled?: boolean | undefined; hint?: string | undefined };
 
@@ -64,6 +69,13 @@ export function AppSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  // The open listbox portals to document.body (position: fixed, by these
+  // coords) so it floats over the whole page instead of being clipped by a
+  // scrolling ancestor — a table wrapper's overflow-x-auto, say, which also
+  // clips the y axis per the CSS overflow spec (one axis non-visible forces
+  // the other to compute as auto too). Setup → Users' table is exactly that.
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
 
   const options = parseOptions(children);
   const filtered = query.trim()
@@ -104,6 +116,29 @@ export function AppSelect({
     if (!open) { setQuery(''); return; }
     setTimeout(() => searchRef.current?.focus(), 0);
   }, [open]);
+
+  const reposition = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < POPOVER_HEIGHT_BUDGET && rect.top > spaceBelow;
+    setCoords({ top: openUp ? rect.top : rect.bottom, left: rect.left, width: rect.width, openUp });
+  }, []);
+
+  // Positioned fresh on open, and kept in place while open: a scroll on any
+  // ancestor (capture: true catches a scrolling table wrapper, not just the
+  // window) or a resize would otherwise leave it floating over the wrong spot.
+  useLayoutEffect(() => {
+    if (!open) { setCoords(null); return; }
+    reposition();
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [open, reposition]);
 
   // Start on the current value when the list opens, and on the first match
   // when the search text changes.
@@ -166,9 +201,12 @@ export function AppSelect({
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      // The listbox portals to document.body, outside containerRef's own
+      // subtree, so a click inside it must count as "inside" too.
+      if (containerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -213,9 +251,11 @@ export function AppSelect({
         />
       </button>
 
-      {open && (
+      {open && coords && createPortal(
         <div
-          className="absolute left-0 top-full z-50 mt-1 w-max min-w-full max-w-sm rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
+          ref={popoverRef}
+          style={{ position: 'fixed', top: coords.openUp ? undefined : coords.top, bottom: coords.openUp ? window.innerHeight - coords.top : undefined, left: coords.left, minWidth: coords.width }}
+          className="z-50 w-max max-w-sm rounded-md border bg-white dark:bg-zinc-900 shadow-xl"
         >
           <div className="flex items-center gap-2 border-b px-3 py-2">
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -286,7 +326,8 @@ export function AppSelect({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

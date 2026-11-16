@@ -37,11 +37,15 @@ async function ensureAdminUser(pool: Pool): Promise<void> {
   if ((existing.rowCount ?? 0) === 0) {
     const password = crypto.randomBytes(12).toString('base64url');
     const hash = await bcrypt.hash(password, 12);
-    await pool.query(
+    const inserted = await pool.query<{ id: string }>(
       `INSERT INTO users (firm_id, email, password_hash, full_name, role)
-       VALUES ($1, 'admin@example.com', $2, 'Acme Admin', 'firm_admin')`,
+       VALUES ($1, 'admin@example.com', $2, 'Acme Admin', 'firm_admin') RETURNING id`,
       [firm_id, hash],
     );
+    // The firm's very first firm_admin is its Primary Admin
+    // (docs/specs/2026-11-15-user-invitations-and-signin-design.md) — in
+    // production this is set the same way, by whoever provisions the firm.
+    await pool.query(`UPDATE firms SET primary_admin_user_id = $2 WHERE id = $1`, [firm_id, inserted.rows[0]!.id]);
     console.log('');
     console.log('=== SEED ADMIN CREDENTIALS (store these now — not printed again) ===');
     console.log('  email:    admin@example.com');

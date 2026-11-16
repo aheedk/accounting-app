@@ -87,4 +87,28 @@ describe('AppSelect', () => {
     act(() => trigger.click());
     expect(document.querySelector(`[role="option"] [title="${long}"]`)).not.toBeNull();
   });
+
+  // Setup → Users' table wraps its rows in overflow-x-auto for horizontal
+  // scrolling, which (per the CSS overflow spec) also clips the y axis — the
+  // listbox used to render inside that ancestor and get cut off there.
+  it('escapes a clipping ancestor instead of being cut off inside it', () => {
+    const clipper = document.createElement('div');
+    clipper.style.overflow = 'hidden';
+    host = document.createElement('div');
+    clipper.appendChild(host);
+    document.body.appendChild(clipper);
+    root = createRoot(host);
+    act(() => root!.render(
+      <AppSelect value="a" onChange={vi.fn()}>
+        <option value="a">Alpha</option>
+        <option value="b">Beta</option>
+      </AppSelect>,
+    ));
+
+    act(() => (host!.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement).click());
+    const listbox = document.querySelector('[role="listbox"]')!;
+    expect(clipper.contains(listbox)).toBe(false);
+    expect(document.body.contains(listbox)).toBe(true);
+    clipper.remove();
+  });
 });

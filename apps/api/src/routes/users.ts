@@ -9,6 +9,7 @@ import { requireMinRole } from '../middleware/rbac.js';
 import { AuthError } from '../lib/errors.js';
 import * as userSvc from '../services/admin/userManagementService.js';
 import { resendInvitation } from '../services/auth/invitationService.js';
+import * as primaryAdminSvc from '../services/admin/primaryAdminService.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 
 const router = Router();
@@ -28,6 +29,29 @@ function ctxFromReq(req: Request): ServiceCtx {
 // Firm-scoped user management. No business resolution — firm_admin only.
 router.use('/me/firm/users', requireAuth, requireMinRole('firm_admin'));
 router.use('/me/firm/security', requireAuth, requireMinRole('firm_admin'));
+// Any firm admin may check whether a transfer is pending; only the Primary
+// Admin may start or cancel one (enforced in the service — it isn't a role).
+router.use('/me/firm/transfer-primary-admin', requireAuth, requireMinRole('firm_admin'));
+router.use('/me/firm/transfer-status', requireAuth, requireMinRole('firm_admin'));
+
+router.post('/me/firm/transfer-primary-admin', async (req, res, next) => {
+  try {
+    const body = schemas.transferPrimaryAdminSchema.parse(req.body);
+    const result = await db.transaction().execute(trx => primaryAdminSvc.initiateTransfer(trx, ctxFromReq(req), body));
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+router.delete('/me/firm/transfer-primary-admin', async (req, res, next) => {
+  try {
+    res.json(await db.transaction().execute(trx => primaryAdminSvc.cancelTransfer(trx, ctxFromReq(req))));
+  } catch (e) { next(e); }
+});
+
+router.get('/me/firm/transfer-status', async (req, res, next) => {
+  try { res.json(await primaryAdminSvc.getTransferStatus(db, req.auth!.firm_id)); }
+  catch (e) { next(e); }
+});
 
 // The firm's sign-in settings: the second step for everyone, and the idle sign-out.
 router.get('/me/firm/security', async (req, res, next) => {
@@ -116,6 +140,21 @@ router.post('/me/firm/users/:id/business-access', async (req, res, next) => {
       }),
     );
     res.status(201).json(grant);
+  } catch (e) { next(e); }
+});
+
+router.patch('/me/firm/users/:id/business-access/:businessId', async (req, res, next) => {
+  try {
+    const body = schemas.businessAccessUpdateSchema.parse(req.body);
+    const updated = await db.transaction().execute(trx =>
+      userSvc.updateBusinessAccess(trx, ctxFromReq(req), {
+        user_id: req.params['id']!,
+        business_id: req.params['businessId']!,
+        role_override: body.role_override ?? null,
+        custom_role_id: body.custom_role_id ?? null,
+      }),
+    );
+    res.json(updated);
   } catch (e) { next(e); }
 });
 

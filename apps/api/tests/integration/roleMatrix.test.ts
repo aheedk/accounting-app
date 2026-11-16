@@ -139,19 +139,25 @@ const FIRM_ADMIN_ONLY = [
   'PATCH /me/firm/roles/:id',
   'DELETE /me/firm/roles/:id',
   'GET /me/firm/security',
+  'GET /me/firm/transfer-status',
   'GET /me/firm/users',
   'GET ~/employees/:id/ssn-reveal',
   'GET ~/vendors/:id/tax-id-reveal',
   'POST ~/vendors/:id/merge',
+  // Not DELETE /me/firm/transfer-primary-admin: cancelling is restricted to
+  // the Primary Admin specifically, so this matrix's firm_admin fixture is
+  // refused it too — see the exception in 'a firm admin is refused nothing'.
   'DELETE /me/firm/users/:id',
   'PATCH /me/firm/security',
   'PATCH /me/firm/users/:id',
+  'PATCH /me/firm/users/:id/business-access/:businessId',
   'PATCH /me/firm/users/:id/profile',
   'PATCH ~',
   'PATCH ~/bank-accounts/:id',
   'PATCH ~/tax-codes/:id',
   'POST /firm/businesses',
   'POST /gmail/connect',
+  'POST /me/firm/transfer-primary-admin',
   'POST /me/firm/users',
   'POST /me/firm/users/:id/business-access',
   'POST /me/firm/users/:id/deactivate',
@@ -294,6 +300,11 @@ describe('role matrix', () => {
   });
 
   it('a firm admin is refused nothing', () => {
-    expect(rows.filter(r => r.firm_admin === 403).map(name)).toEqual([]);
+    // Exception: initiating/cancelling a Primary Admin transfer is restricted
+    // to the Primary Admin specifically — a per-user state, not a role tier —
+    // so the matrix's firm_admin fixture (not the firm's primary admin) is
+    // correctly refused here. See services/admin/primaryAdminService.ts.
+    const PRIMARY_ADMIN_ONLY = ['POST /me/firm/transfer-primary-admin', 'DELETE /me/firm/transfer-primary-admin'];
+    expect(rows.filter(r => r.firm_admin === 403 && !PRIMARY_ADMIN_ONLY.includes(name(r))).map(name)).toEqual([]);
   });
 });

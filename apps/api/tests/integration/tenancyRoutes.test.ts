@@ -69,4 +69,27 @@ describe('tenancy-scoped HTTP routes', () => {
     const res = await request(app).get(`/businesses/${biz.id}/customers`);
     expect(res.status).toBe(401);
   });
+
+  // A firm admin promoted from a lesser role can be left with a stale
+  // per-company grant from before the promotion (Setup → Users has no way to
+  // see or remove one once the login is a firm admin — it just says "All
+  // businesses", nothing to grant or revoke). That leftover row must not
+  // silently downgrade them on that one company.
+  it("a firm admin's access is not downgraded by a leftover per-company role_override", async () => {
+    const firm = await makeFirm(t.db);
+    const biz = await makeBusiness(t.db, firm.id, 'Promoted Co');
+    const admin = await makeUser(t.db, firm.id, { email: 'promoted@x.com', password: 'pw12345678', role: 'firm_admin' });
+    // The grant from before they were a firm admin — never cleaned up.
+    await grantAccess(t.db, admin.id, biz.id, 'accountant');
+    await seedCoa(t.db, biz.id);
+    const customer = await makeCustomer(t.db, biz.id, { name: 'Stale Grant Co' });
+    const app = makeApp();
+    const login = await request(app).post('/auth/login').send({ email: 'promoted@x.com', password: 'pw12345678' });
+
+    // Firm-admin-only: an accountant (what the stale grant says) would get 403.
+    const res = await request(app)
+      .delete(`/businesses/${biz.id}/customers/${customer.id}`)
+      .set('Authorization', `Bearer ${login.body.access_token}`);
+    expect(res.status).not.toBe(403);
+  });
 });

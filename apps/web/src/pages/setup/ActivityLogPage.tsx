@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useActiveBusinessId } from '@/lib/business';
 import { useEffectiveRole } from '@/lib/roleAccess';
@@ -37,11 +38,13 @@ export default function ActivityLogPage() {
   const pageRole = useEffectiveRole();
   const { user } = useAuth();
   const isFirmAdmin = pageRole === 'firm_admin' && user?.role === 'firm_admin';
-  const [scope, setScope] = useState<'company' | 'firm'>('company');
+  // "View user activity" (Setup → Users) deep-links here as ?scope=firm&user_id=...
+  const [initialParams] = useSearchParams();
+  const [scope, setScope] = useState<'company' | 'firm'>(initialParams.get('scope') === 'firm' ? 'firm' : 'company');
   const [rows, setRows] = useState<Row[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [facets, setFacets] = useState<Facets>({ users: [], entity_types: [] });
-  const [userId, setUserId] = useState('');
+  const [userId, setUserId] = useState(initialParams.get('user_id') ?? '');
   const [entityType, setEntityType] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);

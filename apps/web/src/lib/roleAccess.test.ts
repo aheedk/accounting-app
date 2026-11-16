@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { AREAS, type Level, type Permissions } from '@accounting/shared';
-import { canOpenPage, customRoleRefusal, roleAtLeast, roleOnPage, type Access } from './roleAccess';
+import { canOpenPage, customRoleRefusal, resolveAccess, roleAtLeast, roleOnPage, type Access } from './roleAccess';
+
+describe('resolveAccess', () => {
+  // A promotion to firm admin can leave a stale per-business grant behind
+  // (one made while the login was still, say, an accountant) — Setup → Users
+  // no longer offers any way to see or remove it once the login is a firm
+  // admin. It must not silently downgrade them on that one business.
+  it("does not let a leftover per-business role_override downgrade a firm admin", () => {
+    const user = { role: 'firm_admin' as const, custom_role: null };
+    const businesses = [{ id: 'biz-1', role_override: 'accountant' as const, custom_role: null }];
+    expect(resolveAccess(user, businesses, 'biz-1')).toEqual({ kind: 'builtin', role: 'firm_admin' });
+  });
+
+  it('still applies a per-business override for anyone who is not a firm admin', () => {
+    const user = { role: 'staff' as const, custom_role: null };
+    const businesses = [{ id: 'biz-1', role_override: 'accountant' as const, custom_role: null }];
+    expect(resolveAccess(user, businesses, 'biz-1')).toEqual({ kind: 'builtin', role: 'accountant' });
+  });
+
+  it('falls back to the login\'s own role off the active business, or with none open', () => {
+    const user = { role: 'viewer' as const, custom_role: null };
+    expect(resolveAccess(user, [{ id: 'biz-1', role_override: 'accountant' as const, custom_role: null }], 'biz-2')).toEqual({ kind: 'builtin', role: 'viewer' });
+    expect(resolveAccess(user, [], null)).toEqual({ kind: 'builtin', role: 'viewer' });
+  });
+
+  it('returns null signed out', () => {
+    expect(resolveAccess(null, [], null)).toBeNull();
+  });
+});
 
 describe('canOpenPage', () => {
   it('gives a client the dashboard, its invoices and the financial reports', () => {

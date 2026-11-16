@@ -121,3 +121,20 @@ export function passwordResetEmail(input: { to: string; resetUrl: string }): Ema
     devPreviewUrl: input.resetUrl,
   };
 }
+
+export function primaryAdminTransferEmail(input: { to: string; firmName: string; currentAdminName: string; acceptUrl: string }): Email {
+  const firmName = escapeHtml(input.firmName);
+  const currentAdminName = escapeHtml(input.currentAdminName);
+  return {
+    to: input.to,
+    subject: `You've been invited to become the Primary Admin of ${firmName}`,
+    html: layout({
+      heading: `Become the Primary Admin of ${firmName}`,
+      bodyHtml: `<p>${currentAdminName} has invited you to become the Primary Admin of ${firmName}. As Primary Admin, you'll have full control over the firm, all clients, team management, and billing.</p>`,
+      buttonLabel: 'Review the invitation',
+      buttonUrl: input.acceptUrl,
+      fineprint: 'This invitation expires in 7 days.',
+    }),
+    devPreviewUrl: input.acceptUrl,
+  };
+}

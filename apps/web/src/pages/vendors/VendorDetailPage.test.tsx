@@ -264,7 +264,7 @@ describe('VendorDetailPage', () => {
 
     const select = container.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
     await click(select);
-    const balanceOption = Array.from(container.querySelectorAll('[role="option"]')).find(o => o.textContent?.includes('open balance')) as HTMLElement;
+    const balanceOption = Array.from(document.querySelectorAll('[role="option"]')).find(o => o.textContent?.includes('open balance')) as HTMLElement;
     await click(balanceOption);
 
     const names = Array.from(container.querySelectorAll('a')).map(a => a.textContent).filter((t): t is string => !!t && (t.includes('Vendor')));

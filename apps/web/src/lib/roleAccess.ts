@@ -15,15 +15,34 @@ export type Access =
   | { kind: 'builtin'; role: Role }
   | { kind: 'custom'; role: CustomRole };
 
-export function useAccess(): Access | null {
-  const { user, businesses } = useAuth();
-  const [activeId] = useActiveBusinessId();
+/**
+ * The pure rule `useAccess` applies to whatever the auth context and the
+ * active-business hook hand it — split out so it can be tested directly,
+ * without rendering a component.
+ */
+export function resolveAccess(
+  user: { role: Role; custom_role?: CustomRole | null | undefined } | null,
+  businesses: Array<{ id: string; role_override?: Role | null | undefined; custom_role?: CustomRole | null | undefined }>,
+  activeId: string | null,
+): Access | null {
   if (!user) return null;
+  // A firm admin's access is unconditional, everywhere — matching the API
+  // (middleware/tenancy.ts) and Setup → Users' own promise that a firm admin
+  // has "All businesses" with nothing to grant or revoke. A per-company
+  // override must not silently downgrade one, e.g. a grant left over from
+  // before the promotion that the Users page no longer offers any way to see.
+  if (user.role === 'firm_admin') return { kind: 'builtin', role: 'firm_admin' };
   const business = businesses.find(b => b.id === activeId);
   if (business?.custom_role) return { kind: 'custom', role: business.custom_role };
   if (business?.role_override) return { kind: 'builtin', role: business.role_override };
   if (user.custom_role) return { kind: 'custom', role: user.custom_role };
   return { kind: 'builtin', role: user.role };
+}
+
+export function useAccess(): Access | null {
+  const { user, businesses } = useAuth();
+  const [activeId] = useActiveBusinessId();
+  return resolveAccess(user, businesses, activeId);
 }
 
 /**

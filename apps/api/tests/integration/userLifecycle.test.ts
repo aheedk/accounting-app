@@ -8,6 +8,8 @@ import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/te
 import { makeFirm, makeBusiness, makeUser, grantAccess } from '../helpers/factories.js';
 import { makeApp } from '../../src/app.js';
 import { destroyDbSingleton } from '../../src/db/index.js';
+import { systemCtx } from '../../src/lib/ctx.js';
+import { updateUserRole } from '../../src/services/admin/userManagementService.js';
 
 const PASSWORD = 'first-password-1';
 
@@ -43,6 +45,48 @@ describe('editing and deleting a login', () => {
     get: (url: string) => request(app).get(url).set('Authorization', `Bearer ${s.token}`).set('Cookie', s.cookie),
   });
 
+  describe('PATCH /me/firm/users/:id (role)', () => {
+    it("refuses to move the firm's only firm admin to any other role", async () => {
+      const admin = await makeUser(t.db, firmId, { email: 'admin@x.com', password: PASSWORD, role: 'firm_admin' });
+      const session = await signIn('admin@x.com');
+
+      // Someone else may change it — the one admin can't be moved off the
+      // role through themselves, but another firm admin can't be the one
+      // blocked either; only "no admin left" is refused.
+      const r = await as(session).patch(`/me/firm/users/${admin.id}`, { role: 'accountant' });
+      expect(r.status).toBe(403); // "Cannot change your own role" fires first
+      expect(r.body.error.message).toMatch(/own role/);
+    });
+
+    // The only way to a genuinely "someone else demotes the sole firm admin"
+    // state is through the route's own, earlier "cannot change your own role"
+    // guard — the service's check below is defense in depth behind it, the
+    // same structural shape deactivateUser's and deleteUser's own "only firm
+    // admin" guards already have. Exercised directly, as those are elsewhere.
+    it('the service guard itself refuses moving the only firm admin off the role, called directly', async () => {
+      const admin = await makeUser(t.db, firmId, { email: 'admin@x.com', role: 'firm_admin' });
+      const ctx = systemCtx({ firm_id: firmId });
+
+      await expect(
+        t.db.transaction().execute(trx => updateUserRole(trx, ctx, { user_id: admin.id, role: 'accountant' })),
+      ).rejects.toMatchObject({ message: expect.stringContaining('is the only firm admin') as unknown });
+
+      // Once a second firm admin exists, moving the first off the role is fine.
+      await makeUser(t.db, firmId, { email: 'second@x.com', role: 'firm_admin' });
+      const updated = await t.db.transaction().execute(trx => updateUserRole(trx, ctx, { user_id: admin.id, role: 'accountant' }));
+      expect(updated.role).toBe('accountant');
+    });
+
+    it('allows a firm admin to demote a second one while they are not the only one left', async () => {
+      await makeUser(t.db, firmId, { email: 'first@x.com', password: PASSWORD, role: 'firm_admin' });
+      const second = await makeUser(t.db, firmId, { email: 'second@x.com', password: PASSWORD, role: 'firm_admin' });
+      const firstSession = await signIn('first@x.com');
+
+      const demoted = await as(firstSession).patch(`/me/firm/users/${second.id}`, { role: 'accountant' });
+      expect(demoted.status).toBe(200);
+    });
+  });
+
   describe('PATCH /me/firm/users/:id/profile', () => {
     it('renames a login, and the admin need not be a firm admin for their own account', async () => {
       await makeUser(t.db, firmId, { email: 'admin@x.com', password: PASSWORD, role: 'firm_admin' });
@@ -63,6 +107,39 @@ describe('editing and deleting a login', () => {
 
       expect((await as(admin).patch(`/me/firm/users/${pat.id}/profile`, { full_name: '  ' })).status).toBe(400);
       expect((await as(other).patch(`/me/firm/users/${pat.id}/profile`, { full_name: 'Someone Else' })).status).toBe(403);
+    });
+  });
+
+  describe('PATCH /me/firm/users/:id/business-access/:businessId', () => {
+    it("changes an existing grant's role, without a revoke-then-grant round trip", async () => {
+      await makeUser(t.db, firmId, { email: 'admin@x.com', password: PASSWORD, role: 'firm_admin' });
+      const biz = await makeBusiness(t.db, firmId, 'Biz');
+      const pat = await makeUser(t.db, firmId, { email: 'pat@x.com', password: PASSWORD, role: 'staff' });
+      await grantAccess(t.db, pat.id, biz.id, 'staff');
+      const admin = await signIn('admin@x.com');
+
+      const r = await as(admin).patch(`/me/firm/users/${pat.id}/business-access/${biz.id}`, { role_override: 'accountant' });
+      expect(r.status).toBe(200);
+      expect(r.body.role_override).toBe('accountant');
+
+      const row = await t.db.selectFrom('user_business_access').select(['role_override', 'custom_role_id'])
+        .where('user_id', '=', pat.id).where('business_id', '=', biz.id).executeTakeFirstOrThrow();
+      expect(row.role_override).toBe('accountant');
+      expect(row.custom_role_id).toBeNull();
+    });
+
+    it('refuses a business that was never granted, and both a role and a custom role at once', async () => {
+      await makeUser(t.db, firmId, { email: 'admin@x.com', password: PASSWORD, role: 'firm_admin' });
+      const biz = await makeBusiness(t.db, firmId, 'Biz');
+      const pat = await makeUser(t.db, firmId, { email: 'pat@x.com', password: PASSWORD, role: 'staff' });
+      const admin = await signIn('admin@x.com');
+
+      const neverGranted = await as(admin).patch(`/me/firm/users/${pat.id}/business-access/${biz.id}`, { role_override: 'accountant' });
+      expect(neverGranted.status).toBe(404);
+
+      await grantAccess(t.db, pat.id, biz.id);
+      const both = await as(admin).patch(`/me/firm/users/${pat.id}/business-access/${biz.id}`, { role_override: 'accountant', custom_role_id: '11111111-1111-1111-1111-111111111111' });
+      expect(both.status).toBe(400);
     });
   });
 

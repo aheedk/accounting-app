@@ -36,11 +36,11 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 }));
 
 const row = (id: string, email: string, role: string, extra: Partial<{
-  invitation_status: string; invitation_expires_at: string | null; deactivated_at: string | null; full_name: string;
+  invitation_status: string; invitation_expires_at: string | null; deactivated_at: string | null; full_name: string; is_primary_admin: boolean;
 }> = {}) => ({
   id, email, full_name: extra.full_name ?? email, role, custom_role: null, last_login_at: null,
   business_access: [], payroll_access: true, deactivated_at: null, locked: false, two_step_enabled: false,
-  invitation_status: 'accepted', invitation_expires_at: null, ...extra,
+  invitation_status: 'accepted', invitation_expires_at: null, is_primary_admin: false, ...extra,
 });
 
 describe('UsersPage', () => {
@@ -91,7 +91,7 @@ describe('UsersPage', () => {
   async function chooseAppSelect(currentLabel: string, optionLabel: string) {
     const trigger = [...container.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="listbox"]')].find(b => b.textContent === currentLabel)!;
     await act(async () => { trigger.click(); });
-    const option = [...container.querySelectorAll<HTMLElement>('[role="option"]')].find(o => o.textContent === optionLabel)!;
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(o => o.textContent === optionLabel)!;
     await act(async () => { option.click(); });
   }
 
@@ -103,6 +103,64 @@ describe('UsersPage', () => {
     expect(mine.textContent).toContain('(You)');
     expect(mine.querySelector('select, button[aria-haspopup]')).toBeNull(); // no role dropdown on your own row
     expect(theirs.querySelector('button[disabled]')).toBeNull();
+  });
+
+  it("links non-firm-admin rows to Edit client access, and shows firm admins have everything instead", async () => {
+    await render();
+    const mine = rowFor('me@firm.test'); // firm_admin
+    const theirs = rowFor('other@firm.test'); // staff
+    expect(mine.textContent).toContain('All businesses');
+    expect(mine.querySelector('a[href*="/access"]')).toBeNull();
+    const link = theirs.querySelector('a[href*="/access"]') as HTMLAnchorElement;
+    expect(link?.textContent).toBe('Edit client access');
+    expect(link.getAttribute('href')).toBe('/setup/users/other/access');
+  });
+
+  it('confirms before promoting someone to firm admin, and does nothing on Cancel', async () => {
+    apiPatch.mockResolvedValue({ data: {} });
+    await render();
+    await chooseAppSelect('Staff', 'Firm admin');
+
+    expect(document.body.textContent).toContain('Make other@firm.test a firm admin?');
+    expect(apiPatch).not.toHaveBeenCalled();
+
+    const cancel = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel')!;
+    await act(async () => { cancel.click(); });
+    expect(apiPatch).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain('a firm admin?');
+  });
+
+  it('applies the promotion once Confirm is clicked', async () => {
+    apiPatch.mockResolvedValue({ data: {} });
+    await render();
+    await chooseAppSelect('Staff', 'Firm admin');
+    const confirm = [...document.querySelectorAll('button')].find(b => b.textContent === 'Confirm')!;
+    await act(async () => { confirm.click(); await Promise.resolve(); });
+    expect(apiPatch).toHaveBeenCalledWith('/me/firm/users/other', { role: 'firm_admin' });
+  });
+
+  it('never confirms a role change away from, or between, non-firm-admin roles', async () => {
+    apiPatch.mockResolvedValue({ data: {} });
+    await render();
+    await chooseAppSelect('Staff', 'Accountant');
+    expect(document.body.textContent).not.toContain('firm admin?');
+    expect(apiPatch).toHaveBeenCalledWith('/me/firm/users/other', { role: 'accountant' });
+  });
+
+  it("disables the only active firm admin's role dropdown, with a reason", async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/me/firm/users') {
+        return Promise.resolve({ data: { users: [row('me', 'me@firm.test', 'staff'), row('admin2', 'admin2@firm.test', 'firm_admin')] } });
+      }
+      if (url === '/me/firm/roles') return Promise.resolve({ data: { roles: [] } });
+      if (url === '/me/firm/security') return Promise.resolve({ data: { require_two_step: false } });
+      return Promise.resolve({ data: { businesses: [] } });
+    });
+    await render();
+    const admin2 = rowFor('admin2@firm.test');
+    const trigger = admin2.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.closest('[title]')?.getAttribute('title')).toMatch(/assign another firm admin/i);
   });
 
   it('shows a status pill per login, and filters by status', async () => {
@@ -268,5 +326,91 @@ describe('UsersPage', () => {
     await createUser(false);
     expect(container.textContent).toContain('User created, but the email failed');
     expect(container.textContent).toContain("invitation email couldn't be sent");
+  });
+
+  describe('Primary Admin', () => {
+    function mockUsersAndTransfer(users: ReturnType<typeof row>[], transferStatus: object = { pending: false }) {
+      apiGet.mockImplementation((url: string) => {
+        if (url === '/me/firm/users') return Promise.resolve({ data: { users } });
+        if (url === '/me/firm/roles') return Promise.resolve({ data: { roles: [] } });
+        if (url === '/me/firm/security') return Promise.resolve({ data: { require_two_step: false } });
+        if (url === '/me/firm/transfer-status') return Promise.resolve({ data: transferStatus });
+        return Promise.resolve({ data: { businesses: [] } });
+      });
+    }
+
+    it("shows a locked 'Primary admin' label and 'Transfer Primary Admin' as the row's own dropdown trigger", async () => {
+      mockUsersAndTransfer([
+        row('me', 'me@firm.test', 'firm_admin', { is_primary_admin: true }),
+        row('other', 'other@firm.test', 'firm_admin'),
+      ]);
+      await render();
+
+      const mine = rowFor('me@firm.test');
+      expect(mine.textContent).toContain('Primary admin');
+      expect(mine.querySelector('[title*="Transfer the role first"]')).not.toBeNull();
+      expect(mine.querySelector('select, button[aria-haspopup]')).toBeNull(); // no role dropdown
+      expect(mine.textContent).not.toContain('All businesses');
+      expect(menuItem(mine, 'Transfer Primary Admin')).not.toBeUndefined();
+      expect(menuItem(mine, 'View user activity')).not.toBeUndefined();
+    });
+
+    it("hides Transfer Primary Admin and Cancel transfer from a viewer who isn't the Primary Admin", async () => {
+      mockUsersAndTransfer([
+        row('me', 'me@firm.test', 'firm_admin'),
+        row('primary', 'primary@firm.test', 'firm_admin', { is_primary_admin: true }),
+      ], { pending: true, target_user_id: 'me', target_name: 'me@firm.test', target_email: 'me@firm.test' });
+      await render();
+
+      const primaryRow = rowFor('primary@firm.test');
+      expect(menuItem(primaryRow, 'Transfer Primary Admin')).toBeUndefined();
+      expect(menuItem(primaryRow, 'Cancel transfer')).toBeUndefined();
+      expect(menuItem(primaryRow, 'Edit user')).not.toBeUndefined();
+    });
+
+    it('shows the amber pending badge and lets the Primary Admin cancel it', async () => {
+      mockUsersAndTransfer(
+        [row('me', 'me@firm.test', 'firm_admin', { is_primary_admin: true }), row('target', 'target@firm.test', 'firm_admin')],
+        { pending: true, target_user_id: 'target', target_name: 'Target Admin', target_email: 'target@firm.test' },
+      );
+      apiDelete.mockResolvedValue({ data: { ok: true } });
+      await render();
+
+      const mine = rowFor('me@firm.test');
+      expect(mine.textContent).toContain('Transfer pending to Target Admin');
+      await act(async () => { menuItem(mine, 'Cancel transfer')!.dispatchEvent(new MouseEvent('click', { bubbles: true })); await Promise.resolve(); });
+      expect(apiDelete).toHaveBeenCalledWith('/me/firm/transfer-primary-admin');
+    });
+
+    it('starts a transfer through the two-step modal, to an eligible target only', async () => {
+      mockUsersAndTransfer([
+        row('me', 'me@firm.test', 'firm_admin', { is_primary_admin: true }),
+        row('target', 'target@firm.test', 'firm_admin', { full_name: 'Target Admin' }),
+        row('staffer', 'staffer@firm.test', 'staff'),
+      ]);
+      apiPost.mockResolvedValue({ data: { ok: true, target_email: 'target@firm.test', email_sent: true } });
+      await render();
+
+      const mine = rowFor('me@firm.test');
+      await act(async () => { menuItem(mine, 'Transfer Primary Admin')!.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+
+      expect(document.body.textContent).toContain('Transfer Primary Admin');
+      const trigger = [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="listbox"]')].find(b => b.textContent === 'Choose a firm admin…')!;
+      await act(async () => { trigger.click(); });
+      const optionLabels = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map(o => o.textContent);
+      // Only an active, non-primary firm admin is offered — not staff.
+      expect(optionLabels.some(l => l?.includes('Target Admin'))).toBe(true);
+      expect(optionLabels.some(l => l?.includes('staffer'))).toBe(false);
+      const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(o => o.textContent === 'Target Admin (target@firm.test)')!;
+      await act(async () => { option.click(); });
+
+      const continueBtn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Continue')!;
+      await act(async () => { continueBtn.click(); });
+
+      expect(document.body.textContent).toContain('Transfer the Primary Admin role?');
+      const confirmBtn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Transfer Primary Admin' && b.tagName === 'BUTTON')!;
+      await act(async () => { confirmBtn.click(); await Promise.resolve(); });
+      expect(apiPost).toHaveBeenCalledWith('/me/firm/transfer-primary-admin', { target_user_id: 'target' });
+    });
   });
 });

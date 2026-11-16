@@ -59,10 +59,17 @@ export async function resolveBusiness(req: Request, _res: Response, next: NextFu
       .executeTakeFirst();
     if (!access?.grant_id && req.auth.role !== 'firm_admin') throw new AuthError(ERR.FORBIDDEN, 'No access to this business');
 
-    let effective_role = (access?.role_override ?? req.auth.role) as Role;
+    // A firm admin's access is unconditional, everywhere — the one the Users
+    // page itself promises ("All businesses", nothing to grant or revoke).
+    // A per-company override only narrows a lesser role; it must not survive
+    // a promotion to firm admin as an invisible, un-revocable downgrade (a
+    // stale grant from before the promotion, that Setup → Users no longer
+    // even shows a firm admin a way to see or remove).
+    const isFirmAdmin = req.auth.role === 'firm_admin';
+    let effective_role = (isFirmAdmin ? 'firm_admin' : access?.role_override ?? req.auth.role) as Role;
     let permissions: Permissions | undefined;
-    if (access?.company_role_id) permissions = normalizePermissions(access.company_permissions);
-    else if (!access?.role_override && access?.own_role_id) permissions = normalizePermissions(access.own_permissions);
+    if (!isFirmAdmin && access?.company_role_id) permissions = normalizePermissions(access.company_permissions);
+    else if (!isFirmAdmin && !access?.role_override && access?.own_role_id) permissions = normalizePermissions(access.own_permissions);
     if (permissions) {
       // Docs: docs/specs/2026-11-09-custom-roles-design.md. The route's own guard
       // then checks the built-in role of the level in this request's area.

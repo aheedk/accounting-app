@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
@@ -13,12 +13,8 @@ import { printReport } from '@/lib/reportExport';
 import { ROLE_LABELS } from '@accounting/shared';
 import { FirmSignInSettings } from '@/components/account/FirmSignInSettings';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
-type Role = 'firm_admin' | 'accountant' | 'staff' | 'viewer' | 'client';
-const ROLES: Role[] = ['firm_admin', 'accountant', 'staff', 'viewer', 'client'];
-
-/** One of the firm's own roles (Setup → Roles, docs/specs/2026-11-09-custom-roles-design.md). */
-type CustomRoleRef = { id: string; name: string };
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { type Role, type CustomRoleRef, builtin, custom, roleChoice, RoleOptions } from './userRoleOptions';
 
 type BusinessAccess = {
   business_id: string;
@@ -26,29 +22,6 @@ type BusinessAccess = {
   role_override: Role | null;
   custom_role: CustomRoleRef | null;
 };
-
-// A role menu's value: `builtin:staff`, or `custom:<role id>`.
-const builtin = (role: Role) => `builtin:${role}`;
-const custom = (id: string) => `custom:${id}`;
-function roleChoice(value: string): { role: Role } | { custom_role_id: string } {
-  return value.startsWith('custom:') ? { custom_role_id: value.slice('custom:'.length) } : { role: value.slice('builtin:'.length) as Role };
-}
-
-/** The built-in roles, then the firm's own. */
-function RoleOptions({ roles }: { roles: CustomRoleRef[] }) {
-  return (
-    <>
-      <optgroup label="Built-in roles">
-        {ROLES.map(r => <option key={r} value={builtin(r)}>{ROLE_LABELS[r]}</option>)}
-      </optgroup>
-      {roles.length > 0 && (
-        <optgroup label="Your roles">
-          {roles.map(r => <option key={r.id} value={custom(r.id)}>{r.name}</option>)}
-        </optgroup>
-      )}
-    </>
-  );
-}
 
 type UserRow = {
   id: string;
@@ -70,9 +43,13 @@ type UserRow = {
   /** An emailed invitation link in place of an admin-typed password. */
   invitation_status: 'pending' | 'sent' | 'accepted';
   invitation_expires_at: string | null;
+  /** The firm's one owner — locked except through a transfer. */
+  is_primary_admin: boolean;
 };
 
-type BusinessOption = { id: string; name: string };
+type TransferStatus =
+  | { pending: false }
+  | { pending: true; target_user_id: string; target_name: string; target_email: string };
 
 type CreatedUser = {
   user: { id: string; email: string; full_name: string; role: Role };
@@ -103,15 +80,6 @@ const STATUS_FILTERS: Array<{ key: StatusKey | 'all'; label: string }> = [
   { key: 'deactivated', label: 'Deactivated' },
 ];
 
-/** The comma list a business-access cell shows collapsed: the firm admin's
- * implicit "everything", "None", or the first two names plus a "+N more" count. */
-function businessAccessSummary(u: UserRow): string {
-  if (u.role === 'firm_admin') return 'All businesses';
-  if (u.business_access.length === 0) return 'None';
-  const names = u.business_access.map(a => a.business_name);
-  return names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
-}
-
 function errorMessage(e: unknown): string {
   return (e as { response?: { data?: { error?: { message?: string } } } } | undefined)
     ?.response?.data?.error?.message ?? 'Request failed';
@@ -120,10 +88,10 @@ function errorMessage(e: unknown): string {
 export default function UsersPage() {
   const { user } = useAuth();
   const canManage = user?.role === 'firm_admin';
+  const nav = useNavigate();
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleRef[]>([]);
-  const [businesses, setBusinesses] = useState<BusinessOption[]>([]);
   const [err, setErr] = useState<string | null>(null);
   // Which row action is in flight, and a brief result message next to it
   // (green on success, red on failure) — fades on its own after a few seconds.
@@ -153,32 +121,30 @@ export default function UsersPage() {
   const [editBusy, setEditBusy] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
 
-  // Which row's business-access detail (the full list, revoke links, the
-  // grant form) is expanded — collapsed by default so the column stays compact.
-  const [expandedAccess, setExpandedAccess] = useState<string | null>(null);
-  const [grantFor, setGrantFor] = useState<string | null>(null);
-  // `access` is '' (the login's own role applies there) or a role menu value.
-  const [grantForm, setGrantForm] = useState<{ business_id: string; access: string }>({
-    business_id: '', access: '',
-  });
-  const [grantBusy, setGrantBusy] = useState(false);
-  const [grantErr, setGrantErr] = useState<string | null>(null);
+  // Confirming a promotion to firm admin — see changeRole.
+  const [promoteConfirm, setPromoteConfirm] = useState<{ userId: string; userName: string; value: string } | null>(null);
+
   const [excelBusy, setExcelBusy] = useState(false);
+
+  // Transferring the Primary Admin designation: who's pending (firm-wide, so
+  // its own fetch), and the two-step modal state while it's being started.
+  const [transferStatus, setTransferStatus] = useState<TransferStatus>({ pending: false });
+  const [transferStep, setTransferStep] = useState<'pick' | 'confirm' | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferErr, setTransferErr] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setErr(null);
     try {
-      const [u, b, r] = await Promise.all([
+      const [u, r, ts] = await Promise.all([
         api.get<{ users: UserRow[] }>('/me/firm/users'),
-        api.get<{ businesses?: BusinessOption[] }>('/me'),
         api.get<{ roles: CustomRoleRef[] }>('/me/firm/roles'),
+        api.get<TransferStatus>('/me/firm/transfer-status'),
       ]);
       setUsers(u.data.users);
       setCustomRoles(r.data.roles.map(role => ({ id: role.id, name: role.name })));
-      const bizList = Array.isArray(b.data.businesses)
-        ? b.data.businesses.map(x => ({ id: x.id, name: x.name }))
-        : [];
-      setBusinesses(bizList);
+      setTransferStatus(ts.data);
     } catch (e) {
       setErr(errorMessage(e));
     }
@@ -288,7 +254,7 @@ export default function UsersPage() {
     }
   }
 
-  async function changeRole(user_id: string, value: string) {
+  async function applyRoleChange(user_id: string, value: string) {
     try {
       await api.patch(`/me/firm/users/${user_id}`, roleChoice(value));
       await reload();
@@ -297,37 +263,49 @@ export default function UsersPage() {
     }
   }
 
-  function openGrant(user_id: string) {
-    setGrantErr(null);
-    setGrantFor(user_id);
-    setExpandedAccess(user_id);
-    setGrantForm({ business_id: '', access: '' });
+  // Firm admin is the highest level there is, so picking it asks first — an
+  // escalation, not a destructive action, so the dialog's Confirm is the
+  // ordinary primary button, not the red one Switch off and Delete use.
+  // No other role needs this; only becoming a firm admin does.
+  function changeRole(u: UserRow, value: string) {
+    const choice = roleChoice(value);
+    if ('role' in choice && choice.role === 'firm_admin' && u.role !== 'firm_admin') {
+      setPromoteConfirm({ userId: u.id, userName: u.full_name, value });
+      return;
+    }
+    void applyRoleChange(u.id, value);
   }
 
-  async function submitGrant(e: React.FormEvent) {
-    e.preventDefault();
-    if (!grantFor || !grantForm.business_id) return;
-    setGrantErr(null);
-    setGrantBusy(true);
+  function openTransferModal() {
+    setTransferTargetId('');
+    setTransferErr(null);
+    setTransferStep('pick');
+  }
+
+  async function confirmTransfer() {
+    setTransferBusy(true);
+    setTransferErr(null);
     try {
-      const choice = grantForm.access === '' ? null : roleChoice(grantForm.access);
-      await api.post(`/me/firm/users/${grantFor}/business-access`, {
-        business_id: grantForm.business_id,
-        role_override: choice && 'role' in choice ? choice.role : null,
-        custom_role_id: choice && 'custom_role_id' in choice ? choice.custom_role_id : null,
-      });
-      setGrantFor(null);
+      const r = await api.post<{ ok: boolean; target_email: string; email_sent: boolean }>(
+        '/me/firm/transfer-primary-admin', { target_user_id: transferTargetId },
+      );
+      setTransferStep(null);
       await reload();
+      if (!r.data.email_sent) {
+        setErr(`Transfer started, but the email to ${r.data.target_email} couldn't be sent.`);
+      }
     } catch (e) {
-      setGrantErr(errorMessage(e));
+      setTransferErr(errorMessage(e));
     } finally {
-      setGrantBusy(false);
+      setTransferBusy(false);
     }
   }
 
-  async function revoke(user_id: string, business_id: string) {
+  async function cancelTransfer() {
+    if (!window.confirm('Cancel this transfer? The link already sent will stop working.')) return;
+    setErr(null);
     try {
-      await api.delete(`/me/firm/users/${user_id}/business-access/${business_id}`);
+      await api.delete('/me/firm/transfer-primary-admin');
       await reload();
     } catch (e) {
       setErr(errorMessage(e));
@@ -360,11 +338,6 @@ export default function UsersPage() {
     );
   }
 
-  const availableBusinessesFor = (u: UserRow) => {
-    const existing = new Set(u.business_access.map(a => a.business_id));
-    return businesses.filter(b => !existing.has(b.id));
-  };
-
   // The API refuses to switch off or delete the firm's only firm admin, so
   // those links are hidden rather than offered and left to fail.
   const isOnlyActiveFirmAdmin = (u: UserRow) =>
@@ -383,7 +356,8 @@ export default function UsersPage() {
     printReport({ title: 'Users', headers: dlHeaders, rows: dlRows() });
   }
 
-  /** The row's single "Edit user ▾" menu — every other action lives inside it. */
+  /** The row's "⌄" menu: every action except "Edit client access", which is
+   * its own link right next to this trigger — see the Actions cell below. */
   function actionsMenu(u: UserRow) {
     const isSelf = u.id === user?.id;
     const status = userStatus(u);
@@ -400,14 +374,15 @@ export default function UsersPage() {
           <button
             type="button"
             disabled={busyHere}
-            className="inline-flex items-center gap-1 text-link hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="More actions"
+            className="text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Edit user <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="h-4 w-4" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem onSelect={() => startEdit(u)}>Edit user</DropdownMenuItem>
-          {u.role !== 'firm_admin' && <DropdownMenuItem onSelect={() => openGrant(u.id)}>Grant access</DropdownMenuItem>}
+          <DropdownMenuItem onSelect={() => nav(`/setup/activity?scope=firm&user_id=${u.id}`)}>View user activity</DropdownMenuItem>
           {canResend && (
             <DropdownMenuItem onSelect={() => void userAction(u, 'resend-invitation', `Resend the invitation to ${u.email}?`, 'Invitation resent')}>
               Resend invitation
@@ -451,6 +426,39 @@ export default function UsersPage() {
       </DropdownMenu>
     );
   }
+
+  /** The Primary Admin's own row: its dropdown trigger IS "Transfer Primary
+   * Admin", replacing the "Edit client access" link + separate "⌄" every
+   * other row has. Only the Primary Admin themselves sees the transfer/cancel
+   * items — anyone else viewing this row would just get a 403. */
+  function primaryAdminMenu(u: UserRow) {
+    const isSelf = u.id === user?.id;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="inline-flex items-center gap-1 text-sm text-link hover:underline">
+            Transfer Primary Admin <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          {isSelf && <DropdownMenuItem onSelect={openTransferModal}>Transfer Primary Admin</DropdownMenuItem>}
+          <DropdownMenuItem onSelect={() => startEdit(u)}>Edit user</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => nav(`/setup/activity?scope=firm&user_id=${u.id}`)}>View user activity</DropdownMenuItem>
+          {isSelf && transferStatus.pending && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => void cancelTransfer()}>
+                Cancel transfer
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  // Who the Primary Admin may transfer to: another active firm admin, not themselves.
+  const eligibleTransferTargets = users.filter(u => u.role === 'firm_admin' && !u.deactivated_at && !u.is_primary_admin);
 
   return (
     <div className="space-y-6">
@@ -594,12 +602,11 @@ export default function UsersPage() {
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40">
               <tr className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <th className="text-left p-3 w-[18%]">Name</th>
-                <th className="text-left p-3 w-[20%]">Email</th>
-                <th className="text-left p-3 w-[12%]">Status</th>
-                <th className="text-left p-3 w-[18%]">Role</th>
-                <th className="text-left p-3">Business access</th>
-                <th className="text-right p-3 w-[10%]">Actions</th>
+                <th className="text-left p-3 w-[20%]">Name</th>
+                <th className="text-left p-3 w-[24%]">Email</th>
+                <th className="text-left p-3 w-[14%]">Status</th>
+                <th className="text-left p-3">Role</th>
+                <th className="text-right p-3 w-[16%]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -633,7 +640,18 @@ export default function UsersPage() {
                     <td className="p-3">
                       {/* The API refuses changing your own role, so a firm can't be left without an
                           admin. Words, not a locked menu: a greyed "Firm admin" read as broken. */}
-                      {isSelf ? (
+                      {u.is_primary_admin ? (
+                        <>
+                          <p className="text-sm font-medium" title="The Primary admin role cannot be changed. Transfer the role first.">
+                            Primary admin {isSelf && <span className="text-xs text-muted-foreground">(You)</span>}
+                          </p>
+                          {transferStatus.pending && (
+                            <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                              Transfer pending to {transferStatus.target_name}
+                            </span>
+                          )}
+                        </>
+                      ) : isSelf ? (
                         <p className="text-sm font-medium" title="Another firm admin can change your role.">
                           {u.custom_role?.name ?? ROLE_LABELS[u.role]} <span className="text-xs text-muted-foreground">(You)</span>
                         </p>
@@ -641,7 +659,9 @@ export default function UsersPage() {
                         <AppSelect
                           className="h-9 rounded-md border bg-background px-2 text-sm"
                           value={u.custom_role ? custom(u.custom_role.id) : builtin(u.role)}
-                          onChange={e => changeRole(u.id, e.target.value)}
+                          onChange={e => changeRole(u, e.target.value)}
+                          disabled={isOnlyActiveFirmAdmin(u)}
+                          title={isOnlyActiveFirmAdmin(u) ? 'You must assign another firm admin before changing this role.' : undefined}
                         >
                           <RoleOptions roles={customRoles} />
                         </AppSelect>
@@ -658,81 +678,21 @@ export default function UsersPage() {
                         Payroll
                       </label>
                     </td>
-                    <td className="p-3">
-                      {u.role === 'firm_admin' ? (
-                        <span className="text-xs text-muted-foreground">All businesses</span>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="text-left text-xs hover:underline"
-                            onClick={() => setExpandedAccess(cur => (cur === u.id ? null : u.id))}
-                          >
-                            {expandedAccess === u.id ? 'Hide' : businessAccessSummary(u)}
-                          </button>
-                          {expandedAccess === u.id && (
-                            <div className="mt-2 space-y-2">
-                              <ul className="space-y-1">
-                                {u.business_access.length === 0 && <li className="text-xs text-muted-foreground">None</li>}
-                                {u.business_access.map(a => (
-                                  <li key={a.business_id} className="flex items-center gap-2 text-xs">
-                                    <span>{a.business_name}</span>
-                                    {(a.custom_role || a.role_override) && (
-                                      <span className="rounded-full border px-2 py-0.5">
-                                        as {a.custom_role ? a.custom_role.name : a.role_override ? ROLE_LABELS[a.role_override] : ''}
-                                      </span>
-                                    )}
-                                    <button type="button" className="text-destructive hover:underline" onClick={() => revoke(u.id, a.business_id)}>revoke</button>
-                                  </li>
-                                ))}
-                              </ul>
-                              {grantFor === u.id ? (
-                                <form className="grid grid-cols-1 gap-2 md:grid-cols-3 md:items-end" onSubmit={submitGrant}>
-                                  <div>
-                                    <Label className="text-xs">Business</Label>
-                                    <AppSelect
-                                      className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                      value={grantForm.business_id}
-                                      onChange={e => setGrantForm(g => ({ ...g, business_id: e.target.value }))}
-                                      required
-                                    >
-                                      <option value="">Select…</option>
-                                      {availableBusinessesFor(u).map(b => (
-                                        <option key={b.id} value={b.id}>{b.name}</option>
-                                      ))}
-                                    </AppSelect>
-                                  </div>
-                                  <div>
-                                    <Label className="text-xs">Role in this company (optional)</Label>
-                                    <AppSelect
-                                      className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                      value={grantForm.access}
-                                      onChange={e => setGrantForm(g => ({ ...g, access: e.target.value }))}
-                                    >
-                                      <option value="">Their own role</option>
-                                      <RoleOptions roles={customRoles} />
-                                    </AppSelect>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button type="submit" size="sm" disabled={grantBusy}>
-                                      {grantBusy ? 'Granting…' : 'Grant'}
-                                    </Button>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => setGrantFor(null)}>
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                  {grantErr && <p className="text-xs text-destructive md:col-span-3">{grantErr}</p>}
-                                </form>
-                              ) : (
-                                <button type="button" className="text-xs text-link hover:underline" onClick={() => openGrant(u.id)}>Grant access</button>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </td>
                     <td className="p-3 text-right">
-                      {actionsMenu(u)}
+                      <div className="flex items-center justify-end gap-2">
+                        {u.is_primary_admin ? (
+                          primaryAdminMenu(u)
+                        ) : (
+                          <>
+                            {u.role === 'firm_admin' ? (
+                              <span className="text-xs text-muted-foreground">All businesses</span>
+                            ) : (
+                              <Link to={`/setup/users/${u.id}/access`} className="text-link hover:underline">Edit client access</Link>
+                            )}
+                            {actionsMenu(u)}
+                          </>
+                        )}
+                      </div>
                       {rowFlash?.id === u.id && (
                         <p className={`mt-1 text-xs ${rowFlash.tone === 'success' ? 'text-emerald-700' : 'text-destructive'}`}>{rowFlash.text}</p>
                       )}
@@ -742,7 +702,7 @@ export default function UsersPage() {
               })}
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td className="p-6 text-center text-muted-foreground" colSpan={6}>
+                  <td className="p-6 text-center text-muted-foreground" colSpan={5}>
                     {users.length === 0 ? 'No users yet.' : 'No users match the search and filters.'}
                   </td>
                 </tr>
@@ -753,6 +713,64 @@ export default function UsersPage() {
       </Card>
 
       <FirmSignInSettings withoutTwoStep={users.filter(u => !u.deactivated_at && !u.two_step_enabled).length} />
+
+      <Dialog open={promoteConfirm !== null} onOpenChange={o => { if (!o) setPromoteConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Make {promoteConfirm?.userName} a firm admin?</DialogTitle></DialogHeader>
+          <div className="px-6 py-4 text-sm text-muted-foreground">
+            Firm admins have full access to all clients, team management, firm settings, and billing. This is the highest level of access.
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPromoteConfirm(null)}>Cancel</Button>
+            <Button onClick={() => { const p = promoteConfirm; setPromoteConfirm(null); if (p) void applyRoleChange(p.userId, p.value); }}>
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={transferStep !== null} onOpenChange={o => { if (!o) setTransferStep(null); }}>
+        <DialogContent>
+          {transferStep === 'pick' ? (
+            <>
+              <DialogHeader><DialogTitle>Transfer Primary Admin</DialogTitle></DialogHeader>
+              <div className="px-6 py-4 space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  Choose another firm admin to become the firm's Primary Admin. They'll get an email with a link to accept.
+                </p>
+                {eligibleTransferTargets.length === 0 ? (
+                  <p className="text-muted-foreground">No eligible users — only an active firm admin other than yourself can receive the transfer.</p>
+                ) : (
+                  <AppSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={transferTargetId} onChange={e => setTransferTargetId(e.target.value)}>
+                    <option value="" disabled>Choose a firm admin…</option>
+                    {eligibleTransferTargets.map(u => <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>)}
+                  </AppSelect>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setTransferStep(null)}>Cancel</Button>
+                <Button disabled={!transferTargetId} onClick={() => setTransferStep('confirm')}>Continue</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader><DialogTitle>Transfer the Primary Admin role?</DialogTitle></DialogHeader>
+              <div className="px-6 py-4 text-sm text-muted-foreground">
+                {eligibleTransferTargets.find(u => u.id === transferTargetId)?.full_name} will receive an email to accept.
+                Once accepted, they become the firm's Primary Admin and you keep your firm admin access, just not the
+                designation. You can cancel this before they accept.
+              </div>
+              {transferErr && <p className="px-6 text-sm text-destructive">{transferErr}</p>}
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setTransferStep('pick')} disabled={transferBusy}>Back</Button>
+                <Button onClick={() => void confirmTransfer()} disabled={transferBusy}>
+                  {transferBusy ? 'Sending…' : 'Transfer Primary Admin'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

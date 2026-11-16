@@ -8,6 +8,7 @@ import LoginPage from '@/pages/LoginPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AcceptInvitationPage from '@/pages/AcceptInvitationPage';
+import AcceptPrimaryAdminPage from '@/pages/AcceptPrimaryAdminPage';
 import DashboardPage from '@/pages/DashboardPage';
 import AccountPage from '@/pages/AccountPage';
 import ActivityLogPage from '@/pages/setup/ActivityLogPage';
@@ -114,6 +115,7 @@ import CompanySettingsPage from '@/pages/setup/CompanySettingsPage';
 import QuickBooksImportPage from '@/pages/setup/QuickBooksImportPage';
 import AddClientPage from '@/pages/setup/AddClientPage';
 import UsersPage from '@/pages/setup/UsersPage';
+import UserAccessPage from '@/pages/setup/UserAccessPage';
 import RolesPage from '@/pages/setup/RolesPage';
 import CostCentersPage from '@/pages/setup/CostCentersPage';
 import InventoryListPage from '@/pages/inventory/InventoryListPage';
@@ -157,6 +159,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+        <Route path="/accept-primary-admin" element={<AcceptPrimaryAdminPage />} />
         <Route element={<ProtectedRoute />}>
           {/* The firm's view with no client selected: its own top bar, outside AppShell. */}
           <Route path="/firm" element={<FirmShell />}>
@@ -337,6 +340,7 @@ export default function App() {
             <Route path="/setup/coa/:accountId/register" element={<AccountRegisterPage />} />
             <Route path="/setup/cost-centers" element={<CostCentersPage />} />
             <Route path="/setup/users" element={<UsersPage />} />
+            <Route path="/setup/users/:userId/access" element={<UserAccessPage />} />
             <Route path="/setup/roles" element={<RolesPage />} />
 
             {/* Payroll (placeholders) */}

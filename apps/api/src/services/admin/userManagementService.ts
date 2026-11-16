@@ -10,6 +10,7 @@ import { issueInvitation } from '../auth/invitationService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { roleInFirm } from './roleService.js';
+import { isPrimaryAdmin } from './primaryAdminService.js';
 
 export type UserBusinessAccess = {
   business_id: string;
@@ -35,6 +36,8 @@ export type ListedUser = {
   /** An invitation link in place of an admin-typed password (migration 0117). */
   invitation_status: 'pending' | 'sent' | 'accepted';
   invitation_expires_at: unknown;
+  /** The firm's single top-level owner (migration 0118) — never this login's own role field. */
+  is_primary_admin: boolean;
 };
 
 export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<ListedUser[]> {
@@ -50,6 +53,8 @@ export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<Listed
     .orderBy('users.created_at', 'asc')
     .execute();
   if (users.length === 0) return [];
+
+  const firm = await db.selectFrom('firms').select('primary_admin_user_id').where('id', '=', firm_id).executeTakeFirstOrThrow();
 
   const userIds = users.map(u => u.id);
   const accessRows = await db.selectFrom('user_business_access as uba')
@@ -93,6 +98,7 @@ export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<Listed
     business_access: byUser.get(u.id) ?? [],
     invitation_status: u.invitation_status,
     invitation_expires_at: u.invitation_expires_at,
+    is_primary_admin: u.id === firm.primary_admin_user_id,
   }));
 }
 
@@ -170,6 +176,29 @@ export async function updateUserRole(
 
   // A custom role is stored with the role staff (migration 0116).
   const role: UserRole = input.custom_role_id ? 'staff' : input.role;
+
+  // The Primary Admin's role can never change this way at all — not even to
+  // another firm admin's custom role — only by transferring the designation
+  // itself (Setup → Users → Transfer Primary Admin).
+  if (await isPrimaryAdmin(trx, ctx.firm_id, input.user_id)) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED,
+      'The Primary Admin role cannot be changed. Transfer the role first.');
+  }
+
+  // Moving the firm's only firm admin to anything else would leave nobody
+  // able to manage it — the same guard deactivateUser and deleteUser already
+  // have, missing here until now.
+  if (before.role === 'firm_admin' && role !== 'firm_admin') {
+    const others = await trx.selectFrom('users').select('id')
+      .where('firm_id', '=', ctx.firm_id).where('role', '=', 'firm_admin')
+      .where('deleted_at', 'is', null).where('deactivated_at', 'is', null).where('id', '<>', input.user_id)
+      .execute();
+    if (others.length === 0) {
+      throw new BusinessRuleError(ERR.PRECONDITION_FAILED,
+        `${before.full_name} is the only firm admin. Assign another firm admin before changing this role.`);
+    }
+  }
+
   const updated = await trx.updateTable('users')
     .set({ role, custom_role_id: input.custom_role_id ?? null })
     .where('id', '=', input.user_id)
@@ -262,6 +291,36 @@ export async function grantBusinessAccess(
   return row;
 }
 
+/** Changes the role an existing grant already carries — Setup → Users → "Edit client access" → Edit, one business at a time. */
+export async function updateBusinessAccess(
+  trx: Transaction<DB>,
+  ctx: ServiceCtx,
+  input: { user_id: string; business_id: string; role_override: UserRole | null; custom_role_id?: string | null | undefined },
+) {
+  if (input.role_override && input.custom_role_id) {
+    throw new BusinessRuleError(ERR.VALIDATION_FAILED, 'Give either a built-in role or a custom role, not both.');
+  }
+  if (input.custom_role_id) await roleInFirm(trx, ctx.firm_id, input.custom_role_id);
+  const user = await trx.selectFrom('users').select(['id', 'firm_id'])
+    .where('id', '=', input.user_id).where('deleted_at', 'is', null).executeTakeFirst();
+  if (!user || user.firm_id !== ctx.firm_id) throw new NotFoundError('user', input.user_id);
+
+  const before = await trx.selectFrom('user_business_access').selectAll()
+    .where('user_id', '=', input.user_id).where('business_id', '=', input.business_id).executeTakeFirst();
+  if (!before) throw new NotFoundError('user_business_access', `${input.user_id}/${input.business_id}`);
+
+  const updated = await trx.updateTable('user_business_access')
+    .set({ role_override: input.role_override, custom_role_id: input.custom_role_id ?? null })
+    .where('id', '=', before.id)
+    .returningAll().executeTakeFirstOrThrow();
+  await reissueAccessTokens(trx, input.user_id);
+
+  await auditRecord(trx, ctx, {
+    action: AUDIT.USER_BUSINESS_ACCESS_GRANT, entity_type: 'user_business_access', entity_id: updated.id, before, after: updated,
+  });
+  return updated;
+}
+
 export async function revokeBusinessAccess(
   trx: Transaction<DB>,
   ctx: ServiceCtx,
@@ -316,6 +375,11 @@ export async function deactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   const user = await userInFirm(trx, ctx, input.user_id);
   if (user.id === ctx.user_id) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'You cannot switch off your own login.');
   if (user.deactivated_at) return user;
+  // Unconditional — the firm always needs its Primary Admin reachable, even
+  // with other firm admins still active. Transfer the designation first.
+  if (await isPrimaryAdmin(trx, ctx.firm_id, user.id)) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'The Primary Admin cannot be switched off. Transfer the role first.');
+  }
   if (user.role === 'firm_admin') {
     const others = await trx.selectFrom('users').select('id')
       .where('firm_id', '=', ctx.firm_id).where('role', '=', 'firm_admin')
@@ -364,6 +428,9 @@ async function userHasAnyFootprint(trx: Transaction<DB>, user_id: string): Promi
 export async function deleteUser(trx: Transaction<DB>, ctx: ServiceCtx, input: { user_id: string }) {
   const user = await userInFirm(trx, ctx, input.user_id);
   if (user.id === ctx.user_id) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'You cannot delete your own login.');
+  if (await isPrimaryAdmin(trx, ctx.firm_id, user.id)) {
+    throw new BusinessRuleError(ERR.PRECONDITION_FAILED, 'The Primary Admin cannot be deleted. Transfer the role first.');
+  }
   if (user.role === 'firm_admin') {
     const others = await trx.selectFrom('users').select('id')
       .where('firm_id', '=', ctx.firm_id).where('role', '=', 'firm_admin')

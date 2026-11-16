@@ -6,6 +6,7 @@ import * as account from '../services/auth/accountService.js';
 import { hashRefreshToken } from '../services/auth/tokenService.js';
 import * as invitation from '../services/auth/invitationService.js';
 import * as passwordReset from '../services/auth/passwordResetService.js';
+import * as primaryAdminSvc from '../services/admin/primaryAdminService.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import { config } from '../config.js';
@@ -112,6 +113,34 @@ router.post('/auth/reset-password', async (req, res, next) => {
   try {
     const body = schemas.resetPasswordSchema.parse(req.body);
     await passwordReset.completePasswordReset(db, body, reqMeta(req));
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ── Transferring the firm's Primary Admin designation — public, token-based,
+// same shape as the invitation/reset links above. Spec:
+// docs/specs/2026-11-15-user-invitations-and-signin-design.md
+
+router.get('/auth/validate-primary-admin-transfer', async (req, res, next) => {
+  try {
+    const { token } = schemas.tokenLookupSchema.parse(req.query);
+    const lookup = await primaryAdminSvc.validateTransferToken(db, token);
+    res.json({ firm_name: lookup.firm_name, current_admin_name: lookup.current_admin_name, target_email: lookup.target_email });
+  } catch (e) { next(e); }
+});
+
+router.post('/auth/accept-primary-admin', async (req, res, next) => {
+  try {
+    const body = schemas.primaryAdminTokenSchema.parse(req.body);
+    await primaryAdminSvc.acceptTransfer(db, body, reqMeta(req));
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/auth/decline-primary-admin', async (req, res, next) => {
+  try {
+    const body = schemas.primaryAdminTokenSchema.parse(req.body);
+    await primaryAdminSvc.declineTransfer(db, body, reqMeta(req));
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

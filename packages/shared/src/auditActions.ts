@@ -279,6 +279,13 @@ export const AUDIT = {
   USER_INVITE_ACCEPT: 'user.invite_accept',
   AUTH_PASSWORD_RESET_REQUEST: 'auth.password_reset_request',
   AUTH_PASSWORD_RESET_COMPLETE: 'auth.password_reset_complete',
+
+  // The firm's single top-level owner, and transferring that designation
+  // (docs/specs/2026-11-15-user-invitations-and-signin-design.md)
+  PRIMARY_ADMIN_TRANSFER_INITIATE: 'firm.primary_admin_transfer_initiate',
+  PRIMARY_ADMIN_TRANSFER_CANCEL: 'firm.primary_admin_transfer_cancel',
+  PRIMARY_ADMIN_TRANSFER_ACCEPT: 'firm.primary_admin_transfer_accept',
+  PRIMARY_ADMIN_TRANSFER_DECLINE: 'firm.primary_admin_transfer_decline',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

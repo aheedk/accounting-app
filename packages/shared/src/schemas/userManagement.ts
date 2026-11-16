@@ -33,6 +33,22 @@ export const businessAccessGrantSchema = z.object({
 }).refine(v => !(v.role_override && v.custom_role_id), { message: 'Give either a built-in role or a custom role, not both.' });
 export type BusinessAccessGrant = z.infer<typeof businessAccessGrantSchema>;
 
+// Changing an existing grant's role — the business is already named in the URL.
+export const businessAccessUpdateSchema = z.object({
+  role_override: userRoleSchema.nullable().optional(),
+  custom_role_id: z.string().uuid().nullable().optional(),
+}).refine(v => !(v.role_override && v.custom_role_id), { message: 'Give either a built-in role or a custom role, not both.' });
+export type BusinessAccessUpdate = z.infer<typeof businessAccessUpdateSchema>;
+
+// The firm's single top-level owner, transferred to another firm admin by
+// an emailed link they accept or decline — the same pattern an invitation
+// already uses. docs/specs/2026-11-15-user-invitations-and-signin-design.md
+export const transferPrimaryAdminSchema = z.object({ target_user_id: z.string().uuid() });
+export type TransferPrimaryAdmin = z.infer<typeof transferPrimaryAdminSchema>;
+
+export const primaryAdminTokenSchema = z.object({ token: z.string().min(1) });
+export type PrimaryAdminToken = z.infer<typeof primaryAdminTokenSchema>;
+
 const levelSchema = z.enum(LEVELS);
 export const permissionsSchema = z.object(
   Object.fromEntries(AREAS.map(area => [area, levelSchema])) as Record<Area, typeof levelSchema>,
