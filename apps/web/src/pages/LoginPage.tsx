@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthPageShell } from '@/components/auth/AuthPageShell';
+import { SocialSignInButtons } from '@/components/auth/SocialSignInButtons';
 import { useAuth } from '@/auth/useAuth';
 import { clearSignedOutNotice, readSignedOutNotice } from '@/lib/idleSession';
 import { getRememberedEmail, rememberEmail, forgetEmail } from '@/lib/rememberedEmail';
@@ -28,6 +29,8 @@ export default function LoginPage() {
   // reset-password success notice: said once, from the same slot.
   const [notice] = useState(readSignedOutNotice);
   useEffect(clearSignedOutNotice, []);
+  const [params] = useSearchParams();
+  const oauthError = params.get('oauth_error');
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,6 +60,7 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         {notice && <p className="mb-4 rounded-md bg-muted p-3 text-sm text-muted-foreground">{notice}</p>}
+        {oauthError && <p className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{oauthError}</p>}
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -104,8 +108,9 @@ export default function LoginPage() {
           <Button type="submit" className="h-11 w-full rounded-lg font-medium" disabled={busy || (needsCode && code.length !== 6)}>
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">Don't have an account? Contact your administrator</p>
         </form>
+        <SocialSignInButtons />
+        <p className="mt-4 text-center text-sm text-muted-foreground">Don't have an account? Contact your administrator</p>
       </CardContent>
     </AuthPageShell>
   );

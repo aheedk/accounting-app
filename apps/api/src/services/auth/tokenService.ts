@@ -86,3 +86,24 @@ export function verifyGmailConnectState(token: string | undefined): GmailConnect
     return null;
   }
 }
+
+// A CSRF nonce round-tripped through a third party as OAuth's `state`
+// (socialAuthService) — for a plain sign-in, nobody is signed in yet to
+// carry; for "Connect Google/Microsoft" from My account, the already-signed-in
+// person's id rides along so the callback knows which login to attach to.
+// Same signed-JWT-as-a-token idea as the Gmail connect state above.
+export function signSetupPurposeToken(purpose: string, userId?: string): string {
+  return jwt.sign({ purpose, ...(userId ? { user_id: userId } : {}) }, config.JWT_ACCESS_SECRET, { algorithm: 'HS256', expiresIn: '10m' });
+}
+
+export function verifySetupPurposeToken(purpose: string, token: string | undefined): { user_id: string | null } | null {
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, config.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
+    if (typeof decoded === 'string' || decoded['purpose'] !== purpose) return null;
+    const { user_id } = decoded as Record<string, unknown>;
+    return { user_id: typeof user_id === 'string' ? user_id : null };
+  } catch {
+    return null;
+  }
+}

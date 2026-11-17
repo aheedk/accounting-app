@@ -1,7 +1,7 @@
-import type { Kysely } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import { sql } from 'kysely';
 import { AUDIT, ERR, normalizePermissions, type Permissions } from '@accounting/shared';
-import type { DB, UserRole } from '../../db/types.js';
+import type { DB, UserRole, UsersTable } from '../../db/types.js';
 import { AuthError } from '../../lib/errors.js';
 import { hashPassword, verifyPassword } from './passwordHasher.js';
 import { decryptField } from '../../lib/fieldCrypto.js';
@@ -10,6 +10,7 @@ import { revokeSession } from './sessionRevocation.js';
 import { generateRefreshToken, hashRefreshToken, signAccessToken, type RefreshTokenType, type SetupStep } from './tokenService.js';
 import { config } from '../../config.js';
 import { record as auditRecord } from '../audit/auditService.js';
+import { noteSignIn } from './signInAlertService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 
 export type LoginInput = { email: string; password: string; code?: string | undefined };
@@ -219,6 +220,12 @@ export async function login(
     throw new AuthError(ERR.FORBIDDEN, 'This login has been switched off. Ask a firm admin.');
   }
 
+  // Set by accepting the invitation link, or an admin handing over a
+  // password directly — both confirm the address. Nothing else does.
+  if (!preUser.email_verified) {
+    throw new AuthError(ERR.FORBIDDEN, 'Please check your email to verify your account before signing in.');
+  }
+
   if (preUser.totp_enabled_at && preUser.totp_secret) {
     if (!input.code) {
       throw new AuthError(ERR.TWO_STEP_REQUIRED, 'Enter the 6-digit code from your authenticator app.');
@@ -238,6 +245,22 @@ export async function login(
     }
   }
 
+  return completeSignIn(db, preUser, meta, tokenType);
+}
+
+/**
+ * The common tail of signing in, once a real, active, verified user row is
+ * already in hand — by password (login, above) or by a linked Google/
+ * Microsoft account (socialAuthService). Issues the session, records
+ * AUTH_LOGIN, runs the new-device/location check, and returns the same
+ * shape either path does.
+ */
+export async function completeSignIn(
+  db: Kysely<DB>,
+  preUser: Selectable<UsersTable>,
+  meta: ReqMeta,
+  tokenType: RefreshTokenType = 'web',
+): Promise<LoginResult> {
   const firm = await firmSignInSettings(db, preUser.firm_id);
 
   return db.transaction().execute(async (trx) => {
@@ -263,6 +286,8 @@ export async function login(
       before: null,
       after: { email: user.email },
     });
+
+    await noteSignIn(trx, ctxFromLogin(user, meta), user, meta, user.last_login_at === null);
 
     const setup = setupSteps(user, firm);
     return {

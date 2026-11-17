@@ -14,7 +14,11 @@ import { ChangePasswordForm } from '@/components/account/ChangePasswordForm';
 import { TwoStepSetupForm } from '@/components/account/TwoStepSetupForm';
 
 type Session = { id: string; started_at: string; last_active_at: string; user_agent: string | null; ip_address: string | null; current: boolean };
-type Account = { email: string; two_step_enabled: boolean; two_step_required: boolean; sessions: Session[] };
+type Account = {
+  email: string; two_step_enabled: boolean; two_step_required: boolean; sessions: Session[];
+  password_changed_at: string | null;
+  social: { google: boolean; microsoft: boolean };
+};
 
 // The signed-in person's own login: password, the second step of signing in,
 // and where they are signed in. Every role has this page.
@@ -68,6 +72,25 @@ export default function AccountPage() {
 
   const others = account?.sessions.filter(s => !s.current).length ?? 0;
 
+  // ── Connected accounts (Google/Microsoft)
+  const [connectError, setConnectError] = useState<string | null>(null);
+  async function connectProvider(provider: 'google' | 'microsoft') {
+    setConnectError(null);
+    try {
+      const r = await api.get<{ url: string }>(`/auth/${provider}/connect`);
+      window.location.href = r.data.url;
+    } catch (e: unknown) { setConnectError(pickErr(e)); }
+  }
+  async function unlinkProvider(provider: 'google' | 'microsoft') {
+    setConnectError(null);
+    try { await api.delete(`/auth/social/${provider}`); await reload(); }
+    catch (e: unknown) { setConnectError(pickErr(e)); }
+  }
+  useEffect(() => {
+    const linked = new URLSearchParams(window.location.search).get('linked');
+    if (linked) { flashMessage(`${linked === 'google' ? 'Google' : 'Microsoft'} account linked.`, 4000); window.history.replaceState(null, '', '/account'); }
+  }, []);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -80,7 +103,10 @@ export default function AccountPage() {
 
       <Card>
         <CardHeader><CardTitle>Password</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {account?.password_changed_at && (
+            <p className="text-sm text-muted-foreground">Last changed {fmtDateTime(account.password_changed_at)}</p>
+          )}
           <ChangePasswordForm
             note="Changing it signs you out of every other browser."
             onChanged={async () => {
@@ -88,6 +114,29 @@ export default function AccountPage() {
               await reload();
             }}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Connected accounts</CardTitle></CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">Sign in with Google or Microsoft in addition to your password.</p>
+          {connectError && <p className="text-sm text-destructive">{connectError}</p>}
+          {(['google', 'microsoft'] as const).map(provider => (
+            <div key={provider} className="flex items-center justify-between">
+              <span>
+                {provider === 'google' ? 'Google' : 'Microsoft'}
+                {account?.social[provider]
+                  ? <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Connected</span>
+                  : <span className="ml-2 text-xs text-muted-foreground">Not connected</span>}
+              </span>
+              {account?.social[provider] ? (
+                <Button variant="outline" size="sm" onClick={() => void unlinkProvider(provider)}>Unlink</Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => void connectProvider(provider)}>Connect {provider === 'google' ? 'Google' : 'Microsoft'}</Button>
+              )}
+            </div>
+          ))}
         </CardContent>
       </Card>
 

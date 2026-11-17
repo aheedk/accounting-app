@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+export const API_URL = import.meta.env.VITE_API_URL as string;
 
 const ACCESS_TOKEN_KEY = 'acct_access';
 // When the session was last signed in or renewed, shared by the tabs (see lib/idleSession.ts).

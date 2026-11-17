@@ -286,6 +286,12 @@ export const AUDIT = {
   PRIMARY_ADMIN_TRANSFER_CANCEL: 'firm.primary_admin_transfer_cancel',
   PRIMARY_ADMIN_TRANSFER_ACCEPT: 'firm.primary_admin_transfer_accept',
   PRIMARY_ADMIN_TRANSFER_DECLINE: 'firm.primary_admin_transfer_decline',
+
+  // Social sign-in (account linking) and new-device/location alerts
+  // (docs/specs/2026-11-17-auth-email-lifecycle-and-social-login-design.md)
+  AUTH_SOCIAL_LINK: 'auth.social_link',
+  AUTH_SOCIAL_UNLINK: 'auth.social_unlink',
+  AUTH_NEW_DEVICE_ALERT: 'auth.new_device_alert',
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

@@ -9,6 +9,7 @@ import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AcceptInvitationPage from '@/pages/AcceptInvitationPage';
 import AcceptPrimaryAdminPage from '@/pages/AcceptPrimaryAdminPage';
+import OAuthCompletePage from '@/pages/OAuthCompletePage';
 import DashboardPage from '@/pages/DashboardPage';
 import AccountPage from '@/pages/AccountPage';
 import ActivityLogPage from '@/pages/setup/ActivityLogPage';
@@ -160,6 +161,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/accept-primary-admin" element={<AcceptPrimaryAdminPage />} />
+        <Route path="/oauth-complete" element={<OAuthCompletePage />} />
         <Route element={<ProtectedRoute />}>
           {/* The firm's view with no client selected: its own top bar, outside AppShell. */}
           <Route path="/firm" element={<FirmShell />}>

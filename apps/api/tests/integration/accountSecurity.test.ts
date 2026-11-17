@@ -1,7 +1,7 @@
 // Signing in and accounts, through the HTTP layer: the hold after wrong
 // passwords, changing and resetting a password, switching a login off, the
 // second step, and a person's sessions.
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { startTestDb, stopTestDb, truncateAll, type TestDb } from '../helpers/testDb.js';
@@ -88,6 +88,17 @@ describe('accounts and signing in', () => {
     expect((await request(app).post('/auth/refresh').set('Cookie', here.cookie)).status).toBe(200);
   });
 
+  it('emails a changed-password notice, and records when it last changed', async () => {
+    const here = await signIn('pat@x.com');
+    const spy = vi.spyOn(console, 'log');
+    await as(here).post('/auth/password', { current_password: PASSWORD, new_password: 'second-password-2' });
+    expect(spy.mock.calls.map(c => String(c[0])).some(s => s.includes('[email]') && s.includes('to=pat@x.com') && s.includes('password was changed'))).toBe(true);
+    spy.mockRestore();
+
+    const row = await t.db.selectFrom('users').select('password_changed_at').where('id', '=', await userId('pat@x.com')).executeTakeFirstOrThrow();
+    expect(row.password_changed_at).not.toBeNull();
+  });
+
   it('switches a login off at once, and back on', async () => {
     const admin = await signIn('admin@x.com');
     const pat = await signIn('pat@x.com');
@@ -107,6 +118,21 @@ describe('accounts and signing in', () => {
 
     expect((await as(admin).post(`/me/firm/users/${patId}/reactivate`)).status).toBe(200);
     expect((await signIn('pat@x.com')).status).toBe(200);
+  });
+
+  it('emails the login on deactivate and on reactivate', async () => {
+    const admin = await signIn('admin@x.com');
+    const patId = await userId('pat@x.com');
+    const spy = vi.spyOn(console, 'log');
+
+    await as(admin).post(`/me/firm/users/${patId}/deactivate`);
+    expect(spy.mock.calls.map(c => String(c[0])).some(s => s.includes('[email]') && s.includes('to=pat@x.com') && s.includes('deactivated'))).toBe(true);
+
+    spy.mockClear();
+    await as(admin).post(`/me/firm/users/${patId}/reactivate`);
+    expect(spy.mock.calls.map(c => String(c[0])).some(s => s.includes('[email]') && s.includes('to=pat@x.com') && s.includes('reactivated'))).toBe(true);
+
+    spy.mockRestore();
   });
 
   it('will not switch off your own login or the only firm admin', async () => {

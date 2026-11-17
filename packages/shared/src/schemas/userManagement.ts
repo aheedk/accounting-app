@@ -82,3 +82,9 @@ export const activityLogQuerySchema = z.object({
 export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;
 
 export const payrollAccessSchema = z.object({ allowed: z.boolean() });
+
+// Unlinking a social account from one's own login — see socialAuthService.
+// docs/specs/2026-11-17-auth-email-lifecycle-and-social-login-design.md
+export const SOCIAL_PROVIDERS = ['google', 'microsoft'] as const;
+export const unlinkSocialSchema = z.object({ provider: z.enum(SOCIAL_PROVIDERS) });
+export type UnlinkSocial = z.infer<typeof unlinkSocialSchema>;

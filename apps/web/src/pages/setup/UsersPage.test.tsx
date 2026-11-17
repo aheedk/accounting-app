@@ -40,7 +40,8 @@ const row = (id: string, email: string, role: string, extra: Partial<{
 }> = {}) => ({
   id, email, full_name: extra.full_name ?? email, role, custom_role: null, last_login_at: null,
   business_access: [], payroll_access: true, deactivated_at: null, locked: false, two_step_enabled: false,
-  invitation_status: 'accepted', invitation_expires_at: null, is_primary_admin: false, ...extra,
+  invitation_status: 'accepted', invitation_expires_at: null, is_primary_admin: false,
+  social: { google: false, microsoft: false }, ...extra,
 });
 
 describe('UsersPage', () => {

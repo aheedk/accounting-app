@@ -7,6 +7,7 @@ import { hashRefreshToken } from '../services/auth/tokenService.js';
 import * as invitation from '../services/auth/invitationService.js';
 import * as passwordReset from '../services/auth/passwordResetService.js';
 import * as primaryAdminSvc from '../services/admin/primaryAdminService.js';
+import * as social from '../services/auth/socialAuthService.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ServiceCtx } from '../lib/ctx.js';
 import { config } from '../config.js';
@@ -141,6 +142,76 @@ router.post('/auth/decline-primary-admin', async (req, res, next) => {
   try {
     const body = schemas.primaryAdminTokenSchema.parse(req.body);
     await primaryAdminSvc.declineTransfer(db, body, reqMeta(req));
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ── Social sign-in (Google/Microsoft) — account linking, never self-
+// registration. Spec: docs/specs/2026-11-17-auth-email-lifecycle-and-social-login-design.md
+
+// The login page asks this to decide which buttons to show at all, rather
+// than offering one that would only fail once clicked.
+router.get('/auth/social-providers', (_req, res) => {
+  res.json({ google: social.providerConfigured('google'), microsoft: social.providerConfigured('microsoft') });
+});
+
+function startOAuth(provider: social.Provider) {
+  return (_req: Request, res: Response) => {
+    if (!social.providerConfigured(provider)) {
+      res.redirect(`${config.APP_PUBLIC_URL}/login?oauth_error=${encodeURIComponent(`Sign-in with ${provider === 'google' ? 'Google' : 'Microsoft'} is not set up on this server.`)}`);
+      return;
+    }
+    res.redirect(social.authUrl(provider));
+  };
+}
+router.get('/auth/google', startOAuth('google'));
+router.get('/auth/microsoft', startOAuth('microsoft'));
+
+// "Connect Google/Microsoft" on My account: the same provider round trip,
+// but starting from an already-signed-in person, so the callback links to
+// them specifically instead of running the sign-in lookup.
+router.get('/auth/:provider/connect', requireAuth, (req, res) => {
+  const provider = req.params['provider'] as social.Provider;
+  if (provider !== 'google' && provider !== 'microsoft') { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown provider' } }); return; }
+  if (!social.providerConfigured(provider)) {
+    res.status(412).json({ error: { code: 'PRECONDITION_FAILED', message: `${provider === 'google' ? 'Google' : 'Microsoft'} sign-in is not set up on this server.` } });
+    return;
+  }
+  res.json({ url: social.authUrl(provider, req.auth!.user_id) });
+});
+
+function oauthCallback(provider: social.Provider) {
+  return async (req: Request, res: Response) => {
+    const code = req.query['code'] as string | undefined;
+    const linkingUserId = social.stateLinkingUserId(req.query['state'] as string | undefined);
+    const failWith = (message: string) => res.redirect(`${config.APP_PUBLIC_URL}/login?oauth_error=${encodeURIComponent(message)}`);
+    if (linkingUserId === undefined) return failWith('That sign-in link expired or did not come from this app. Try again.');
+    if (!code) return failWith('Sign-in was cancelled.');
+    try {
+      if (linkingUserId) {
+        const target = await db.selectFrom('users').select(['id', 'firm_id', 'role'])
+          .where('id', '=', linkingUserId).where('deleted_at', 'is', null).executeTakeFirst();
+        if (!target) return failWith('That login no longer exists.');
+        await social.linkSocialAccount(db, { user_id: target.id, firm_id: target.firm_id, business_id: null, effective_role: target.role, ...reqMeta(req) }, provider, code);
+        res.redirect(`${config.APP_PUBLIC_URL}/account?linked=${provider}`);
+        return;
+      }
+      const out = await social.completeOAuthSignIn(db, provider, code, reqMeta(req));
+      setRefreshCookie(res, out.refresh_token, out.refresh_expires_at);
+      res.redirect(`${config.APP_PUBLIC_URL}/oauth-complete`);
+    } catch (e: unknown) {
+      failWith(e instanceof Error ? e.message : 'Sign-in failed.');
+    }
+  };
+}
+router.get('/auth/google/callback', oauthCallback('google'));
+router.get('/auth/microsoft/callback', oauthCallback('microsoft'));
+
+router.delete('/auth/social/:provider', requireAuth, async (req, res, next) => {
+  try {
+    const provider = req.params['provider'];
+    if (provider !== 'google' && provider !== 'microsoft') { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown provider' } }); return; }
+    await social.unlinkSocialAccount(db, { user_id: req.auth!.user_id, firm_id: req.auth!.firm_id, business_id: null, effective_role: req.auth!.role, ...reqMeta(req) }, provider);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

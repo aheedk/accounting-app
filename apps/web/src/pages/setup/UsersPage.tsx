@@ -45,6 +45,7 @@ type UserRow = {
   invitation_expires_at: string | null;
   /** The firm's one owner — locked except through a transfer. */
   is_primary_admin: boolean;
+  social: { google: boolean; microsoft: boolean };
 };
 
 type TransferStatus =
@@ -626,6 +627,10 @@ export default function UsersPage() {
                             <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingId(null)}>Cancel</Button>
                           </div>
                           {editErr && <p className="text-xs text-destructive">{editErr}</p>}
+                          <p className="text-xs text-muted-foreground">
+                            Google: {u.social.google ? <span className="text-emerald-700">linked ✓</span> : 'not linked'}
+                            {' · '}Microsoft: {u.social.microsoft ? <span className="text-emerald-700">linked ✓</span> : 'not linked'}
+                          </p>
                         </div>
                       ) : u.full_name}
                     </td>

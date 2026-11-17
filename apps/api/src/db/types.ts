@@ -94,6 +94,23 @@ export interface UsersTable {
   // A separate, shorter-lived "forgot password" link.
   password_reset_token_hash: string | null;
   password_reset_expires_at: Timestamp | null;
+  // Migration 0119: social sign-in (account linking) and the "last changed"
+  // date shown on My account. See docs/specs/2026-11-17-auth-email-lifecycle-and-social-login-design.md.
+  google_id: string | null;
+  microsoft_id: string | null;
+  avatar_url: string | null;
+  password_changed_at: Timestamp | null;
+}
+
+// Migration 0119: a browser/location a login has signed in from before.
+export interface UserDevicesTable {
+  id: Generated<string>;
+  user_id: string;
+  device_fingerprint: string;
+  device_label: string | null;
+  ip_address: string | null;
+  last_seen: Generated<Timestamp>;
+  created_at: Generated<Timestamp>;
 }
 
 export interface UserBusinessAccessTable {
@@ -1221,6 +1238,7 @@ export interface DB {
   firms: FirmsTable;
   businesses: BusinessesTable;
   users: UsersTable;
+  user_devices: UserDevicesTable;
   user_business_access: UserBusinessAccessTable;
   refresh_tokens: RefreshTokensTable;
   firm_roles: FirmRolesTable;

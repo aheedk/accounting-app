@@ -6,7 +6,7 @@ import { BusinessRuleError } from '../../lib/errors.js';
 import { config } from '../../config.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import { generateSetupToken, hashSetupToken } from './tokenService.js';
-import { sendEmail, passwordResetEmail } from '../notifications/emailService.js';
+import { sendEmail, passwordResetEmail, passwordChangedEmail } from '../notifications/emailService.js';
 import { endSessions } from './accountService.js';
 import { hashPassword } from './passwordHasher.js';
 import type { ReqMeta } from './authService.js';
@@ -89,6 +89,7 @@ export async function completePasswordReset(db: Kysely<DB>, input: { token: stri
       must_change_password: false,
       failed_login_count: 0,
       locked_until: null,
+      password_changed_at: sql`now()`,
       updated_at: sql`now()`,
     })
       .where('id', '=', row.id)
@@ -102,5 +103,6 @@ export async function completePasswordReset(db: Kysely<DB>, input: { token: stri
     }, {
       action: AUDIT.AUTH_PASSWORD_RESET_COMPLETE, entity_type: 'user', entity_id: row.id, before: null, after: { email: row.email },
     });
+    await sendEmail(passwordChangedEmail({ to: row.email, forgotPasswordUrl: `${config.APP_PUBLIC_URL}/forgot-password` }));
   });
 }

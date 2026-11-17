@@ -26,6 +26,17 @@ const schema = z.object({
   // verification — the default, so sending works the moment a key is added.
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('Accmatica <onboarding@resend.dev>'),
+  // Social sign-in (account linking, not self-registration — see
+  // services/auth/socialAuthService.ts). Without a provider's client id/secret
+  // set, that provider's "Sign in with ..." button is simply not offered.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().optional(),
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_CALLBACK_URL: z.string().optional(),
+  // 'common' accepts both personal Microsoft accounts and work/school (Azure AD) ones.
+  MICROSOFT_TENANT_ID: z.string().default('common'),
 });
 
 export const config = schema.parse(process.env);

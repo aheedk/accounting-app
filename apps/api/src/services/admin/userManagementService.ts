@@ -7,6 +7,7 @@ import { hashPassword } from '../auth/passwordHasher.js';
 import { endSessions, reissueAccessTokens } from '../auth/accountService.js';
 import { firmSignInSettings } from '../auth/authService.js';
 import { issueInvitation } from '../auth/invitationService.js';
+import { sendEmail, accountDeactivatedEmail, accountReactivatedEmail } from '../notifications/emailService.js';
 import { record as auditRecord } from '../audit/auditService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { roleInFirm } from './roleService.js';
@@ -38,6 +39,8 @@ export type ListedUser = {
   invitation_expires_at: unknown;
   /** The firm's single top-level owner (migration 0118) — never this login's own role field. */
   is_primary_admin: boolean;
+  /** Which social accounts are linked (migration 0119) — shown, not editable, from here; unlinking is self-service only. */
+  social: { google: boolean; microsoft: boolean };
 };
 
 export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<ListedUser[]> {
@@ -46,7 +49,7 @@ export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<Listed
     .select([
       'users.id', 'email', 'full_name', 'role', 'last_login_at', 'users.created_at', 'deactivated_at', 'locked_until',
       'totp_enabled_at', 'payroll_access', 'fr.id as custom_role_id', 'fr.name as custom_role_name',
-      'invitation_status', 'invitation_expires_at',
+      'invitation_status', 'invitation_expires_at', 'google_id', 'microsoft_id',
     ])
     .where('users.firm_id', '=', firm_id)
     .where('deleted_at', 'is', null)
@@ -99,6 +102,7 @@ export async function listUsers(db: Kysely<DB>, firm_id: string): Promise<Listed
     invitation_status: u.invitation_status,
     invitation_expires_at: u.invitation_expires_at,
     is_primary_admin: u.id === firm.primary_admin_user_id,
+    social: { google: u.google_id !== null, microsoft: u.microsoft_id !== null },
   }));
 }
 
@@ -392,6 +396,7 @@ export async function deactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_DEACTIVATE, entity_type: 'user', entity_id: user.id, before: { active: true }, after: { active: false },
   });
+  await sendEmail(accountDeactivatedEmail({ to: user.email }));
   return { ...user, deactivated_at: new Date() };
 }
 
@@ -456,6 +461,7 @@ export async function reactivateUser(trx: Transaction<DB>, ctx: ServiceCtx, inpu
   await auditRecord(trx, ctx, {
     action: AUDIT.USER_REACTIVATE, entity_type: 'user', entity_id: user.id, before: { active: false }, after: { active: true },
   });
+  await sendEmail(accountReactivatedEmail({ to: user.email }));
   return { ...user, deactivated_at: null };
 }
 
@@ -476,6 +482,9 @@ export async function resetUserPassword(trx: Transaction<DB>, ctx: ServiceCtx, i
     .set({
       password_hash: await hashPassword(plaintext), failed_login_count: 0, locked_until: null, must_change_password: true,
       invitation_status: 'accepted', invitation_token_hash: null, invitation_expires_at: null,
+      // Handing over a password directly confirms the address, same as accepting an invitation would.
+      email_verified: true,
+      password_changed_at: sql`now()`,
     })
     .where('id', '=', user.id).execute();
   await endSessions(trx, { user_id: user.id });

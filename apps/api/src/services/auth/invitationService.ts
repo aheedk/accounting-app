@@ -111,6 +111,7 @@ export async function acceptInvitation(
       invitation_expires_at: null,
       email_verified: true,
       must_change_password: false,
+      password_changed_at: sql`now()`,
       ...(input.full_name ? { full_name: input.full_name } : {}),
       updated_at: sql`now()`,
     })

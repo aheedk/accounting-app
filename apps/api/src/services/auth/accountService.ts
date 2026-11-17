@@ -3,7 +3,9 @@ import { AUDIT, ERR, passwordProblem } from '@accounting/shared';
 import type { DB } from '../../db/types.js';
 import { BusinessRuleError, NotFoundError } from '../../lib/errors.js';
 import { decryptField, encryptField } from '../../lib/fieldCrypto.js';
+import { config } from '../../config.js';
 import { record as auditRecord } from '../audit/auditService.js';
+import { sendEmail, passwordChangedEmail } from '../notifications/emailService.js';
 import type { ServiceCtx } from '../../lib/ctx.js';
 import { hashPassword, verifyPassword } from './passwordHasher.js';
 import { revokeAccessTokensBefore, revokeSession } from './sessionRevocation.js';
@@ -117,13 +119,17 @@ export async function changePassword(
   if (problem) throw new BusinessRuleError(ERR.PRECONDITION_FAILED, problem);
   // Choosing one's own password is also the step a password made by a firm admin waits for.
   await trx.updateTable('users')
-    .set({ password_hash: await hashPassword(input.new_password), failed_login_count: 0, locked_until: null, must_change_password: false })
+    .set({
+      password_hash: await hashPassword(input.new_password), failed_login_count: 0, locked_until: null, must_change_password: false,
+      password_changed_at: sql`now()`,
+    })
     .where('id', '=', user.id).execute();
   // Every other browser is signed out; this one stays.
   await endSessions(trx, { user_id: user.id, keep_token_hash: input.keep_token_hash });
   await auditRecord(trx, ctx, {
     action: AUDIT.AUTH_PASSWORD_CHANGE, entity_type: 'user', entity_id: user.id, before: null, after: { email: user.email },
   });
+  await sendEmail(passwordChangedEmail({ to: user.email, forgotPasswordUrl: `${config.APP_PUBLIC_URL}/forgot-password` }));
 }
 
 export type SessionRow = {
@@ -172,11 +178,16 @@ export async function signOutSessions(
 
 /** Whether the second step is on for this user, and whether their firm requires it. */
 export async function accountStatus(db: Kysely<DB>, user_id: string) {
-  const user = await db.selectFrom('users').select(['email', 'firm_id', 'totp_enabled_at'])
+  const user = await db.selectFrom('users')
+    .select(['email', 'firm_id', 'totp_enabled_at', 'google_id', 'microsoft_id', 'password_changed_at'])
     .where('id', '=', user_id).where('deleted_at', 'is', null).executeTakeFirst();
   if (!user) throw new NotFoundError('user', user_id);
   const firm = await firmSignInSettings(db, user.firm_id);
-  return { email: user.email, two_step_enabled: user.totp_enabled_at !== null, two_step_required: firm.require_two_step };
+  return {
+    email: user.email, two_step_enabled: user.totp_enabled_at !== null, two_step_required: firm.require_two_step,
+    password_changed_at: user.password_changed_at,
+    social: { google: user.google_id !== null, microsoft: user.microsoft_id !== null },
+  };
 }
 
 /**
